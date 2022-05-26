@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  payments-mongo:
+    image: mongo:latest
+    container_name: payments-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: payments
+    volumes:
+      - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - 27018:27017
+
+  mongo-viewer:
+    image: mongo-express
+    container_name: mongo-viewer
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@payments-mongo:27017/payments
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      VCAP_APP_PORT: 8082
+    ports:
+      - 8082:8082
+    depends_on:
+      - payments-mongo
