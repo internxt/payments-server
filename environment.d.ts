@@ -5,6 +5,8 @@ declare global {
       SERVER_PORT: string;
       SERVER_AUTH_SECRET: string;
       MONGO_URI: string;
+      REDIS_HOST?: string;
+      REDIS_PASSWORD?: string;
     }
   }
 }
