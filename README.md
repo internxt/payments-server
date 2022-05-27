@@ -5,7 +5,8 @@
 - Install and use Node v16 (last LTS).
 - Install yarn (`npm i -g yarn`)
 - Run the needed services with `cd infrastructure && docker-compose up`
-- Rename `.env.template` to `.env`
+- Rename `.env.template` to `.env` and fill the empty variables
+- Redirect webhooks to your local server `stripe listen --forward-to localhost:8000/webhook`
 - Run `yarn dev`
 
 ### Nice to know

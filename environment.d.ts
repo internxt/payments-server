@@ -7,6 +7,7 @@ declare global {
       MONGO_URI: string;
       REDIS_HOST?: string;
       REDIS_PASSWORD?: string;
+      STRIPE_SECRET_KEY: string;
     }
   }
 }
