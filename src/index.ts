@@ -6,7 +6,7 @@ import { MongoClient } from 'mongodb';
 import { ConfigService } from './services/ConfigService';
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
-import webhook from './webhook';
+import webhook from './webhooks';
 
 const fastify = Fastify({
   logger: true,

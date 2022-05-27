@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
-import { StorageService } from './services/StorageService';
-import { UsersService } from './services/UsersService';
-import stripe from './stripe';
-import handleSubscriptionCanceled from './webhook-handlers/handleSubscriptionCanceled';
-import handleSubscriptionUpdated from './webhook-handlers/handleSubscriptionUpdated';
+import { StorageService } from '../services/StorageService';
+import { UsersService } from '../services/UsersService';
+import stripe from '../stripe';
+import handleSubscriptionCanceled from './handleSubscriptionCanceled';
+import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 
 export default function (storageService: StorageService, usersService: UsersService) {
   return async function (fastify: FastifyInstance) {
