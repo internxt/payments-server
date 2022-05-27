@@ -1,13 +1,13 @@
 import 'dotenv/config';
 
 import Fastify from 'fastify';
+import webhook from './webhook';
+
 const fastify = Fastify({
   logger: true,
 });
 
-fastify.get('/', async (request, reply) => {
-  return { hello: 'world' };
-});
+fastify.register(webhook);
 
 const start = async () => {
   try {
