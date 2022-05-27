@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import Stripe from 'stripe';
 import stripe from './stripe';
 
 export default async function (fastify: FastifyInstance) {
@@ -13,7 +14,16 @@ export default async function (fastify: FastifyInstance) {
   fastify.post<{ Body: Buffer }>('/webhook', async (req, rep) => {
     const sig = req.headers['stripe-signature'] as string;
 
-    const event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_KEY);
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_KEY);
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
+        return rep.status(401);
+      } else {
+        throw err;
+      }
+    }
     fastify.log.info(`Stripe event received: ${event.type}`);
 
     return rep.status(201);
