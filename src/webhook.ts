@@ -4,6 +4,7 @@ import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
 import stripe from './stripe';
 import handleSubscriptionCanceled from './webhook-handlers/handleSubscriptionCanceled';
+import handleSubscriptionUpdated from './webhook-handlers/handleSubscriptionUpdated';
 
 export default function (storageService: StorageService, usersService: UsersService) {
   return async function (fastify: FastifyInstance) {
@@ -37,6 +38,9 @@ export default function (storageService: StorageService, usersService: UsersServ
             usersService,
             (event.data.object as Stripe.Subscription).customer as string,
           );
+          break;
+        case 'customer.subscription.updated':
+          await handleSubscriptionUpdated(storageService, usersService, event.data.object as Stripe.Subscription);
           break;
         default:
           fastify.log.info(`Not handler for event: ${event.type}`);
