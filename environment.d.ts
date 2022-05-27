@@ -8,6 +8,7 @@ declare global {
       REDIS_HOST?: string;
       REDIS_PASSWORD?: string;
       STRIPE_SECRET_KEY: string;
+      STRIPE_WEBHOOK_KEY: string;
     }
   }
 }
