@@ -1,0 +1,1 @@
+export const FREE_PLAN_BYTES_SPACE = 2 * 1024 * 1024 * 1024;
