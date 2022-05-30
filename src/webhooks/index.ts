@@ -3,11 +3,15 @@ import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import { StorageService } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
-import stripe from '../stripe';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 
-export default function (storageService: StorageService, usersService: UsersService, config: AppConfig) {
+export default function (
+  stripe: Stripe,
+  storageService: StorageService,
+  usersService: UsersService,
+  config: AppConfig,
+) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
       done(null, body);

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 const mandatoryVariables = [
   'NODE_ENV',
   'SERVER_PORT',

@@ -1,12 +1,14 @@
 import axios from 'axios';
-import 'dotenv/config';
-
 import Fastify from 'fastify';
 import { MongoClient } from 'mongodb';
-import config from './config';
+import Stripe from 'stripe';
+
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
+import { PaymentService } from './services/PaymentService';
+import config from './config';
 import webhook from './webhooks';
+import controller from './controller';
 
 const fastify = Fastify({
   logger: true,
@@ -19,7 +21,13 @@ const start = async () => {
   await mongoClient.connect();
   const usersService = new UsersService(mongoClient);
 
-  fastify.register(webhook(storageService, usersService, config));
+  const stripe = new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
+
+  const paymentService = new PaymentService(stripe);
+
+  fastify.register(controller(paymentService, usersService, config));
+
+  fastify.register(webhook(stripe, storageService, usersService, config));
 
   try {
     const PORT = config.SERVER_PORT;
