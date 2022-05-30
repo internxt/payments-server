@@ -9,6 +9,7 @@ const mandatoryVariables = [
   'STORAGE_GATEWAY_URL',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_KEY',
+  'JWT_SECRET',
 ] as const;
 
 type BaseConfig = {
