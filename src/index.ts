@@ -3,7 +3,7 @@ import 'dotenv/config';
 
 import Fastify from 'fastify';
 import { MongoClient } from 'mongodb';
-import { ConfigService } from './services/ConfigService';
+import config from './config';
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
 import webhook from './webhooks';
@@ -13,19 +13,16 @@ const fastify = Fastify({
 });
 
 const start = async () => {
-  const configService = new ConfigService(process.env);
+  const storageService = new StorageService(config, axios);
 
-  const storageService = new StorageService(configService, axios);
-
-  const mongoClient = new MongoClient(configService.getEnvironment().MONGO_URI as string);
+  const mongoClient = new MongoClient(config.MONGO_URI);
   await mongoClient.connect();
   const usersService = new UsersService(mongoClient);
 
-  fastify.register(webhook(storageService, usersService));
+  fastify.register(webhook(storageService, usersService, config));
 
   try {
-    const PORT = process.env.SERVER_PORT;
-    if (!PORT) throw new Error('SERVER_PORT env variable must be defined');
+    const PORT = config.SERVER_PORT;
 
     await fastify.listen(PORT, '0.0.0.0');
   } catch (err) {
