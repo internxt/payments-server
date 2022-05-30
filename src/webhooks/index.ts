@@ -43,7 +43,7 @@ export default function (storageService: StorageService, usersService: UsersServ
           await handleSubscriptionUpdated(storageService, usersService, event.data.object as Stripe.Subscription);
           break;
         default:
-          fastify.log.info(`Not handler for event: ${event.type}`);
+          fastify.log.info(`No handler registered for event: ${event.type}`);
       }
 
       return rep.status(204).send();
