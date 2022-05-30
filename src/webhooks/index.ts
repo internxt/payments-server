@@ -46,7 +46,7 @@ export default function (storageService: StorageService, usersService: UsersServ
           fastify.log.info(`Not handler for event: ${event.type}`);
       }
 
-      return rep.status(201);
+      return rep.status(204).send();
     });
   };
 }

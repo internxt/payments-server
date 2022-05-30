@@ -17,7 +17,7 @@ const start = async () => {
 
   const storageService = new StorageService(configService, axios);
 
-  const mongoClient = new MongoClient(configService.getEnvironment().MONGO_URI);
+  const mongoClient = new MongoClient(configService.getEnvironment().MONGO_URI as string);
   await mongoClient.connect();
   const usersService = new UsersService(mongoClient);
 
