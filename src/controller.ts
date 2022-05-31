@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { type AppConfig } from './config';
-import { UsersService } from './services/UsersService';
+import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 
@@ -15,5 +15,37 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         reply.status(401).send();
       }
     });
+
+    fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
+      '/invoices',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { limit: { type: 'number', default: 10 }, starting_after: { type: 'string' } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { uuid } = req.user.payload;
+
+        let customerId: string;
+        try {
+          const user = await usersService.findUserByUUID(uuid);
+          customerId = user.customerId;
+        } catch (err) {
+          if (err instanceof UserNotFoundError) {
+            return rep.status(404).send({ message: 'User not found' });
+          }
+          throw err;
+        }
+
+        const { limit, starting_after: startingAfter } = req.query;
+
+        const invoices = await paymentService.getInvoicesFromUser(customerId, { limit, startingAfter });
+
+        return rep.send(invoices);
+      },
+    );
   };
 }
