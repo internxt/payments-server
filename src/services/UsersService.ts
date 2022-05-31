@@ -11,22 +11,15 @@ export type User = {
 
 export enum Product {
   Teams = 'teams',
-  Individual = 'individual'
+  Individual = 'individual',
 }
 
 export class UsersService {
-  // private readonly users: Collection<MongoUser>;
   private readonly usersRepository: UsersRepository;
   private readonly paymentService: PaymentService;
   private readonly storageService: StorageService;
 
-  constructor(
-    // mongo: MongoClient, 
-    usersRepository: UsersRepository,
-    paymentsService: PaymentService,
-    storageService: StorageService
-  ) {
-    // this.users = mongo.db().collection<MongoUser>('users');
+  constructor(usersRepository: UsersRepository, paymentsService: PaymentService, storageService: StorageService) {
     this.usersRepository = usersRepository;
     this.paymentService = paymentsService;
     this.storageService = storageService;
@@ -34,7 +27,7 @@ export class UsersService {
 
   async findUserByCustomerID(customerId: User['customerId']): Promise<User> {
     const userFound = await this.usersRepository.findUserByCustomerId(customerId);
-    
+
     if (!userFound) {
       throw new UserNotFoundError();
     }
@@ -62,7 +55,7 @@ export class UsersService {
     const subscriptionsToCancel = activeSubscriptions.filter((subscription) => {
       const isTeams = parseInt(subscription.items.data[0].price.metadata.is_teams);
 
-      return isTeams === 1;  
+      return isTeams === 1;
     }) as Stripe.Subscription[];
 
     for (const subscriptionToCancel of subscriptionsToCancel) {
