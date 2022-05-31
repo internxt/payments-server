@@ -13,7 +13,15 @@ import { UsersRepository } from './core/users/UsersRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 
 const fastify = Fastify({
-  logger: true,
+  logger: {
+    prettyPrint:
+      config.NODE_ENV === 'development'
+        ? {
+            translateTime: 'HH:MM:ss Z',
+            ignore: 'pid,hostname'
+          }
+        : false
+  },
 });
 
 const start = async () => {
