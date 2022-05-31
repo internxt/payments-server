@@ -10,6 +10,8 @@ type PlanId = Plan['id'];
 type Subscription = Stripe.Subscription;
 type SubscriptionId = Subscription['id'];
 
+type Invoice = Stripe.Invoice;
+
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -30,12 +32,25 @@ export class PaymentService {
   async subscribeCustomerToPlan(customerId: CustomerId, planId: PlanId): Promise<void> {
     await this.provider.subscriptions.create({
       customer: customerId,
-      items: [{ plan: planId }]
+      items: [{ plan: planId }],
     });
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
+
+    return res.data;
+  }
+
+  async getInvoicesFromUser(
+    customerId: CustomerId,
+    pagination: { limit?: number; startingAfter?: string },
+  ): Promise<Invoice[]> {
+    const res = await this.provider.invoices.list({
+      customer: customerId,
+      limit: pagination.limit,
+      starting_after: pagination.startingAfter,
+    });
 
     return res.data;
   }

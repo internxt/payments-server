@@ -27,6 +27,15 @@ export class UsersService {
     return this.mongoUserToUser(userFound);
   }
 
+  async findUserByUUID(uuid: User['uuid']): Promise<User> {
+    const userFound = await this.users.findOne({ uuid });
+    if (!userFound) {
+      throw new UserNotFoundError();
+    }
+
+    return this.mongoUserToUser(userFound);
+  }
+
   private mongoUserToUser(mongoUser: MongoUser): User {
     const { customer_id: customerId, uuid } = mongoUser;
 
