@@ -31,7 +31,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
         let customerId: string;
         try {
-          const user = await usersService.findUserByUUID(uuid);
+          const user = await usersService.findUserByUuid(uuid);
           customerId = user.customerId;
         } catch (err) {
           if (err instanceof UserNotFoundError) {
