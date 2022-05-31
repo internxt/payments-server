@@ -7,11 +7,6 @@ export type User = {
   uuid: string;
 };
 
-export enum Product {
-  Teams = 'teams',
-  Individual = 'individual',
-}
-
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository, private readonly paymentService: PaymentService) {}
 
@@ -61,11 +56,9 @@ export class UsersService {
       throw new Error('Subscriptions not found');
     }
 
-    const individualSubscriptions = activeSubscriptions.filter((subscription) => {
-      const isTeams = parseInt(subscription.items.data[0].price.metadata.is_teams);
-
-      return isTeams === 0;
-    }) as Stripe.Subscription[];
+    const individualSubscriptions = activeSubscriptions.filter(
+      (subscription) => subscription.metadata.is_teams !== '1',
+    ) as Stripe.Subscription[];
 
     for (const subscriptionToCancel of individualSubscriptions) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);

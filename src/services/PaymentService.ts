@@ -24,7 +24,7 @@ export class PaymentService {
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<Subscription[]> {
-    const res = await this.provider.subscriptions.list({ customer: customerId, status: 'active' });
+    const res = await this.provider.subscriptions.list({ customer: customerId });
 
     return res.data;
   }

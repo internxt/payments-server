@@ -47,5 +47,12 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         return rep.send(invoices);
       },
     );
+
+    fastify.delete('/subscriptions', async (req, rep) => {
+      const { uuid } = req.user.payload;
+      await usersService.cancelUserIndividualSubscriptions(uuid);
+
+      return rep.status(204).send();
+    });
   };
 }
