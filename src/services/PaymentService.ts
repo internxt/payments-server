@@ -4,8 +4,8 @@ type Customer = Stripe.Customer;
 type CustomerId = Customer['id'];
 type CustomerEmail = Customer['email'];
 
-type Plan = Stripe.Plan;
-type PlanId = Plan['id'];
+type Price = Stripe.Price;
+type PriceId = Price['id'];
 
 type Subscription = Stripe.Subscription;
 type SubscriptionId = Subscription['id'];
@@ -29,11 +29,27 @@ export class PaymentService {
     return res.data;
   }
 
-  async subscribeCustomerToPlan(customerId: CustomerId, planId: PlanId): Promise<void> {
-    await this.provider.subscriptions.create({
-      customer: customerId,
-      items: [{ plan: planId }],
+  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId): Promise<Subscription> {
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+
+    const individualActiveSubscription = activeSubscriptions.find(
+      (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
+    );
+    if (!individualActiveSubscription) {
+      throw new Error('There is no individual subscription to update');
+    }
+    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
+      cancel_at_period_end: false,
+      proration_behavior: 'create_prorations',
+      items: [
+        {
+          id: individualActiveSubscription.items.data[0].id,
+          price: priceId,
+        },
+      ],
     });
+
+    return updatedSubscription;
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {

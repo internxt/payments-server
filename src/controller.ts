@@ -54,5 +54,38 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
       return rep.status(204).send();
     });
+
+    fastify.put<{ Body: { price_id: string } }>(
+      '/subscriptions',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['price_id'],
+            properties: { price_id: { type: 'string' } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { uuid } = req.user.payload;
+
+        let customerId: string;
+        try {
+          const user = await usersService.findUserByUuid(uuid);
+          customerId = user.customerId;
+        } catch (err) {
+          if (err instanceof UserNotFoundError) {
+            return rep.status(404).send({ message: 'User not found' });
+          }
+          throw err;
+        }
+
+        const { price_id: priceId } = req.body;
+
+        const updatedSubscription = await paymentService.updateSubscriptionPrice(customerId, priceId);
+
+        return rep.send(updatedSubscription);
+      },
+    );
   };
 }
