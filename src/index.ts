@@ -9,22 +9,30 @@ import { PaymentService } from './services/PaymentService';
 import config from './config';
 import webhook from './webhooks';
 import controller from './controller';
+import { UsersRepository } from './core/users/UsersRepository';
+import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 
 const fastify = Fastify({
-  logger: true,
+  logger: {
+    prettyPrint:
+      config.NODE_ENV === 'development'
+        ? {
+            translateTime: 'HH:MM:ss Z',
+            ignore: 'pid,hostname'
+          }
+        : false
+  },
 });
 
 const start = async () => {
-  const storageService = new StorageService(config, axios);
-
-  const mongoClient = new MongoClient(config.MONGO_URI);
-  await mongoClient.connect();
-  const usersService = new UsersService(mongoClient);
+  const mongoClient = await new MongoClient(config.MONGO_URI).connect();
+  const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
 
   const stripe = new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
-
   const paymentService = new PaymentService(stripe);
-
+  const storageService = new StorageService(config, axios);
+  const usersService = new UsersService(usersRepository, paymentService, storageService);
+  
   fastify.register(controller(paymentService, usersService, config));
 
   fastify.register(webhook(stripe, storageService, usersService, config));
@@ -38,4 +46,5 @@ const start = async () => {
     process.exit(1);
   }
 };
+
 start();
