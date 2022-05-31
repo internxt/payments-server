@@ -18,9 +18,9 @@ const fastify = Fastify({
       config.NODE_ENV === 'development'
         ? {
             translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname'
+            ignore: 'pid,hostname',
           }
-        : false
+        : false,
   },
 });
 
@@ -31,8 +31,8 @@ const start = async () => {
   const stripe = new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(config, axios);
-  const usersService = new UsersService(usersRepository, paymentService, storageService);
-  
+  const usersService = new UsersService(usersRepository, paymentService);
+
   fastify.register(controller(paymentService, usersService, config));
 
   fastify.register(webhook(stripe, storageService, usersService, config));

@@ -1,8 +1,6 @@
 import Stripe from 'stripe';
-import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { PaymentService } from './PaymentService';
-import { StorageService } from './StorageService';
 
 export type User = {
   customerId: string;
@@ -15,15 +13,7 @@ export enum Product {
 }
 
 export class UsersService {
-  private readonly usersRepository: UsersRepository;
-  private readonly paymentService: PaymentService;
-  private readonly storageService: StorageService;
-
-  constructor(usersRepository: UsersRepository, paymentsService: PaymentService, storageService: StorageService) {
-    this.usersRepository = usersRepository;
-    this.paymentService = paymentsService;
-    this.storageService = storageService;
-  }
+  constructor(private readonly usersRepository: UsersRepository, private readonly paymentService: PaymentService) {}
 
   async findUserByCustomerID(customerId: User['customerId']): Promise<User> {
     const userFound = await this.usersRepository.findUserByCustomerId(customerId);
@@ -61,8 +51,6 @@ export class UsersService {
     for (const subscriptionToCancel of subscriptionsToCancel) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
-
-    await this.storageService.changeStorage(teamsUserUuid, FREE_PLAN_BYTES_SPACE);
   }
 
   async cancelUserIndividualSubscriptions(uuid: User['uuid']): Promise<void> {
@@ -82,8 +70,6 @@ export class UsersService {
     for (const subscriptionToCancel of individualSubscriptions) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
-
-    await this.storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
   }
 }
 
