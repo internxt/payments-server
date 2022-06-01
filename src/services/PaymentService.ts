@@ -76,7 +76,7 @@ export class PaymentService {
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
-    return this.provider.setupIntents.create({ customer: customerId });
+    return this.provider.setupIntents.create({ customer: customerId, usage: 'off_session' });
   }
 
   async getDefaultPaymentMethod(customerId: string): Promise<CustomerSource | null> {
