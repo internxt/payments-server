@@ -85,5 +85,9 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
       return { clientSecret };
     });
+
+    fastify.get('/default-payment-method', async (req, rep) => {
+      return paymentService.getDefaultPaymentMethod(req.customerId);
+    });
   };
 }

@@ -14,6 +14,8 @@ type Invoice = Stripe.Invoice;
 
 type SetupIntent = Stripe.SetupIntent;
 
+type CustomerSource = Stripe.CustomerSource;
+
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -75,5 +77,15 @@ export class PaymentService {
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
     return this.provider.setupIntents.create({ customer: customerId });
+  }
+
+  async getDefaultPaymentMethod(customerId: string): Promise<CustomerSource | null> {
+    const customer = await this.provider.customers.retrieve(customerId, {
+      expand: ['default_source'],
+    });
+
+    if (customer.deleted) throw new Error('Customer has been deleted');
+
+    return customer.default_source as CustomerSource | null;
   }
 }
