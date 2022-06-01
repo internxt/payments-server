@@ -3,7 +3,6 @@ import 'dotenv/config';
 const mandatoryVariables = [
   'NODE_ENV',
   'SERVER_PORT',
-  'SERVER_AUTH_SECRET',
   'MONGO_URI',
   'STORAGE_GATEWAY_SECRET',
   'STORAGE_GATEWAY_URL',
