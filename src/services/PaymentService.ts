@@ -12,6 +12,8 @@ type SubscriptionId = Subscription['id'];
 
 type Invoice = Stripe.Invoice;
 
+type SetupIntent = Stripe.SetupIntent;
+
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -69,5 +71,9 @@ export class PaymentService {
     });
 
     return res.data;
+  }
+
+  getSetupIntent(customerId: string): Promise<SetupIntent> {
+    return this.provider.setupIntents.create({ customer: customerId });
   }
 }

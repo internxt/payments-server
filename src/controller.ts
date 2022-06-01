@@ -79,5 +79,11 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         return rep.send(updatedSubscription);
       },
     );
+
+    fastify.get('/setup-intent', async (req, rep) => {
+      const { client_secret: clientSecret } = await paymentService.getSetupIntent(req.customerId);
+
+      return { clientSecret };
+    });
   };
 }
