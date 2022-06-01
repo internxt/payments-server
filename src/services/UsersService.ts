@@ -48,9 +48,8 @@ export class UsersService {
     }
   }
 
-  async cancelUserIndividualSubscriptions(uuid: User['uuid']): Promise<void> {
-    const user = await this.findUserByUuid(uuid);
-    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(user.customerId);
+  async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
+    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
     if (activeSubscriptions.length === 0) {
       throw new Error('Subscriptions not found');

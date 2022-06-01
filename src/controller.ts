@@ -3,6 +3,11 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
+declare module 'fastify' {
+  interface FastifyRequest {
+    customerId: string;
+  }
+}
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
@@ -13,6 +18,20 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       } catch (err) {
         fastify.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         reply.status(401).send();
+      }
+    });
+
+    fastify.addHook('onRequest', async (req, rep) => {
+      const { uuid } = req.user.payload;
+
+      try {
+        const user = await usersService.findUserByUuid(uuid);
+        req.customerId = user.customerId;
+      } catch (err) {
+        if (err instanceof UserNotFoundError) {
+          return rep.status(404).send({ message: 'User not found' });
+        }
+        throw err;
       }
     });
 
@@ -27,30 +46,16 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         },
       },
       async (req, rep) => {
-        const { uuid } = req.user.payload;
-
-        let customerId: string;
-        try {
-          const user = await usersService.findUserByUuid(uuid);
-          customerId = user.customerId;
-        } catch (err) {
-          if (err instanceof UserNotFoundError) {
-            return rep.status(404).send({ message: 'User not found' });
-          }
-          throw err;
-        }
-
         const { limit, starting_after: startingAfter } = req.query;
 
-        const invoices = await paymentService.getInvoicesFromUser(customerId, { limit, startingAfter });
+        const invoices = await paymentService.getInvoicesFromUser(req.customerId, { limit, startingAfter });
 
         return rep.send(invoices);
       },
     );
 
     fastify.delete('/subscriptions', async (req, rep) => {
-      const { uuid } = req.user.payload;
-      await usersService.cancelUserIndividualSubscriptions(uuid);
+      await usersService.cancelUserIndividualSubscriptions(req.customerId);
 
       return rep.status(204).send();
     });
@@ -67,22 +72,9 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         },
       },
       async (req, rep) => {
-        const { uuid } = req.user.payload;
-
-        let customerId: string;
-        try {
-          const user = await usersService.findUserByUuid(uuid);
-          customerId = user.customerId;
-        } catch (err) {
-          if (err instanceof UserNotFoundError) {
-            return rep.status(404).send({ message: 'User not found' });
-          }
-          throw err;
-        }
-
         const { price_id: priceId } = req.body;
 
-        const updatedSubscription = await paymentService.updateSubscriptionPrice(customerId, priceId);
+        const updatedSubscription = await paymentService.updateSubscriptionPrice(req.customerId, priceId);
 
         return rep.send(updatedSubscription);
       },
