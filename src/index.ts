@@ -2,6 +2,7 @@ import axios from 'axios';
 import Fastify from 'fastify';
 import { MongoClient } from 'mongodb';
 import Stripe from 'stripe';
+import fastifyCors from '@fastify/cors';
 
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
@@ -36,6 +37,22 @@ const start = async () => {
   fastify.register(controller(paymentService, usersService, config));
 
   fastify.register(webhook(stripe, storageService, usersService, config));
+
+  fastify.register(fastifyCors, {
+    allowedHeaders: [
+      'sessionId',
+      'Content-Type',
+      'Authorization',
+      'method',
+      'internxt-version',
+      'internxt-client',
+      'internxt-mnemonic',
+    ],
+    exposedHeaders: ['sessionId'],
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    preflightContinue: false,
+  });
 
   try {
     const PORT = config.SERVER_PORT;
