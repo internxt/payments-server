@@ -14,8 +14,9 @@ type Invoice = Stripe.Invoice;
 
 type SetupIntent = Stripe.SetupIntent;
 
-type CustomerSource = Stripe.CustomerSource;
+type PaymentMethod = Stripe.PaymentMethod;
 
+type CustomerSource = Stripe.CustomerSource;
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -28,7 +29,10 @@ export class PaymentService {
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<Subscription[]> {
-    const res = await this.provider.subscriptions.list({ customer: customerId });
+    const res = await this.provider.subscriptions.list({
+      customer: customerId,
+      expand: ['data.default_payment_method', 'data.default_source'],
+    });
 
     return res.data;
   }
@@ -79,13 +83,32 @@ export class PaymentService {
     return this.provider.setupIntents.create({ customer: customerId, usage: 'off_session' });
   }
 
-  async getDefaultPaymentMethod(customerId: string): Promise<CustomerSource | null> {
+  /*
+   *  When a stripe subscription is going to be charged
+   *  subscription.default_payment_method takes precedence over
+   *  subscription.default_source that precedence over
+   *  customer.invoice_settings.default_payment_method that precedence over
+   *  customer.default_source
+   */
+  async getDefaultPaymentMethod(customerId: string): Promise<PaymentMethod | CustomerSource | null> {
+    const subscriptions = await this.getActiveSubscriptions(customerId);
+    const subscriptionWithDefaultPaymentMethod = subscriptions.find(
+      (subscription) => subscription.default_payment_method,
+    );
+    if (subscriptionWithDefaultPaymentMethod)
+      return subscriptionWithDefaultPaymentMethod.default_payment_method as PaymentMethod;
+
+    const subscriptionWithDefaultSource = subscriptions.find((subscription) => subscription.default_source);
+    if (subscriptionWithDefaultSource) return subscriptionWithDefaultSource.default_source as CustomerSource;
+
     const customer = await this.provider.customers.retrieve(customerId, {
-      expand: ['default_source'],
+      expand: ['data.default_source', 'data.invoice_settings.default_payment_method'],
     });
 
-    if (customer.deleted) throw new Error('Customer has been deleted');
+    if (customer.deleted) return null;
 
-    return customer.default_source as CustomerSource | null;
+    return (
+      (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
+    );
   }
 }
