@@ -50,7 +50,20 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
         const invoices = await paymentService.getInvoicesFromUser(req.customerId, { limit, startingAfter });
 
-        return rep.send(invoices);
+        const invoicesMapped = invoices
+          .filter(
+            (invoice) =>
+              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.at(0)?.price?.metadata?.maxSpaceBytes,
+          )
+          .map((invoice) => {
+            return {
+              created: invoice.created,
+              pdf: invoice.invoice_pdf,
+              bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+            };
+          });
+
+        return rep.send(invoicesMapped);
       },
     );
 
