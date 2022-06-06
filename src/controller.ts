@@ -57,6 +57,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
           )
           .map((invoice) => {
             return {
+              id: invoice.id,
               created: invoice.created,
               pdf: invoice.invoice_pdf,
               bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
