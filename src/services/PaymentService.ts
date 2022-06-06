@@ -38,14 +38,7 @@ export class PaymentService {
   }
 
   async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId): Promise<Subscription> {
-    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
-
-    const individualActiveSubscription = activeSubscriptions.find(
-      (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
-    );
-    if (!individualActiveSubscription) {
-      throw new Error('There is no individual subscription to update');
-    }
+    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
@@ -55,6 +48,18 @@ export class PaymentService {
           price: priceId,
         },
       ],
+    });
+
+    return updatedSubscription;
+  }
+
+  async updateSubscriptionPaymentMethod(
+    customerId: CustomerId,
+    paymentMethod: PaymentMethod['id'],
+  ): Promise<Subscription> {
+    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
+    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
+      default_payment_method: paymentMethod,
     });
 
     return updatedSubscription;
@@ -110,5 +115,18 @@ export class PaymentService {
     return (
       (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
     );
+  }
+
+  private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+
+    const individualActiveSubscription = activeSubscriptions.find(
+      (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
+    );
+    if (!individualActiveSubscription) {
+      throw new Error('There is no individual subscription to update');
+    }
+
+    return individualActiveSubscription;
   }
 }

@@ -36,7 +36,7 @@ const start = async () => {
 
   fastify.register(controller(paymentService, usersService, config));
 
-  fastify.register(webhook(stripe, storageService, usersService, config));
+  fastify.register(webhook(stripe, storageService, usersService, paymentService, config));
 
   fastify.register(fastifyCors, {
     allowedHeaders: [

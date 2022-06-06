@@ -5,11 +5,14 @@ import { StorageService } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
+import handlePaymentMethodAttached from './handlePaymentMethodAttached';
+import { PaymentService } from '../services/PaymentService';
 
 export default function (
   stripe: Stripe,
   storageService: StorageService,
   usersService: UsersService,
+  paymentService: PaymentService,
   config: AppConfig,
 ) {
   return async function (fastify: FastifyInstance) {
@@ -42,6 +45,13 @@ export default function (
           break;
         case 'customer.subscription.updated':
           await handleSubscriptionUpdated(storageService, usersService, event.data.object as Stripe.Subscription);
+          break;
+        case 'payment_method.attached':
+          await handlePaymentMethodAttached(
+            paymentService,
+            (event.data.object as Stripe.PaymentMethod).customer as string,
+            (event.data.object as Stripe.PaymentMethod).id,
+          );
           break;
         default:
           fastify.log.info(`No handler registered for event: ${event.type}`);
