@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { UserSubscription } from '../core/users/User';
 
 type Customer = Stripe.Customer;
 type CustomerId = Customer['id'];
@@ -117,6 +118,32 @@ export class PaymentService {
     );
   }
 
+  async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
+    let subscription;
+    try {
+      subscription = await this.findIndividualActiveSubscription(customerId);
+    } catch (err) {
+      if (err instanceof NotFoundSubscriptionError) {
+        return { type: 'free' };
+      } else {
+        throw err;
+      }
+    }
+
+    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ subscription: subscription.id });
+
+    const { price } = subscription.items.data[0];
+
+    return {
+      type: 'subscription',
+      amount: price.unit_amount!,
+      currency: price.currency,
+      interval: price.recurring!.interval as 'year' | 'month',
+      nextPayment: subscription.current_period_end,
+      amountAfterCoupon: upcomingInvoice.total !== price.unit_amount ? upcomingInvoice.total : undefined,
+    };
+  }
+
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
@@ -124,9 +151,11 @@ export class PaymentService {
       (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
     );
     if (!individualActiveSubscription) {
-      throw new Error('There is no individual subscription to update');
+      throw new NotFoundSubscriptionError('There is no individual subscription to update');
     }
 
     return individualActiveSubscription;
   }
 }
+
+class NotFoundSubscriptionError extends Error {}

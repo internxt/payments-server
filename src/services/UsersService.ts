@@ -1,11 +1,7 @@
 import Stripe from 'stripe';
+import { User } from '../core/users/User';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { PaymentService } from './PaymentService';
-
-export type User = {
-  customerId: string;
-  uuid: string;
-};
 
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository, private readonly paymentService: PaymentService) {}

@@ -3,9 +3,10 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
+import { User, UserSubscription } from './core/users/User';
 declare module 'fastify' {
   interface FastifyRequest {
-    customerId: string;
+    fullUser: User;
   }
 }
 
@@ -26,7 +27,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
       try {
         const user = await usersService.findUserByUuid(uuid);
-        req.customerId = user.customerId;
+        req.fullUser = user;
       } catch (err) {
         if (err instanceof UserNotFoundError) {
           return rep.status(404).send({ message: 'User not found' });
@@ -48,7 +49,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       async (req, rep) => {
         const { limit, starting_after: startingAfter } = req.query;
 
-        const invoices = await paymentService.getInvoicesFromUser(req.customerId, { limit, startingAfter });
+        const invoices = await paymentService.getInvoicesFromUser(req.fullUser.customerId, { limit, startingAfter });
 
         const invoicesMapped = invoices
           .filter(
@@ -69,7 +70,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
     );
 
     fastify.delete('/subscriptions', async (req, rep) => {
-      await usersService.cancelUserIndividualSubscriptions(req.customerId);
+      await usersService.cancelUserIndividualSubscriptions(req.fullUser.customerId);
 
       return rep.status(204).send();
     });
@@ -88,20 +89,32 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       async (req, rep) => {
         const { price_id: priceId } = req.body;
 
-        const updatedSubscription = await paymentService.updateSubscriptionPrice(req.customerId, priceId);
+        const updatedSubscription = await paymentService.updateSubscriptionPrice(req.fullUser.customerId, priceId);
 
         return rep.send(updatedSubscription);
       },
     );
 
     fastify.get('/setup-intent', async (req, rep) => {
-      const { client_secret: clientSecret } = await paymentService.getSetupIntent(req.customerId);
+      const { client_secret: clientSecret } = await paymentService.getSetupIntent(req.fullUser.customerId);
 
       return { clientSecret };
     });
 
     fastify.get('/default-payment-method', async (req, rep) => {
-      return paymentService.getDefaultPaymentMethod(req.customerId);
+      return paymentService.getDefaultPaymentMethod(req.fullUser.customerId);
+    });
+
+    fastify.get('/subscriptions', async (req, rep) => {
+      let response: UserSubscription;
+
+      if (req.fullUser.lifetime) {
+        response = { type: 'lifetime' };
+      } else {
+        response = await paymentService.getUserSubscription(req.fullUser.customerId);
+      }
+
+      return response;
     });
   };
 }

@@ -1,6 +1,6 @@
 import { Collection, MongoClient, ObjectId } from 'mongodb';
+import { User } from './User';
 
-import { User } from '../../services/UsersService';
 import { UsersRepository } from './UsersRepository';
 
 interface MongoUser extends Omit<User, 'customerId'> {
