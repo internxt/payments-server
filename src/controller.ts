@@ -1,16 +1,23 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
-declare module 'fastify' {
-  interface FastifyRequest {
-    fullUser: User;
-  }
-}
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
+  async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
+    const { uuid } = req.user.payload;
+    try {
+      return await usersService.findUserByUuid(uuid);
+    } catch (err) {
+      if (err instanceof UserNotFoundError) {
+        return rep.status(404).send({ message: 'User not found' });
+      }
+      throw err;
+    }
+  }
+
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.addHook('onRequest', async (request, reply) => {
@@ -19,20 +26,6 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       } catch (err) {
         fastify.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         reply.status(401).send();
-      }
-    });
-
-    fastify.addHook('onRequest', async (req, rep) => {
-      const { uuid } = req.user.payload;
-
-      try {
-        const user = await usersService.findUserByUuid(uuid);
-        req.fullUser = user;
-      } catch (err) {
-        if (err instanceof UserNotFoundError) {
-          return rep.status(404).send({ message: 'User not found' });
-        }
-        throw err;
       }
     });
 
@@ -49,7 +42,9 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       async (req, rep) => {
         const { limit, starting_after: startingAfter } = req.query;
 
-        const invoices = await paymentService.getInvoicesFromUser(req.fullUser.customerId, { limit, startingAfter });
+        const user = await assertUser(req, rep);
+
+        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit, startingAfter });
 
         const invoicesMapped = invoices
           .filter(
@@ -70,7 +65,8 @@ export default function (paymentService: PaymentService, usersService: UsersServ
     );
 
     fastify.delete('/subscriptions', async (req, rep) => {
-      await usersService.cancelUserIndividualSubscriptions(req.fullUser.customerId);
+      const user = await assertUser(req, rep);
+      await usersService.cancelUserIndividualSubscriptions(user.customerId);
 
       return rep.status(204).send();
     });
@@ -89,29 +85,34 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       async (req, rep) => {
         const { price_id: priceId } = req.body;
 
-        const updatedSubscription = await paymentService.updateSubscriptionPrice(req.fullUser.customerId, priceId);
+        const user = await assertUser(req, rep);
+        const updatedSubscription = await paymentService.updateSubscriptionPrice(user.customerId, priceId);
 
         return rep.send(updatedSubscription);
       },
     );
 
     fastify.get('/setup-intent', async (req, rep) => {
-      const { client_secret: clientSecret } = await paymentService.getSetupIntent(req.fullUser.customerId);
+      const user = await assertUser(req, rep);
+      const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId);
 
       return { clientSecret };
     });
 
     fastify.get('/default-payment-method', async (req, rep) => {
-      return paymentService.getDefaultPaymentMethod(req.fullUser.customerId);
+      const user = await assertUser(req, rep);
+      return paymentService.getDefaultPaymentMethod(user.customerId);
     });
 
     fastify.get('/subscriptions', async (req, rep) => {
       let response: UserSubscription;
 
-      if (req.fullUser.lifetime) {
+      const user = await assertUser(req, rep);
+
+      if (user.lifetime) {
         response = { type: 'lifetime' };
       } else {
-        response = await paymentService.getUserSubscription(req.fullUser.customerId);
+        response = await paymentService.getUserSubscription(user.customerId);
       }
 
       return response;
@@ -120,5 +121,41 @@ export default function (paymentService: PaymentService, usersService: UsersServ
     fastify.get('/prices', async (req, rep) => {
       return paymentService.getPrices();
     });
+
+    fastify.post<{ Body: { price_id: string; success_url: string; cancel_url: string } }>(
+      '/checkout-session',
+
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['price_id', 'success_url', 'cancel_url'],
+            properties: {
+              price_id: { type: 'string' },
+              success_url: { type: 'string' },
+              cancel_url: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { uuid } = req.user.payload;
+
+        let user: User | undefined;
+        try {
+          user = await usersService.findUserByUuid(uuid);
+        } catch (err) {
+          fastify.log.info(`User with uuid ${uuid} not found in DB`);
+        }
+        const { id } = await paymentService.getCheckoutSession(
+          req.body.price_id,
+          req.body.success_url,
+          req.body.cancel_url,
+          user,
+        );
+
+        return { sessionId: id };
+      },
+    );
   };
 }

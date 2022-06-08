@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
-import { UserSubscription } from '../core/users/User';
+import { User, UserSubscription } from '../core/users/User';
 
 type Customer = Stripe.Customer;
 type CustomerId = Customer['id'];
@@ -157,6 +157,24 @@ export class PaymentService {
       bytes: parseInt(price.metadata.maxSpaceBytes),
       interval: price.recurring!.interval as 'year' | 'month',
     }));
+  }
+
+  async getCheckoutSession(
+    priceId: string,
+    successUrl: string,
+    cancelUrl: string,
+    user?: User,
+  ): Promise<Stripe.Checkout.Session> {
+    return this.provider.checkout.sessions.create({
+      payment_method_types: ['card'],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer: user?.customerId,
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+    });
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
