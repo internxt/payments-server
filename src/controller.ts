@@ -116,5 +116,9 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
       return response;
     });
+
+    fastify.get('/prices', async (req, rep) => {
+      return paymentService.getPrices();
+    });
   };
 }

@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { DisplayPrice } from '../core/users/DisplayPrice';
 import { UserSubscription } from '../core/users/User';
 
 type Customer = Stripe.Customer;
@@ -142,6 +143,20 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total !== price.unit_amount ? upcomingInvoice.total : undefined,
     };
+  }
+
+  async getPrices(): Promise<DisplayPrice[]> {
+    const res = await this.provider.prices.search({
+      query: 'metadata["show"]:"1" type:"recurring" active:"true"',
+      limit: 100,
+    });
+
+    return res.data.map((price) => ({
+      id: price.id,
+      amount: price.unit_amount!,
+      bytes: parseInt(price.metadata.maxSpaceBytes),
+      interval: price.recurring!.interval as 'year' | 'month',
+    }));
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
