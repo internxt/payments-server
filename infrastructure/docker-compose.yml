@@ -14,20 +14,6 @@ services:
     ports:
       - 27018:27017
 
-  mongo-viewer:
-    image: mongo-express
-    container_name: mongo-viewer
-    restart: always
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password@payments-mongo:27017/payments
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password
-      VCAP_APP_PORT: 8082
-    ports:
-      - 8082:8082
-    depends_on:
-      - payments-mongo
-
   payments-redis:
     image: redis:latest
     container_name: payments-redis
