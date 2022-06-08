@@ -13,4 +13,5 @@ export type UserSubscription =
       amountAfterCoupon?: number;
       interval: 'year' | 'month';
       nextPayment: number;
+      priceId: string;
     };

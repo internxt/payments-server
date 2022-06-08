@@ -142,6 +142,7 @@ export class PaymentService {
       interval: price.recurring!.interval as 'year' | 'month',
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total !== price.unit_amount ? upcomingInvoice.total : undefined,
+      priceId: price.id,
     };
   }
 
