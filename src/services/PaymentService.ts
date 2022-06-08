@@ -107,9 +107,8 @@ export class PaymentService {
 
     const subscriptionWithDefaultSource = subscriptions.find((subscription) => subscription.default_source);
     if (subscriptionWithDefaultSource) return subscriptionWithDefaultSource.default_source as CustomerSource;
-
     const customer = await this.provider.customers.retrieve(customerId, {
-      expand: ['data.default_source', 'data.invoice_settings.default_payment_method'],
+      expand: ['default_source', 'invoice_settings.default_payment_method'],
     });
 
     if (customer.deleted) return null;
