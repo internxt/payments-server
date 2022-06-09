@@ -3,12 +3,10 @@ import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import config from '../config';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
-import { StorageService } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
-  storageService: StorageService,
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
@@ -24,6 +22,11 @@ export default async function handleCheckoutSessionCompleted(
 
   if (!price) {
     log.error('Checkout session completed does not contain price');
+    return;
+  }
+
+  if (price.metadata.maxSpaceBytes === undefined) {
+    log.error('Checkout session completed with a price without maxSpaceBytes as metadata');
     return;
   }
 

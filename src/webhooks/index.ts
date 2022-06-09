@@ -57,7 +57,6 @@ export default function (
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,
-            storageService,
             usersService,
             paymentService,
             fastify.log,
