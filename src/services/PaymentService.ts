@@ -19,6 +19,12 @@ type SetupIntent = Stripe.SetupIntent;
 type PaymentMethod = Stripe.PaymentMethod;
 
 type CustomerSource = Stripe.CustomerSource;
+
+export type PriceMetadata = {
+  maxSpaceBytes: string;
+  planType: 'subscription' | 'one_time';
+};
+
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -175,6 +181,14 @@ export class PaymentService {
       allow_promotion_codes: true,
       billing_address_collection: 'required',
     });
+  }
+
+  async getLineItems(checkoutSessionId: string) {
+    return this.provider.checkout.sessions.listLineItems(checkoutSessionId);
+  }
+
+  getCustomer(customerId: CustomerId) {
+    return this.provider.customers.retrieve(customerId);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

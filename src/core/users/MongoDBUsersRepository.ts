@@ -1,11 +1,10 @@
-import { Collection, MongoClient, ObjectId } from 'mongodb';
+import { Collection, MongoClient } from 'mongodb';
 import { User } from './User';
 
 import { UsersRepository } from './UsersRepository';
 
 interface MongoUser extends Omit<User, 'customerId'> {
   customer_id: string;
-  _id: ObjectId;
 }
 
 export class MongoDBUsersRepository implements UsersRepository {
@@ -35,9 +34,19 @@ export class MongoDBUsersRepository implements UsersRepository {
     }
   }
 
-  private mongoUserToUser(mongoUser: MongoUser): User {
-    const { customer_id: customerId, uuid } = mongoUser;
+  async insertUser(user: User): Promise<void> {
+    await this.collection.insertOne(this.userToMongoUser(user));
+  }
 
-    return { customerId, uuid };
+  private mongoUserToUser(mongoUser: MongoUser): User {
+    const { customer_id: customerId, uuid, lifetime } = mongoUser;
+
+    return { customerId, uuid, lifetime };
+  }
+
+  private userToMongoUser(user: User): MongoUser {
+    const { customerId: customer_id, uuid, lifetime } = user;
+
+    return { customer_id, uuid, lifetime };
   }
 }

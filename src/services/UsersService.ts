@@ -59,6 +59,10 @@ export class UsersService {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
   }
+
+  insertUser(user: User) {
+    return this.usersRepository.insertUser(user);
+  }
 }
 
 export class UserNotFoundError extends Error {}

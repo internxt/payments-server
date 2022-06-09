@@ -7,6 +7,7 @@ import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handlePaymentMethodAttached from './handlePaymentMethodAttached';
 import { PaymentService } from '../services/PaymentService';
+import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 
 export default function (
   stripe: Stripe,
@@ -51,6 +52,15 @@ export default function (
             paymentService,
             (event.data.object as Stripe.PaymentMethod).customer as string,
             (event.data.object as Stripe.PaymentMethod).id,
+          );
+          break;
+        case 'checkout.session.completed':
+          await handleCheckoutSessionCompleted(
+            event.data.object as Stripe.Checkout.Session,
+            storageService,
+            usersService,
+            paymentService,
+            fastify.log,
           );
           break;
         default:

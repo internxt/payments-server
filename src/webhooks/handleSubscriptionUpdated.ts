@@ -1,10 +1,7 @@
 import Stripe from 'stripe';
+import { PriceMetadata } from '../services/PaymentService';
 import { StorageService } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
-
-type PriceMetadata = {
-  maxSpaceBytes: string;
-};
 
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
