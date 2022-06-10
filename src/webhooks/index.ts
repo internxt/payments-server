@@ -36,7 +36,7 @@ export default function (
           throw err;
         }
       }
-      fastify.log.info(`Stripe event received: ${event.type}`);
+      fastify.log.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
         case 'customer.subscription.deleted':
@@ -74,7 +74,7 @@ export default function (
           );
           break;
         default:
-          fastify.log.info(`No handler registered for event: ${event.type}`);
+          fastify.log.info(`No handler registered for event: ${event.type}, id: ${event.id}`);
       }
 
       return rep.status(204).send();
