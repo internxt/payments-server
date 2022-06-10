@@ -23,12 +23,14 @@ export default async function handleCheckoutSessionCompleted(
   const price = lineItems.data[0].price;
 
   if (!price) {
-    log.error('Checkout session completed does not contain price');
+    log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
     return;
   }
 
   if (price.metadata.maxSpaceBytes === undefined) {
-    log.error('Checkout session completed with a price without maxSpaceBytes as metadata');
+    log.error(
+      `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
+    );
     return;
   }
 
@@ -47,7 +49,9 @@ export default async function handleCheckoutSessionCompleted(
     const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string);
     user = res.data.user;
   } catch (err) {
-    log.error('Something went wrong while creating or updating user in checkout session completed handler');
+    log.error(
+      `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+    );
     log.error(err);
     return;
   }
