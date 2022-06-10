@@ -4,8 +4,14 @@ import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
+import CacheService from './services/CacheService';
 
-export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
+export default function (
+  paymentService: PaymentService,
+  usersService: UsersService,
+  config: AppConfig,
+  cacheService: CacheService,
+) {
   async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
     const { uuid } = req.user.payload;
     try {
@@ -109,11 +115,29 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
       const user = await assertUser(req, rep);
 
+      let subscriptionInCache: UserSubscription | null | undefined;
+      try {
+        subscriptionInCache = await cacheService.getSubscription(user.customerId);
+      } catch (err) {
+        fastify.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
+        fastify.log.error(err);
+      }
+
+      if (subscriptionInCache) {
+        fastify.log.info(`Cache hit for ${user.customerId} subscription`);
+        return subscriptionInCache;
+      }
+
       if (user.lifetime) {
         response = { type: 'lifetime' };
       } else {
         response = await paymentService.getUserSubscription(user.customerId);
       }
+
+      cacheService.setSubscription(user.customerId, response).catch((err) => {
+        fastify.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
+        fastify.log.error(err);
+      });
 
       return response;
     });

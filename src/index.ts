@@ -12,6 +12,7 @@ import webhook from './webhooks';
 import controller from './controller';
 import { UsersRepository } from './core/users/UsersRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
+import CacheService from './services/CacheService';
 
 const fastify = Fastify({
   logger: {
@@ -33,10 +34,11 @@ const start = async () => {
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(config, axios);
   const usersService = new UsersService(usersRepository, paymentService);
+  const cacheService = new CacheService(config);
 
-  fastify.register(controller(paymentService, usersService, config));
+  fastify.register(controller(paymentService, usersService, config, cacheService));
 
-  fastify.register(webhook(stripe, storageService, usersService, paymentService, config));
+  fastify.register(webhook(stripe, storageService, usersService, paymentService, config, cacheService));
 
   fastify.register(fastifyCors, {
     allowedHeaders: [

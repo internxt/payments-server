@@ -8,6 +8,7 @@ import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handlePaymentMethodAttached from './handlePaymentMethodAttached';
 import { PaymentService } from '../services/PaymentService';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
+import CacheService from '../services/CacheService';
 
 export default function (
   stripe: Stripe,
@@ -15,6 +16,7 @@ export default function (
   usersService: UsersService,
   paymentService: PaymentService,
   config: AppConfig,
+  cacheService: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -42,10 +44,18 @@ export default function (
             storageService,
             usersService,
             (event.data.object as Stripe.Subscription).customer as string,
+            cacheService,
+            fastify.log,
           );
           break;
         case 'customer.subscription.updated':
-          await handleSubscriptionUpdated(storageService, usersService, event.data.object as Stripe.Subscription);
+          await handleSubscriptionUpdated(
+            storageService,
+            usersService,
+            event.data.object as Stripe.Subscription,
+            cacheService,
+            fastify.log,
+          );
           break;
         case 'payment_method.attached':
           await handlePaymentMethodAttached(
@@ -60,6 +70,7 @@ export default function (
             usersService,
             paymentService,
             fastify.log,
+            cacheService,
           );
           break;
         default:

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import config from '../config';
+import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { UsersService } from '../services/UsersService';
 
@@ -10,6 +11,7 @@ export default async function handleCheckoutSessionCompleted(
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
+  cacheService: CacheService,
 ): Promise<void> {
   if (session.payment_status !== 'paid') {
     log.info(`Checkout processed without action, ${session.customer_email} has not paid successfully`);
@@ -58,6 +60,11 @@ export default async function handleCheckoutSessionCompleted(
       uuid: user.uuid,
       lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
     });
+  }
+  try {
+    await cacheService.clearSubscription(customer.id);
+  } catch (err) {
+    log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 }
 
