@@ -18,6 +18,7 @@ export default function (
       return await usersService.findUserByUuid(uuid);
     } catch (err) {
       if (err instanceof UserNotFoundError) {
+        req.log.info(`User with uuid ${uuid} was not found`);
         return rep.status(404).send({ message: 'User not found' });
       }
       throw err;
@@ -30,7 +31,7 @@ export default function (
       try {
         await request.jwtVerify();
       } catch (err) {
-        fastify.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         reply.status(401).send();
       }
     });
@@ -119,12 +120,12 @@ export default function (
       try {
         subscriptionInCache = await cacheService.getSubscription(user.customerId);
       } catch (err) {
-        fastify.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
-        fastify.log.error(err);
+        req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
+        req.log.error(err);
       }
 
       if (subscriptionInCache) {
-        fastify.log.info(`Cache hit for ${user.customerId} subscription`);
+        req.log.info(`Cache hit for ${user.customerId} subscription`);
         return subscriptionInCache;
       }
 
@@ -135,8 +136,8 @@ export default function (
       }
 
       cacheService.setSubscription(user.customerId, response).catch((err) => {
-        fastify.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
-        fastify.log.error(err);
+        req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
+        req.log.error(err);
       });
 
       return response;
@@ -169,7 +170,7 @@ export default function (
         try {
           user = await usersService.findUserByUuid(uuid);
         } catch (err) {
-          fastify.log.info(`User with uuid ${uuid} not found in DB`);
+          req.log.info(`User with uuid ${uuid} not found in DB`);
         }
         const { id } = await paymentService.getCheckoutSession(
           req.body.price_id,
