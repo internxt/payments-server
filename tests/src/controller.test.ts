@@ -315,4 +315,97 @@ describe('controller e2e tests', () => {
       expect(response.statusCode).toBe(200);
     });
   });
+
+  describe('GET /setup-intent', () => {
+    test('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({
+        path: '/setup-intent',
+        headers: { authorization: 'Bearer faketoken' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    test('it should return 404 if the authenticated user is not found', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        throw new UserNotFoundError();
+      };
+      const response = await app.inject({
+        path: '/setup-intent',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('happy path', async () => {
+      const { app, usersService, validToken, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      paymentsService.getSetupIntent = async () => {
+        return { client_secret: 'clientSecret' } as Stripe.SetupIntent;
+      };
+
+      const fn = jest.spyOn(paymentsService, 'getSetupIntent');
+
+      const response = await app.inject({
+        path: '/setup-intent',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+
+      expect(fn).toBeCalledWith('customerId');
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toMatchObject({ clientSecret: 'clientSecret' });
+    });
+  });
+
+  describe('GET /default-payment-method', () => {
+    test('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({
+        path: '/default-payment-method',
+        headers: { authorization: 'Bearer faketoken' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    test('it should return 404 if the authenticated user is not found', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        throw new UserNotFoundError();
+      };
+      const response = await app.inject({
+        path: '/default-payment-method',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('happy path', async () => {
+      const { app, usersService, validToken, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      paymentsService.getDefaultPaymentMethod = async () => {
+        return {} as Stripe.Card;
+      };
+
+      const fn = jest.spyOn(paymentsService, 'getDefaultPaymentMethod');
+
+      const response = await app.inject({
+        path: '/default-payment-method',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+
+      expect(fn).toBeCalledWith('customerId');
+
+      expect(response.statusCode).toBe(200);
+    });
+  });
 });
