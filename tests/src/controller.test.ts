@@ -508,4 +508,84 @@ describe('controller e2e tests', () => {
       expect(JSON.parse(response.body)).toMatchObject(await paymentsService.getPrices());
     });
   });
+
+  describe('POST /checkout-session', () => {
+    test('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({
+        method: 'POST',
+        path: '/checkout-session',
+        headers: { authorization: 'Bearer faketoken' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    test('it should return 400 if the body is not in the expected format', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+      const response = await app.inject({
+        method: 'POST',
+        path: '/checkout-session',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ priceId: 'price_id', successUrl: 'success_url', cancelUrl: 'cancel_url' }),
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    test('happy path when user is found in db', async () => {
+      const { app, usersService, validToken, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      paymentsService.getCheckoutSession = async () => {
+        return { id: 'sessionId' } as Stripe.Checkout.Session;
+      };
+
+      const fn = jest.spyOn(paymentsService, 'getCheckoutSession');
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/checkout-session',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ price_id: 'price_id', success_url: 'success_url', cancel_url: 'cancel_url' }),
+      });
+
+      expect(fn).toBeCalledWith('price_id', 'success_url', 'cancel_url', await usersService.findUserByUuid('uuid'));
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toMatchObject({ sessionId: 'sessionId' });
+    });
+
+    test('happy path when user is not found in db', async () => {
+      const { app, usersService, validToken, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        throw new UserNotFoundError();
+      };
+
+      paymentsService.getCheckoutSession = async () => {
+        return { id: 'sessionId' } as Stripe.Checkout.Session;
+      };
+
+      const fn = jest.spyOn(paymentsService, 'getCheckoutSession');
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/checkout-session',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ price_id: 'price_id', success_url: 'success_url', cancel_url: 'cancel_url' }),
+      });
+
+      expect(fn).toBeCalledWith('price_id', 'success_url', 'cancel_url', undefined);
+
+      expect(response.statusCode).toBe(200);
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toMatchObject({ sessionId: 'sessionId' });
+    });
+  });
 });
