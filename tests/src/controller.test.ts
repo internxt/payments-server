@@ -408,4 +408,87 @@ describe('controller e2e tests', () => {
       expect(response.statusCode).toBe(200);
     });
   });
+
+  describe('GET /subscriptions', () => {
+    test('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({
+        path: '/subscriptions',
+        headers: { authorization: 'Bearer faketoken' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    test('it should return 404 if the authenticated user is not found', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        throw new UserNotFoundError();
+      };
+      const response = await app.inject({
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('happy path with cache hit', async () => {
+      const { app, usersService, validToken, cacheService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      cacheService.getSubscription = async () => {
+        return { type: 'lifetime' };
+      };
+
+      const fn = jest.spyOn(cacheService, 'getSubscription');
+
+      const response = await app.inject({
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+
+      expect(fn).toBeCalledWith('customerId');
+
+      expect(response.statusCode).toBe(200);
+
+      expect(JSON.parse(response.body)).toMatchObject({ type: 'lifetime' });
+    });
+
+    test('happy path with cache miss', async () => {
+      const { app, usersService, validToken, cacheService, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      cacheService.getSubscription = async () => {
+        return null;
+      };
+
+      paymentsService.getUserSubscription = async () => {
+        return { type: 'lifetime' };
+      };
+
+      cacheService.setSubscription = async () => undefined;
+
+      const cacheGetFn = jest.spyOn(cacheService, 'getSubscription');
+      const cacheSetFn = jest.spyOn(cacheService, 'setSubscription');
+      const serviceFn = jest.spyOn(paymentsService, 'getUserSubscription');
+
+      const response = await app.inject({
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}` },
+      });
+
+      expect(cacheGetFn).toBeCalledWith('customerId');
+      expect(cacheSetFn).toBeCalledWith('customerId', { type: 'lifetime' });
+      expect(serviceFn).toBeCalledWith('customerId');
+
+      expect(response.statusCode).toBe(200);
+
+      expect(JSON.parse(response.body)).toMatchObject({ type: 'lifetime' });
+    });
+  });
 });
