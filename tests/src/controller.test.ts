@@ -491,4 +491,21 @@ describe('controller e2e tests', () => {
       expect(JSON.parse(response.body)).toMatchObject({ type: 'lifetime' });
     });
   });
+
+  describe('GET /prices', () => {
+    it('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({ path: '/prices', headers: { authorization: 'Bearer faketoken' } });
+      expect(response.statusCode).toBe(401);
+    });
+    it('happy path', async () => {
+      const { app, paymentsService, validToken } = await getMocks();
+      paymentsService.getPrices = async () => {
+        return [{ amount: 49, bytes: 20, id: 'price', interval: 'month' }];
+      };
+      const response = await app.inject({ path: '/prices', headers: { authorization: `Bearer ${validToken}` } });
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toMatchObject(await paymentsService.getPrices());
+    });
+  });
 });
