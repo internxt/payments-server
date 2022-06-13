@@ -1,63 +1,37 @@
 import axios from 'axios';
-import Fastify from 'fastify';
 import { MongoClient } from 'mongodb';
 import Stripe from 'stripe';
-import fastifyCors from '@fastify/cors';
 
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
-import config from './config';
-import webhook from './webhooks';
-import controller from './controller';
+import envVariablesConfig from './config';
 import { UsersRepository } from './core/users/UsersRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 import CacheService from './services/CacheService';
-
-const fastify = Fastify({
-  logger: {
-    prettyPrint:
-      config.NODE_ENV === 'development'
-        ? {
-            translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname',
-          }
-        : false,
-  },
-});
+import { buildApp } from './app';
 
 const start = async () => {
-  const mongoClient = await new MongoClient(config.MONGO_URI).connect();
+  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
 
-  const stripe = new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
+  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
   const paymentService = new PaymentService(stripe);
-  const storageService = new StorageService(config, axios);
+  const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(usersRepository, paymentService);
-  const cacheService = new CacheService(config);
+  const cacheService = new CacheService(envVariablesConfig);
 
-  fastify.register(controller(paymentService, usersService, config, cacheService));
-
-  fastify.register(webhook(stripe, storageService, usersService, paymentService, config, cacheService));
-
-  fastify.register(fastifyCors, {
-    allowedHeaders: [
-      'sessionId',
-      'Content-Type',
-      'Authorization',
-      'method',
-      'internxt-version',
-      'internxt-client',
-      'internxt-mnemonic',
-    ],
-    exposedHeaders: ['sessionId'],
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    preflightContinue: false,
-  });
+  const fastify = await buildApp(
+    paymentService,
+    storageService,
+    usersService,
+    cacheService,
+    stripe,
+    envVariablesConfig,
+  );
 
   try {
-    const PORT = config.SERVER_PORT;
+    const PORT = envVariablesConfig.SERVER_PORT;
 
     await fastify.listen(PORT, '0.0.0.0');
   } catch (err) {

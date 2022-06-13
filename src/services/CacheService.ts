@@ -1,6 +1,6 @@
 import { UserSubscription } from '../core/users/User';
 import Redis from 'ioredis';
-import { AppConfig } from '../config';
+import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 

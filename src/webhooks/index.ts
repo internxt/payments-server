@@ -71,6 +71,7 @@ export default function (
             paymentService,
             fastify.log,
             cacheService,
+            config,
           );
           break;
         default:

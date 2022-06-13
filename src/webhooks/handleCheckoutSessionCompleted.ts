@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
-import config from '../config';
+import { type AppConfig } from '../config';
 import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { UsersService } from '../services/UsersService';
@@ -12,6 +12,7 @@ export default async function handleCheckoutSessionCompleted(
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
   cacheService: CacheService,
+  config: AppConfig,
 ): Promise<void> {
   if (session.payment_status !== 'paid') {
     log.info(`Checkout processed without action, ${session.customer_email} has not paid successfully`);
@@ -46,7 +47,7 @@ export default async function handleCheckoutSessionCompleted(
 
   let user: { uuid: string };
   try {
-    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string);
+    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
     user = res.data.user;
   } catch (err) {
     log.error(
@@ -72,7 +73,7 @@ export default async function handleCheckoutSessionCompleted(
   }
 }
 
-function createOrUpdateUser(maxSpaceBytes: string, email: string) {
+function createOrUpdateUser(maxSpaceBytes: string, email: string, config: AppConfig) {
   return axios.post(
     `${config.DRIVE_GATEWAY_URL}/api/gateway/user/updateOrCreate`,
     { maxSpaceBytes, email },
