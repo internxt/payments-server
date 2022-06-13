@@ -250,4 +250,69 @@ describe('controller e2e tests', () => {
       expect([expectedInvoice]).toMatchObject(body);
     });
   });
+
+  describe('PUT /subscriptions', () => {
+    test('it should return 401 if no valid token is present in the request', async () => {
+      const { app } = await getMocks();
+      const response = await app.inject({
+        method: 'PUT',
+        path: '/subscriptions',
+        headers: { authorization: 'Bearer faketoken' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    test('it should return 404 if the authenticated user is not found', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        throw new UserNotFoundError();
+      };
+      const response = await app.inject({
+        method: 'PUT',
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ price_id: 'price_id' }),
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('it should return 400 if the body is not in the expected format', async () => {
+      const { app, usersService, validToken } = await getMocks();
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+      const response = await app.inject({
+        method: 'PUT',
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ priceId: 'price_id' }),
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    test('happy path', async () => {
+      const { app, usersService, validToken, paymentsService } = await getMocks();
+
+      usersService.findUserByUuid = async () => {
+        return { uuid: 'uuid', customerId: 'customerId' };
+      };
+
+      paymentsService.updateSubscriptionPrice = async () => {
+        return {} as Stripe.Subscription;
+      };
+
+      const fn = jest.spyOn(paymentsService, 'updateSubscriptionPrice');
+
+      const response = await app.inject({
+        method: 'PUT',
+        path: '/subscriptions',
+        headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
+        payload: JSON.stringify({ price_id: 'price_id' }),
+      });
+
+      expect(fn).toBeCalledWith('customerId', 'price_id');
+
+      expect(response.statusCode).toBe(200);
+    });
+  });
 });
