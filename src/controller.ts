@@ -147,18 +147,19 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.post<{ Body: { price_id: string; success_url: string; cancel_url: string } }>(
+    fastify.post<{ Body: { price_id: string; success_url: string; cancel_url: string; customer_email: string } }>(
       '/checkout-session',
 
       {
         schema: {
           body: {
             type: 'object',
-            required: ['price_id', 'success_url', 'cancel_url'],
+            required: ['price_id', 'success_url', 'cancel_url', 'customer_email'],
             properties: {
               price_id: { type: 'string' },
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
+              customer_email: { type: 'string' },
             },
           },
         },
@@ -176,7 +177,7 @@ export default function (
           req.body.price_id,
           req.body.success_url,
           req.body.cancel_url,
-          user,
+          user ?? req.body.customer_email,
         );
 
         return { sessionId: id };

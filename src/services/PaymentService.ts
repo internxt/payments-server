@@ -169,13 +169,14 @@ export class PaymentService {
     priceId: string,
     successUrl: string,
     cancelUrl: string,
-    user?: User,
+    prefill: User | string,
   ): Promise<Stripe.Checkout.Session> {
     return this.provider.checkout.sessions.create({
       payment_method_types: ['card'],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      customer: user?.customerId,
+      customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
+      customer_email: typeof prefill === 'string' ? prefill : undefined,
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,

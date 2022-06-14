@@ -551,7 +551,12 @@ describe('controller e2e tests', () => {
         method: 'POST',
         path: '/checkout-session',
         headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
-        payload: JSON.stringify({ price_id: 'price_id', success_url: 'success_url', cancel_url: 'cancel_url' }),
+        payload: JSON.stringify({
+          price_id: 'price_id',
+          success_url: 'success_url',
+          cancel_url: 'cancel_url',
+          customer_email: 'acustomeremail@inxt.com',
+        }),
       });
 
       expect(fn).toBeCalledWith('price_id', 'success_url', 'cancel_url', await usersService.findUserByUuid('uuid'));
@@ -577,10 +582,15 @@ describe('controller e2e tests', () => {
         method: 'POST',
         path: '/checkout-session',
         headers: { authorization: `Bearer ${validToken}`, 'content-type': 'application/json' },
-        payload: JSON.stringify({ price_id: 'price_id', success_url: 'success_url', cancel_url: 'cancel_url' }),
+        payload: JSON.stringify({
+          price_id: 'price_id',
+          success_url: 'success_url',
+          cancel_url: 'cancel_url',
+          customer_email: 'acustomeremail@inxt.com',
+        }),
       });
 
-      expect(fn).toBeCalledWith('price_id', 'success_url', 'cancel_url', undefined);
+      expect(fn).toBeCalledWith('price_id', 'success_url', 'cancel_url', 'acustomeremail@inxt.com');
 
       expect(response.statusCode).toBe(200);
 
