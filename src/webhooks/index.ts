@@ -31,7 +31,7 @@ export default function (
         event = stripe.webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_KEY);
       } catch (err) {
         if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
-          return rep.status(401);
+          return rep.status(401).send();
         } else {
           throw err;
         }
