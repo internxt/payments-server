@@ -31,6 +31,11 @@ export default function (
         event = stripe.webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_KEY);
       } catch (err) {
         if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
+          fastify.log.info(
+            `Stripe event could not be verified, sig: ${sig}, webhook_key: ${
+              config.STRIPE_WEBHOOK_KEY
+            } event: ${JSON.stringify(req.body.toString(), null, 2)}`,
+          );
           return rep.status(401).send();
         } else {
           throw err;
