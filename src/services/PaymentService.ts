@@ -157,12 +157,14 @@ export class PaymentService {
       limit: 100,
     });
 
-    return res.data.map((price) => ({
-      id: price.id,
-      amount: price.unit_amount!,
-      bytes: parseInt(price.metadata.maxSpaceBytes),
-      interval: price.recurring!.interval as 'year' | 'month',
-    }));
+    return res.data
+      .map((price) => ({
+        id: price.id,
+        amount: price.unit_amount!,
+        bytes: parseInt(price.metadata.maxSpaceBytes),
+        interval: price.recurring!.interval as 'year' | 'month',
+      }))
+      .filter((price) => price.bytes !== null);
   }
 
   async getCheckoutSession(
