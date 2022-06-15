@@ -158,13 +158,13 @@ export class PaymentService {
     });
 
     return res.data
+      .filter((price) => price.metadata.maxSpaceBytes)
       .map((price) => ({
         id: price.id,
         amount: price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
         interval: price.recurring!.interval as 'year' | 'month',
-      }))
-      .filter((price) => price.bytes !== null);
+      }));
   }
 
   async getCheckoutSession(
