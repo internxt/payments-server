@@ -52,7 +52,7 @@ export default function (
         const user = await assertUser(req, rep);
 
         const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit, startingAfter });
-        req.log.info(`Invoices: ${JSON.stringify(invoices, null, 2)}`);
+
         const invoicesMapped = invoices
           .filter(
             (invoice) =>
