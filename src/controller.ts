@@ -56,7 +56,7 @@ export default function (
         const invoicesMapped = invoices
           .filter(
             (invoice) =>
-              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.at(0)?.price?.metadata?.maxSpaceBytes,
+              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes,
           )
           .map((invoice) => {
             return {
