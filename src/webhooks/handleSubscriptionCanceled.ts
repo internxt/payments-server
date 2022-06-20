@@ -11,6 +11,7 @@ export default async function handleSubscriptionCanceled(
   cacheService: CacheService,
   log: FastifyLoggerInstance,
 ): Promise<void> {
+  log.info(`Trying to cancel subscription with customer_id: ${customerId}`);
   const { uuid } = await usersService.findUserByCustomerID(customerId);
   try {
     await cacheService.clearSubscription(customerId);
