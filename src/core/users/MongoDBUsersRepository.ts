@@ -11,7 +11,7 @@ export class MongoDBUsersRepository implements UsersRepository {
   private readonly collection: Collection<MongoUser>;
 
   constructor(mongo: MongoClient) {
-    this.collection = mongo.db().collection<MongoUser>('users');
+    this.collection = mongo.db('payments').collection<MongoUser>('users');
   }
 
   async findUserByCustomerId(customerId: string): Promise<User | null> {
