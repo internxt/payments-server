@@ -14,6 +14,11 @@ export class MongoDBUsersRepository implements UsersRepository {
     this.collection = mongo.db('payments').collection<MongoUser>('users');
   }
 
+  async updateUser(customerId: string, body: Pick<User, 'lifetime'>): Promise<boolean> {
+    const result = await this.collection.updateOne({ customer_id: customerId }, { $set: body });
+    return result.matchedCount === 1;
+  }
+
   async findUserByCustomerId(customerId: string): Promise<User | null> {
     const user = await this.collection.findOne({ customer_id: customerId });
 

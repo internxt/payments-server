@@ -6,6 +6,13 @@ import { PaymentService } from './PaymentService';
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository, private readonly paymentService: PaymentService) {}
 
+  async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
+    const updated = this.usersRepository.updateUser(customerId, body);
+    if (!updated) {
+      throw new UserNotFoundError();
+    }
+  }
+
   async findUserByCustomerID(customerId: User['customerId']): Promise<User> {
     const userFound = await this.usersRepository.findUserByCustomerId(customerId);
 

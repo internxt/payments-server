@@ -9,6 +9,7 @@ import handlePaymentMethodAttached from './handlePaymentMethodAttached';
 import { PaymentService } from '../services/PaymentService';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import CacheService from '../services/CacheService';
+import handleLifetimeRefunded from './handleLifetimeRefunded';
 
 export default function (
   stripe: Stripe,
@@ -73,6 +74,15 @@ export default function (
             fastify.log,
             cacheService,
             config,
+          );
+          break;
+        case 'charge.refunded':
+          await handleLifetimeRefunded(
+            storageService,
+            usersService,
+            (event.data.object as Stripe.Charge).customer as string,
+            cacheService,
+            fastify.log,
           );
           break;
         default:
