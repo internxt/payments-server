@@ -161,6 +161,7 @@ export class PaymentService {
       .filter((price) => price.metadata.maxSpaceBytes)
       .map((price) => ({
         id: price.id,
+        currency: price.currency,
         amount: price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
         interval: price.recurring!.interval as 'year' | 'month',
