@@ -501,7 +501,7 @@ describe('controller e2e tests', () => {
     it('happy path', async () => {
       const { app, paymentsService, validToken } = await getMocks();
       paymentsService.getPrices = async () => {
-        return [{ amount: 49, bytes: 20, id: 'price', interval: 'month' }];
+        return [{ amount: 49, bytes: 20, id: 'price', interval: 'month', currency: '€' }];
       };
       const response = await app.inject({ path: '/prices', headers: { authorization: `Bearer ${validToken}` } });
       expect(response.statusCode).toBe(200);

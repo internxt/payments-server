@@ -3,4 +3,5 @@ export interface DisplayPrice {
   bytes: number;
   interval: 'year' | 'month';
   amount: number;
+  currency: string;
 }
