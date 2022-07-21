@@ -16,7 +16,6 @@ const mandatoryVariables = [
 
 const optionalVariables = [
   'REDIS_HOST',
-  'REDIS_PASSWORD'
 ] as const;
 
 type BaseConfig = {
@@ -29,7 +28,7 @@ interface DevConfig extends BaseConfig {
   NODE_ENV: 'development';
 }
 
-const mandatoryVariablesOnlyInProd = ['REDIS_HOST'] as const;
+const mandatoryVariablesOnlyInProd = ['REDIS_PASSWORD'] as const;
 
 type ProdConfig = BaseConfig & {
   NODE_ENV: 'production';
