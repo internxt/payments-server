@@ -7,10 +7,7 @@ const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
-    this.redis =
-      config.NODE_ENV === 'production'
-        ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD })
-        : new Redis();
+    this.redis = new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD });
   }
 
   private buildSubscriptionKey(customerId: string): string {
