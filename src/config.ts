@@ -14,15 +14,19 @@ const mandatoryVariables = [
   'DRIVE_GATEWAY_PASSWORD',
 ] as const;
 
+
+
 type BaseConfig = {
   [name in typeof mandatoryVariables[number]]: string;
-};
+}
 
 interface DevConfig extends BaseConfig {
   NODE_ENV: 'development';
+  REDIS_HOST?: string
 }
 
-const mandatoryVariablesOnlyInProd = ['REDIS_HOST', 'REDIS_PASSWORD'] as const;
+
+const mandatoryVariablesOnlyInProd = ['REDIS_HOST','REDIS_PASSWORD'] as const;
 
 type ProdConfig = BaseConfig & {
   NODE_ENV: 'production';
