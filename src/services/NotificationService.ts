@@ -21,16 +21,8 @@ export class Notifications {
     return Notifications.instance;
   }
 
-  subscriptionChanged({
-    clientId,
-    subscription,
-    space,
-  }: {
-    clientId: string;
-    subscription: UserSubscription;
-    space: number;
-  }): Promise<void> {
-    return this.post({ event: 'SUBSCRIPTION_CHANGED', payload: { subscription, space }, clientId });
+  subscriptionChanged({ clientId, subscription }: { clientId: string; subscription: UserSubscription }): Promise<void> {
+    return this.post({ event: 'SUBSCRIPTION_CHANGED', payload: subscription, clientId });
   }
 
   private async post(data: RequestData): Promise<void> {

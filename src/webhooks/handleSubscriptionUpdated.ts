@@ -34,6 +34,5 @@ export default async function handleSubscriptionUpdated(
   return Notifications.getInstance().subscriptionChanged({
     clientId: customerId,
     subscription: updatedSubscription,
-    space: bytesSpace,
   });
 }

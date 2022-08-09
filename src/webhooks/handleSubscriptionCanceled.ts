@@ -26,6 +26,5 @@ export default async function handleSubscriptionCanceled(
   return Notifications.getInstance().subscriptionChanged({
     clientId: customerId,
     subscription: updatedSubscription,
-    space: FREE_PLAN_BYTES_SPACE,
   });
 }
