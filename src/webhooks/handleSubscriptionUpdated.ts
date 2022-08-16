@@ -32,7 +32,7 @@ export default async function handleSubscriptionUpdated(
   await storageService.changeStorage(uuid, bytesSpace);
   const updatedSubscription = await paymentService.getUserSubscription(customerId);
   return Notifications.getInstance().subscriptionChanged({
-    userId: customerId,
+    userId: uuid,
     subscription: updatedSubscription,
   });
 }

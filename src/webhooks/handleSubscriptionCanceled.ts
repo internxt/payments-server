@@ -24,7 +24,7 @@ export default async function handleSubscriptionCanceled(
 
   const updatedSubscription = await paymentService.getUserSubscription(customerId);
   return Notifications.getInstance().subscriptionChanged({
-    clientId: customerId,
+    userId: uuid,
     subscription: updatedSubscription,
   });
 }
