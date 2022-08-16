@@ -4,7 +4,7 @@ import { UserSubscription } from '../core/users/User';
 type RequestData = {
   event: string;
   payload: Record<string, any>;
-  clientId: string;
+  userId: string;
   email?: string;
 };
 
@@ -21,8 +21,8 @@ export class Notifications {
     return Notifications.instance;
   }
 
-  subscriptionChanged({ clientId, subscription }: { clientId: string; subscription: UserSubscription }): Promise<void> {
-    return this.post({ event: 'SUBSCRIPTION_CHANGED', payload: subscription, clientId });
+  subscriptionChanged({ userId, subscription }: { userId: string; subscription: UserSubscription }): Promise<void> {
+    return this.post({ event: 'SUBSCRIPTION_CHANGED', userId, payload: subscription });
   }
 
   private async post(data: RequestData): Promise<void> {
