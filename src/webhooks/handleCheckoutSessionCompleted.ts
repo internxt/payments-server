@@ -54,7 +54,8 @@ export default async function handleCheckoutSessionCompleted(
       `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
     );
     log.error(err);
-    return;
+    
+    throw err;
   }
 
   try {
