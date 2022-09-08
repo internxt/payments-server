@@ -78,6 +78,16 @@ export default function (
             config,
           );
           break;
+        case 'checkout.session.async_payment_succeeded':
+          await handleCheckoutSessionCompleted(
+            event.data.object as Stripe.Checkout.Session,
+            usersService,
+            paymentService,
+            fastify.log,
+            cacheService,
+            config,
+          );
+          break;
         case 'charge.refunded':
           await handleLifetimeRefunded(
             storageService,
