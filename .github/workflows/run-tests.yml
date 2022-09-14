@@ -1,0 +1,37 @@
+name: run-test
+on:
+  push:
+    branches:
+      - 'master'
+      - 'develop'
+  pull_request:
+    branches:
+     - master
+     - develop
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [14.x]
+    env:
+      NODE_ENV: test
+      SERVER_PORT: 8000
+      MONGO_URI: mongo
+      STORAGE_GATEWAY_SECRET: 1234
+      STORAGE_GATEWAY_URL: 1234
+      STRIPE_SECRET_KEY: 1234
+      STRIPE_WEBHOOK_KEY: 1234
+      JWT_SECRET: 1234
+      DRIVE_GATEWAY_URL: localhost:3000
+      DRIVE_GATEWAY_USER: user
+      DRIVE_GATEWAY_PASSWORD: gatewaypass
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: yarn install
+      - run: yarn run test
+
