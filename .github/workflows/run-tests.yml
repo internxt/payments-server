@@ -26,6 +26,8 @@ jobs:
       DRIVE_GATEWAY_URL: localhost:3000
       DRIVE_GATEWAY_USER: user
       DRIVE_GATEWAY_PASSWORD: gatewaypass
+      NOTIFICATIONS_API_KEY: 1234
+      NOTIFICATIONS_URL: notifications:1234
     steps:
       - uses: actions/checkout@v2
       - name: Use Node.js ${{ matrix.node-version }}
@@ -41,4 +43,3 @@ jobs:
       - run: echo "always-auth=true" >> .npmrc          
       - run: yarn install
       - run: yarn run test
-
