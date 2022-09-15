@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { buildApp } from '../../src/app';
 import { AppConfig } from '../../src/config';
+import { UserSubscription } from '../../src/core/users/User';
 import CacheService from '../../src/services/CacheService';
 import { PaymentService } from '../../src/services/PaymentService';
 import { StorageService } from '../../src/services/StorageService';
@@ -301,7 +302,12 @@ describe('controller e2e tests', () => {
         return {} as Stripe.Subscription;
       };
 
+      paymentsService.getUserSubscription = async (customerId: string) => {
+        return Promise.resolve({} as UserSubscription);
+      };
+
       const fn = jest.spyOn(paymentsService, 'updateSubscriptionPrice');
+      const getUserSubscriptionSpy = jest.spyOn(paymentsService, 'getUserSubscription');
 
       const response = await app.inject({
         method: 'PUT',
@@ -311,6 +317,7 @@ describe('controller e2e tests', () => {
       });
 
       expect(fn).toBeCalledWith('customerId', 'price_id');
+      expect(getUserSubscriptionSpy).toBeCalledWith('customerId');
 
       expect(response.statusCode).toBe(200);
     });
