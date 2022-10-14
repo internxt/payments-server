@@ -180,7 +180,7 @@ export default function (
           req.body.price_id,
           req.body.success_url,
           req.body.cancel_url,
-          user?.customerId ?? req.body.customer_email,
+          user ?? req.body.customer_email,
           req.body.coupon_code,
         );
 
