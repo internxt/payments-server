@@ -173,6 +173,7 @@ export class PaymentService {
     successUrl: string,
     cancelUrl: string,
     prefill: User | string,
+    couponCode?: string,
   ): Promise<Stripe.Checkout.Session> {
     return this.provider.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -180,9 +181,10 @@ export class PaymentService {
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
       customer_email: typeof prefill === 'string' ? prefill : undefined,
-      mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
+      mode: 'subscription',
+      discounts: couponCode ? [{ coupon: couponCode }] : undefined,
+      allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
     });
   }

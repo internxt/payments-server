@@ -115,7 +115,7 @@ export default function (
     fastify.get('/subscriptions', async (req, rep) => {
       let response: UserSubscription;
 
-      const user = await assertUser(req, rep);
+      const user: User = await assertUser(req, rep);
 
       let subscriptionInCache: UserSubscription | null | undefined;
       try {
@@ -148,7 +148,9 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.post<{ Body: { price_id: string; success_url: string; cancel_url: string; customer_email: string } }>(
+    fastify.post<{
+      Body: { price_id: string; success_url: string; coupon_code: string; cancel_url: string; customer_email: string };
+    }>(
       '/checkout-session',
 
       {
@@ -158,6 +160,7 @@ export default function (
             required: ['price_id', 'success_url', 'cancel_url', 'customer_email'],
             properties: {
               price_id: { type: 'string' },
+              coupon_code: { type: 'string' },
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
               customer_email: { type: 'string' },
@@ -167,7 +170,6 @@ export default function (
       },
       async (req, rep) => {
         const { uuid } = req.user.payload;
-
         let user: User | undefined;
         try {
           user = await usersService.findUserByUuid(uuid);
@@ -179,6 +181,7 @@ export default function (
           req.body.success_url,
           req.body.cancel_url,
           user ?? req.body.customer_email,
+          req.body.coupon_code,
         );
 
         return { sessionId: id };
