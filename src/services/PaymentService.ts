@@ -173,6 +173,7 @@ export class PaymentService {
     successUrl: string,
     cancelUrl: string,
     prefill: User | string,
+    mode: Stripe.Checkout.SessionCreateParams.Mode,
     couponCode?: string,
   ): Promise<Stripe.Checkout.Session> {
     return this.provider.checkout.sessions.create({
@@ -182,7 +183,7 @@ export class PaymentService {
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
       customer_email: typeof prefill === 'string' ? prefill : undefined,
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
+      mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
