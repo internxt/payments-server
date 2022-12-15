@@ -185,7 +185,7 @@ export class PaymentService {
       line_items: [{ price: priceId, quantity: 1 }],
       mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
-      allow_promotion_codes: couponCode ? undefined : true,
+      allow_promotion_codes: true,
       billing_address_collection: 'required',
     });
   }
