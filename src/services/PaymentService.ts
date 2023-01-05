@@ -153,7 +153,7 @@ export class PaymentService {
 
   async getPrices(): Promise<DisplayPrice[]> {
     const res = await this.provider.prices.search({
-      query: 'metadata["show"]:"1" type:"recurring" active:"true"',
+      query: 'metadata["show"]:"1" active:"true"',
       limit: 100,
     });
 
@@ -164,7 +164,8 @@ export class PaymentService {
         currency: price.currency,
         amount: price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
-        interval: price.recurring!.interval as 'year' | 'month',
+        interval: price.type === 'one_time' ? 'lifetime' : 
+          price.recurring!.interval as 'year' | 'month'
       }));
   }
 
