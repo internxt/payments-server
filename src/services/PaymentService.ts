@@ -153,7 +153,7 @@ export class PaymentService {
 
   async getPrices(): Promise<DisplayPrice[]> {
     const res = await this.provider.prices.search({
-      query: 'metadata["show"]:"1" type:"recurring" active:"true"',
+      query: 'metadata["show"]:"1" active:"true"',
       limit: 100,
     });
 
