@@ -164,7 +164,8 @@ export class PaymentService {
         currency: price.currency,
         amount: price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
-        interval: price.recurring!.interval as 'year' | 'month',
+        interval: price.type === 'one_time' ? 'lifetime' : 
+          price.recurring!.interval as 'year' | 'month'
       }));
   }
 
