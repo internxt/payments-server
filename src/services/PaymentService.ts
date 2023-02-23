@@ -189,7 +189,6 @@ export class PaymentService {
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
       subscription_data: {
-        trial_from_plan: trial ? true : undefined,
         trial_period_days: trial ? 30 : undefined,
       },
     });
