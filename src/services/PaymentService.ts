@@ -164,8 +164,7 @@ export class PaymentService {
         currency: price.currency,
         amount: price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
-        interval: price.type === 'one_time' ? 'lifetime' : 
-          price.recurring!.interval as 'year' | 'month'
+        interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
       }));
   }
 
@@ -175,8 +174,12 @@ export class PaymentService {
     cancelUrl: string,
     prefill: User | string,
     mode: Stripe.Checkout.SessionCreateParams.Mode,
+    trialDays?: number,
     couponCode?: string,
   ): Promise<Stripe.Checkout.Session> {
+    const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = trialDays
+      ? { trial_period_days: trialDays }
+      : {};
     return this.provider.checkout.sessions.create({
       payment_method_types: ['card'],
       success_url: successUrl,
@@ -188,6 +191,7 @@ export class PaymentService {
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
+      ...subscriptionData,
     });
   }
 
