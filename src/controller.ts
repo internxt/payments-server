@@ -150,12 +150,13 @@ export default function (
     });
 
     fastify.post<{
-      Body: { 
-        price_id: string; 
-        success_url: string; 
-        coupon_code: string; 
-        cancel_url: string; 
+      Body: {
+        price_id: string;
+        success_url: string;
+        coupon_code: string;
+        cancel_url: string;
         customer_email: string;
+        trial: boolean;
         mode?: string;
       };
     }>(
@@ -168,6 +169,7 @@ export default function (
             properties: {
               mode: { type: 'string' },
               price_id: { type: 'string' },
+              trial: { type: 'boolean' },
               coupon_code: { type: 'string' },
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
@@ -190,6 +192,7 @@ export default function (
           req.body.cancel_url,
           user ?? req.body.customer_email,
           (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
+          req.body.trial,
           req.body.coupon_code,
         );
 
