@@ -156,7 +156,7 @@ export default function (
         coupon_code: string;
         cancel_url: string;
         customer_email: string;
-        trialDays: number;
+        trialDays?: number;
         mode?: string;
       };
     }>(
