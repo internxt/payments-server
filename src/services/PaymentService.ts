@@ -177,6 +177,9 @@ export class PaymentService {
     trialDays?: number,
     couponCode?: string,
   ): Promise<Stripe.Checkout.Session> {
+    const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = trialDays
+      ? { trial_period_days: trialDays }
+      : {};
     return this.provider.checkout.sessions.create({
       payment_method_types: ['card'],
       success_url: successUrl,
@@ -188,7 +191,7 @@ export class PaymentService {
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
-      ...(trialDays ? { subscription_data: { trial_period_days: trialDays } } : {}),
+      ...subscriptionData,
     });
   }
 
