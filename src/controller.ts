@@ -156,7 +156,7 @@ export default function (
         coupon_code: string;
         cancel_url: string;
         customer_email: string;
-        trialDays?: number;
+        trial_days?: number;
         mode?: string;
       };
     }>(
@@ -169,7 +169,7 @@ export default function (
             properties: {
               mode: { type: 'string' },
               price_id: { type: 'string' },
-              trialDays: { type: 'number' },
+              trial_days: { type: 'number' },
               coupon_code: { type: 'string' },
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
@@ -192,7 +192,7 @@ export default function (
           req.body.cancel_url,
           user ?? req.body.customer_email,
           (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
-          req.body.trialDays,
+          req.body.trial_days,
           req.body.coupon_code,
         );
 
