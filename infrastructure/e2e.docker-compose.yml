@@ -1,0 +1,43 @@
+version: '3.9'
+
+networks:
+  internxt:
+    name: internxt
+
+services:
+  payments-mongo:
+    image: mongo:latest
+    container_name: payments-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: payments
+    volumes:
+      - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - 27018:27017
+    networks:
+      - internxt
+
+  payments-redis:
+    image: redis:latest
+    container_name: payments-redis
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      - internxt
+
+  payments-server:
+    build:
+      context: '../'
+      dockerfile: infrastructure/development.Dockerfile
+    container_name: payments-server
+    ports:
+      - 8003:8003
+    depends_on:
+      - payments-mongo
+      - payments-redis
+    networks:
+      - internxt
