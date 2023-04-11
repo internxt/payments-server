@@ -99,19 +99,23 @@ export class PaymentService {
 
   async hasUserAppliedCoupon(email: string, couponCode: string): Promise<hasUserAppliedCoupon> {
     const getCustomerId = await this.getCustomersByEmail(email);
-    const getUserInvoices = await this.getInvoicesFromUser(getCustomerId[0].id, { limit: 100 });
+    const getUserInvoices = await this.getInvoicesFromUser(getCustomerId[0].id, {});
 
-    const hasCouponApplied = getUserInvoices.some((invoice) => invoice.discount?.coupon.name === couponCode);
-    const couponId = getUserInvoices.find((invoice) => invoice.discount?.coupon.name === couponCode)?.discount?.coupon
-      .id;
+    const getCoupons = await this.provider.coupons.list({ limit: 100 });
 
-    return !hasCouponApplied
+    const coupon = getCoupons.data.find((coupon) => coupon.name === couponCode);
+
+    const hasCouponApplied = getUserInvoices.some(
+      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === coupon?.name,
+    );
+
+    return hasCouponApplied
       ? {
-          elegible: hasCouponApplied,
+          elegible: true,
         }
       : {
-          elegible: hasCouponApplied,
-          coupon: couponId,
+          elegible: false,
+          coupon: coupon?.id,
         };
   }
 
