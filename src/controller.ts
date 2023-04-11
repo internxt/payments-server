@@ -30,7 +30,7 @@ export default function (
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string, method?: string } = request.context.config;
+        const config: { url?: string; method?: string } = request.context.config;
         if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
           return;
         }
@@ -151,6 +151,10 @@ export default function (
 
     fastify.get('/prices', async (req, rep) => {
       return paymentService.getPrices();
+    });
+
+    fastify.get<{ Body: { email: string; coupon_code: string } }>('/apply-coupon', async (req, rep) => {
+      return paymentService.hasUserAppliedCoupon(req.body.email, req.body.coupon_code);
     });
 
     fastify.post<{
