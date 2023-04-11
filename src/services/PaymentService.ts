@@ -102,6 +102,8 @@ export class PaymentService {
     const getUserInvoices = await this.getInvoicesFromUser(getCustomerId[0].id, { limit: 100 });
 
     const hasCouponApplied = getUserInvoices.some((invoice) => invoice.discount?.coupon.name === couponCode);
+    const couponId = getUserInvoices.find((invoice) => invoice.discount?.coupon.name === couponCode)?.discount?.coupon
+      .id;
 
     return !hasCouponApplied
       ? {
@@ -109,7 +111,7 @@ export class PaymentService {
         }
       : {
           elegible: hasCouponApplied,
-          coupon: couponCode,
+          coupon: couponId,
         };
   }
 
