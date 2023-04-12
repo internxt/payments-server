@@ -112,6 +112,18 @@ export class PaymentService {
     return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: coupon.id };
   }
 
+  async applyCouponToUser(customerId: string) {
+    this.hasUserAppliedCoupon(customerId).then((res) => {
+      if (res.elegible) {
+        return this.provider.subscriptions.update(customerId, {
+          coupon: res.coupon,
+        });
+      } else {
+        throw new CouponAlreadyAppliedError('User already applied coupon');
+      }
+    });
+  }
+
   getSetupIntent(customerId: string): Promise<SetupIntent> {
     return this.provider.setupIntents.create({ customer: customerId, usage: 'off_session' });
   }
@@ -236,3 +248,4 @@ export class PaymentService {
 }
 
 class NotFoundSubscriptionError extends Error {}
+export class CouponAlreadyAppliedError extends Error {}

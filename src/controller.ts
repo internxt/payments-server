@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { PaymentService } from './services/PaymentService';
+import { CouponAlreadyAppliedError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -158,6 +158,18 @@ export default function (
       const user = await usersService.findUserByUuid(uuid);
 
       return paymentService.hasUserAppliedCoupon(user.customerId);
+    });
+
+    fastify.put('/apply-coupon', async (req, rep) => {
+      const { uuid } = req.user.payload;
+      const user = await usersService.findUserByUuid(uuid);
+
+      return paymentService.applyCouponToUser(user.customerId).catch((err) => {
+        if (err instanceof CouponAlreadyAppliedError) {
+          return rep.status(403).send({ message: 'Coupon already applied' });
+        }
+        throw err;
+      });
     });
 
     fastify.post<{
