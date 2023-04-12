@@ -50,11 +50,12 @@ export class PaymentService {
     return res.data;
   }
 
-  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId): Promise<Subscription> {
+  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId, couponCode?: string): Promise<Subscription> {
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
+      coupon: couponCode ? couponCode : undefined,
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
@@ -113,15 +114,20 @@ export class PaymentService {
   }
 
   async applyCouponToUser(customerId: string) {
-    this.hasUserAppliedCoupon(customerId).then((res) => {
-      if (res.elegible) {
-        return this.provider.subscriptions.update(customerId, {
-          coupon: res.coupon,
-        });
-      } else {
-        throw new CouponAlreadyAppliedError('User already applied coupon');
-      }
-    });
+    const hasCouponApplied = await this.hasUserAppliedCoupon(customerId);
+    if (hasCouponApplied.elegible) {
+      const subscription = await this.findIndividualActiveSubscription(customerId);
+
+      const updateSubscription = await this.updateSubscriptionPrice(
+        customerId,
+        subscription.items.data[0].plan.product as string,
+        hasCouponApplied.coupon as string,
+      );
+
+      return updateSubscription;
+    } else {
+      throw new CouponAlreadyAppliedError('User already applied coupon');
+    }
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {

@@ -164,12 +164,16 @@ export default function (
       const { uuid } = req.user.payload;
       const user = await usersService.findUserByUuid(uuid);
 
-      return paymentService.applyCouponToUser(user.customerId).catch((err) => {
+      try {
+        const applyCoupon = await paymentService.applyCouponToUser(user.customerId);
+        return applyCoupon;
+      } catch (err) {
         if (err instanceof CouponAlreadyAppliedError) {
           return rep.status(403).send({ message: 'Coupon already applied' });
+        } else {
+          return rep.status(500).send({ message: 'Internal server error' });
         }
-        throw err;
-      });
+      }
     });
 
     fastify.post<{
