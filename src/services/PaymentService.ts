@@ -103,13 +103,13 @@ export class PaymentService {
       status: 'all',
     });
 
-    const couponName = await this.provider.coupons.retrieve(process.env.COMEBACK_COUPON_CODE as string);
+    const coupon = await this.provider.coupons.retrieve(process.env.COMEBACK_COUPON_CODE as string);
 
     const isCouponAlreadyApplied = userSubscriptions.data.some(
-      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === couponName.name,
+      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === coupon.name,
     );
 
-    return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: couponName.id };
+    return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: coupon.id };
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
