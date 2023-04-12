@@ -153,8 +153,11 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.get<{ Body: { email: string; coupon_code: string } }>('/apply-coupon', async (req, rep) => {
-      return paymentService.hasUserAppliedCoupon(req.body.email, req.body.coupon_code);
+    fastify.get('/request-coupon', async (req, rep) => {
+      const { uuid } = req.user.payload;
+      const user = await usersService.findUserByUuid(uuid);
+
+      return paymentService.hasUserAppliedCoupon(user.customerId);
     });
 
     fastify.post<{

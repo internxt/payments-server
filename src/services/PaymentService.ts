@@ -20,7 +20,7 @@ type PaymentMethod = Stripe.PaymentMethod;
 
 type CustomerSource = Stripe.CustomerSource;
 
-type hasUserAppliedCoupon = {
+type HasUserAppliedCouponResponse = {
   elegible: boolean;
   coupon?: string;
 };
@@ -97,26 +97,19 @@ export class PaymentService {
     return res.data;
   }
 
-  async hasUserAppliedCoupon(email: string, couponCode: string): Promise<hasUserAppliedCoupon> {
-    const getCustomerId = await this.getCustomersByEmail(email);
-    const getUserInvoices = await this.getInvoicesFromUser(getCustomerId[0].id, {});
+  async hasUserAppliedCoupon(customerId: string): Promise<HasUserAppliedCouponResponse> {
+    const userSubscriptions = await this.provider.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+    });
 
-    const getCoupons = await this.provider.coupons.list({ limit: 100 });
+    const couponName = await this.provider.coupons.retrieve(process.env.COMEBACK_COUPON_CODE as string);
 
-    const coupon = getCoupons.data.find((coupon) => coupon.name === couponCode);
-
-    const hasCouponApplied = getUserInvoices.some(
-      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === coupon?.name,
+    const isCouponAlreadyApplied = userSubscriptions.data.some(
+      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === couponName.name,
     );
 
-    return hasCouponApplied
-      ? {
-          elegible: true,
-        }
-      : {
-          elegible: false,
-          coupon: coupon?.id,
-        };
+    return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: couponName.id };
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
