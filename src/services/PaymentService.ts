@@ -20,6 +20,11 @@ type PaymentMethod = Stripe.PaymentMethod;
 
 type CustomerSource = Stripe.CustomerSource;
 
+type HasUserAppliedCouponResponse = {
+  elegible: boolean;
+  coupon?: string;
+};
+
 export type PriceMetadata = {
   maxSpaceBytes: string;
   planType: 'subscription' | 'one_time';
@@ -90,6 +95,21 @@ export class PaymentService {
     });
 
     return res.data;
+  }
+
+  async hasUserAppliedCoupon(customerId: string): Promise<HasUserAppliedCouponResponse> {
+    const userSubscriptions = await this.provider.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+    });
+
+    const coupon = await this.provider.coupons.retrieve(process.env.COMEBACK_COUPON_CODE as string);
+
+    const isCouponAlreadyApplied = userSubscriptions.data.some(
+      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === coupon.name,
+    );
+
+    return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: coupon.id };
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
