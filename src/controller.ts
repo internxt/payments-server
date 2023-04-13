@@ -165,8 +165,8 @@ export default function (
       const user = await usersService.findUserByUuid(uuid);
 
       try {
-        const applyCoupon = await paymentService.applyCouponToUser(user.customerId);
-        return applyCoupon;
+        await paymentService.applyCouponToUser(user.customerId);
+        return rep.status(200).send({ message: 'Coupon applied' });
       } catch (err) {
         if (err instanceof CouponCodeError) {
           return rep.status(403).send({ message: err.message });
