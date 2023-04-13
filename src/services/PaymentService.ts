@@ -120,11 +120,12 @@ export class PaymentService {
 
       const updateSubscription = await this.updateSubscriptionPrice(
         customerId,
-        subscription.items.data[0].plan.product as string,
+        subscription.items.data[0].plan.id as string,
         hasCouponApplied.coupon as string,
       );
+      const updatedSubscription = await this.provider.subscriptions.retrieve(updateSubscription.id);
 
-      return updateSubscription;
+      return updatedSubscription;
     } else {
       throw new CouponAlreadyAppliedError('User already applied coupon');
     }

@@ -169,8 +169,9 @@ export default function (
         return applyCoupon;
       } catch (err) {
         if (err instanceof CouponAlreadyAppliedError) {
-          return rep.status(403).send({ message: 'Coupon already applied' });
+          return rep.status(403).send({ message: err.message });
         } else {
+          req.log.error(err);
           return rep.status(500).send({ message: 'Internal server error' });
         }
       }
