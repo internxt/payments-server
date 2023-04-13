@@ -255,4 +255,10 @@ export class PaymentService {
 }
 
 class NotFoundSubscriptionError extends Error {}
-export class CouponAlreadyAppliedError extends Error {}
+export class CouponCodeError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
