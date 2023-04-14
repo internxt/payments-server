@@ -127,7 +127,7 @@ export class PaymentService {
 
       return updatedSubscription;
     } else {
-      throw new CouponAlreadyAppliedError('User already applied coupon');
+      throw new CouponCodeError('User already applied coupon');
     }
   }
 
