@@ -118,14 +118,13 @@ export class PaymentService {
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
 
-      const updateSubscription = await this.updateSubscriptionPrice(
+      await this.updateSubscriptionPrice(
         customerId,
         subscription.items.data[0].plan.id as string,
         hasCouponApplied.coupon as string,
       );
-      const updatedSubscription = await this.provider.subscriptions.retrieve(updateSubscription.id);
 
-      return updatedSubscription;
+      return true;
     } else {
       throw new CouponCodeError('User already applied coupon');
     }
