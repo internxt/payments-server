@@ -50,11 +50,12 @@ export class PaymentService {
     return res.data;
   }
 
-  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId): Promise<Subscription> {
+  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId, couponCode?: string): Promise<Subscription> {
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
+      coupon: couponCode ? couponCode : undefined,
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
@@ -110,6 +111,23 @@ export class PaymentService {
     );
 
     return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: coupon.id };
+  }
+
+  async applyCouponToUser(customerId: string) {
+    const hasCouponApplied = await this.hasUserAppliedCoupon(customerId);
+    if (hasCouponApplied.elegible) {
+      const subscription = await this.findIndividualActiveSubscription(customerId);
+
+      await this.updateSubscriptionPrice(
+        customerId,
+        subscription.items.data[0].plan.id as string,
+        hasCouponApplied.coupon as string,
+      );
+
+      return true;
+    } else {
+      throw new CouponCodeError('User already applied coupon');
+    }
   }
 
   getSetupIntent(customerId: string): Promise<SetupIntent> {
@@ -236,3 +254,10 @@ export class PaymentService {
 }
 
 class NotFoundSubscriptionError extends Error {}
+export class CouponCodeError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}

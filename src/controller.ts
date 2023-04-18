@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { PaymentService } from './services/PaymentService';
+import { CouponCodeError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -158,6 +158,23 @@ export default function (
       const user = await usersService.findUserByUuid(uuid);
 
       return paymentService.hasUserAppliedCoupon(user.customerId);
+    });
+
+    fastify.put('/apply-coupon', async (req, rep) => {
+      const { uuid } = req.user.payload;
+      const user = await usersService.findUserByUuid(uuid);
+
+      try {
+        await paymentService.applyCouponToUser(user.customerId);
+        return rep.status(200).send({ message: 'Coupon applied' });
+      } catch (err) {
+        if (err instanceof CouponCodeError) {
+          return rep.status(403).send({ message: err.message });
+        } else {
+          req.log.error(err);
+          return rep.status(500).send({ message: 'Internal server error' });
+        }
+      }
     });
 
     fastify.post<{
