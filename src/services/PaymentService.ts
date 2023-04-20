@@ -174,7 +174,7 @@ export class PaymentService {
       }
     }
 
-    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ subscription: subscription.id });
+    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
 
     const { price } = subscription.items.data[0];
 
@@ -184,7 +184,7 @@ export class PaymentService {
       currency: price.currency,
       interval: price.recurring!.interval as 'year' | 'month',
       nextPayment: subscription.current_period_end,
-      amountAfterCoupon: upcomingInvoice.total !== price.unit_amount ? upcomingInvoice.total : undefined,
+      amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
     };
   }
