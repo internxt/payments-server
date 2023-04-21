@@ -216,6 +216,7 @@ export class PaymentService {
     couponCode?: string,
   ): Promise<Stripe.Checkout.Session> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
+    const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     return this.provider.checkout.sessions.create({
       payment_method_types: ['card'],
       success_url: successUrl,
@@ -227,6 +228,7 @@ export class PaymentService {
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
+      ...invoiceCreation,
       ...subscriptionData,
     });
   }
