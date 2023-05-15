@@ -22,7 +22,7 @@ type CustomerSource = Stripe.CustomerSource;
 
 type HasUserAppliedCouponResponse = {
   elegible: boolean;
-  coupon?: string;
+  reason?: Record<string, any>;
 };
 
 export type PriceMetadata = {
@@ -120,7 +120,7 @@ export class PaymentService {
 
     return isCouponAlreadyApplied
       ? { elegible: false }
-      : { elegible: true, coupon: subscriptionWithCoupon?.metadata.reason };
+      : { elegible: true, reason: { name: subscriptionWithCoupon?.metadata.reason, freeDays: 3 } };
   }
 
   async applyCouponToUser(customerId: string) {
@@ -128,9 +128,9 @@ export class PaymentService {
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
       //3 Months of free trial
-      const date = new Date();
-      const freeTiralPeriod = date.setMonth(date.getMonth() + 3);
 
+      const date = new Date();
+      const freeTiralPeriod = date.setMonth(date.getMonth() + hasCouponApplied.reason?.freeDays);
       await this.updateSubscriptionPrice(customerId, subscription.items.data[0].plan.id as string, freeTiralPeriod);
 
       return true;
