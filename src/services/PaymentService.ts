@@ -130,8 +130,8 @@ export class PaymentService {
       //3 Months of free trial
 
       const date = new Date();
-      const freeTiralPeriod = date.setMonth(date.getMonth() + hasCouponApplied.reason?.freeDays);
-      await this.updateSubscriptionPrice(customerId, subscription.items.data[0].plan.id as string, freeTiralPeriod);
+      const freeTrialPeriod = date.setMonth(date.getMonth() + hasCouponApplied.reason?.freeDays);
+      await this.updateSubscriptionPrice(customerId, subscription.items.data[0].plan.id as string, freeTrialPeriod);
 
       return true;
     } else {
