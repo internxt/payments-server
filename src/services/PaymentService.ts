@@ -50,12 +50,18 @@ export class PaymentService {
     return res.data;
   }
 
-  async updateSubscriptionPrice(customerId: CustomerId, priceId: PriceId, couponCode?: string): Promise<Subscription> {
+  async updateSubscriptionPrice(
+    customerId: CustomerId,
+    priceId: PriceId,
+    freeTrialPeriod?: number,
+    couponCode?: string,
+  ): Promise<Subscription> {
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
       coupon: couponCode ? couponCode : undefined,
+      trial_end: freeTrialPeriod ? Math.floor(freeTrialPeriod / 1000) : undefined,
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
@@ -104,25 +110,28 @@ export class PaymentService {
       status: 'all',
     });
 
-    const coupon = await this.provider.coupons.retrieve(process.env.COMEBACK_COUPON_CODE as string);
-
-    const isCouponAlreadyApplied = userSubscriptions.data.some(
-      (invoice) => invoice.discount?.coupon && invoice.discount?.coupon.name === coupon.name,
+    const subscriptionWithCoupon = userSubscriptions.data.find(
+      (invoice) => invoice.metadata && invoice.metadata.reason === 'COMEBACK',
     );
 
-    return isCouponAlreadyApplied ? { elegible: false } : { elegible: true, coupon: coupon.id };
+    const isCouponAlreadyApplied = userSubscriptions.data.some(
+      (invoice) => invoice.metadata && invoice.metadata.reason === 'COMEBACK',
+    );
+
+    return isCouponAlreadyApplied
+      ? { elegible: false }
+      : { elegible: true, coupon: subscriptionWithCoupon?.metadata.reason };
   }
 
   async applyCouponToUser(customerId: string) {
     const hasCouponApplied = await this.hasUserAppliedCoupon(customerId);
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
+      //3 Months of free trial
+      const date = new Date();
+      const freeTiralPeriod = date.setMonth(date.getMonth() + 3);
 
-      await this.updateSubscriptionPrice(
-        customerId,
-        subscription.items.data[0].plan.id as string,
-        hasCouponApplied.coupon as string,
-      );
+      await this.updateSubscriptionPrice(customerId, subscription.items.data[0].plan.id as string, freeTiralPeriod);
 
       return true;
     } else {
