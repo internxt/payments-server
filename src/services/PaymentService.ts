@@ -25,6 +25,11 @@ type HasUserAppliedCouponResponse = {
   reason?: Record<string, any>;
 };
 
+export type Reason = {
+  name: string;
+  freeDays: number;
+};
+
 export type PriceMetadata = {
   maxSpaceBytes: string;
   planType: 'subscription' | 'one_time';
@@ -53,21 +58,23 @@ export class PaymentService {
   async updateSubscriptionPrice(
     customerId: CustomerId,
     priceId: PriceId,
-    freeTrialPeriod?: number,
+    freeTrialPeriod?: Record<string, any>,
     couponCode?: string,
   ): Promise<Subscription> {
+    const hasMetadata = freeTrialPeriod ? { metadata: { reason: freeTrialPeriod.name } } : {};
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
       coupon: couponCode ? couponCode : undefined,
-      trial_end: freeTrialPeriod ? Math.floor(freeTrialPeriod / 1000) : undefined,
+      trial_end: freeTrialPeriod ? Math.floor(freeTrialPeriod.freeDays / 1000) : undefined,
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
           price: priceId,
         },
       ],
+      ...hasMetadata,
     });
 
     return updatedSubscription;
@@ -104,34 +111,33 @@ export class PaymentService {
     return res.data;
   }
 
-  async hasUserAppliedCoupon(customerId: string): Promise<HasUserAppliedCouponResponse> {
+  async hasUserAppliedCoupon(customerId: string, reason: Reason): Promise<HasUserAppliedCouponResponse> {
     const userSubscriptions = await this.provider.subscriptions.list({
       customer: customerId,
       status: 'all',
     });
 
-    const subscriptionWithCoupon = userSubscriptions.data.find(
-      (invoice) => invoice.metadata && invoice.metadata.reason === 'COMEBACK',
+    const isFreeTrialAlreadyApplied = userSubscriptions.data.some(
+      (invoice) => invoice.metadata && invoice.metadata.reason === reason.name,
     );
-
-    const isCouponAlreadyApplied = userSubscriptions.data.some(
-      (invoice) => invoice.metadata && invoice.metadata.reason === 'COMEBACK',
-    );
-
-    return isCouponAlreadyApplied
+    const date = new Date();
+    const freeTrialPeriod = date.setMonth(date.getMonth() + reason.freeDays);
+    return isFreeTrialAlreadyApplied
       ? { elegible: false }
-      : { elegible: true, reason: { name: subscriptionWithCoupon?.metadata.reason, freeDays: 3 } };
+      : { elegible: true, reason: { name: reason.name, freeTrial: freeTrialPeriod } };
   }
 
-  async applyCouponToUser(customerId: string) {
-    const hasCouponApplied = await this.hasUserAppliedCoupon(customerId);
+  async applyCouponToUser(customerId: string, reason: Reason) {
+    const hasCouponApplied = await this.hasUserAppliedCoupon(customerId, reason);
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
       //3 Months of free trial
 
-      const date = new Date();
-      const freeTrialPeriod = date.setMonth(date.getMonth() + hasCouponApplied.reason?.freeDays);
-      await this.updateSubscriptionPrice(customerId, subscription.items.data[0].plan.id as string, freeTrialPeriod);
+      await this.updateSubscriptionPrice(
+        customerId,
+        subscription.items.data[0].plan.id as string,
+        hasCouponApplied.reason,
+      );
 
       return true;
     } else {

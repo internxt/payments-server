@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, PaymentService } from './services/PaymentService';
+import { CouponCodeError, PaymentService, Reason } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -153,19 +153,37 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.get('/request-coupon', async (req, rep) => {
-      const { uuid } = req.user.payload;
-      const user = await usersService.findUserByUuid(uuid);
+    fastify.get<{ Querystring: { reason: string; freeTrial: number } }>(
+      '/request-coupon',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { reason: { type: 'string' }, freeTrial: { type: 'number', default: 3 } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { uuid } = req.user.payload;
+        const user = await usersService.findUserByUuid(uuid);
 
-      return paymentService.hasUserAppliedCoupon(user.customerId);
-    });
+        return paymentService.hasUserAppliedCoupon(user.customerId, {
+          name: req.query.reason,
+          freeDays: req.query.freeTrial,
+        });
+      },
+    );
 
-    fastify.put('/apply-coupon', async (req, rep) => {
+    fastify.put<{
+      Body: {
+        reason: Reason;
+      };
+    }>('/apply-coupon', async (req, rep) => {
       const { uuid } = req.user.payload;
       const user = await usersService.findUserByUuid(uuid);
 
       try {
-        await paymentService.applyCouponToUser(user.customerId);
+        await paymentService.applyCouponToUser(user.customerId, req.body.reason);
         return rep.status(200).send({ message: 'Coupon applied' });
       } catch (err) {
         if (err instanceof CouponCodeError) {
