@@ -162,11 +162,7 @@ export default function (
       });
     });
 
-    fastify.put<{
-      Body: {
-        reason: Reason;
-      };
-    }>('/prevent-cancellation', async (req, rep) => {
+    fastify.put('/prevent-cancellation', async (req, rep) => {
       const { uuid } = req.user.payload;
       const user = await usersService.findUserByUuid(uuid);
 
