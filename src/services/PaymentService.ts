@@ -22,12 +22,15 @@ type CustomerSource = Stripe.CustomerSource;
 
 type HasUserAppliedCouponResponse = {
   elegible: boolean;
-  reason?: Record<string, any>;
+  reason?: Reason;
 };
 
 export type Reason = {
-  name: string;
-  freeDays: number;
+  name: 'prevent-cancellation';
+};
+
+const reasonFreeDaysMap: Record<Reason['name'], number> = {
+  'prevent-cancellation': 90,
 };
 
 export type PriceMetadata = {
@@ -55,26 +58,38 @@ export class PaymentService {
     return res.data;
   }
 
+  async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
+    let trialEnd = 0;
+
+    if (reason.name in reasonFreeDaysMap) {
+      const date = new Date();
+      trialEnd = date.setDate(date.getDate() + reasonFreeDaysMap[reason.name]);
+    }
+
+    return this.updateSubscriptionPrice(customerId, priceId, undefined, {
+      trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
+      metadata: { reason: reason.name },
+    });
+  }
+
   async updateSubscriptionPrice(
     customerId: CustomerId,
     priceId: PriceId,
-    freeTrialPeriod?: Record<string, any>,
     couponCode?: string,
+    additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {},
   ): Promise<Subscription> {
-    const hasMetadata = freeTrialPeriod ? { metadata: { reason: freeTrialPeriod.name } } : {};
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'create_prorations',
       coupon: couponCode ? couponCode : undefined,
-      trial_end: freeTrialPeriod ? Math.floor(freeTrialPeriod.freeDays / 1000) : undefined,
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
           price: priceId,
         },
       ],
-      ...hasMetadata,
+      ...additionalOptions,
     });
 
     return updatedSubscription;
@@ -111,7 +126,7 @@ export class PaymentService {
     return res.data;
   }
 
-  async hasUserAppliedCoupon(customerId: string, reason: Reason): Promise<HasUserAppliedCouponResponse> {
+  async hasUserAppliedFreeTrial(customerId: string, reason: Reason): Promise<HasUserAppliedCouponResponse> {
     const userSubscriptions = await this.provider.subscriptions.list({
       customer: customerId,
       status: 'all',
@@ -120,24 +135,16 @@ export class PaymentService {
     const isFreeTrialAlreadyApplied = userSubscriptions.data.some(
       (invoice) => invoice.metadata && invoice.metadata.reason === reason.name,
     );
-    const date = new Date();
-    const freeTrialPeriod = date.setMonth(date.getMonth() + reason.freeDays);
-    return isFreeTrialAlreadyApplied
-      ? { elegible: false }
-      : { elegible: true, reason: { name: reason.name, freeTrial: freeTrialPeriod } };
+
+    return isFreeTrialAlreadyApplied ? { elegible: false } : { elegible: true, reason: { name: reason.name } };
   }
 
-  async applyCouponToUser(customerId: string, reason: Reason) {
-    const hasCouponApplied = await this.hasUserAppliedCoupon(customerId, reason);
+  async applyFreeTrialToUser(customerId: string, reason: Reason) {
+    const hasCouponApplied = await this.hasUserAppliedFreeTrial(customerId, reason);
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
-      //3 Months of free trial
 
-      await this.updateSubscriptionPrice(
-        customerId,
-        subscription.items.data[0].plan.id as string,
-        hasCouponApplied.reason,
-      );
+      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan.id as string, reason);
 
       return true;
     } else {

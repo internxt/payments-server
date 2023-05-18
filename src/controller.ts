@@ -28,18 +28,18 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        const config: { url?: string; method?: string } = request.context.config;
-        if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
-          return;
-        }
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
+    // fastify.addHook('onRequest', async (request, reply) => {
+    //   try {
+    //     const config: { url?: string; method?: string } = request.context.config;
+    //     if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
+    //       return;
+    //     }
+    //     await request.jwtVerify();
+    //   } catch (err) {
+    //     request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+    //     reply.status(401).send();
+    //   }
+    // });
 
     fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
       '/invoices',
@@ -153,37 +153,27 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.get<{ Querystring: { reason: string; freeTrial: number } }>(
-      '/request-coupon',
-      {
-        schema: {
-          querystring: {
-            type: 'object',
-            properties: { reason: { type: 'string' }, freeTrial: { type: 'number', default: 3 } },
-          },
-        },
-      },
-      async (req, rep) => {
-        const { uuid } = req.user.payload;
-        const user = await usersService.findUserByUuid(uuid);
+    fastify.get('/request-prevent-cancellation', async (req) => {
+      const { uuid } = req.user.payload;
+      const user = await usersService.findUserByUuid(uuid);
 
-        return paymentService.hasUserAppliedCoupon(user.customerId, {
-          name: req.query.reason,
-          freeDays: req.query.freeTrial,
-        });
-      },
-    );
+      return paymentService.hasUserAppliedFreeTrial(user.customerId, {
+        name: 'prevent-cancellation',
+      });
+    });
 
     fastify.put<{
       Body: {
         reason: Reason;
       };
-    }>('/apply-coupon', async (req, rep) => {
+    }>('/prevent-cancellation', async (req, rep) => {
       const { uuid } = req.user.payload;
       const user = await usersService.findUserByUuid(uuid);
 
       try {
-        await paymentService.applyCouponToUser(user.customerId, req.body.reason);
+        await paymentService.applyFreeTrialToUser(user.customerId, {
+          name: 'prevent-cancellation',
+        });
         return rep.status(200).send({ message: 'Coupon applied' });
       } catch (err) {
         if (err instanceof CouponCodeError) {
