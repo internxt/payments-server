@@ -28,18 +28,18 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    // fastify.addHook('onRequest', async (request, reply) => {
-    //   try {
-    //     const config: { url?: string; method?: string } = request.context.config;
-    //     if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
-    //       return;
-    //     }
-    //     await request.jwtVerify();
-    //   } catch (err) {
-    //     request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-    //     reply.status(401).send();
-    //   }
-    // });
+    fastify.addHook('onRequest', async (request, reply) => {
+      try {
+        const config: { url?: string; method?: string } = request.context.config;
+        if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
+          return;
+        }
+        await request.jwtVerify();
+      } catch (err) {
+        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+        reply.status(401).send();
+      }
+    });
 
     fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
       '/invoices',
