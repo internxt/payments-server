@@ -29,8 +29,8 @@ export type Reason = {
   name: 'prevent-cancellation';
 };
 
-const reasonFreeDaysMap: Record<Reason['name'], number> = {
-  'prevent-cancellation': 90,
+const reasonFreeMonthsMap: Record<Reason['name'], number> = {
+  'prevent-cancellation': 3,
 };
 
 export type PriceMetadata = {
@@ -61,9 +61,9 @@ export class PaymentService {
   async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
     let trialEnd = 0;
 
-    if (reason.name in reasonFreeDaysMap) {
+    if (reason.name in reasonFreeMonthsMap) {
       const date = new Date();
-      trialEnd = date.setDate(date.getDate() + reasonFreeDaysMap[reason.name]);
+      trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
     return this.updateSubscriptionPrice(customerId, priceId, undefined, {
