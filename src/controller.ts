@@ -155,11 +155,24 @@ export default function (
 
     fastify.get('/request-prevent-cancellation', async (req) => {
       const { uuid } = req.user.payload;
-      const user = await usersService.findUserByUuid(uuid);
+      try {
+        const user = await usersService.findUserByUuid(uuid);
+        if (user.lifetime) {
+          return {
+            elegible: false,
+          };
+        }
 
-      return paymentService.hasUserAppliedFreeTrial(user.customerId, {
-        name: 'prevent-cancellation',
-      });
+        return paymentService.hasUserAppliedFreeTrial(user.customerId, {
+          name: 'prevent-cancellation',
+        });
+      } catch (err) {
+        const error = err as Error;
+        req.log.error(
+          `[REQUEST-PREVENT-CANCELLATION] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
+        );
+        throw err;
+      }
     });
 
     fastify.put('/prevent-cancellation', async (req, rep) => {

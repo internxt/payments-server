@@ -136,7 +136,7 @@ export class PaymentService {
       (invoice) => invoice.metadata && invoice.metadata.reason === reason.name,
     );
 
-    return isFreeTrialAlreadyApplied ? { elegible: false } : { elegible: true, reason: { name: reason.name } };
+    return isFreeTrialAlreadyApplied ? { elegible: false } : { elegible: true };
   }
 
   async applyFreeTrialToUser(customerId: string, reason: Reason) {
