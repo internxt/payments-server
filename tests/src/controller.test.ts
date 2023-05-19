@@ -668,5 +668,43 @@ describe('controller e2e tests', () => {
         });
       });
     });
+
+    describe('Preventing cancellation when the user is elegible', () => {
+      describe('Users with active subscription and who have not used the offer', () => {
+        it('When the user is elegible it should prevent cancellation', async () => {
+          const { getValidToken, preventCancellationTestUsers: users } = await getMocks();
+          const response = await app.inject({
+            path: '/prevent-cancellation',
+            method: 'PUT',
+            headers: { authorization: `Bearer ${getValidToken(users.elegible.subscriptionUserUuid)}` },
+          });
+
+          expect(response.statusCode).toBe(200);
+        });
+      });
+      describe('Users with active subscription who have used the offer or has a lifetime plan', () => {
+        it('When the user is not elegible it should not prevent cancellation', async () => {
+          const { getValidToken, preventCancellationTestUsers: users } = await getMocks();
+          const response = await app.inject({
+            path: '/prevent-cancellation',
+            method: 'PUT',
+            headers: { authorization: `Bearer ${getValidToken(users.nonElegible.subscriptionUserUuid)}` },
+          });
+
+          expect(response.statusCode).toBe(403);
+        });
+
+        it('When the user has a lifetime plan', async () => {
+          const { getValidToken, preventCancellationTestUsers: users } = await getMocks();
+          const response = await app.inject({
+            path: '/prevent-cancellation',
+            method: 'PUT',
+            headers: { authorization: `Bearer ${getValidToken(users.elegible.subscriptionUserUuid)}` },
+          });
+
+          expect(response.statusCode).toBe(403);
+        });
+      });
+    });
   });
 });

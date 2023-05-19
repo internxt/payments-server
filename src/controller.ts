@@ -157,13 +157,8 @@ export default function (
       const { uuid } = req.user.payload;
       try {
         const user = await usersService.findUserByUuid(uuid);
-        if (user.lifetime) {
-          return {
-            elegible: false,
-          };
-        }
 
-        return paymentService.hasUserAppliedFreeTrial(user.customerId, {
+        return paymentService.isUserElegibleForTrial(user, {
           name: 'prevent-cancellation',
         });
       } catch (err) {
@@ -180,7 +175,7 @@ export default function (
       const user = await usersService.findUserByUuid(uuid);
 
       try {
-        await paymentService.applyFreeTrialToUser(user.customerId, {
+        await paymentService.applyFreeTrialToUser(user, {
           name: 'prevent-cancellation',
         });
         return rep.status(200).send({ message: 'Coupon applied' });

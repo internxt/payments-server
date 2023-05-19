@@ -126,7 +126,15 @@ export class PaymentService {
     return res.data;
   }
 
-  async hasUserAppliedFreeTrial(customerId: string, reason: Reason): Promise<HasUserAppliedCouponResponse> {
+  async isUserElegibleForTrial(user: User, reason: Reason): Promise<HasUserAppliedCouponResponse> {
+    const { lifetime, customerId } = user;
+
+    if (lifetime) {
+      return {
+        elegible: false,
+      };
+    }
+
     const userSubscriptions = await this.provider.subscriptions.list({
       customer: customerId,
       status: 'all',
@@ -139,8 +147,9 @@ export class PaymentService {
     return isFreeTrialAlreadyApplied ? { elegible: false } : { elegible: true };
   }
 
-  async applyFreeTrialToUser(customerId: string, reason: Reason) {
-    const hasCouponApplied = await this.hasUserAppliedFreeTrial(customerId, reason);
+  async applyFreeTrialToUser(user: User, reason: Reason) {
+    const { customerId } = user;
+    const hasCouponApplied = await this.isUserElegibleForTrial(user, reason);
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
 
