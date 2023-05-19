@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, PaymentService } from './services/PaymentService';
+import { CouponCodeError, PaymentService, Reason } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -153,19 +153,31 @@ export default function (
       return paymentService.getPrices();
     });
 
-    fastify.get('/request-coupon', async (req, rep) => {
+    fastify.get('/request-prevent-cancellation', async (req) => {
       const { uuid } = req.user.payload;
-      const user = await usersService.findUserByUuid(uuid);
+      try {
+        const user = await usersService.findUserByUuid(uuid);
 
-      return paymentService.hasUserAppliedCoupon(user.customerId);
+        return paymentService.isUserElegibleForTrial(user, {
+          name: 'prevent-cancellation',
+        });
+      } catch (err) {
+        const error = err as Error;
+        req.log.error(
+          `[REQUEST-PREVENT-CANCELLATION] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
+        );
+        throw err;
+      }
     });
 
-    fastify.put('/apply-coupon', async (req, rep) => {
+    fastify.put('/prevent-cancellation', async (req, rep) => {
       const { uuid } = req.user.payload;
       const user = await usersService.findUserByUuid(uuid);
 
       try {
-        await paymentService.applyCouponToUser(user.customerId);
+        await paymentService.applyFreeTrialToUser(user, {
+          name: 'prevent-cancellation',
+        });
         return rep.status(200).send({ message: 'Coupon applied' });
       } catch (err) {
         if (err instanceof CouponCodeError) {
