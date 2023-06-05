@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { MongoClient } from 'mongodb';
 import XLSX from 'xlsx';
 import Stripe from 'stripe';
@@ -11,6 +12,7 @@ import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
 import { LicenseCode } from '../core/users/LicenseCode';
+import { StorageService } from '../services/StorageService';
 
 const [,,filePath,provider] = process.argv;
 
@@ -47,6 +49,7 @@ async function main() {
   try {
     const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
+    const storageService = new StorageService(envVariablesConfig, axios);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(
       mongoClient
     );
@@ -56,7 +59,8 @@ async function main() {
     const licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,
-      licenseCodesRepository
+      storageService,
+      licenseCodesRepository,
     );
 
     for (const licenseCode of loadFromExcel()) {
