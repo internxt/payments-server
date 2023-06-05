@@ -45,6 +45,28 @@ export class PaymentService {
     this.provider = provider;
   }
 
+  async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
+    const customer = await this.provider.customers.create(payload);
+    
+    return customer;
+  }
+
+  async subscribe(
+    customerId: CustomerId,
+    priceId: PriceId
+  ): Promise<Stripe.Subscription> {
+    const subscription = await this.provider.subscriptions.create({
+      customer: customerId,
+      items: [
+        {
+          price: priceId,
+        }
+      ]
+    });
+
+    return subscription;
+  }
+
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
     await this.provider.subscriptions.del(subscriptionId, {});
   }
