@@ -248,8 +248,6 @@ export default function (
 
     fastify.post<{ 
       Body: {
-        email: string,
-        uuid: string,
         code: string,
         provider: string,
       } 
@@ -259,10 +257,8 @@ export default function (
         schema: {
           body: {
             type: 'object',
-            required: ['email', 'uuid', 'code', 'provider'],
+            required: ['code', 'provider'],
             properties: { 
-              email: { type: 'string' },
-              uuid: { type: 'string' },
               code: { type: 'string' },
               provider: { type: 'string' },
             },
@@ -270,12 +266,12 @@ export default function (
         },
       },
       async (req, rep) => {
-        const { email, uuid, code, provider } = req.body;
+        const { email, uuid, name, lastname } = req.user.payload;
+        const { code, provider } = req.body;
 
         try {
           await licenseCodesService.redeem(
-            email,
-            uuid,
+            { email, uuid, name: `${name} ${lastname}` },
             code,
             provider
           );

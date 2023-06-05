@@ -30,6 +30,7 @@ const start = async (): Promise<FastifyInstance> => {
   const licenseCodesService = new LicenseCodesService(
     paymentService,
     usersService,
+    storageService,
     licenseCodesRepository
   );
 
