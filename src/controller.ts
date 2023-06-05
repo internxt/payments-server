@@ -11,6 +11,8 @@ import {
   LicenseCodeAlreadyAppliedError, 
   LicenseCodesService 
 } from './services/LicenseCodesService';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rateLimit = require('fastify-rate-limit');
 
 export default function (
   paymentService: PaymentService,
@@ -34,6 +36,10 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
+    fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: '1 minute'
+    });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
         const config: { url?: string; method?: string } = request.context.config;
@@ -264,6 +270,12 @@ export default function (
             },
           },
         },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          }
+        }
       },
       async (req, rep) => {
         const { email, uuid, name, lastname } = req.user.payload;
