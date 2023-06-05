@@ -1,17 +1,23 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, PaymentService, Reason } from './services/PaymentService';
+import { CouponCodeError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
+import { 
+  InvalidLicenseCodeError, 
+  LicenseCodeAlreadyAppliedError, 
+  LicenseCodesService 
+} from './services/LicenseCodesService';
 
 export default function (
   paymentService: PaymentService,
   usersService: UsersService,
   config: AppConfig,
   cacheService: CacheService,
+  licenseCodesService: LicenseCodesService,
 ) {
   async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
     const { uuid } = req.user.payload;
@@ -238,6 +244,58 @@ export default function (
 
         return { sessionId: id };
       },
+    );
+
+    fastify.post<{ 
+      Body: {
+        email: string,
+        uuid: string,
+        code: string,
+        provider: string,
+      } 
+    }>(
+      '/licenses', 
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['email', 'uuid', 'code', 'provider'],
+            properties: { 
+              email: { type: 'string' },
+              uuid: { type: 'string' },
+              code: { type: 'string' },
+              provider: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { email, uuid, code, provider } = req.body;
+
+        try {
+          await licenseCodesService.redeem(
+            email,
+            uuid,
+            code,
+            provider
+          );
+
+          return rep.status(200).send({ message: 'Code redeemed' });
+        } catch (error) {
+          const err = error as Error;
+
+          if (err instanceof InvalidLicenseCodeError) {
+            return rep.status(400).send({ message: err.message });
+          }
+
+          if (err instanceof LicenseCodeAlreadyAppliedError) {
+            return rep.status(403).send({ message: err.message });
+          }
+
+          req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
+        }
+      }
     );
   };
 }

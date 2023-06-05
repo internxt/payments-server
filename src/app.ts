@@ -8,12 +8,14 @@ import { PaymentService } from './services/PaymentService';
 import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
 import webhook from './webhooks';
+import { LicenseCodesService } from './services/LicenseCodesService';
 
 export async function buildApp(
   paymentService: PaymentService,
   storageService: StorageService,
   usersService: UsersService,
   cacheService: CacheService,
+  licenseCodesService: LicenseCodesService,
   stripe: Stripe,
   config: AppConfig,
 ): Promise<FastifyInstance> {
@@ -28,7 +30,9 @@ export async function buildApp(
           : false,
     },
   });
-  fastify.register(controller(paymentService, usersService, config, cacheService));
+  fastify.register(
+    controller(paymentService, usersService, config, cacheService, licenseCodesService)
+  );
 
   fastify.register(webhook(stripe, storageService, usersService, paymentService, config, cacheService));
 
