@@ -54,17 +54,37 @@ export class PaymentService {
   async subscribe(
     customerId: CustomerId,
     priceId: PriceId
-  ): Promise<Stripe.Subscription> {
-    const subscription = await this.provider.subscriptions.create({
-      customer: customerId,
-      items: [
-        {
-          price: priceId,
-        }
-      ]
-    });
+  ): Promise<{ maxSpaceBytes: number, recurring: boolean }> {
+    const price = await this.provider.prices.retrieve(priceId);
+    const isRecurring = price.type === 'recurring';
 
-    return subscription;
+    if (isRecurring) {
+      await this.provider.subscriptions.create({
+        customer: customerId,
+        items: [
+          {
+            price: priceId,
+          }
+        ]
+      });
+    } else {
+      await this.provider.invoiceItems.create({
+        customer: customerId,
+        price: priceId,
+        description: 'One-time charge',
+      });
+      const invoice = await this.provider.invoices.create({
+        customer: customerId,
+        auto_advance: false,
+        pending_invoice_items_behavior: 'include_and_require'
+      });
+      
+      await this.provider.invoices.pay(invoice.id, {
+        paid_out_of_band: true,
+      });
+    }
+
+    return { maxSpaceBytes: parseInt(price.metadata.maxSpaceBytes), recurring: isRecurring };
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
