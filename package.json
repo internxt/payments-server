@@ -9,7 +9,8 @@
     "dev": "nodemon src/index.ts",
     "start": "node .",
     "build": "tsc",
-    "test": "jest"
+    "test": "jest",
+    "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "devDependencies": {
     "@internxt/eslint-config-internxt": "^1.0.8",
@@ -26,7 +27,8 @@
     "prettier": "^2.6.2",
     "ts-jest": "27",
     "ts-node": "^10.8.0",
-    "typescript": "^4.7.2"
+    "typescript": "^4.7.2",
+    "xlsx": "^0.18.5"
   },
   "dependencies": {
     "@fastify/cors": "^7.0.0",
@@ -34,6 +36,7 @@
     "axios": "^0.27.2",
     "dotenv": "^16.0.1",
     "fastify": "^3.29.0",
+    "fastify-rate-limit": "^5.9.0",
     "ioredis": "^5.0.6",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^4.6.0",

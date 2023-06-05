@@ -1,17 +1,25 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, PaymentService, Reason } from './services/PaymentService';
+import { CouponCodeError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
+import { 
+  InvalidLicenseCodeError, 
+  LicenseCodeAlreadyAppliedError, 
+  LicenseCodesService 
+} from './services/LicenseCodesService';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rateLimit = require('fastify-rate-limit');
 
 export default function (
   paymentService: PaymentService,
   usersService: UsersService,
   config: AppConfig,
   cacheService: CacheService,
+  licenseCodesService: LicenseCodesService,
 ) {
   async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
     const { uuid } = req.user.payload;
@@ -28,6 +36,10 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
+    fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: '1 minute'
+    });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
         const config: { url?: string; method?: string } = request.context.config;
@@ -238,6 +250,60 @@ export default function (
 
         return { sessionId: id };
       },
+    );
+
+    fastify.post<{ 
+      Body: {
+        code: string,
+        provider: string,
+      } 
+    }>(
+      '/licenses', 
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['code', 'provider'],
+            properties: { 
+              code: { type: 'string' },
+              provider: { type: 'string' },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          }
+        }
+      },
+      async (req, rep) => {
+        const { email, uuid, name, lastname } = req.user.payload;
+        const { code, provider } = req.body;
+
+        try {
+          await licenseCodesService.redeem(
+            { email, uuid, name: `${name} ${lastname}` },
+            code,
+            provider
+          );
+
+          return rep.status(200).send({ message: 'Code redeemed' });
+        } catch (error) {
+          const err = error as Error;
+
+          if (err instanceof InvalidLicenseCodeError) {
+            return rep.status(400).send({ message: err.message });
+          }
+
+          if (err instanceof LicenseCodeAlreadyAppliedError) {
+            return rep.status(403).send({ message: err.message });
+          }
+
+          req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
+        }
+      }
     );
   };
 }
