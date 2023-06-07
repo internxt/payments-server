@@ -14,7 +14,6 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
 
-//Type for allowed methods for each route
 type AllowedMethods = 'GET' | 'POST';
 
 const allowedRoutes: {
@@ -280,9 +279,12 @@ export default function (
       },
       async (req, res) => {
         const { code, provider } = req.query;
-        await licenseCodesService.isLicenseCodeAvailable(code, provider);
-
-        return res.status(200).send({ message: 'Code is available' });
+        try {
+          await licenseCodesService.isLicenseCodeAvailable(code, provider);
+          return res.status(200).send({ message: 'Code is available' });
+        } catch (err) {
+          return res.status(404).send({ message: 'Not found' });
+        }
       },
     );
 
