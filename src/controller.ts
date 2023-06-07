@@ -282,8 +282,14 @@ export default function (
         try {
           await licenseCodesService.isLicenseCodeAvailable(code, provider);
           return res.status(200).send({ message: 'Code is available' });
-        } catch (err) {
-          return res.status(404).send({ message: 'Not found' });
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof LicenseCodeAlreadyAppliedError || err instanceof InvalidLicenseCodeError) {
+            return res.status(404).send({ message: err.message });
+          }
+
+          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
     );
