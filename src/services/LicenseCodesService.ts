@@ -26,22 +26,19 @@ export class LicenseCodesService {
     private readonly paymentService: PaymentService,
     private readonly usersService: UsersService,
     private readonly storageService: StorageService,
-    private readonly licenseCodesRepository: LicenseCodesRepository
+    private readonly licenseCodesRepository: LicenseCodesRepository,
   ) {}
 
   async redeem(
     user: {
-      email: string, 
-      uuid: User['uuid'],
-      name?: string,
+      email: string;
+      uuid: User['uuid'];
+      name?: string;
     },
     code: LicenseCode['code'],
     provider: LicenseCode['provider'],
   ): Promise<void> {
-    const licenseCode = await this.licenseCodesRepository.findOne(
-      code, 
-      provider
-    );
+    const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
 
     if (licenseCode === null) {
       throw new InvalidLicenseCodeError();
@@ -56,23 +53,22 @@ export class LicenseCodesService {
 
     // 1. Create or get customer from Stripe
     if (!maybeExistingUser) {
-      customerId = (await this.paymentService.createCustomer({ 
-        name: user.name || 'Internxt User',
-        email: user.email,
-      })).id;
+      customerId = (
+        await this.paymentService.createCustomer({
+          name: user.name || 'Internxt User',
+          email: user.email,
+        })
+      ).id;
     } else {
       customerId = (await this.paymentService.getCustomer(maybeExistingUser.customerId)).id;
     }
-    
+
     // 2. Subscribe to the price referenced by the code
-    const productMetadata = await this.paymentService.subscribe(
-      customerId,
-      licenseCode.priceId,
-    ); 
+    const productMetadata = await this.paymentService.subscribe(customerId, licenseCode.priceId);
 
     // 3. Set the storage referenced by the code
-    await this.storageService.changeStorage(user.uuid, productMetadata.maxSpaceBytes);  
- 
+    await this.storageService.changeStorage(user.uuid, productMetadata.maxSpaceBytes);
+
     // 4. Update user accordingly
     if (!maybeExistingUser) {
       await this.usersService.insertUser({
