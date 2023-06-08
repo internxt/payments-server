@@ -53,9 +53,9 @@ export default function (
       try {
         const config: { url?: string; method?: AllowedMethods } = request.context.config;
         if (
-          config.method && 
-          config.url && 
-          allowedRoutes[config.url] && 
+          config.method &&
+          config.url &&
+          allowedRoutes[config.url] &&
           allowedRoutes[config.url].includes(config.method)
         ) {
           return;
