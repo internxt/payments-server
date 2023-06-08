@@ -29,6 +29,20 @@ export class LicenseCodesService {
     private readonly licenseCodesRepository: LicenseCodesRepository,
   ) {}
 
+  async isLicenseCodeAvailable(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<boolean> {
+    const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
+
+    if (licenseCode === null) {
+      throw new InvalidLicenseCodeError();
+    }
+
+    if (licenseCode.redeemed) {
+      throw new LicenseCodeAlreadyAppliedError();
+    }
+
+    return true;
+  }
+
   async redeem(
     user: {
       email: string;
