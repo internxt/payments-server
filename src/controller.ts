@@ -6,10 +6,10 @@ import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
-import { 
-  InvalidLicenseCodeError, 
-  LicenseCodeAlreadyAppliedError, 
-  LicenseCodesService 
+import {
+  InvalidLicenseCodeError,
+  LicenseCodeAlreadyAppliedError,
+  LicenseCodesService,
 } from './services/LicenseCodesService';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
@@ -38,7 +38,7 @@ export default function (
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(rateLimit, {
       max: 1000,
-      timeWindow: '1 minute'
+      timeWindow: '1 minute',
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
@@ -252,19 +252,20 @@ export default function (
       },
     );
 
-    fastify.post<{ 
+
+    fastify.post<{
       Body: {
-        code: string,
-        provider: string,
-      } 
+        code: string;
+        provider: string;
+      };
     }>(
-      '/licenses', 
+      '/licenses',
       {
         schema: {
           body: {
             type: 'object',
             required: ['code', 'provider'],
-            properties: { 
+            properties: {
               code: { type: 'string' },
               provider: { type: 'string' },
             },
@@ -274,19 +275,15 @@ export default function (
           rateLimit: {
             max: 5,
             timeWindow: '1 minute',
-          }
-        }
+          },
+        },
       },
       async (req, rep) => {
         const { email, uuid, name, lastname } = req.user.payload;
         const { code, provider } = req.body;
 
         try {
-          await licenseCodesService.redeem(
-            { email, uuid, name: `${name} ${lastname}` },
-            code,
-            provider
-          );
+          await licenseCodesService.redeem({ email, uuid, name: `${name} ${lastname}` }, code, provider);
 
           return rep.status(200).send({ message: 'Code redeemed' });
         } catch (error) {
@@ -303,7 +300,7 @@ export default function (
           req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
-      }
+      },
     );
   };
 }
