@@ -16,8 +16,8 @@ export class MongoDBLicenseCodesRepository implements LicenseCodesRepository {
 
   async findOne(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<LicenseCode | null> {
     const licenseCode = await this.collection.findOne({
-      code,
-      provider,
+      code, 
+      provider
     });
 
     if (licenseCode) {
@@ -28,7 +28,7 @@ export class MongoDBLicenseCodesRepository implements LicenseCodesRepository {
   }
 
   async insert(licenseCode: LicenseCode): Promise<void> {
-    await this.collection.insertOne(this.toPersistence(licenseCode));
+    await this.collection.insertOne(this.toPersistence(licenseCode));    
   }
 
   async updateByCode(code: LicenseCode['code'], body: Partial<Omit<LicenseCode, 'code'>>): Promise<boolean> {
