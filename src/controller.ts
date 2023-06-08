@@ -14,6 +14,15 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
 
+type AllowedMethods = 'GET' | 'POST';
+
+const allowedRoutes: {
+  [key: string]: AllowedMethods[];
+} = {
+  '/prices': ['GET'],
+  '/is-unique-code-available': ['GET'],
+};
+
 export default function (
   paymentService: PaymentService,
   usersService: UsersService,
@@ -42,8 +51,13 @@ export default function (
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string; method?: string } = request.context.config;
-        if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
+        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        if (
+          config.method && 
+          config.url && 
+          allowedRoutes[config.url] && 
+          allowedRoutes[config.url].includes(config.method)
+        ) {
           return;
         }
         await request.jwtVerify();
