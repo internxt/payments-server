@@ -35,8 +35,8 @@ async function getMocks() {
   const uniqueCode = {
     techCult: {
       codes: {
-        elegible: '101057359',
-        nonElegible: '2tb_code_redeem',
+        elegible: '5tb_redeem_code', //REDEEMED: FALSE
+        nonElegible: '2tb_code_redeem', //REDEEMED: TRUE
         doesntExist: 'doesnt_exist',
       },
       provider: 'TECHCULT',
