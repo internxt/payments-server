@@ -32,12 +32,24 @@ async function getMocks() {
     },
   };
 
+  const uniqueCode = {
+    techCult: {
+      codes: {
+        elegible: '5tb_redeem_code', //REDEEMED: FALSE
+        nonElegible: '2tb_code_redeem', //REDEEMED: TRUE
+        doesntExist: 'doesnt_exist',
+      },
+      provider: 'TECHCULT',
+    },
+  };
+
   function getValidToken(userUuid: string): string {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
   }
   return {
     getValidToken,
     preventCancellationTestUsers,
+    uniqueCode,
     validToken:
       // eslint-disable-next-line max-len
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7InV1aWQiOiJiODQyODk3YS01MDg2LTQxODMtYWZiMS1mYTAwNGVlMzljNjYiLCJlbWFpbCI6InByZXBheW1lbnRzbGF1bmNoQGlueHQuY29tIiwibmFtZSI6ImhlbGxvIiwibGFzdG5hbWUiOiJoZWxsbyIsInVzZXJuYW1lIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJzaGFyZWRXb3Jrc3BhY2UiOnRydWUsIm5ldHdvcmtDcmVkZW50aWFscyI6eyJ1c2VyIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJwYXNzIjoiJDJhJDA4JFRRSmppNS9wUHpWUlp0UWNxOW9hd3VsdEFUYUlMTjdlUHNjWHg2Vy95WDhzNGJyM1FtOWJtIn19LCJpYXQiOjE2NTUxMDQwOTZ9.s3791sv4gmWgt5Ni1a8DnRw_5JyJ8g9Ff0bpIlqo6LM',
@@ -617,6 +629,42 @@ describe('controller e2e tests', () => {
   //     expect(JSON.parse(response.body)).toMatchObject({ sessionId: 'sessionId' });
   //   });
   // });
+
+  describe('Check if the unique code provided by the user is valid', () => {
+    describe('Detrmine if the code is invalid', () => {
+      it('When the code is already used, it should return 404', async () => {
+        const { uniqueCode } = await getMocks();
+        const response = await app.inject({
+          path: '/is-unique-code-available',
+          query: { code: uniqueCode.techCult.codes.nonElegible, provider: uniqueCode.techCult.provider },
+          method: 'GET',
+        });
+        expect(response.statusCode).toBe(404);
+      });
+
+      // eslint-disable-next-line quotes
+      it("When the code doesn't exist, it should return 404", async () => {
+        const { uniqueCode } = await getMocks();
+        const response = await app.inject({
+          path: '/is-unique-code-available',
+          query: { code: uniqueCode.techCult.codes.doesntExist, provider: uniqueCode.techCult.provider },
+          method: 'GET',
+        });
+        expect(response.statusCode).toBe(404);
+      });
+    });
+    describe('Determine if the code is valid', () => {
+      it('When the code is valid, it should return 200', async () => {
+        const { uniqueCode } = await getMocks();
+        const response = await app.inject({
+          path: '/is-unique-code-available',
+          query: { code: uniqueCode.techCult.codes.elegible, provider: uniqueCode.techCult.provider },
+          method: 'GET',
+        });
+        expect(response.statusCode).toBe(200);
+      });
+    });
+  });
 
   describe('Determine if a user is eligible for preventing cancellation', () => {
     it('When an invalid token is provided, it should return Unauthorized (401)', async () => {

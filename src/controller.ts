@@ -6,13 +6,22 @@ import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
-import { 
-  InvalidLicenseCodeError, 
-  LicenseCodeAlreadyAppliedError, 
-  LicenseCodesService 
+import {
+  InvalidLicenseCodeError,
+  LicenseCodeAlreadyAppliedError,
+  LicenseCodesService,
 } from './services/LicenseCodesService';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
+
+type AllowedMethods = 'GET' | 'POST';
+
+const allowedRoutes: {
+  [key: string]: AllowedMethods[];
+} = {
+  '/prices': ['GET'],
+  '/is-unique-code-available': ['GET'],
+};
 
 export default function (
   paymentService: PaymentService,
@@ -38,12 +47,17 @@ export default function (
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(rateLimit, {
       max: 1000,
-      timeWindow: '1 minute'
+      timeWindow: '1 minute',
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string; method?: string } = request.context.config;
-        if (config.url && config.url === '/prices' && config.method && config.method === 'GET') {
+        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        if (
+          config.method &&
+          config.url &&
+          allowedRoutes[config.url] &&
+          allowedRoutes[config.url].includes(config.method)
+        ) {
           return;
         }
         await request.jwtVerify();
@@ -252,19 +266,52 @@ export default function (
       },
     );
 
-    fastify.post<{ 
+    fastify.get<{ Querystring: { code: string; provider: string } }>(
+      '/is-unique-code-available',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { code: { type: 'string' }, provider: { type: 'string' } },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const { code, provider } = req.query;
+        try {
+          await licenseCodesService.isLicenseCodeAvailable(code, provider);
+          return res.status(200).send({ message: 'Code is available' });
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof LicenseCodeAlreadyAppliedError || err instanceof InvalidLicenseCodeError) {
+            return res.status(404).send({ message: err.message });
+          }
+
+          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          return res.status(500).send({ message: 'Internal Server Error' });
+        }
+      },
+    );
+
+    fastify.post<{
       Body: {
-        code: string,
-        provider: string,
-      } 
+        code: string;
+        provider: string;
+      };
     }>(
-      '/licenses', 
+      '/licenses',
       {
         schema: {
           body: {
             type: 'object',
             required: ['code', 'provider'],
-            properties: { 
+            properties: {
               code: { type: 'string' },
               provider: { type: 'string' },
             },
@@ -274,19 +321,15 @@ export default function (
           rateLimit: {
             max: 5,
             timeWindow: '1 minute',
-          }
-        }
+          },
+        },
       },
       async (req, rep) => {
         const { email, uuid, name, lastname } = req.user.payload;
         const { code, provider } = req.body;
 
         try {
-          await licenseCodesService.redeem(
-            { email, uuid, name: `${name} ${lastname}` },
-            code,
-            provider
-          );
+          await licenseCodesService.redeem({ email, uuid, name: `${name} ${lastname}` }, code, provider);
 
           return rep.status(200).send({ message: 'Code redeemed' });
         } catch (error) {
@@ -303,7 +346,7 @@ export default function (
           req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
-      }
+      },
     );
   };
 }
