@@ -1,18 +1,14 @@
-FROM mhart/alpine-node:16
+FROM node:16-alpine
 LABEL author="internxt"
 
-WORKDIR /
+WORKDIR /usr/app
 
-# Add useful packages
-RUN apk add git curl
+COPY package*.json ./
+
+COPY .npmrc ./
+
+RUN yarn
 
 COPY . ./
 
-# Install deps
-RUN yarn && yarn build
-
-# Create prometheus directories
-RUN mkdir -p /mnt/prometheusvol{1,2}
-
-# Start server
-CMD node /dist/index.js
+CMD yarn dev
