@@ -14,7 +14,7 @@ import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodes
 import { LicenseCode } from '../core/users/LicenseCode';
 import { StorageService } from '../services/StorageService';
 
-const [,,filePath,provider] = process.argv;
+const [, , filePath, provider] = process.argv;
 
 if (!filePath || !provider) {
   throw new Error('Missing "filePath" or "provider" params');
@@ -29,7 +29,7 @@ function loadFromExcel(): LicenseCode[] {
   const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
   jsonData.forEach((_row) => {
-    const row = (_row as Record<Stripe.Price['id'], number>);
+    const row = _row as Record<Stripe.Price['id'], number>;
 
     for (const priceId of Object.keys(row)) {
       licenseCodes.push({
@@ -47,12 +47,10 @@ function loadFromExcel(): LicenseCode[] {
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
-    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
+    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const storageService = new StorageService(envVariablesConfig, axios);
-    const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(
-      mongoClient
-    );
+    const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
 
     const paymentService = new PaymentService(stripe);
     const usersService = new UsersService(usersRepository, paymentService);
@@ -65,14 +63,16 @@ async function main() {
 
     for (const licenseCode of loadFromExcel()) {
       await licenseCodesService.insertLicenseCode(licenseCode);
-    } 
+    }
   } finally {
     await mongoClient.close();
   }
 }
 
-main().then(() => {
-  console.log('License codes loaded');
-}).catch((err) => {
-  console.error('Error loading license codes', err.message);
-});
+main()
+  .then(() => {
+    console.log('License codes loaded');
+  })
+  .catch((err) => {
+    console.error('Error loading license codes', err.message);
+  });

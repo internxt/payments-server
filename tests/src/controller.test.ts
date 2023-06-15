@@ -41,6 +41,14 @@ async function getMocks() {
       },
       provider: 'TECHCULT',
     },
+    stackCommerce: {
+      codes: {
+        elegible: '5tb_redeem_code', //REDEEMED: FALSE
+        nonElegible: '2tb_code_redeem', //REDEEMED: TRUE
+        doesntExist: 'doesnt_exist',
+      },
+      provider: 'STACKCOMMERCE',
+    },
   };
 
   function getValidToken(userUuid: string): string {
