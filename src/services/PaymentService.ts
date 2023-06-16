@@ -103,8 +103,14 @@ export class PaymentService {
   async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
     let trialEnd = 0;
 
+    const { data } = await this.provider.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+    });
+    const [lastActiveSub] = data;
+  
     if (reason.name in reasonFreeMonthsMap) {
-      const date = new Date();
+      const date = new Date(lastActiveSub.current_period_end*1000);
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
@@ -195,7 +201,7 @@ export class PaymentService {
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
 
-      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan.id as string, reason);
+      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan.id, reason);
 
       return true;
     } else {
