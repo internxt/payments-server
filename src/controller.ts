@@ -183,7 +183,7 @@ export default function (
       } catch (err) {
         const error = err as Error;
         req.log.error(`[PAYMENT-METHOD] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`);
-        throw err;
+        return rep.status(404).send({ message: 'Payment method not found' });
       }
     });
 
