@@ -146,6 +146,15 @@ export class PaymentService {
     return updatedSubscription;
   }
 
+  async getUserPaymentMethod(customerId: CustomerId): Promise<string | undefined> {
+    const paymentMethods = await this.provider.paymentMethods.list({
+      customer: customerId,
+    });
+    const { data } = paymentMethods;
+
+    return data.find((paymentMethod) => paymentMethod.id)?.type;
+  }
+
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
