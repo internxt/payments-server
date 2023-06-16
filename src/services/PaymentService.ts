@@ -100,12 +100,17 @@ export class PaymentService {
     return res.data;
   }
 
-  async updateSubscriptionByReason(customerId: CustomerId, plan: Stripe.Plan, reason: Reason) {
+  async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
     let trialEnd = 0;
-    const priceId = plan.id;
 
+    const { data } = await this.provider.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+    });
+    const [lastActiveSub] = data;
+  
     if (reason.name in reasonFreeMonthsMap) {
-      const date = new Date(plan.created);
+      const date = new Date(lastActiveSub.current_period_end*1000);
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
@@ -196,7 +201,7 @@ export class PaymentService {
     if (hasCouponApplied.elegible) {
       const subscription = await this.findIndividualActiveSubscription(customerId);
 
-      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan, reason);
+      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan.id, reason);
 
       return true;
     } else {
