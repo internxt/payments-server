@@ -175,18 +175,6 @@ export default function (
       return response;
     });
 
-    fastify.get('/payment-method', async (req, rep) => {
-      const { uuid } = req.user.payload;
-      try {
-        const user = await usersService.findUserByUuid(uuid);
-        return paymentService.getUserPaymentMethod(user.customerId);
-      } catch (err) {
-        const error = err as Error;
-        req.log.error(`[PAYMENT-METHOD] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`);
-        return rep.status(404).send({ message: 'Payment method not found' });
-      }
-    });
-
     fastify.get('/prices', async (req, rep) => {
       return paymentService.getPrices();
     });
