@@ -105,9 +105,9 @@ export class PaymentService {
       status: 'active',
     });
     const [lastActiveSub] = data;
-  
+
     if (reason.name in reasonFreeMonthsMap) {
-      const date = new Date(lastActiveSub.current_period_end*1000);
+      const date = new Date(lastActiveSub.current_period_end * 1000);
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
@@ -294,7 +294,7 @@ export class PaymentService {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     return this.provider.checkout.sessions.create({
-      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
+      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort'],
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
