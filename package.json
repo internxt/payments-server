@@ -40,6 +40,6 @@
     "ioredis": "^5.0.6",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^4.6.0",
-    "stripe": "^9.5.0"
+    "stripe": "12.9.0"
   }
 }

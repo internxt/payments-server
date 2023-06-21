@@ -47,14 +47,11 @@ export class PaymentService {
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
     const customer = await this.provider.customers.create(payload);
-    
+
     return customer;
   }
 
-  async subscribe(
-    customerId: CustomerId,
-    priceId: PriceId
-  ): Promise<{ maxSpaceBytes: number, recurring: boolean }> {
+  async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
     const price = await this.provider.prices.retrieve(priceId);
     const isRecurring = price.type === 'recurring';
 
@@ -64,8 +61,8 @@ export class PaymentService {
         items: [
           {
             price: priceId,
-          }
-        ]
+          },
+        ],
       });
     } else {
       await this.provider.invoiceItems.create({
@@ -76,9 +73,9 @@ export class PaymentService {
       const invoice = await this.provider.invoices.create({
         customer: customerId,
         auto_advance: false,
-        pending_invoice_items_behavior: 'include_and_require'
+        pending_invoice_items_behavior: 'include_and_require',
       });
-      
+
       await this.provider.invoices.pay(invoice.id, {
         paid_out_of_band: true,
       });
@@ -297,7 +294,7 @@ export class PaymentService {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     return this.provider.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,

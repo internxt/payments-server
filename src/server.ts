@@ -18,11 +18,9 @@ import { MongoDBLicenseCodesRepository } from './core/users/MongoDBLicenseCodesR
 const start = async (): Promise<FastifyInstance> => {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-  const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(
-    mongoClient
-  );
+  const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
 
-  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' });
+  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' });
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(usersRepository, paymentService);
@@ -31,7 +29,7 @@ const start = async (): Promise<FastifyInstance> => {
     paymentService,
     usersService,
     storageService,
-    licenseCodesRepository
+    licenseCodesRepository,
   );
 
   const fastify = await buildApp(
