@@ -73,7 +73,7 @@ export class PaymentService {
       const invoice = await this.provider.invoices.create({
         customer: customerId,
         auto_advance: false,
-        pending_invoice_items_behavior: 'include_and_require',
+        pending_invoice_items_behavior: 'include',
       });
 
       await this.provider.invoices.pay(invoice.id, {
