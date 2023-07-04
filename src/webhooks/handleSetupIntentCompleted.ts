@@ -3,7 +3,7 @@ import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/CacheService';
-import { PaymentService, PriceMetadata } from '../services/PaymentService';
+import { PaymentService } from '../services/PaymentService';
 import { UsersService } from '../services/UsersService';
 
 export default async function handleSetupIntentCompleted(
@@ -24,7 +24,7 @@ export default async function handleSetupIntentCompleted(
     return;
   }
 
-  if (session.metadata.space === undefined) {
+  if (!session.metadata.space) {
     log.error(
       `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.metadata?.email}`,
     );
@@ -54,15 +54,8 @@ export default async function handleSetupIntentCompleted(
     throw err;
   }
 
-  console.log('First customerId', customer.id);
-
   try {
-    const { customerId } = await usersService.findUserByUuid(user.uuid);
-
-    console.log('Second customerId', customerId);
-    usersService.updateUser(customerId, {
-      lifetime: session.metadata.interval === 'lifetime',
-    });
+    await usersService.findUserByUuid(user.uuid);
   } catch {
     await usersService.insertUser({
       customerId: customer.id,

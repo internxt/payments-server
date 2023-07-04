@@ -293,6 +293,8 @@ export class PaymentService {
     const getPriceProduct = await this.getPrices();
     const priceProduct = getPriceProduct.find((price) => price.id === priceId);
 
+    if (!priceProduct) throw new Error('Price not found');
+
     const customer = await this.provider.customers.create({
       name: user.name || 'Internxt User',
       email: user.email,
@@ -328,6 +330,8 @@ export class PaymentService {
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const getPriceProduct = await this.getPrices();
     const priceProduct = getPriceProduct.find((price) => price.id === priceId);
+    if (!priceProduct) throw new Error('Price not found');
+
     const paymentMethods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
       priceProduct?.interval === 'lifetime'
         ? ['card', 'bancontact', 'ideal', 'sofort', 'paypal']
@@ -361,7 +365,6 @@ export class PaymentService {
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
-    console.log('activeSubscriptions', activeSubscriptions);
 
     const individualActiveSubscription = activeSubscriptions.find(
       (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',

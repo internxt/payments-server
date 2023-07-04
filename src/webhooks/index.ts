@@ -83,8 +83,8 @@ export default function (
               ],
               expand: ['latest_invoice.payment_intent'],
             })
-            .then(async (res) => {
-              await handleSetupIntentCompleted(
+            .then(() => {
+              handleSetupIntentCompleted(
                 event.data.object as Stripe.SetupIntent,
                 usersService,
                 paymentService,
@@ -92,11 +92,13 @@ export default function (
                 cacheService,
                 config,
               ).catch((err) => {
-                console.error('Setup Intent', err);
+                const error = err as Error;
+                fastify.log.error('[SETUP INTENT/STACK]: ', error.stack || 'NO STACK');
               });
             })
             .catch((err) => {
-              console.error(err);
+              const error = err as Error;
+              fastify.log.error('[CREATE SUBSCRIPTION ERROR/STACK]: ', error.stack || 'NO STACK');
             });
 
           break;

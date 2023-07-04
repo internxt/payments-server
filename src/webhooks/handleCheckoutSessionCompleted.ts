@@ -28,7 +28,7 @@ export default async function handleCheckoutSessionCompleted(
     return;
   }
 
-  if (price.metadata.maxSpaceBytes === undefined) {
+  if (!price.metadata.maxSpaceBytes) {
     log.error(
       `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
     );
@@ -60,10 +60,11 @@ export default async function handleCheckoutSessionCompleted(
 
   try {
     const { customerId } = await usersService.findUserByUuid(user.uuid);
-
-    usersService.updateUser(customerId, {
-      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
-    });
+    if ((price.metadata as PriceMetadata).planType === 'one_time') {
+      await usersService.updateUser(customerId, {
+        lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+      });
+    }
   } catch {
     await usersService.insertUser({
       customerId: customer.id,
