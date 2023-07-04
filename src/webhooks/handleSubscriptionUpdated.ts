@@ -14,7 +14,10 @@ export default async function handleSubscriptionUpdated(
   log: FastifyLoggerInstance,
 ): Promise<void> {
   const customerId = subscription.customer as string;
-  const { uuid } = await usersService.findUserByCustomerID(customerId);
+  const { uuid, lifetime } = await usersService.findUserByCustomerID(customerId);
+  if (lifetime) {
+    throw new Error('Lifetime user cannot purchase a subscription plan');
+  }
 
   const bytesSpace =
     subscription.status === 'canceled'

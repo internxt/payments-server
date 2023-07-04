@@ -10,6 +10,7 @@ import { PaymentService } from '../services/PaymentService';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
+import handleSetupIntentCompleted from './handleSetupIntentCompleted';
 
 export default function (
   stripe: Stripe,
@@ -66,6 +67,40 @@ export default function (
             (event.data.object as Stripe.PaymentMethod).id,
           );
           break;
+
+        case 'setup_intent.succeeded': {
+          stripe.subscriptions
+            .create({
+              customer: (event.data.object as Stripe.SetupIntent).customer as string,
+              default_payment_method: (event.data.object as Stripe.SetupIntent).payment_method as string,
+              items: [
+                {
+                  price: (event.data.object as Stripe.SetupIntent).metadata?.priceId as string,
+                  metadata: {
+                    is_teams: 0,
+                  },
+                },
+              ],
+              expand: ['latest_invoice.payment_intent'],
+            })
+            .then(async (res) => {
+              await handleSetupIntentCompleted(
+                event.data.object as Stripe.SetupIntent,
+                usersService,
+                paymentService,
+                fastify.log,
+                cacheService,
+                config,
+              ).catch((err) => {
+                console.error('Setup Intent', err);
+              });
+            })
+            .catch((err) => {
+              console.error(err);
+            });
+
+          break;
+        }
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,

@@ -92,6 +92,7 @@ export class PaymentService {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
       expand: ['data.default_payment_method', 'data.default_source'],
+      status: 'active',
     });
 
     return res.data;
@@ -282,6 +283,38 @@ export class PaymentService {
       }));
   }
 
+  async getPaypalSetupIntent(
+    priceId: string,
+    user: {
+      name?: string;
+      email: string;
+    },
+  ): Promise<Stripe.SetupIntent> {
+    const getPriceProduct = await this.getPrices();
+    const priceProduct = getPriceProduct.find((price) => price.id === priceId);
+
+    const customer = await this.provider.customers.create({
+      name: user.name || 'Internxt User',
+      email: user.email,
+    });
+
+    const setupIntent = await this.provider.setupIntents.create({
+      customer: customer.id,
+      payment_method_types: ['paypal'],
+      payment_method_data: {
+        type: 'paypal',
+      },
+      metadata: {
+        priceId: priceId,
+        space: String(priceProduct?.bytes),
+        email: user.email,
+        interval: String(priceProduct?.interval),
+      },
+    });
+
+    return setupIntent;
+  }
+
   async getCheckoutSession(
     priceId: string,
     successUrl: string,
@@ -290,11 +323,18 @@ export class PaymentService {
     mode: Stripe.Checkout.SessionCreateParams.Mode,
     trialDays?: number,
     couponCode?: string,
-  ): Promise<Stripe.Checkout.Session> {
+  ): Promise<Stripe.Checkout.Session | Stripe.SetupIntent | void> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    return this.provider.checkout.sessions.create({
-      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort'],
+    const getPriceProduct = await this.getPrices();
+    const priceProduct = getPriceProduct.find((price) => price.id === priceId);
+    const paymentMethods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
+      priceProduct?.interval === 'lifetime'
+        ? ['card', 'bancontact', 'ideal', 'sofort', 'paypal']
+        : ['card', 'bancontact', 'ideal', 'sofort'];
+
+    const checkout = await this.provider.checkout.sessions.create({
+      payment_method_types: paymentMethods,
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
@@ -307,6 +347,8 @@ export class PaymentService {
       ...invoiceCreation,
       ...subscriptionData,
     });
+
+    return checkout;
   }
 
   async getLineItems(checkoutSessionId: string) {
@@ -319,6 +361,7 @@ export class PaymentService {
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+    console.log('activeSubscriptions', activeSubscriptions);
 
     const individualActiveSubscription = activeSubscriptions.find(
       (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',

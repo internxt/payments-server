@@ -215,6 +215,28 @@ export default function (
       }
     });
 
+    fastify.get<{ Querystring: { priceId: string } }>(
+      '/paypal-setup-intent',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { priceId: { type: 'string' } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { name, email } = req.user.payload;
+        const { priceId } = req.query;
+
+        const paypalSetup = await paymentService.getPaypalSetupIntent(priceId, {
+          name,
+          email,
+        });
+
+        return paypalSetup;
+      },
+    );
     fastify.post<{
       Body: {
         price_id: string;
@@ -252,7 +274,7 @@ export default function (
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
-        const { id } = await paymentService.getCheckoutSession(
+        const checkout = await paymentService.getCheckoutSession(
           req.body.price_id,
           req.body.success_url,
           req.body.cancel_url,
@@ -262,7 +284,7 @@ export default function (
           req.body.coupon_code,
         );
 
-        return { sessionId: id };
+        return checkout;
       },
     );
 

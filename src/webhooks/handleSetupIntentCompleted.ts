@@ -6,36 +6,32 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { UsersService } from '../services/UsersService';
 
-export default async function handleCheckoutSessionCompleted(
-  session: Stripe.Checkout.Session,
+export default async function handleSetupIntentCompleted(
+  session: Stripe.SetupIntent,
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
 ): Promise<void> {
-  if (session.payment_status !== 'paid') {
-    log.info(`Checkout processed without action, ${session.customer_email} has not paid successfully`);
+  if (session.status !== 'succeeded') {
+    log.info(`Checkout processed without action, ${session.metadata?.email} has not paid successfully`);
     return;
   }
 
-  const lineItems = await paymentService.getLineItems(session.id);
-
-  const price = lineItems.data[0].price;
-
-  if (!price) {
-    log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
+  if (!session.metadata?.priceId) {
+    log.error(`Checkout session completed does not contain price, customer: ${session.metadata?.email}`);
     return;
   }
 
-  if (price.metadata.maxSpaceBytes === undefined) {
+  if (session.metadata.space === undefined) {
     log.error(
-      `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
+      `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.metadata?.email}`,
     );
     return;
   }
 
-  const { maxSpaceBytes } = price.metadata as PriceMetadata;
+  const { space } = session.metadata;
 
   const customer = await paymentService.getCustomer(session.customer as string);
   if (customer.deleted) {
@@ -47,28 +43,31 @@ export default async function handleCheckoutSessionCompleted(
 
   let user: { uuid: string };
   try {
-    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
+    const res = await createOrUpdateUser(space, customer.email as string, config);
     user = res.data.user;
   } catch (err) {
     log.error(
-      `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+      `Error while creating or updating user in checkout session completed handler, email: ${session.metadata?.email}`,
     );
     log.error(err);
 
     throw err;
   }
 
+  console.log('First customerId', customer.id);
+
   try {
     const { customerId } = await usersService.findUserByUuid(user.uuid);
 
+    console.log('Second customerId', customerId);
     usersService.updateUser(customerId, {
-      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+      lifetime: session.metadata.interval === 'lifetime',
     });
   } catch {
     await usersService.insertUser({
       customerId: customer.id,
       uuid: user.uuid,
-      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+      lifetime: session.metadata.interval === 'lifetime',
     });
   }
   try {
