@@ -13,6 +13,7 @@ export default async function handleSetupIntentCompleted(
   log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
+  customerId: string,
 ): Promise<void> {
   if (session.status !== 'succeeded') {
     log.info(`Checkout processed without action, ${session.metadata?.email} has not paid successfully`);
@@ -33,7 +34,8 @@ export default async function handleSetupIntentCompleted(
 
   const { space } = session.metadata;
 
-  const customer = await paymentService.getCustomer(session.customer as string);
+  const customer = await paymentService.getCustomer(customerId);
+
   if (customer.deleted) {
     log.error(
       `Customer object could not be retrieved in checkout session completed handler with id ${session.customer}`,

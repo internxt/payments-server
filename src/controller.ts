@@ -215,23 +215,28 @@ export default function (
       }
     });
 
-    fastify.get<{ Querystring: { priceId: string } }>(
+    fastify.get<{ Querystring: { priceId: string; coupon: string } }>(
       '/paypal-setup-intent',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { priceId: { type: 'string' } },
+            properties: { priceId: { type: 'string' }, coupon: { type: 'string' } },
           },
         },
       },
       async (req, rep) => {
-        const { name, email } = req.user.payload;
-        const { priceId } = req.query;
+        const { name, email, uuid } = req.user.payload;
+        const { priceId, coupon } = req.query;
 
-        const paypalSetup = await paymentService.getPaypalSetupIntent(priceId, {
-          name,
-          email,
+        const paypalSetup = await paymentService.getPaypalSetupIntent({
+          priceId: priceId as string,
+          coupon: coupon as string,
+          user: {
+            name: name as string,
+            email: email as string,
+          },
+          uuid: uuid,
         });
 
         return paypalSetup;
@@ -274,15 +279,15 @@ export default function (
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
-        const checkout = await paymentService.getCheckoutSession(
-          req.body.price_id,
-          req.body.success_url,
-          req.body.cancel_url,
-          user ?? req.body.customer_email,
-          (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
-          req.body.trial_days,
-          req.body.coupon_code,
-        );
+        const checkout = await paymentService.getCheckoutSession({
+          priceId: req.body.price_id,
+          successUrl: req.body.success_url,
+          cancelUrl: req.body.cancel_url,
+          prefill: user ?? req.body.customer_email,
+          mode: (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
+          trialDays: req.body.trial_days,
+          couponCode: req.body.coupon_code,
+        });
 
         return checkout;
       },

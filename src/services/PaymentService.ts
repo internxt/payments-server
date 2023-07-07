@@ -283,49 +283,60 @@ export class PaymentService {
       }));
   }
 
-  async getPaypalSetupIntent(
-    priceId: string,
-    user: {
-      name?: string;
-      email: string;
-    },
-  ): Promise<Stripe.SetupIntent> {
+  async getPaypalSetupIntent({
+    priceId,
+    coupon,
+    user,
+    uuid,
+  }: {
+    priceId: string;
+    coupon?: string;
+    user: Record<'name' | 'email', string>;
+    uuid: string;
+  }): Promise<Stripe.SetupIntent> {
     const getPriceProduct = await this.getPrices();
     const priceProduct = getPriceProduct.find((price) => price.id === priceId);
 
     if (!priceProduct) throw new Error('Price not found');
 
-    const customer = await this.provider.customers.create({
-      name: user.name || 'Internxt User',
+    const metadata = {
+      priceId: priceId,
+      space: String(priceProduct?.bytes),
       email: user.email,
-    });
+      interval: String(priceProduct?.interval),
+      name: user.name || 'My Internxt',
+      uuid: uuid,
+      ...(coupon && { coupon: coupon }),
+    };
 
     const setupIntent = await this.provider.setupIntents.create({
-      customer: customer.id,
       payment_method_types: ['paypal'],
       payment_method_data: {
         type: 'paypal',
       },
-      metadata: {
-        priceId: priceId,
-        space: String(priceProduct?.bytes),
-        email: user.email,
-        interval: String(priceProduct?.interval),
-      },
+      metadata: metadata,
     });
 
     return setupIntent;
   }
 
-  async getCheckoutSession(
-    priceId: string,
-    successUrl: string,
-    cancelUrl: string,
-    prefill: User | string,
-    mode: Stripe.Checkout.SessionCreateParams.Mode,
-    trialDays?: number,
-    couponCode?: string,
-  ): Promise<Stripe.Checkout.Session | Stripe.SetupIntent | void> {
+  async getCheckoutSession({
+    priceId,
+    successUrl,
+    cancelUrl,
+    prefill,
+    mode,
+    trialDays,
+    couponCode,
+  }: {
+    priceId: string;
+    successUrl: string;
+    cancelUrl: string;
+    prefill: User | string;
+    mode: Stripe.Checkout.SessionCreateParams.Mode;
+    trialDays?: number;
+    couponCode?: string;
+  }): Promise<Stripe.Checkout.Session | Stripe.SetupIntent | void> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const getPriceProduct = await this.getPrices();
