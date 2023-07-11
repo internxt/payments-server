@@ -71,13 +71,18 @@ export default function (
 
         case 'setup_intent.succeeded': {
           let customerId: string;
+          const coupon = (event.data.object as Stripe.SetupIntent).metadata?.coupon
+            ? {
+                coupon: (event.data.object as Stripe.SetupIntent).metadata?.coupon as string,
+              }
+            : undefined;
 
           try {
-            const getUser = await usersService.findUserByUuid(
+            const getUser: User = await usersService.findUserByUuid(
               (event.data.object as Stripe.SetupIntent).metadata?.uuid as string,
             );
 
-            const updateCustomer = await stripe.paymentMethods.attach(
+            const updateCustomer: Stripe.Response<Stripe.PaymentMethod> = await stripe.paymentMethods.attach(
               (event.data.object as Stripe.SetupIntent).payment_method as string,
               {
                 customer: getUser.customerId,
@@ -107,9 +112,7 @@ export default function (
               },
             ],
             expand: ['latest_invoice.payment_intent'],
-            coupon:
-              (event.data.object as Stripe.SetupIntent).metadata?.coupon &&
-              ((event.data.object as Stripe.SetupIntent).metadata?.coupon as string),
+            ...coupon,
           });
 
           await handleSetupIntentCompleted(

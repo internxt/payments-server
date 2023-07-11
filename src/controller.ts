@@ -230,11 +230,11 @@ export default function (
         const { priceId, coupon } = req.query;
 
         const paypalSetup = await paymentService.getPaypalSetupIntent({
-          priceId: priceId as string,
-          coupon: coupon as string,
+          priceId: priceId,
+          coupon: coupon,
           user: {
-            name: name as string,
-            email: email as string,
+            name: name,
+            email: email,
           },
           uuid: uuid,
         });
@@ -272,6 +272,7 @@ export default function (
         },
       },
       async (req, rep) => {
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code } = req.body;
         const { uuid } = req.user.payload;
         let user: User | undefined;
         try {
@@ -279,17 +280,17 @@ export default function (
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
-        const checkout = await paymentService.getCheckoutSession({
-          priceId: req.body.price_id,
-          successUrl: req.body.success_url,
-          cancelUrl: req.body.cancel_url,
-          prefill: user ?? req.body.customer_email,
-          mode: (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
-          trialDays: req.body.trial_days,
-          couponCode: req.body.coupon_code,
+        const { id } = await paymentService.getCheckoutSession({
+          priceId: price_id,
+          successUrl: success_url,
+          cancelUrl: cancel_url,
+          prefill: user ?? customer_email,
+          mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
+          trialDays: trial_days,
+          couponCode: coupon_code,
         });
 
-        return checkout;
+        return { sessionId: id };
       },
     );
 

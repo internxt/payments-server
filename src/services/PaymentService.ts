@@ -92,7 +92,6 @@ export class PaymentService {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
       expand: ['data.default_payment_method', 'data.default_source'],
-      status: 'active',
     });
 
     return res.data;
@@ -336,7 +335,7 @@ export class PaymentService {
     mode: Stripe.Checkout.SessionCreateParams.Mode;
     trialDays?: number;
     couponCode?: string;
-  }): Promise<Stripe.Checkout.Session | Stripe.SetupIntent | void> {
+  }): Promise<Stripe.Checkout.Session> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const getPriceProduct = await this.getPrices();
