@@ -16,7 +16,7 @@ export default async function handleSubscriptionUpdated(
   const customerId = subscription.customer as string;
   const { uuid, lifetime } = await usersService.findUserByCustomerID(customerId);
   if (lifetime) {
-    throw new Error('Lifetime user cannot purchase a subscription plan');
+    return;
   }
 
   const bytesSpace =

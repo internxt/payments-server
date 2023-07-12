@@ -286,12 +286,10 @@ export class PaymentService {
     priceId,
     coupon,
     user,
-    uuid,
   }: {
     priceId: string;
     coupon?: string;
-    user: Record<'name' | 'email', string>;
-    uuid: string;
+    user: Record<'name' | 'email' | 'uuid', string>;
   }): Promise<Stripe.SetupIntent> {
     const getPriceProduct = await this.getPrices();
     const priceProduct = getPriceProduct.find((price) => price.id === priceId);
@@ -299,12 +297,12 @@ export class PaymentService {
     if (!priceProduct) throw new Error('Price not found');
 
     const metadata = {
+      email: user.email,
+      name: user.name || 'My Internxt',
+      uuid: user.uuid,
       priceId: priceId,
       space: String(priceProduct?.bytes),
-      email: user.email,
       interval: String(priceProduct?.interval),
-      name: user.name || 'My Internxt',
-      uuid: uuid,
       ...(coupon && { coupon: coupon }),
     };
 
