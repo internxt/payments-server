@@ -235,8 +235,8 @@ export default function (
           user: {
             name: name,
             email: email,
+            uuid: uuid,
           },
-          uuid: uuid,
         });
 
         return paypalSetup;
