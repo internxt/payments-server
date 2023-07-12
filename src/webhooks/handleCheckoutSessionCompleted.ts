@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
+import { createOrUpdateUser } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 
 export default async function handleCheckoutSessionCompleted(
@@ -77,17 +78,4 @@ export default async function handleCheckoutSessionCompleted(
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
-}
-
-function createOrUpdateUser(maxSpaceBytes: string, email: string, config: AppConfig) {
-  return axios.post(
-    `${config.DRIVE_GATEWAY_URL}/api/gateway/user/updateOrCreate`,
-    { maxSpaceBytes, email },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      auth: { username: config.DRIVE_GATEWAY_USER, password: config.DRIVE_GATEWAY_PASSWORD },
-    },
-  );
 }

@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import { StorageService } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import { UserNotFoundError, UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handlePaymentMethodAttached from './handlePaymentMethodAttached';
@@ -78,26 +78,32 @@ export default function (
             : undefined;
 
           try {
-            const getUser: User = await usersService.findUserByUuid(
+            const user = await usersService.findUserByUuid(
               (event.data.object as Stripe.SetupIntent).metadata?.uuid as string,
             );
 
             const updateCustomer: Stripe.Response<Stripe.PaymentMethod> = await stripe.paymentMethods.attach(
               (event.data.object as Stripe.SetupIntent).payment_method as string,
               {
-                customer: getUser.customerId,
+                customer: user.customerId,
               },
             );
 
             customerId = updateCustomer.customer as string;
           } catch (err) {
-            const customer: Stripe.Customer = await stripe.customers.create({
-              name: (event.data.object as Stripe.SetupIntent).metadata?.name,
-              email: (event.data.object as Stripe.SetupIntent).metadata?.email,
-              payment_method: (event.data.object as Stripe.SetupIntent).payment_method as string,
-            });
+            const error = err as Error;
+            if (error instanceof UserNotFoundError) {
+              const customer: Stripe.Customer = await stripe.customers.create({
+                name: (event.data.object as Stripe.SetupIntent).metadata?.name,
+                email: (event.data.object as Stripe.SetupIntent).metadata?.email,
+                payment_method: (event.data.object as Stripe.SetupIntent).payment_method as string,
+              });
 
-            customerId = customer.id;
+              customerId = customer.id;
+            } else {
+              fastify.log.info(`[ERROR CREATING CUSTOMER/STACK]: ${error.stack || 'NO STACK'}`);
+              throw error;
+            }
           }
 
           await stripe.subscriptions.create({
