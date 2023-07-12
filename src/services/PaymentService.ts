@@ -336,12 +336,13 @@ export class PaymentService {
   }): Promise<Stripe.Checkout.Session> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    const getPriceProduct = await this.getPrices();
-    const priceProduct = getPriceProduct.find((price) => price.id === priceId);
-    if (!priceProduct) throw new Error('Price not found');
+    const prices = await this.getPrices();
+    const product = prices.find((price) => price.id === priceId);
+
+    if (!product) throw new Error('The product does not exist');
 
     const paymentMethods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
-      priceProduct?.interval === 'lifetime'
+      product?.interval === 'lifetime'
         ? ['card', 'bancontact', 'ideal', 'sofort', 'paypal']
         : ['card', 'bancontact', 'ideal', 'sofort'];
 
