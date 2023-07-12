@@ -294,7 +294,7 @@ export class PaymentService {
     const prices = await this.getPrices();
     const product = prices.find((price) => price.id === priceId);
 
-    if (!product) throw new Error('Price not found');
+    if (!product) throw new Error('The product does not exist');
 
     const metadata = {
       email: user.email,
