@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import { StorageService } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import { UserNotFoundError, UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handlePaymentMethodAttached from './handlePaymentMethodAttached';
@@ -10,6 +10,8 @@ import { PaymentService } from '../services/PaymentService';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
+import handleSetupIntentCompleted from './handleSetupIntentCompleted';
+import { User } from '../core/users/User';
 
 export default function (
   stripe: Stripe,
@@ -66,6 +68,71 @@ export default function (
             (event.data.object as Stripe.PaymentMethod).id,
           );
           break;
+
+        case 'setup_intent.succeeded': {
+          let customerId: string;
+          const coupon = (event.data.object as Stripe.SetupIntent).metadata?.coupon
+            ? {
+                coupon: (event.data.object as Stripe.SetupIntent).metadata?.coupon as string,
+              }
+            : undefined;
+
+          try {
+            const user = await usersService.findUserByUuid(
+              (event.data.object as Stripe.SetupIntent).metadata?.uuid as string,
+            );
+
+            const updateCustomer: Stripe.Response<Stripe.PaymentMethod> = await stripe.paymentMethods.attach(
+              (event.data.object as Stripe.SetupIntent).payment_method as string,
+              {
+                customer: user.customerId,
+              },
+            );
+
+            customerId = updateCustomer.customer as string;
+          } catch (err) {
+            const error = err as Error;
+            if (error instanceof UserNotFoundError) {
+              const customer: Stripe.Customer = await stripe.customers.create({
+                name: (event.data.object as Stripe.SetupIntent).metadata?.name,
+                email: (event.data.object as Stripe.SetupIntent).metadata?.email,
+                payment_method: (event.data.object as Stripe.SetupIntent).payment_method as string,
+              });
+
+              customerId = customer.id;
+            } else {
+              fastify.log.info(`[ERROR CREATING CUSTOMER/STACK]: ${error.stack || 'NO STACK'}`);
+              throw error;
+            }
+          }
+
+          await stripe.subscriptions.create({
+            customer: customerId,
+            default_payment_method: (event.data.object as Stripe.SetupIntent).payment_method as string,
+            items: [
+              {
+                price: (event.data.object as Stripe.SetupIntent).metadata?.priceId as string,
+                metadata: {
+                  is_teams: 0,
+                },
+              },
+            ],
+            expand: ['latest_invoice.payment_intent'],
+            ...coupon,
+          });
+
+          await handleSetupIntentCompleted(
+            event.data.object as Stripe.SetupIntent,
+            usersService,
+            paymentService,
+            fastify.log,
+            cacheService,
+            config,
+            customerId,
+          );
+
+          break;
+        }
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,

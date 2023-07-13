@@ -1,4 +1,4 @@
-import { Axios, AxiosRequestConfig } from 'axios';
+import axios, { Axios, AxiosRequestConfig } from 'axios';
 import { sign } from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 
@@ -29,4 +29,17 @@ export class StorageService {
       params,
     );
   }
+}
+
+export async function createOrUpdateUser(maxSpaceBytes: string, email: string, config: AppConfig) {
+  return axios.post(
+    `${config.DRIVE_GATEWAY_URL}/api/gateway/user/updateOrCreate`,
+    { maxSpaceBytes, email },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      auth: { username: config.DRIVE_GATEWAY_USER, password: config.DRIVE_GATEWAY_PASSWORD },
+    },
+  );
 }

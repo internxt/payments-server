@@ -282,19 +282,72 @@ export class PaymentService {
       }));
   }
 
-  async getCheckoutSession(
-    priceId: string,
-    successUrl: string,
-    cancelUrl: string,
-    prefill: User | string,
-    mode: Stripe.Checkout.SessionCreateParams.Mode,
-    trialDays?: number,
-    couponCode?: string,
-  ): Promise<Stripe.Checkout.Session> {
+  async getPaypalSetupIntent({
+    priceId,
+    coupon,
+    user,
+  }: {
+    priceId: string;
+    coupon?: string;
+    user: Record<'name' | 'email' | 'uuid', string>;
+  }): Promise<Stripe.SetupIntent> {
+    const prices = await this.getPrices();
+    const product = prices.find((price) => price.id === priceId);
+
+    if (!product) throw new Error('The product does not exist');
+
+    const metadata = {
+      email: user.email,
+      name: user.name || 'My Internxt',
+      uuid: user.uuid,
+      priceId: priceId,
+      space: String(product?.bytes),
+      interval: String(product?.interval),
+      ...(coupon && { coupon: coupon }),
+    };
+
+    const setupIntent = await this.provider.setupIntents.create({
+      payment_method_types: ['paypal'],
+      payment_method_data: {
+        type: 'paypal',
+      },
+      metadata: metadata,
+    });
+
+    return setupIntent;
+  }
+
+  async getCheckoutSession({
+    priceId,
+    successUrl,
+    cancelUrl,
+    prefill,
+    mode,
+    trialDays,
+    couponCode,
+  }: {
+    priceId: string;
+    successUrl: string;
+    cancelUrl: string;
+    prefill: User | string;
+    mode: Stripe.Checkout.SessionCreateParams.Mode;
+    trialDays?: number;
+    couponCode?: string;
+  }): Promise<Stripe.Checkout.Session> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    return this.provider.checkout.sessions.create({
-      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort'],
+    const prices = await this.getPrices();
+    const product = prices.find((price) => price.id === priceId);
+
+    if (!product) throw new Error('The product does not exist');
+
+    const paymentMethods: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
+      product?.interval === 'lifetime'
+        ? ['card', 'bancontact', 'ideal', 'sofort', 'paypal']
+        : ['card', 'bancontact', 'ideal', 'sofort'];
+
+    const checkout = await this.provider.checkout.sessions.create({
+      payment_method_types: paymentMethods,
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
@@ -307,6 +360,8 @@ export class PaymentService {
       ...invoiceCreation,
       ...subscriptionData,
     });
+
+    return checkout;
   }
 
   async getLineItems(checkoutSessionId: string) {

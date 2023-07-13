@@ -215,6 +215,33 @@ export default function (
       }
     });
 
+    fastify.get<{ Querystring: { priceId: string; coupon: string } }>(
+      '/paypal-setup-intent',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { priceId: { type: 'string' }, coupon: { type: 'string' } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { name, email, uuid } = req.user.payload;
+        const { priceId, coupon } = req.query;
+
+        const paypalSetup = await paymentService.getPaypalSetupIntent({
+          priceId: priceId,
+          coupon: coupon,
+          user: {
+            name: name,
+            email: email,
+            uuid: uuid,
+          },
+        });
+
+        return paypalSetup;
+      },
+    );
     fastify.post<{
       Body: {
         price_id: string;
@@ -245,6 +272,7 @@ export default function (
         },
       },
       async (req, rep) => {
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code } = req.body;
         const { uuid } = req.user.payload;
         let user: User | undefined;
         try {
@@ -252,15 +280,15 @@ export default function (
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
-        const { id } = await paymentService.getCheckoutSession(
-          req.body.price_id,
-          req.body.success_url,
-          req.body.cancel_url,
-          user ?? req.body.customer_email,
-          (req.body.mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
-          req.body.trial_days,
-          req.body.coupon_code,
-        );
+        const { id } = await paymentService.getCheckoutSession({
+          priceId: price_id,
+          successUrl: success_url,
+          cancelUrl: cancel_url,
+          prefill: user ?? customer_email,
+          mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
+          trialDays: trial_days,
+          couponCode: coupon_code,
+        });
 
         return { sessionId: id };
       },
