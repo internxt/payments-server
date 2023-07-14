@@ -215,33 +215,6 @@ export default function (
       }
     });
 
-    fastify.get<{ Querystring: { priceId: string; coupon: string } }>(
-      '/paypal-setup-intent',
-      {
-        schema: {
-          querystring: {
-            type: 'object',
-            properties: { priceId: { type: 'string' }, coupon: { type: 'string' } },
-          },
-        },
-      },
-      async (req, rep) => {
-        const { name, email, uuid } = req.user.payload;
-        const { priceId, coupon } = req.query;
-
-        const paypalSetup = await paymentService.getPaypalSetupIntent({
-          priceId: priceId,
-          coupon: coupon,
-          user: {
-            name: name,
-            email: email,
-            uuid: uuid,
-          },
-        });
-
-        return paypalSetup;
-      },
-    );
     fastify.post<{
       Body: {
         price_id: string;

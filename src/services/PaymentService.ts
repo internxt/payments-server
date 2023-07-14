@@ -282,41 +282,6 @@ export class PaymentService {
       }));
   }
 
-  async getPaypalSetupIntent({
-    priceId,
-    coupon,
-    user,
-  }: {
-    priceId: string;
-    coupon?: string;
-    user: Record<'name' | 'email' | 'uuid', string>;
-  }): Promise<Stripe.SetupIntent> {
-    const prices = await this.getPrices();
-    const product = prices.find((price) => price.id === priceId);
-
-    if (!product) throw new Error('The product does not exist');
-
-    const metadata = {
-      email: user.email,
-      name: user.name || 'My Internxt',
-      uuid: user.uuid,
-      priceId: priceId,
-      space: String(product?.bytes),
-      interval: String(product?.interval),
-      ...(coupon && { coupon: coupon }),
-    };
-
-    const setupIntent = await this.provider.setupIntents.create({
-      payment_method_types: ['paypal'],
-      payment_method_data: {
-        type: 'paypal',
-      },
-      metadata: metadata,
-    });
-
-    return setupIntent;
-  }
-
   async getCheckoutSession({
     priceId,
     successUrl,
