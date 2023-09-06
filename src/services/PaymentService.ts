@@ -127,13 +127,18 @@ export class PaymentService {
     priceId,
     couponCode,
     additionalOptions,
+    isFreeTrial,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+    isFreeTrial?: boolean;
   }): Promise<Subscription> {
+    // If the user uses the free trial, then create_prorations must be none and billingCycleAnchor must be undefined to avoid
+    // overcharging the user
     const createProrations = additionalOptions?.proration_behavior ?? 'create_prorations';
+    const billingCycleAnchor = createProrations === 'none' ? undefined : 'now';
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
@@ -145,6 +150,7 @@ export class PaymentService {
           price: priceId,
         },
       ],
+      billing_cycle_anchor: billingCycleAnchor,
       ...additionalOptions,
     });
 
