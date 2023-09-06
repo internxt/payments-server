@@ -127,13 +127,11 @@ export class PaymentService {
     priceId,
     couponCode,
     additionalOptions,
-    isFreeTrial,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
-    isFreeTrial?: boolean;
   }): Promise<Subscription> {
     // If the user uses the free trial, then create_prorations must be none and billingCycleAnchor must be undefined to avoid
     // overcharging the user
