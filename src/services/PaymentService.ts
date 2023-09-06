@@ -111,22 +111,33 @@ export class PaymentService {
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
-    return this.updateSubscriptionPrice(customerId, priceId, undefined, {
-      trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
-      metadata: { reason: reason.name },
+    return this.updateSubscriptionPrice({
+      customerId: customerId,
+      priceId: priceId,
+      additionalOptions: {
+        trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
+        metadata: { reason: reason.name },
+        proration_behavior: 'none',
+      },
     });
   }
 
-  async updateSubscriptionPrice(
-    customerId: CustomerId,
-    priceId: PriceId,
-    couponCode?: string,
-    additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {},
-  ): Promise<Subscription> {
+  async updateSubscriptionPrice({
+    customerId,
+    priceId,
+    couponCode,
+    additionalOptions,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode?: string;
+    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+  }): Promise<Subscription> {
+    const createProrations = additionalOptions?.proration_behavior ?? 'create_prorations';
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
-      proration_behavior: 'create_prorations',
+      proration_behavior: createProrations,
       coupon: couponCode ? couponCode : undefined,
       items: [
         {
