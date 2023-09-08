@@ -111,22 +111,36 @@ export class PaymentService {
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
-    return this.updateSubscriptionPrice(customerId, priceId, undefined, {
-      trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
-      metadata: { reason: reason.name },
+    return this.updateSubscriptionPrice({
+      customerId: customerId,
+      priceId: priceId,
+      additionalOptions: {
+        trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
+        metadata: { reason: reason.name },
+        proration_behavior: 'none',
+      },
     });
   }
 
-  async updateSubscriptionPrice(
-    customerId: CustomerId,
-    priceId: PriceId,
-    couponCode?: string,
-    additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {},
-  ): Promise<Subscription> {
+  async updateSubscriptionPrice({
+    customerId,
+    priceId,
+    couponCode,
+    additionalOptions,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode?: string;
+    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+  }): Promise<Subscription> {
+    // If the user uses the free trial, then create_prorations must be none and billingCycleAnchor must be undefined to avoid
+    // overcharging the user
+    const createProrations = additionalOptions?.proration_behavior ?? 'create_prorations';
+    const billingCycleAnchor = createProrations === 'none' ? undefined : 'now';
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
-      proration_behavior: 'create_prorations',
+      proration_behavior: createProrations,
       coupon: couponCode ? couponCode : undefined,
       items: [
         {
@@ -134,6 +148,8 @@ export class PaymentService {
           price: priceId,
         },
       ],
+      billing_cycle_anchor: billingCycleAnchor,
+      trial_end: 'now',
       ...additionalOptions,
     });
 

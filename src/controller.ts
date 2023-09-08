@@ -124,7 +124,11 @@ export default function (
         const { price_id: priceId, couponCode } = req.body;
 
         const user = await assertUser(req, rep);
-        await paymentService.updateSubscriptionPrice(user.customerId, priceId, couponCode);
+        await paymentService.updateSubscriptionPrice({
+          customerId: user.customerId,
+          priceId: priceId,
+          couponCode: couponCode,
+        });
 
         const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
         return rep.send(updatedSubscription);
