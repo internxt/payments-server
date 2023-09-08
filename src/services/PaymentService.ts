@@ -149,6 +149,7 @@ export class PaymentService {
         },
       ],
       billing_cycle_anchor: billingCycleAnchor,
+      trial_end: 'now',
       ...additionalOptions,
     });
 
