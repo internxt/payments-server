@@ -118,6 +118,7 @@ export class PaymentService {
         trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
         metadata: { reason: reason.name },
       },
+      isFreeTrial: true,
     });
   }
 
@@ -126,12 +127,15 @@ export class PaymentService {
     priceId,
     couponCode,
     additionalOptions,
+    isFreeTrial,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+    isFreeTrial?: boolean;
   }): Promise<Subscription> {
+    const billingCycleAnchor: Stripe.SubscriptionUpdateParams = !isFreeTrial ? { billing_cycle_anchor: 'now' } : {};
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
@@ -144,7 +148,7 @@ export class PaymentService {
         },
       ],
       trial_end: 'now',
-      billing_cycle_anchor: 'now',
+      ...billingCycleAnchor,
       ...additionalOptions,
     });
 
