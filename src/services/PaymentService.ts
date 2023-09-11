@@ -117,8 +117,8 @@ export class PaymentService {
       additionalOptions: {
         trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
         metadata: { reason: reason.name },
-        proration_behavior: 'none',
       },
+      isFreeTrial: true,
     });
   }
 
@@ -127,20 +127,19 @@ export class PaymentService {
     priceId,
     couponCode,
     additionalOptions,
+    isFreeTrial,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+    isFreeTrial?: boolean;
   }): Promise<Subscription> {
-    // If the user uses the free trial, then create_prorations must be none and billingCycleAnchor must be undefined to avoid
-    // overcharging the user
-    const createProrations = additionalOptions?.proration_behavior ?? 'create_prorations';
-    const billingCycleAnchor = createProrations === 'none' ? undefined : 'now';
+    const billingCycleAnchor: Stripe.SubscriptionUpdateParams = !isFreeTrial ? { billing_cycle_anchor: 'now' } : {};
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
-      proration_behavior: createProrations,
+      proration_behavior: 'none',
       coupon: couponCode ? couponCode : undefined,
       items: [
         {
@@ -148,8 +147,8 @@ export class PaymentService {
           price: priceId,
         },
       ],
-      billing_cycle_anchor: billingCycleAnchor,
       trial_end: 'now',
+      ...billingCycleAnchor,
       ...additionalOptions,
     });
 
