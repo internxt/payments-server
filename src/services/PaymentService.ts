@@ -135,7 +135,6 @@ export class PaymentService {
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
     isFreeTrial?: boolean;
   }): Promise<Subscription> {
-    const billingCycleAnchor: Stripe.SubscriptionUpdateParams = !isFreeTrial ? { billing_cycle_anchor: 'now' } : {};
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
@@ -148,10 +147,8 @@ export class PaymentService {
         },
       ],
       trial_end: 'now',
-      ...billingCycleAnchor,
       ...additionalOptions,
     });
-
     return updatedSubscription;
   }
 
