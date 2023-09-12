@@ -155,6 +155,7 @@ export class PaymentService {
       ...additionalOptions,
     });
 
+    // Get the invoices to check if the payment intent has a next_action with type three_d_secure_redirect to redirect the user to the 3D secure page
     const getInvoice = await this.provider.invoices.retrieve(updatedSubscription?.latest_invoice as string);
     if (getInvoice?.payment_intent !== null) {
       const getPaymentIntent = await this.provider.paymentIntents.retrieve(getInvoice?.payment_intent.toString());
