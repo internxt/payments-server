@@ -66,7 +66,6 @@ export default function (
             (event.data.object as Stripe.PaymentMethod).id,
           );
           break;
-
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
             event.data.object as Stripe.Checkout.Session,

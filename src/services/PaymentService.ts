@@ -134,7 +134,13 @@ export class PaymentService {
     couponCode?: string;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
     isFreeTrial?: boolean;
-  }): Promise<Subscription> {
+  }): Promise<{
+    updatedSubscription: Subscription;
+    request3DSecure: boolean;
+    clientSecret: string;
+  }> {
+    let request3DSecure = false;
+    let clientSecret = '';
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
@@ -149,7 +155,20 @@ export class PaymentService {
       trial_end: 'now',
       ...additionalOptions,
     });
-    return updatedSubscription;
+
+    const getInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+    const getPaymentIntent = await this.provider.paymentIntents.retrieve(getInvoice.payment_intent as string);
+
+    if ((getPaymentIntent.next_action?.use_stripe_sdk as any)?.type === 'three_d_secure_redirect') {
+      request3DSecure = true;
+      clientSecret = getPaymentIntent.client_secret as string;
+    }
+
+    return {
+      updatedSubscription,
+      request3DSecure,
+      clientSecret,
+    };
   }
 
   async updateSubscriptionPaymentMethod(
@@ -313,13 +332,31 @@ export class PaymentService {
   }): Promise<Stripe.Checkout.Session> {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
+    const commonPaymentTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
+      'card',
+      'bancontact',
+      'ideal',
+      'sofort',
+      'paypal',
+    ];
+    const additionalPaymentTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
+      'afterpay_clearpay',
+      'alipay',
+      'giropay',
+      'eps',
+      'klarna',
+      'blik',
+    ];
+
+    const paymentTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
+      mode === 'payment' ? [...commonPaymentTypes, ...additionalPaymentTypes] : commonPaymentTypes;
     const prices = await this.getPrices();
     const product = prices.find((price) => price.id === priceId);
 
     if (!product) throw new Error('The product does not exist');
 
     const checkout = await this.provider.checkout.sessions.create({
-      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
+      payment_method_types: paymentTypes,
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
