@@ -152,16 +152,16 @@ export class PaymentService {
           price: priceId,
         },
       ],
-      trial_end: 'now',
       ...additionalOptions,
     });
 
-    const getInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
-    const getPaymentIntent = await this.provider.paymentIntents.retrieve(getInvoice.payment_intent as string);
-
-    if ((getPaymentIntent.next_action?.use_stripe_sdk as any)?.type === 'three_d_secure_redirect') {
-      request3DSecure = true;
-      clientSecret = getPaymentIntent.client_secret as string;
+    const getInvoice = await this.provider.invoices.retrieve(updatedSubscription?.latest_invoice as string);
+    if (getInvoice?.payment_intent !== null) {
+      const getPaymentIntent = await this.provider.paymentIntents.retrieve(getInvoice?.payment_intent.toString());
+      if ((getPaymentIntent.next_action?.use_stripe_sdk as any)?.type === 'three_d_secure_redirect') {
+        request3DSecure = true;
+        clientSecret = getPaymentIntent.client_secret as string;
+      }
     }
 
     return {
