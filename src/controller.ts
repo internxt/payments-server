@@ -124,18 +124,14 @@ export default function (
         const { price_id: priceId, couponCode } = req.body;
 
         const user = await assertUser(req, rep);
-        const updateSub = await paymentService.updateSubscriptionPrice({
+        await paymentService.updateSubscriptionPrice({
           customerId: user.customerId,
           priceId: priceId,
           couponCode: couponCode,
         });
 
         const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
-        return rep.send({
-          updatedSubscription,
-          request3DSecure: updateSub.request3DSecure,
-          clientSecret: updateSub.clientSecret,
-        });
+        return rep.send(updatedSubscription);
       },
     );
 
