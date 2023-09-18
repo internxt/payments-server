@@ -194,7 +194,7 @@ export default function (
       } catch (err) {
         const error = err as Error;
         req.log.error(
-          `[REQUEST-PREVENT-CANCELLATION] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
+          `[REQUEST-PREVENT-CANCELLATION/ERROR]: Error for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
         );
         throw err;
       }
