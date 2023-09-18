@@ -184,11 +184,52 @@ export class PaymentService {
       customerId: customerId,
       priceId: priceId,
       additionalOptions: {
-        coupon: couponCode ? couponCode : undefined,
+        coupon: couponCode,
       },
     });
 
     return updatedSubscription;
+  }
+
+  async updateSubscriptionWith3DSecure({
+    customerId,
+    priceId,
+    couponCode,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode: string;
+  }) {
+    let is3DSecureRequired = false;
+    let clientSecret = '';
+    const updatedSubscription = await this.updateSub({
+      customerId: customerId,
+      priceId: priceId,
+      additionalOptions: {
+        coupon: couponCode,
+      },
+    });
+
+    const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+
+    if (getLatestInvoice.payment_intent) {
+      const getPaymentIntent: Stripe.PaymentIntent = await this.provider.paymentIntents.retrieve(
+        getLatestInvoice.payment_intent as string,
+      );
+      if (
+        getPaymentIntent.status === 'requires_action' &&
+        getPaymentIntent.next_action?.type === 'use_stripe_sdk' &&
+        getPaymentIntent.client_secret
+      ) {
+        is3DSecureRequired = true;
+        clientSecret = getPaymentIntent.client_secret;
+      }
+    }
+
+    return {
+      is3DSecureRequired,
+      clientSecret,
+    };
   }
 
   async updateSubscriptionPaymentMethod(
