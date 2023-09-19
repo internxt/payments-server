@@ -97,6 +97,47 @@ export class PaymentService {
     return res.data;
   }
 
+  /**
+   * Function to update the subscription that contains the basic params
+   *
+   * @param customerId - The customer id
+   * @param priceId - The price id
+   * @param additionalOptions - Additional options to update the subscription (all the options from Stripe.SubscriptionUpdateParams)
+   * @returns The updated subscription
+   */
+  async updateSub({
+    customerId,
+    priceId,
+    additionalOptions,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode?: string;
+    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+  }) {
+    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
+    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
+      cancel_at_period_end: false,
+      proration_behavior: 'none',
+      items: [
+        {
+          id: individualActiveSubscription.items.data[0].id,
+          price: priceId,
+        },
+      ],
+      ...additionalOptions,
+    });
+
+    return updatedSubscription;
+  }
+
+  /**
+   *  Function to update the subscription with a freeTrial (prevent-cancellation flow)
+   * @param customerId - The customer id
+   * @param priceId - The price id
+   * @param reason - The reason to update the subscription
+   * @returns The updated subscription with the corresponding trial_end
+   */
   async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
     let trialEnd = 0;
 
@@ -111,23 +152,27 @@ export class PaymentService {
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
-    return this.updateSubscriptionPrice({
+    return this.updateSub({
       customerId: customerId,
       priceId: priceId,
       additionalOptions: {
         trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
         metadata: { reason: reason.name },
       },
-      isFreeTrial: true,
     });
   }
 
+  /**
+   * Function to update the subscription price (change the plan)
+   * @param customerId - The customer id
+   * @param priceId - The price id
+   * @param couponCode - The coupon code
+   * @returns updated subscription
+   */
   async updateSubscriptionPrice({
     customerId,
     priceId,
     couponCode,
-    additionalOptions,
-    isFreeTrial,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
@@ -135,24 +180,56 @@ export class PaymentService {
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
     isFreeTrial?: boolean;
   }): Promise<Subscription> {
-    const billingCycleAnchor: Stripe.SubscriptionUpdateParams = !isFreeTrial ? { billing_cycle_anchor: 'now' } : {};
-    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
-    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
-      cancel_at_period_end: false,
-      proration_behavior: 'none',
-      coupon: couponCode ? couponCode : undefined,
-      items: [
-        {
-          id: individualActiveSubscription.items.data[0].id,
-          price: priceId,
-        },
-      ],
-      trial_end: 'now',
-      ...billingCycleAnchor,
-      ...additionalOptions,
+    const updatedSubscription = await this.updateSub({
+      customerId: customerId,
+      priceId: priceId,
+      additionalOptions: {
+        coupon: couponCode,
+      },
     });
 
     return updatedSubscription;
+  }
+
+  async updateSubscriptionWith3DSecure({
+    customerId,
+    priceId,
+    couponCode,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode: string;
+  }) {
+    let is3DSecureRequired = false;
+    let clientSecret = '';
+    const updatedSubscription = await this.updateSub({
+      customerId: customerId,
+      priceId: priceId,
+      additionalOptions: {
+        coupon: couponCode,
+      },
+    });
+
+    const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+
+    if (getLatestInvoice.payment_intent) {
+      const getPaymentIntent: Stripe.PaymentIntent = await this.provider.paymentIntents.retrieve(
+        getLatestInvoice.payment_intent as string,
+      );
+      if (
+        getPaymentIntent.status === 'requires_action' &&
+        getPaymentIntent.next_action?.type === 'use_stripe_sdk' &&
+        getPaymentIntent.client_secret
+      ) {
+        is3DSecureRequired = true;
+        clientSecret = getPaymentIntent.client_secret;
+      }
+    }
+
+    return {
+      is3DSecureRequired,
+      clientSecret,
+    };
   }
 
   async updateSubscriptionPaymentMethod(

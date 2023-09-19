@@ -135,6 +135,36 @@ export default function (
       },
     );
 
+    fastify.put<{ Body: { price_id: string; couponCode: string } }>(
+      '/subscriptions-with-3DSecure',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['price_id'],
+            properties: { price_id: { type: 'string' }, couponCode: { type: 'string' } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { price_id: priceId, couponCode } = req.body;
+
+        const user = await assertUser(req, rep);
+        const userUpdated = await paymentService.updateSubscriptionWith3DSecure({
+          customerId: user.customerId,
+          priceId: priceId,
+          couponCode: couponCode,
+        });
+
+        const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
+        return rep.send({
+          userSubscription: updatedSubscription,
+          request3DSecure: userUpdated.is3DSecureRequired,
+          clientSecret: userUpdated.clientSecret,
+        });
+      },
+    );
+
     fastify.get('/setup-intent', async (req, rep) => {
       const user = await assertUser(req, rep);
       const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId);
@@ -194,7 +224,7 @@ export default function (
       } catch (err) {
         const error = err as Error;
         req.log.error(
-          `[REQUEST-PREVENT-CANCELLATION] ERROR for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
+          `[REQUEST-PREVENT-CANCELLATION/ERROR]: Error for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
         );
         throw err;
       }
