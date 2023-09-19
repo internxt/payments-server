@@ -124,33 +124,7 @@ export default function (
         const { price_id: priceId, couponCode } = req.body;
 
         const user = await assertUser(req, rep);
-        await paymentService.updateSubscriptionPrice({
-          customerId: user.customerId,
-          priceId: priceId,
-          couponCode: couponCode,
-        });
-
-        const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
-        return rep.send(updatedSubscription);
-      },
-    );
-
-    fastify.put<{ Body: { price_id: string; couponCode: string } }>(
-      '/subscriptions-with-3DSecure',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['price_id'],
-            properties: { price_id: { type: 'string' }, couponCode: { type: 'string' } },
-          },
-        },
-      },
-      async (req, rep) => {
-        const { price_id: priceId, couponCode } = req.body;
-
-        const user = await assertUser(req, rep);
-        const userUpdated = await paymentService.updateSubscriptionWith3DSecure({
+        const userUpdated = await paymentService.updateSubscriptionPrice({
           customerId: user.customerId,
           priceId: priceId,
           couponCode: couponCode,
