@@ -176,28 +176,6 @@ export class PaymentService {
   }: {
     customerId: CustomerId;
     priceId: PriceId;
-    couponCode?: string;
-    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
-    isFreeTrial?: boolean;
-  }): Promise<Subscription> {
-    const updatedSubscription = await this.updateSub({
-      customerId: customerId,
-      priceId: priceId,
-      additionalOptions: {
-        coupon: couponCode,
-      },
-    });
-
-    return updatedSubscription;
-  }
-
-  async updateSubscriptionWith3DSecure({
-    customerId,
-    priceId,
-    couponCode,
-  }: {
-    customerId: CustomerId;
-    priceId: PriceId;
     couponCode: string;
   }) {
     let is3DSecureRequired = false;
