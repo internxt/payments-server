@@ -373,11 +373,28 @@ export class PaymentService {
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const prices = await this.getPrices();
     const product = prices.find((price) => price.id === priceId);
+    const commonPaymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
+      'card',
+      'bancontact',
+      'ideal',
+      'sofort',
+      'paypal',
+    ];
+    const additionalPaymentTypesForOneTime: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
+      'alipay',
+      'eps',
+      'giropay',
+      'klarna',
+    ];
+    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
+      mode === 'subscription'
+        ? commonPaymentMethodTypes
+        : [...commonPaymentMethodTypes, ...additionalPaymentTypesForOneTime];
 
     if (!product) throw new Error('The product does not exist');
 
     const checkout = await this.provider.checkout.sessions.create({
-      payment_method_types: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
+      payment_method_types: paymentMethodTypes,
       success_url: successUrl,
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
