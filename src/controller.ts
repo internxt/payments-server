@@ -16,6 +16,8 @@ const rateLimit = require('fastify-rate-limit');
 
 type AllowedMethods = 'GET' | 'POST';
 
+export const allowedCurrency = ['eur', 'usd'];
+
 const allowedRoutes: {
   [key: string]: AllowedMethods[];
 } = {
@@ -183,8 +185,41 @@ export default function (
       return response;
     });
 
-    fastify.get('/prices', async (req, rep) => {
-      return paymentService.getPrices();
+    function checkCurrency(currency?: string): { currencyValue: string; isError: boolean; errorMessage?: string } {
+      let currencyValue: string;
+
+      if (!currency) {
+        currencyValue = 'eur';
+      } else {
+        const validatedCurrency = allowedCurrency.includes(currency.toLowerCase());
+        if (!validatedCurrency) {
+          return { currencyValue: '', isError: true, errorMessage: 'Bad request' };
+        } else {
+          currencyValue = currency.toLowerCase();
+        }
+      }
+
+      return { currencyValue, isError: false };
+    }
+
+    fastify.get<{
+      Querystring: { currency?: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { currency: { type: 'string' } };
+        };
+      };
+    }>('/prices', async (req, rep) => {
+      const { currency } = req.query;
+
+      const { currencyValue, isError, errorMessage } = checkCurrency(currency);
+
+      if (isError) {
+        return rep.status(400).send({ message: errorMessage });
+      }
+
+      return paymentService.getPrices(currencyValue);
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {
@@ -232,6 +267,7 @@ export default function (
         customer_email: string;
         trial_days?: number;
         mode?: string;
+        currency?: string;
       };
     }>(
       '/checkout-session',
@@ -248,19 +284,29 @@ export default function (
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
               customer_email: { type: 'string' },
+              currency: { type: 'string' },
             },
           },
         },
       },
       async (req, rep) => {
-        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code } = req.body;
         const { uuid } = req.user.payload;
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency } = req.body;
+
+        const { currencyValue, isError, errorMessage } = checkCurrency(currency);
+
+        if (isError) {
+          return rep.status(400).send({ message: errorMessage });
+        }
+
         let user: User | undefined;
+
         try {
           user = await usersService.findUserByUuid(uuid);
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
+
         const { id } = await paymentService.getCheckoutSession({
           priceId: price_id,
           successUrl: success_url,
@@ -269,6 +315,7 @@ export default function (
           mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
           trialDays: trial_days,
           couponCode: coupon_code,
+          currency: currencyValue,
         });
 
         return { sessionId: id };

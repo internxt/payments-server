@@ -29,6 +29,16 @@ export type Reason = {
   name: 'prevent-cancellation';
 };
 
+const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
+  usd: [],
+  eur: ['bancontact', 'ideal', 'sofort'],
+};
+
+const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
+  usd: [],
+  eur: ['alipay', 'eps', 'giropay'],
+};
+
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
 };
@@ -335,9 +345,9 @@ export class PaymentService {
     };
   }
 
-  async getPrices(): Promise<DisplayPrice[]> {
+  async getPrices(currency?: string): Promise<DisplayPrice[]> {
     const res = await this.provider.prices.search({
-      query: 'metadata["show"]:"1" active:"true"',
+      query: `metadata["show"]:"1" active:"true" currency:"${currency ?? 'eur'}"`,
       limit: 100,
     });
 
@@ -352,6 +362,16 @@ export class PaymentService {
       }));
   }
 
+  private getPaymentMethodTypes(
+    currency: string,
+    isOneTime: boolean,
+  ): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
+    const commonPaymentTypes = commonPaymentMethodTypes[currency];
+    const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
+
+    return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
+  }
+
   async getCheckoutSession({
     priceId,
     successUrl,
@@ -360,6 +380,7 @@ export class PaymentService {
     mode,
     trialDays,
     couponCode,
+    currency,
   }: {
     priceId: string;
     successUrl: string;
@@ -368,28 +389,18 @@ export class PaymentService {
     mode: Stripe.Checkout.SessionCreateParams.Mode;
     trialDays?: number;
     couponCode?: string;
+    currency?: string;
   }): Promise<Stripe.Checkout.Session> {
+    const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    const prices = await this.getPrices();
+    const prices = await this.getPrices(productCurrency);
     const product = prices.find((price) => price.id === priceId);
-    const commonPaymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
-      'card',
-      'bancontact',
-      'ideal',
-      'sofort',
-      'paypal',
-    ];
-    const additionalPaymentTypesForOneTime: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
-      'alipay',
-      'eps',
-      'giropay',
-      'klarna',
-    ];
-    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
-      mode === 'subscription'
-        ? commonPaymentMethodTypes
-        : [...commonPaymentMethodTypes, ...additionalPaymentTypesForOneTime];
+
+    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
+      productCurrency,
+      product?.interval === 'lifetime',
+    );
 
     if (!product) throw new Error('The product does not exist');
 
@@ -400,6 +411,8 @@ export class PaymentService {
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
       customer_email: typeof prefill === 'string' ? prefill : undefined,
       line_items: [{ price: priceId, quantity: 1 }],
+      automatic_tax: { enabled: false },
+      currency: productCurrency,
       mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,

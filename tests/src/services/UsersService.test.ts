@@ -15,7 +15,7 @@ let usersService: UsersService;
 let usersRepository: UsersRepository;
 
 beforeEach(() => {
-  paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2020-08-27' }));
+  paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' }));
   usersRepository = {} as UsersRepository;
   storageService = new StorageService(config, axios);
   usersService = new UsersService(usersRepository, paymentService);
