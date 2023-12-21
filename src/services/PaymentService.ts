@@ -29,6 +29,16 @@ export type Reason = {
   name: 'prevent-cancellation';
 };
 
+const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
+  usd: ['card', 'paypal'],
+  eur: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
+};
+
+const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
+  usd: ['afterpay_clearpay', 'klarna'],
+  eur: ['alipay', 'eps', 'giropay'],
+};
+
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
 };
@@ -352,6 +362,13 @@ export class PaymentService {
       }));
   }
 
+  private getPaymentMethodTypes(currency: string, isOneTime: boolean) {
+    const commonPaymentTypes = commonPaymentMethodTypes[currency];
+    const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
+
+    return [...commonPaymentTypes, ...additionalPaymentTypes];
+  }
+
   async getCheckoutSession({
     priceId,
     successUrl,
@@ -376,25 +393,11 @@ export class PaymentService {
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const prices = await this.getPrices(productCurrency);
     const product = prices.find((price) => price.id === priceId);
-    const commonPaymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
-      'card',
-      // 'bancontact',
-      // 'ideal',
-      // 'sofort',
-      'paypal',
-    ];
 
-    const additionalPaymentTypesForOneTime: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = [
-      // 'alipay',
-      // 'eps',
-      // 'giropay',
-      // 'klarna',
-    ];
-
-    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] =
-      mode === 'subscription'
-        ? commonPaymentMethodTypes
-        : [...commonPaymentMethodTypes, ...additionalPaymentTypesForOneTime];
+    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
+      productCurrency,
+      product?.interval === 'lifetime',
+    );
 
     if (!product) throw new Error('The product does not exist');
 
