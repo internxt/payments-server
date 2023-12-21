@@ -184,7 +184,7 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { currency: string };
+      Querystring: { currency?: string };
       schema: {
         querystring: {
           type: 'object';
