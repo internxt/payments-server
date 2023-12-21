@@ -30,12 +30,12 @@ export type Reason = {
 };
 
 const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: ['card', 'paypal'],
-  eur: ['card', 'bancontact', 'ideal', 'sofort', 'paypal'],
+  usd: [],
+  eur: ['bancontact', 'ideal', 'sofort'],
 };
 
 const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: ['afterpay_clearpay', 'klarna'],
+  usd: [],
   eur: ['alipay', 'eps', 'giropay'],
 };
 
@@ -362,11 +362,14 @@ export class PaymentService {
       }));
   }
 
-  private getPaymentMethodTypes(currency: string, isOneTime: boolean) {
+  private getPaymentMethodTypes(
+    currency: string,
+    isOneTime: boolean,
+  ): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
     const commonPaymentTypes = commonPaymentMethodTypes[currency];
     const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
 
-    return [...commonPaymentTypes, ...additionalPaymentTypes];
+    return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
   async getCheckoutSession({
