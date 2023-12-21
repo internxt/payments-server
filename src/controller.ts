@@ -183,8 +183,17 @@ export default function (
       return response;
     });
 
-    fastify.get('/prices', async (req, rep) => {
-      return paymentService.getPrices();
+    fastify.get<{
+      Querystring: { currency: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { currency: { type: 'string' } };
+        };
+      };
+    }>('/prices', async (req, rep) => {
+      const { currency } = req.query;
+      return paymentService.getPrices(currency);
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {
@@ -232,6 +241,7 @@ export default function (
         customer_email: string;
         trial_days?: number;
         mode?: string;
+        currency?: string;
       };
     }>(
       '/checkout-session',
@@ -248,19 +258,23 @@ export default function (
               success_url: { type: 'string' },
               cancel_url: { type: 'string' },
               customer_email: { type: 'string' },
+              currency: { type: 'string' },
             },
           },
         },
       },
       async (req, rep) => {
-        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code } = req.body;
         const { uuid } = req.user.payload;
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency } = req.body;
+
         let user: User | undefined;
+
         try {
           user = await usersService.findUserByUuid(uuid);
         } catch (err) {
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
+
         const { id } = await paymentService.getCheckoutSession({
           priceId: price_id,
           successUrl: success_url,
@@ -269,6 +283,7 @@ export default function (
           mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
           trialDays: trial_days,
           couponCode: coupon_code,
+          currency,
         });
 
         return { sessionId: id };
