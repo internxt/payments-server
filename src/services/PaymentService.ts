@@ -345,7 +345,7 @@ export class PaymentService {
     };
   }
 
-  async getPrices(currency?: string): Promise<(DisplayPrice | undefined)[]> {
+  async getPrices(currency?: string): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
     let priceProduct;
 
@@ -355,11 +355,13 @@ export class PaymentService {
       limit: 100,
     });
 
-    return res.data
+    const products = res.data
       .filter((price) => price.metadata.maxSpaceBytes)
       .map((price) => {
         priceProduct = price.currency_options?.[currencyValue].unit_amount;
-        if (!priceProduct) return;
+        if (!priceProduct) {
+          return;
+        }
 
         return {
           id: price.id,
@@ -369,6 +371,8 @@ export class PaymentService {
           interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
         };
       });
+
+    return products.filter((price) => price !== undefined) as DisplayPrice[];
   }
 
   private getPaymentMethodTypes(
@@ -404,7 +408,7 @@ export class PaymentService {
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
     const prices = await this.getPrices(productCurrency);
-    const product = prices.find((price) => price && price.id === priceId);
+    const product = prices.find((price) => price.id === priceId);
 
     const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
       productCurrency,
