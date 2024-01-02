@@ -346,8 +346,10 @@ export class PaymentService {
   }
 
   async getPrices(currency?: string): Promise<DisplayPrice[]> {
+    const currencyValue = currency ?? 'eur';
     const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currency ?? 'eur'}"`,
+      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      expand: ['data.currency_options'],
       limit: 100,
     });
 
@@ -355,8 +357,8 @@ export class PaymentService {
       .filter((price) => price.metadata.maxSpaceBytes)
       .map((price) => ({
         id: price.id,
-        currency: price.currency,
-        amount: price.unit_amount!,
+        currency: currencyValue,
+        amount: price.currency_options?.[currencyValue].unit_amount ?? price.unit_amount!,
         bytes: parseInt(price.metadata.maxSpaceBytes),
         interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
       }));
