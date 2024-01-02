@@ -346,20 +346,28 @@ export class PaymentService {
   }
 
   async getPrices(currency?: string): Promise<DisplayPrice[]> {
+    const currencyValue = currency ?? 'eur';
+
     const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currency ?? 'eur'}"`,
+      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      expand: ['data.currency_options'],
       limit: 100,
     });
 
     return res.data
-      .filter((price) => price.metadata.maxSpaceBytes)
-      .map((price) => ({
-        id: price.id,
-        currency: price.currency,
-        amount: price.unit_amount!,
-        bytes: parseInt(price.metadata.maxSpaceBytes),
-        interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
-      }));
+      .filter(
+        (price) =>
+          price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
+      )
+      .map((price) => {
+        return {
+          id: price.id,
+          currency: currencyValue,
+          amount: price.currency_options![currencyValue].unit_amount as number,
+          bytes: parseInt(price.metadata.maxSpaceBytes),
+          interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
+        };
+      });
   }
 
   private getPaymentMethodTypes(
@@ -412,7 +420,7 @@ export class PaymentService {
       customer_email: typeof prefill === 'string' ? prefill : undefined,
       line_items: [{ price: priceId, quantity: 1 }],
       automatic_tax: { enabled: false },
-      currency: productCurrency,
+      currency: product.currency,
       mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
