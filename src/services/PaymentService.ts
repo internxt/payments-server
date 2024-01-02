@@ -347,7 +347,6 @@ export class PaymentService {
 
   async getPrices(currency?: string): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
-    let priceProduct;
 
     const res = await this.provider.prices.search({
       query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
@@ -355,24 +354,20 @@ export class PaymentService {
       limit: 100,
     });
 
-    const products = res.data
-      .filter((price) => price.metadata.maxSpaceBytes)
+    return res.data
+      .filter(
+        (price) =>
+          price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
+      )
       .map((price) => {
-        priceProduct = price.currency_options?.[currencyValue].unit_amount;
-        if (!priceProduct) {
-          return;
-        }
-
         return {
           id: price.id,
           currency: currencyValue,
-          amount: priceProduct,
+          amount: price.currency_options![currencyValue].unit_amount as number,
           bytes: parseInt(price.metadata.maxSpaceBytes),
           interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
         };
       });
-
-    return products.filter((price) => price !== undefined) as DisplayPrice[];
   }
 
   private getPaymentMethodTypes(
