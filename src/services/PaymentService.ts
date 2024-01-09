@@ -108,7 +108,7 @@ export class PaymentService {
   }
 
   /**
-   * Function to update the subscription that contains the basic params
+   * Function to update a normal subscription
    *
    * @param customerId - The customer id
    * @param priceId - The price id
@@ -129,7 +129,6 @@ export class PaymentService {
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
-      billing_cycle_anchor: 'now',
       items: [
         {
           id: individualActiveSubscription.items.data[0].id,
@@ -196,6 +195,7 @@ export class PaymentService {
       priceId: priceId,
       additionalOptions: {
         coupon: couponCode,
+        billing_cycle_anchor: 'now',
       },
     });
 
