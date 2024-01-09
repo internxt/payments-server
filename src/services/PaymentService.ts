@@ -108,7 +108,7 @@ export class PaymentService {
   }
 
   /**
-   * Function to update a normal subscription
+   * Function to update the subscription that contains the basic params
    *
    * @param customerId - The customer id
    * @param priceId - The price id
