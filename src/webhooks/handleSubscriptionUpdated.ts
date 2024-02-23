@@ -28,7 +28,7 @@ export default async function handleSubscriptionUpdated(
       : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
 
   const planId = isSubscriptionCanceled
-    ? FREE_INDIVIDUAL_TIER : subscription.items.data[0].price.product;
+    ? FREE_INDIVIDUAL_TIER : subscription.items.data[0].price.product as string;
 
   try {
     await cacheService.clearSubscription(customerId);
