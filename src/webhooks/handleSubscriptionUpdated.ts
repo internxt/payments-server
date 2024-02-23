@@ -27,8 +27,8 @@ export default async function handleSubscriptionUpdated(
       ? FREE_PLAN_BYTES_SPACE
       : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
 
-  const planTier = isSubscriptionCanceled
-    ? FREE_INDIVIDUAL_TIER : subscription.items.data[0].price.id;
+  const planId = isSubscriptionCanceled
+    ? FREE_INDIVIDUAL_TIER : subscription.items.data[0].price.product;
 
   try {
     await cacheService.clearSubscription(customerId);
@@ -37,7 +37,7 @@ export default async function handleSubscriptionUpdated(
   }
 
   try {
-    await updateUserTier(uuid, planTier, config);
+    await updateUserTier(uuid, planId, config);
   } catch (err) {
     log.error(
       `Error while updating user tier: uuid: ${uuid} `,

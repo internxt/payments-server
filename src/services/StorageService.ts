@@ -44,7 +44,7 @@ export async function createOrUpdateUser(maxSpaceBytes: string, email: string, c
   );
 }
 
-export async function updateUserTier(planId: string, uuid: string, config: AppConfig) {
+export async function updateUserTier(uuid: string, planId: string, config: AppConfig) {
   return axios.put(
     `${config.DRIVE_GATEWAY_URL}/api/gateway/user/update/tier`,
     { planId, uuid },

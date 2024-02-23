@@ -60,10 +60,10 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    await updateUserTier(user.uuid, price.id, config);
+    await updateUserTier(user.uuid, price.product, config);
   } catch (err) {
     log.error(
-      `Error while updating user tier: email: ${session.customer_email}, priceId: ${price.id} `,
+      `Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `,
     );
     log.error(err);
 
