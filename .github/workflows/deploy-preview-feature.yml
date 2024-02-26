@@ -80,7 +80,7 @@ jobs:
       - name: Dispatch Check Preview Repository Command
         uses: myrotvorets/trigger-repository-dispatch-action@1.0.0
         with:
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           repo: internxt/environments
           type: check-preview-command
           payload: |
