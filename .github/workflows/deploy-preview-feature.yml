@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./
-          file: ./Dockerfile
+          file: ./infrastructure/development.Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/payments-server-dev:preview-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
   add_preview_label:
@@ -80,7 +80,7 @@ jobs:
       - name: Dispatch Check Preview Repository Command
         uses: myrotvorets/trigger-repository-dispatch-action@1.0.0
         with:
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          token: ${{ secrets.PAT }}
           repo: internxt/environments
           type: check-preview-command
           payload: |
