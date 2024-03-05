@@ -14,5 +14,4 @@ export type UserSubscription =
       interval: 'year' | 'month';
       nextPayment: number;
       priceId: string;
-      productId: string;
     };
