@@ -24,10 +24,9 @@ export default async function handleSubscriptionCanceled(
     await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
   } catch (err) {
     log.error(
-      `Error while updating user tier: uuid: ${uuid} `,
+      `[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `,
     );
     log.error(err);
-    throw err;
   }
   
   return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
