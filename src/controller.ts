@@ -104,6 +104,33 @@ export default function (
       },
     );
 
+    fastify.get<{ Querystring: { couponCodeName: string } }>(
+      '/is-coupon-used-by-user',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { coupon: { type: 'string' } },
+          },
+        },
+      },
+      async (req, res) => {
+        const { couponCodeName } = req.query;
+
+        const { customerId } = await assertUser(req, res);
+
+        const limit = 100;
+
+        const userInvoices = await paymentService.getInvoicesFromUser(customerId, {
+          limit: limit,
+        });
+
+        const isCouponUsed = await userInvoices.some((invoice) => invoice.discount?.coupon.name === couponCodeName);
+
+        return isCouponUsed ?? false;
+      },
+    );
+
     fastify.delete('/subscriptions', async (req, rep) => {
       const user = await assertUser(req, rep);
       await usersService.cancelUserIndividualSubscriptions(user.customerId);
@@ -233,7 +260,7 @@ export default function (
       } catch (err) {
         const error = err as Error;
         req.log.error(
-          `[REQUEST-PREVENT-CANCELLATION/ERROR]: Error for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
+          `[REQUEST-PREVENT-CANCELLATION/ERROR]: Error for user ${uuid} ${error.message}. ${error.stack ?? 'NO STACK'}`,
         );
         throw err;
       }
@@ -349,7 +376,7 @@ export default function (
             return res.status(404).send({ message: err.message });
           }
 
-          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
@@ -399,7 +426,7 @@ export default function (
             return rep.status(403).send({ message: err.message });
           }
 
-          req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },
