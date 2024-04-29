@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
@@ -6,6 +5,8 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
+
+let stripe: Stripe;
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
@@ -60,11 +61,24 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
+    const userData = await usersService.findUserByUuid(user.uuid);
+    const invoice = await stripe.invoices.retrieve(session.invoice as string);
+
+    const promotionCodeId = invoice.discount?.promotion_code;
+
+    if (promotionCodeId) {
+      const promotionCodeName = await stripe.promotionCodes.retrieve(promotionCodeId as string);
+
+      usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
+    }
+  } catch (err) {
+    log.error(`Error while adding user id and coupon id: ${err}`);
+  }
+
+  try {
     await updateUserTier(user.uuid, price.product as string, config);
   } catch (err) {
-    log.error(
-      `Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `,
-    );
+    log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `);
     log.error(err);
 
     throw err;
