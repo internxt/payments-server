@@ -104,30 +104,36 @@ export default function (
       },
     );
 
-    fastify.get<{ Querystring: { couponCodeName: string } }>(
-      '/is-coupon-used-by-user',
+    fastify.get<{ Params: { coupon: string } }>(
+      '/coupons/:coupon/used',
       {
         schema: {
-          querystring: {
+          params: {
             type: 'object',
             properties: { coupon: { type: 'string' } },
           },
         },
       },
       async (req, res) => {
-        const { couponCodeName } = req.query;
-
-        const { customerId } = await assertUser(req, res);
-
+        const { coupon } = req.params;
         const limit = 100;
 
-        const userInvoices = await paymentService.getInvoicesFromUser(customerId, {
-          limit: limit,
-        });
+        try {
+          const { customerId } = await assertUser(req, res);
 
-        const isCouponUsed = await userInvoices.some((invoice) => invoice.discount?.coupon.name === couponCodeName);
+          const userInvoices = await paymentService.getInvoicesFromUser(customerId, {
+            limit: limit,
+          });
 
-        return isCouponUsed ?? false;
+          const isCouponUsed = userInvoices.some((invoice) => invoice.discount?.coupon.name === coupon);
+
+          return res.send({ isCouponUsed });
+        } catch (err) {
+          const error = err as Error;
+          return res.status(500).send({
+            message: error.message,
+          });
+        }
       },
     );
 
