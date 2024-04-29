@@ -13,6 +13,10 @@ import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { StorageService } from '../services/StorageService';
+import { 
+  DisplayBillingRepository, 
+  MongoDBDisplayBillingRepository 
+} from '../core/users/MongoDBDisplayBillingRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -51,9 +55,10 @@ async function main() {
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const storageService = new StorageService(envVariablesConfig, axios);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
+    const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
 
     const paymentService = new PaymentService(stripe);
-    const usersService = new UsersService(usersRepository, paymentService);
+    const usersService = new UsersService(usersRepository, paymentService, displayBillingRepository);
     const licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,
