@@ -2,9 +2,14 @@ import Stripe from 'stripe';
 import { User } from '../core/users/User';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { PaymentService } from './PaymentService';
+import { DisplayBillingRepository } from '../core/users/MongoDBDisplayBillingRepository';
 
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository, private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly usersRepository: UsersRepository, 
+    private readonly paymentService: PaymentService,
+    private readonly displayBillingRepository: DisplayBillingRepository
+  ) {}
 
   async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
     const updated = this.usersRepository.updateUser(customerId, body);
@@ -65,6 +70,12 @@ export class UsersService {
     for (const subscriptionToCancel of individualSubscriptions) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
+  }
+
+  async shouldDisplayBilling(): Promise<boolean> {
+    const billing = await this.displayBillingRepository.find();
+
+    return billing.display;
   }
 
   insertUser(user: User) {

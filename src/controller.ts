@@ -404,5 +404,19 @@ export default function (
         }
       },
     );
+
+    fastify.get('/display-billing', async (req, rep) => {
+      try {
+        const display = await usersService.shouldDisplayBilling();
+
+        return rep.status(200).send({ display });
+      } catch (error) {
+        const err = error as Error;
+
+        req.log.error(`[DISPLAY-BILLING]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
   };
 }
