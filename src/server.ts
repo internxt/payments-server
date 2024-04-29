@@ -18,17 +18,29 @@ import {
   DisplayBillingRepository, 
   MongoDBDisplayBillingRepository 
 } from './core/users/MongoDBDisplayBillingRepository';
+import { CouponsRepository } from './core/coupons/CouponsRepository';
+import { MongoDBCouponsRepository } from './core/coupons/MongoDBCouponsRepository';
+import { UsersCouponsRepository } from './core/coupons/UsersCouponsRepository';
+import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCouponsRepository';
 
 const start = async (): Promise<FastifyInstance> => {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
   const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
+  const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
+  const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
 
   const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' });
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(envVariablesConfig, axios);
-  const usersService = new UsersService(usersRepository, paymentService, displayBillingRepository);
+  const usersService = new UsersService(
+    usersRepository, 
+    paymentService, 
+    displayBillingRepository,
+    couponsRepository,
+    usersCouponsRepository,
+  );
   const cacheService = new CacheService(envVariablesConfig);
   const licenseCodesService = new LicenseCodesService(
     paymentService,

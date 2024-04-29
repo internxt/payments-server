@@ -17,6 +17,10 @@ import {
   DisplayBillingRepository, 
   MongoDBDisplayBillingRepository 
 } from '../core/users/MongoDBDisplayBillingRepository';
+import { CouponsRepository } from '../core/coupons/CouponsRepository';
+import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
+import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
+import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -56,9 +60,17 @@ async function main() {
     const storageService = new StorageService(envVariablesConfig, axios);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
+    const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
+    const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
 
     const paymentService = new PaymentService(stripe);
-    const usersService = new UsersService(usersRepository, paymentService, displayBillingRepository);
+    const usersService = new UsersService(
+      usersRepository, 
+      paymentService, 
+      displayBillingRepository,
+      couponsRepository,
+      usersCouponsRepository,
+    );
     const licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,

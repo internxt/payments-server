@@ -11,6 +11,7 @@ import {
   LicenseCodeAlreadyAppliedError,
   LicenseCodesService,
 } from './services/LicenseCodesService';
+import { Coupon } from './core/coupons/Coupon';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
 
@@ -418,5 +419,46 @@ export default function (
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
+
+    fastify.get<{ Querystring: { code: Coupon['code']; } }>(
+      '/coupon-in-use',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { code: { type: 'string' } },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, rep) => {
+        const { code } = req.query;
+        const { uuid } = req.user.payload;
+        const user = await usersService.findUserByUuid(uuid);
+
+        if (!code) {
+          return rep.status(400).send({ message: 'Bad Request' });
+        }
+
+        try {
+          const isBeingUsed = await usersService.isCouponBeingUsedByUser(user, code);
+
+          return rep.status(200).send({ couponUsed: isBeingUsed });
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof LicenseCodeAlreadyAppliedError || err instanceof InvalidLicenseCodeError) {
+            return rep.status(404).send({ message: err.message });
+          }
+
+          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
+        }
+      },
+    );
   };
 }
