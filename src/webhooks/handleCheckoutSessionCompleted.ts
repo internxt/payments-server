@@ -65,8 +65,6 @@ export default async function handleCheckoutSessionCompleted(
 
     const couponId = invoice.discount?.coupon.id;
 
-    console.log({ userUuid: userData, couponId });
-
     if (couponId) {
       await usersService.storeCouponUsedByUser(userData, couponId);
     }
