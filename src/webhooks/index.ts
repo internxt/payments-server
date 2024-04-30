@@ -54,7 +54,6 @@ export default function (
         case 'customer.subscription.updated':
           await handleSubscriptionUpdated(
             storageService,
-            stripe,
             usersService,
             event.data.object as Stripe.Subscription,
             cacheService,

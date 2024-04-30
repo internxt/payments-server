@@ -59,17 +59,16 @@ export default async function handleCheckoutSessionCompleted(
     throw err;
   }
 
-  // Check if the user used a coupon code and add the promotion_code coupon used by a given user.
   try {
     const userData = await usersService.findUserByUuid(user.uuid);
     const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-    const promotionCodeId = invoice.discount?.promotion_code;
+    const couponId = invoice.discount?.coupon.id;
 
-    if (promotionCodeId) {
-      const promotionCodeName = await stripe.promotionCodes.retrieve(promotionCodeId as string);
+    console.log({ userUuid: userData, couponId });
 
-      await usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
+    if (couponId) {
+      await usersService.storeCouponUsedByUser(userData, couponId);
     }
   } catch (err) {
     log.error(`Error while adding user ${user.uuid} and coupon`);

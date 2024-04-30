@@ -2,25 +2,23 @@ import { Collection, MongoClient, ObjectId, WithId } from 'mongodb';
 import { UsersCouponsRepository } from './UsersCouponsRepository';
 import { UserCoupon } from './UserCoupon';
 
-interface UserCouponDocument extends WithId<
-  Omit<UserCoupon, 'id' | 'user' | 'coupon' >
-> {
+interface UserCouponDocument extends WithId<Omit<UserCoupon, 'id' | 'user' | 'coupon'>> {
   user: ObjectId;
   coupon: ObjectId;
-};
+}
 
 function toDomain(doc: UserCouponDocument): UserCoupon {
   return {
     id: doc._id.toString(),
     coupon: doc.coupon.toString(),
-    user: doc.coupon.toString(),
+    user: doc.user.toString(),
   };
 }
 
 function toDocument(domain: Omit<UserCoupon, 'id'>): Omit<UserCouponDocument, '_id'> {
   return {
     coupon: new ObjectId(domain.coupon),
-    user: new ObjectId(domain.coupon),
+    user: new ObjectId(domain.user),
   };
 }
 
@@ -37,21 +35,17 @@ export class MongoDBUsersCouponsRepository implements UsersCouponsRepository {
     return userCoupon ? toDomain(userCoupon) : null;
   }
 
-  async findByUserAndCoupon(
-    userId: UserCoupon['user'], 
-    couponId: UserCoupon['coupon']
-  ): Promise<UserCoupon | null> {
+  async findByUserAndCoupon(userId: UserCoupon['user'], couponId: UserCoupon['coupon']): Promise<UserCoupon | null> {
     const userCoupon = await this.collection.findOne({
       user: new ObjectId(userId),
-      coupon: new ObjectId(couponId)
+      coupon: new ObjectId(couponId),
     });
 
     return userCoupon ? toDomain(userCoupon) : null;
   }
 
   async create(payload: Omit<UserCoupon, 'id'>): Promise<void> {
-    await this.collection.insertOne(
-      toDocument(payload) as UserCouponDocument
-    );
+    console.log('PAYLOAD IN CREATE', payload);
+    await this.collection.insertOne(toDocument(payload) as UserCouponDocument);
   }
 }
