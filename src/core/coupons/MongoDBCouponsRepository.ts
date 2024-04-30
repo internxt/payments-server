@@ -12,6 +12,7 @@ interface CouponDocument extends WithId<
 function toDomain(doc: CouponDocument): Coupon {
   return {
     id: doc._id.toString(),
+    provider: doc.provider,
     code: doc.code,
   };
 }
