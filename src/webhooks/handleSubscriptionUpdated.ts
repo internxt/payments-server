@@ -11,6 +11,7 @@ let stripe: Stripe;
 
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
+  stripe: Stripe,
   usersService: UsersService,
   subscription: Stripe.Subscription,
   cacheService: CacheService,
@@ -36,19 +37,22 @@ export default async function handleSubscriptionUpdated(
     log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }
 
+  // Check if the user used a promotion code and add the promotion_code coupon
+  // used by a given user.
   try {
     const userData = await usersService.findUserByUuid(uuid);
-    const invoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
 
-    const promotionCodeId = invoice.discount?.promotion_code;
+    const promotionCodeId = subscription.discount?.promotion_code;
 
     if (promotionCodeId) {
       const promotionCodeName = await stripe.promotionCodes.retrieve(promotionCodeId as string);
 
-      usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
+      await usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
     }
   } catch (err) {
     log.error(`Error while adding user id and coupon id: ${err}`);
+
+    throw err;
   }
 
   try {

@@ -6,10 +6,9 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 
-let stripe: Stripe;
-
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
+  stripe: Stripe,
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
@@ -60,6 +59,7 @@ export default async function handleCheckoutSessionCompleted(
     throw err;
   }
 
+  // Check if the user used a coupon code and add the promotion_code coupon used by a given user.
   try {
     const userData = await usersService.findUserByUuid(user.uuid);
     const invoice = await stripe.invoices.retrieve(session.invoice as string);
@@ -69,10 +69,12 @@ export default async function handleCheckoutSessionCompleted(
     if (promotionCodeId) {
       const promotionCodeName = await stripe.promotionCodes.retrieve(promotionCodeId as string);
 
-      usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
+      await usersService.storeCouponUsedByUser(userData, promotionCodeName.code);
     }
   } catch (err) {
-    log.error(`Error while adding user id and coupon id: ${err}`);
+    log.error(`Error while adding user ${user.uuid} and coupon`);
+
+    throw err;
   }
 
   try {
