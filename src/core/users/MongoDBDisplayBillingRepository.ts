@@ -1,7 +1,12 @@
 import { Collection, MongoClient } from 'mongodb';
 
-interface DisplayBilling {
+enum OS {
+  Android = 'android',
+  IOS = 'ios'
+}
+export interface DisplayBilling {
   display: boolean;
+  oses: { [key in OS]: string }[]
 }
 
 export interface DisplayBillingRepository {
@@ -18,10 +23,6 @@ export class MongoDBDisplayBillingRepository implements DisplayBillingRepository
   async find(): Promise<DisplayBilling> {
     const displayBilling = await this.collection.findOne();
 
-    if (!displayBilling) {
-      return { display: true };
-    }
-
-    return displayBilling;
+    return displayBilling as DisplayBilling;
   }
 }

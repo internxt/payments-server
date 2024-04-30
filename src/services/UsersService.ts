@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { User } from '../core/users/User';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { PaymentService } from './PaymentService';
-import { DisplayBillingRepository } from '../core/users/MongoDBDisplayBillingRepository';
+import { DisplayBilling, DisplayBillingRepository } from '../core/users/MongoDBDisplayBillingRepository';
 import { Coupon } from '../core/coupons/Coupon';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
@@ -85,10 +85,10 @@ export class UsersService {
     }
   }
 
-  async shouldDisplayBilling(): Promise<boolean> {
+  async getDisplayBilling(): Promise<DisplayBilling> {
     const billing = await this.displayBillingRepository.find();
 
-    return billing.display;
+    return billing;
   }
 
   insertUser(user: Omit<User, 'id'>) {

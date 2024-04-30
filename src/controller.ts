@@ -408,9 +408,9 @@ export default function (
 
     fastify.get('/display-billing', async (req, rep) => {
       try {
-        const display = await usersService.shouldDisplayBilling();
+        const display = await usersService.getDisplayBilling();
 
-        return rep.status(200).send({ display });
+        return rep.status(200).send(display);
       } catch (error) {
         const err = error as Error;
 
