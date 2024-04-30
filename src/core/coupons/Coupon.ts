@@ -1,4 +1,7 @@
+import { Stripe } from 'stripe';
+
 export interface Coupon {
   id: string;
-  code: string;
+  provider: 'stripe'
+  code: Stripe.Coupon['id'];
 }
