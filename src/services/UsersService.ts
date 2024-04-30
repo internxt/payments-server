@@ -17,7 +17,7 @@ export class CouponNotBeingTrackedError extends Error {
 
 export class UsersService {
   constructor(
-    private readonly usersRepository: UsersRepository, 
+    private readonly usersRepository: UsersRepository,
     private readonly paymentService: PaymentService,
     private readonly displayBillingRepository: DisplayBillingRepository,
     private readonly couponsRepository: CouponsRepository,
@@ -113,7 +113,7 @@ export class UsersService {
       user: user.id,
     });
   }
-  
+
   /**
    * Indicates if the coupon has been used or not by a given user
    * @param user User that could have been used a coupon

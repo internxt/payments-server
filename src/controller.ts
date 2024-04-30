@@ -420,7 +420,7 @@ export default function (
       }
     });
 
-    fastify.get<{ Querystring: { code: Coupon['code']; } }>(
+    fastify.get<{ Querystring: { code: Coupon['code'] } }>(
       '/coupon-in-use',
       {
         schema: {

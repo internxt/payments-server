@@ -22,13 +22,11 @@ export default async function handleSubscriptionUpdated(
   }
   const isSubscriptionCanceled = subscription.status === 'canceled';
 
-  const bytesSpace =
-    isSubscriptionCanceled
-      ? FREE_PLAN_BYTES_SPACE
-      : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
+  const bytesSpace = isSubscriptionCanceled
+    ? FREE_PLAN_BYTES_SPACE
+    : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
 
-  const planId = isSubscriptionCanceled
-    ? FREE_INDIVIDUAL_TIER : subscription.items.data[0].price.product as string;
+  const planId = isSubscriptionCanceled ? FREE_INDIVIDUAL_TIER : (subscription.items.data[0].price.product as string);
 
   try {
     await cacheService.clearSubscription(customerId);
@@ -39,9 +37,7 @@ export default async function handleSubscriptionUpdated(
   try {
     await updateUserTier(uuid, planId, config);
   } catch (err) {
-    log.error(
-      `Error while updating user tier: uuid: ${uuid} `,
-    );
+    log.error(`Error while updating user tier: uuid: ${uuid} `);
     log.error(err);
     throw err;
   }

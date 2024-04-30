@@ -343,7 +343,7 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
-      planId: price?.product as string
+      planId: price?.product as string,
     };
   }
 
