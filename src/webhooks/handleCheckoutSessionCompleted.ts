@@ -74,8 +74,6 @@ export default async function handleCheckoutSessionCompleted(
     if (!(err instanceof CouponNotBeingTrackedError)) {
       log.error(`Error while adding user ${user.uuid} and coupon: `, err);
     }
-
-    throw err;
   }
 
   try {
