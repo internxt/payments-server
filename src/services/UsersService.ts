@@ -125,7 +125,7 @@ export class UsersService {
     const isTracked = !!coupon;
 
     if (!isTracked) {
-      throw new CouponNotBeingTrackedError(couponCode);
+      return false;
     }
 
     const userCouponEntry = await this.usersCouponsRepository.findByUserAndCoupon(user.id, coupon.id);

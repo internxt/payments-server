@@ -45,7 +45,6 @@ export class MongoDBUsersCouponsRepository implements UsersCouponsRepository {
   }
 
   async create(payload: Omit<UserCoupon, 'id'>): Promise<void> {
-    console.log('PAYLOAD IN CREATE', payload);
     await this.collection.insertOne(toDocument(payload) as UserCouponDocument);
   }
 }
