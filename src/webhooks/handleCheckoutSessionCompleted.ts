@@ -62,7 +62,12 @@ export default async function handleCheckoutSessionCompleted(
   try {
     if (session.total_details?.amount_discount) {
       const userData = await usersService.findUserByUuid(user.uuid);
+
+      log.info({ userData });
+
       const invoice = await stripe.invoices.retrieve(session.invoice as string);
+
+      log.info({ invoice });
 
       const couponId = invoice.discount?.coupon.id;
 
@@ -71,8 +76,9 @@ export default async function handleCheckoutSessionCompleted(
       }
     }
   } catch (err) {
+    const error = err as Error;
     if (!(err instanceof CouponNotBeingTrackedError)) {
-      log.error(`Error while adding user ${user.uuid} and coupon: `, err);
+      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
     }
   }
 
