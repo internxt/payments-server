@@ -60,23 +60,6 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    if (session.total_details?.amount_discount) {
-      const userData = await usersService.findUserByUuid(user.uuid);
-      const invoice = await stripe.invoices.retrieve(session.invoice as string);
-
-      const couponId = invoice.discount?.coupon.id;
-
-      if (couponId) {
-        await usersService.storeCouponUsedByUser(userData, couponId);
-      }
-    }
-  } catch (err) {
-    if (!(err instanceof CouponNotBeingTrackedError)) {
-      log.error(`Error while adding user ${user.uuid} and coupon: `, err);
-    }
-  }
-
-  try {
     await updateUserTier(user.uuid, price.product as string, config);
   } catch (err) {
     log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `);
@@ -99,6 +82,27 @@ export default async function handleCheckoutSessionCompleted(
       lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
     });
   }
+
+  try {
+    if (session.total_details?.amount_discount) {
+      const userData = await usersService.findUserByUuid(user.uuid);
+
+      const invoice = await stripe.invoices.retrieve(session.invoice as string);
+
+      const couponId = invoice.discount?.coupon.id;
+
+      if (couponId) {
+        await usersService.storeCouponUsedByUser(userData, couponId);
+      }
+    }
+  } catch (err) {
+    const error = err as Error;
+    if (!(err instanceof CouponNotBeingTrackedError)) {
+      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
+      log.error(error);
+    }
+  }
+
   try {
     await cacheService.clearSubscription(customer.id);
   } catch (err) {
