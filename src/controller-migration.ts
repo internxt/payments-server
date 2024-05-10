@@ -46,13 +46,29 @@ export default function (
       const user: User = await assertUser(req, rep);
 
       if (user.lifetime) {
-        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit: 100 })
-        const oneTimePurchases = invoices.filter(invoice => invoice.paid && !invoice.subscription && invoice?.lines?.data[0]?.price?.type === 'one_time')
-          .map(invoice => ({ price: invoice.lines.data[0].price, planId: invoice.lines.data[0].price?.product }))
-        response = {
-          planId: oneTimePurchases[0].planId as string,
-          type: 'lifetime',
-          uuid: user.uuid
+        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit: 100 });
+
+        if (invoices.length > 0) {
+          const oneTimePurchases = invoices.filter(
+            invoice => invoice.paid && !invoice.subscription && invoice?.lines?.data[0]?.price?.type === 'one_time'
+          ).map(invoice => ({ price: invoice.lines.data[0].price, planId: invoice.lines.data[0].price?.product }));
+          response = {
+            planId: oneTimePurchases[0].planId as string,
+            type: 'lifetime',
+            uuid: user.uuid
+          };
+        } else {
+          const planId = 
+            await paymentService.getPlanIdFromLastPayment(user.customerId, { limit: 100 });
+
+          if (!planId) {
+            throw new Error('Unable to find planId');
+          }
+          response = {
+            planId: planId,
+            type: 'lifetime',
+            uuid: user.uuid
+          };
         }
       } else {
         const subscription = await paymentService.getUserSubscription(user.customerId) as any;
@@ -60,7 +76,7 @@ export default function (
           planId: subscription.planId,
           type: subscription.type,
           uuid: user.uuid
-        }
+        };
       }
 
       return response;
