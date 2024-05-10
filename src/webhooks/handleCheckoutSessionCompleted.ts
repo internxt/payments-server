@@ -23,6 +23,7 @@ export default async function handleCheckoutSessionCompleted(
   const lineItems = await paymentService.getLineItems(session.id);
 
   const price = lineItems.data[0].price;
+  const productId = lineItems.data[0].price?.product.toString();
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
@@ -107,5 +108,16 @@ export default async function handleCheckoutSessionCompleted(
     await cacheService.clearSubscription(customer.id);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+  }
+
+  if (!productId) {
+    log.error(`Checkout session completed does not contain product id, customer: ${session.customer_email}`);
+    return;
+  }
+
+  if (productId == 'b2b plan id') {
+    const address = customer.address?.line1 || undefined;
+    await usersService.initializeWorkspace(user.uuid, maxSpaceBytes, address);
+    return;
   }
 }

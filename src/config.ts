@@ -12,6 +12,8 @@ const mandatoryVariables = [
   'DRIVE_GATEWAY_URL',
   'DRIVE_GATEWAY_USER',
   'DRIVE_GATEWAY_PASSWORD',
+  'DRIVE_NEW_GATEWAY_URL',
+  'DRIVE_NEW_GATEWAY_SECRET',
 ] as const;
 
 
@@ -40,6 +42,8 @@ const variablesToCheck = [
   ...mandatoryVariables,
   ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : []),
 ];
+
+
 
 const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
 

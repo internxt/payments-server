@@ -13,9 +13,9 @@ import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { StorageService } from '../services/StorageService';
-import { 
-  DisplayBillingRepository, 
-  MongoDBDisplayBillingRepository 
+import {
+  DisplayBillingRepository,
+  MongoDBDisplayBillingRepository,
 } from '../core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
@@ -65,11 +65,13 @@ async function main() {
 
     const paymentService = new PaymentService(stripe);
     const usersService = new UsersService(
-      usersRepository, 
-      paymentService, 
+      usersRepository,
+      paymentService,
       displayBillingRepository,
       couponsRepository,
       usersCouponsRepository,
+      envVariablesConfig,
+      axios,
     );
     const licenseCodesService = new LicenseCodesService(
       paymentService,
