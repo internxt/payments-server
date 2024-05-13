@@ -5,6 +5,7 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
+import { PRODUCT_IDS } from '../constants';
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
@@ -114,10 +115,10 @@ export default async function handleCheckoutSessionCompleted(
     log.error(`Checkout session completed does not contain product id, customer: ${session.customer_email}`);
     return;
   }
-
-  if (productId == 'b2b plan id') {
+  
+  if (productId == PRODUCT_IDS.B2B) {
     const address = customer.address?.line1 || undefined;
-    await usersService.initializeWorkspace(user.uuid, maxSpaceBytes, address);
+    await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), address);
     return;
   }
 }

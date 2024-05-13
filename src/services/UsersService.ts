@@ -145,7 +145,7 @@ export class UsersService {
     return !!userCouponEntry;
   }
 
-  async initializeWorkspace(ownerId: string, newStorageBytes: string, address?: string): Promise<void> {
+  async initializeWorkspace(ownerId: string, newStorageBytes: number, address?: string): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
