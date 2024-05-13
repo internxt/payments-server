@@ -5,7 +5,6 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
-import { PRODUCT_IDS } from '../constants';
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
@@ -24,7 +23,6 @@ export default async function handleCheckoutSessionCompleted(
   const lineItems = await paymentService.getLineItems(session.id);
 
   const price = lineItems.data[0].price;
-  const productId = lineItems.data[0].price?.product.toString();
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
@@ -111,12 +109,7 @@ export default async function handleCheckoutSessionCompleted(
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 
-  if (!productId) {
-    log.error(`Checkout session completed does not contain product id, customer: ${session.customer_email}`);
-    return;
-  }
-  
-  if (productId == PRODUCT_IDS.B2B) {
+  if (price.metadata?.is_workspace) {
     const address = customer.address?.line1 || undefined;
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), address);
     return;
