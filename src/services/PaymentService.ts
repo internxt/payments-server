@@ -435,7 +435,9 @@ export class PaymentService {
   }
 
   async getLineItems(checkoutSessionId: string) {
-    return this.provider.checkout.sessions.listLineItems(checkoutSessionId);
+    return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
+      expand: ['data.price.product'],
+    });
   }
 
   getCustomer(customerId: CustomerId) {
