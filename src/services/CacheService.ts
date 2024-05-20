@@ -4,20 +4,25 @@ import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 
+type SubscriptionType = 'B2B' | 'individual';
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
-    this.redis = config.NODE_ENV === 'production'
-    ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD })
-    : new Redis({ host: config.REDIS_HOST});
+    this.redis =
+      config.NODE_ENV === 'production'
+        ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD })
+        : new Redis({ host: config.REDIS_HOST });
   }
 
-  private buildSubscriptionKey(customerId: string): string {
-    return `subscription-${customerId}`;
+  private buildSubscriptionKey(customerId: string, subscriptionType: SubscriptionType = 'individual'): string {
+    return `subscription-${customerId}-${subscriptionType}`;
   }
 
-  async getSubscription(customerId: string): Promise<UserSubscription | null> {
-    const cachedSubscription = await this.redis.get(this.buildSubscriptionKey(customerId));
+  async getSubscription(
+    customerId: string,
+    subscriptionType: SubscriptionType = 'individual',
+  ): Promise<UserSubscription | null> {
+    const cachedSubscription = await this.redis.get(this.buildSubscriptionKey(customerId, subscriptionType));
 
     if (!cachedSubscription) {
       return null;
@@ -26,9 +31,13 @@ export default class CacheService {
     }
   }
 
-  async setSubscription(customerId: string, subscription: UserSubscription): Promise<void> {
+  async setSubscription(
+    customerId: string,
+    subscriptionType: SubscriptionType,
+    subscription: UserSubscription,
+  ): Promise<void> {
     await this.redis.set(
-      this.buildSubscriptionKey(customerId),
+      this.buildSubscriptionKey(customerId, subscriptionType),
       JSON.stringify(subscription),
       'EX',
       SUBSCRIPTION_EXPIRATION_IN_SECONDS,

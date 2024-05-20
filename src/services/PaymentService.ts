@@ -25,6 +25,10 @@ type HasUserAppliedCouponResponse = {
   reason?: Reason;
 };
 
+interface ExtendedSubscription extends Subscription {
+  product?: Stripe.Product;
+}
+
 export type Reason = {
   name: 'prevent-cancellation';
 };
@@ -98,13 +102,24 @@ export class PaymentService {
     await this.provider.subscriptions.del(subscriptionId, {});
   }
 
-  async getActiveSubscriptions(customerId: CustomerId): Promise<Subscription[]> {
+  async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
-      expand: ['data.default_payment_method', 'data.default_source'],
+      expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
-    return res.data;
+    const transformedData: ExtendedSubscription[] = res.data.map((subscription) => {
+      const untypedSubscription = subscription as any;
+      if ('plan' in untypedSubscription) {
+        return {
+          ...subscription,
+          product: (untypedSubscription.plan as Stripe.Plan).product as Stripe.Product,
+        };
+      }
+      return subscription;
+    });
+
+    return transformedData;
   }
 
   /**
@@ -347,6 +362,22 @@ export class PaymentService {
     };
   }
 
+  async getB2BSubscription(customerId: CustomerId): Promise<UserSubscription> {
+    const subscription = await this.findB2BActiveSubscription(customerId);
+
+    const { price } = subscription.items.data[0];
+
+    return {
+      type: 'subscription',
+      amount: price.unit_amount!,
+      currency: price.currency,
+      interval: price.recurring!.interval as 'year' | 'month',
+      nextPayment: subscription.current_period_end,
+      priceId: price.id,
+      planId: price?.product as string,
+    };
+  }
+
   async getPrices(currency?: string): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
 
@@ -447,14 +478,30 @@ export class PaymentService {
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
-    const individualActiveSubscription = activeSubscriptions.find(
-      (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
-    );
+    const individualActiveSubscription = activeSubscriptions.find((subscription) => {
+      const isNotTeams = subscription.items.data[0].price.metadata.is_teams !== '1';
+      const isNotBusiness = subscription.product?.metadata?.type !== 'business';
+      return isNotTeams && isNotBusiness;
+    });
     if (!individualActiveSubscription) {
       throw new NotFoundSubscriptionError('There is no individual subscription to update');
     }
 
     return individualActiveSubscription;
+  }
+
+  private async findB2BActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+
+    const b2bActiveSubscription = activeSubscriptions.find((subscription) => {
+      const product = subscription.product;
+      return product && product.metadata?.type === 'business';
+    });
+    if (!b2bActiveSubscription) {
+      throw new NotFoundSubscriptionError('No B2B subscription found');
+    }
+
+    return b2bActiveSubscription;
   }
 }
 

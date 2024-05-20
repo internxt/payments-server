@@ -154,37 +154,53 @@ export default function (
       return paymentService.getDefaultPaymentMethod(user.customerId);
     });
 
-    fastify.get('/subscriptions', async (req, rep) => {
-      let response: UserSubscription;
+    fastify.get<{
+      Querystring: { subscription_type?: 'B2B' };
+    }>(
+      '/subscriptions',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { subscription_type: { type: 'string', enum: ['B2B'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        let response: UserSubscription;
 
-      const user: User = await assertUser(req, rep);
+        const user: User = await assertUser(req, rep);
+        const subscriptionType = req.query.subscription_type ?? 'individual';
 
-      let subscriptionInCache: UserSubscription | null | undefined;
-      try {
-        subscriptionInCache = await cacheService.getSubscription(user.customerId);
-      } catch (err) {
-        req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
-        req.log.error(err);
-      }
+        let subscriptionInCache: UserSubscription | null | undefined;
+        try {
+          subscriptionInCache = await cacheService.getSubscription(user.customerId, subscriptionType);
+        } catch (err) {
+          req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
+          req.log.error(err);
+        }
 
-      if (subscriptionInCache) {
-        req.log.info(`Cache hit for ${user.customerId} subscription`);
-        return subscriptionInCache;
-      }
+        if (subscriptionInCache) {
+          req.log.info(`Cache hit for ${user.customerId} subscription`);
+          return subscriptionInCache;
+        }
 
-      if (user.lifetime) {
-        response = { type: 'lifetime' };
-      } else {
-        response = await paymentService.getUserSubscription(user.customerId);
-      }
+        if (subscriptionType === 'B2B') {
+          response = await paymentService.getB2BSubscription(user.customerId);
+        } else if (user.lifetime) {
+          response = { type: 'lifetime' };
+        } else {
+          response = await paymentService.getUserSubscription(user.customerId);
+        }
 
-      cacheService.setSubscription(user.customerId, response).catch((err) => {
-        req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
-        req.log.error(err);
-      });
+        cacheService.setSubscription(user.customerId, subscriptionType, response).catch((err) => {
+          req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
+          req.log.error(err);
+        });
 
-      return response;
-    });
+        return response;
+      },
+    );
 
     function checkCurrency(currency?: string): { currencyValue: string; isError: boolean; errorMessage?: string } {
       let currencyValue: string;
