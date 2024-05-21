@@ -6,6 +6,16 @@ import { DisplayBilling, DisplayBillingRepository } from '../core/users/MongoDBD
 import { Coupon } from '../core/coupons/Coupon';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
+import { sign } from 'jsonwebtoken';
+import { Axios, AxiosRequestConfig } from 'axios';
+import { type AppConfig } from '../config';
+
+function signToken(duration: string, secret: string) {
+  return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
+    algorithm: 'RS256',
+    expiresIn: duration,
+  });
+}
 
 export class CouponNotBeingTrackedError extends Error {
   constructor(couponName: Coupon['code']) {
@@ -22,6 +32,8 @@ export class UsersService {
     private readonly displayBillingRepository: DisplayBillingRepository,
     private readonly couponsRepository: CouponsRepository,
     private readonly usersCouponsRepository: UsersCouponsRepository,
+    private readonly config: AppConfig,
+    private readonly axios: Axios,
   ) {}
 
   async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
@@ -131,6 +143,26 @@ export class UsersService {
     const userCouponEntry = await this.usersCouponsRepository.findByUserAndCoupon(user.id, coupon.id);
 
     return !!userCouponEntry;
+  }
+
+  async initializeWorkspace(ownerId: string, newStorageBytes: number, address?: string): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const params: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
+      {
+        ownerId,
+        maxSpaceBytes: newStorageBytes,
+        address: address,
+      },
+      params,
+    );
   }
 }
 
