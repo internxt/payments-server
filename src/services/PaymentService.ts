@@ -479,9 +479,8 @@ export class PaymentService {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
     const individualActiveSubscription = activeSubscriptions.find((subscription) => {
-      const isNotTeams = subscription.items.data[0].price.metadata.is_teams !== '1';
       const isNotBusiness = subscription.product?.metadata?.type !== 'business';
-      return isNotTeams && isNotBusiness;
+      return isNotBusiness;
     });
     if (!individualActiveSubscription) {
       throw new NotFoundSubscriptionError('There is no individual subscription to update');
