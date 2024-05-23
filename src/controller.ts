@@ -70,22 +70,30 @@ export default function (
       }
     });
 
-    fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
+    fastify.get<{ Querystring: { limit: number; starting_after?: string; subscription?: string } }>(
       '/invoices',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { limit: { type: 'number', default: 10 }, starting_after: { type: 'string' } },
+            properties: {
+              limit: { type: 'number', default: 10 },
+              starting_after: { type: 'string' },
+              subscription: { type: 'string' },
+            },
           },
         },
       },
       async (req, rep) => {
-        const { limit, starting_after: startingAfter } = req.query;
+        const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
 
         const user = await assertUser(req, rep);
 
-        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit, startingAfter });
+        const invoices = await paymentService.getInvoicesFromUser(
+          user.customerId,
+          { limit, startingAfter },
+          subscriptionId,
+        );
 
         const invoicesMapped = invoices
           .filter(

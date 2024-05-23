@@ -257,11 +257,13 @@ export class PaymentService {
   async getInvoicesFromUser(
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
+    subscriptionId?: SubscriptionId,
   ): Promise<Invoice[]> {
     const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
+      subscription: subscriptionId,
     });
 
     return res.data;
