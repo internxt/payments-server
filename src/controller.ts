@@ -163,14 +163,14 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { subscription_type?: 'B2B' };
+      Querystring: { subscriptionType?: 'B2B' };
     }>(
       '/subscriptions',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscription_type: { type: 'string', enum: ['B2B'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['B2B'] } },
           },
         },
       },
@@ -178,7 +178,7 @@ export default function (
         let response: UserSubscription;
 
         const user: User = await assertUser(req, rep);
-        const subscriptionType = req.query.subscription_type ?? 'individual';
+        const subscriptionType = req.query.subscriptionType ?? 'individual';
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {

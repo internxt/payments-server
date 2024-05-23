@@ -254,6 +254,32 @@ export class PaymentService {
     return res.data;
   }
 
+  async getPlanIdFromLastPayment(
+    customerId: CustomerId,
+    pagination: { limit?: number; startingAfter?: string },
+  ): Promise<string | null> {
+    const res = await this.provider.paymentIntents.list({
+      customer: customerId,
+      limit: pagination.limit,
+      starting_after: pagination.startingAfter
+    });
+
+    const lastPaymentIntent = res.data
+      .filter(pi => pi.status === 'succeeded')
+      .sort((a, b) => b.created - a.created)
+      .at(0);
+    
+    if (!lastPaymentIntent) {
+      return null;
+    }
+
+    const checkout = await this.provider.checkout.sessions.list({ payment_intent: lastPaymentIntent.id });
+    const checkoutLines = await this.provider.checkout.sessions.listLineItems(checkout.data[0].id);
+    const productId = checkoutLines.data[0].price?.product;
+
+    return productId as string;
+  }
+
   async getInvoicesFromUser(
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
@@ -481,9 +507,8 @@ export class PaymentService {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
     const individualActiveSubscription = activeSubscriptions.find((subscription) => {
-      const isNotTeams = subscription.items.data[0].price.metadata.is_teams !== '1';
       const isNotBusiness = subscription.product?.metadata?.type !== 'business';
-      return isNotTeams && isNotBusiness;
+      return isNotBusiness;
     });
     if (!individualActiveSubscription) {
       throw new NotFoundSubscriptionError('There is no individual subscription to update');
