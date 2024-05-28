@@ -51,6 +51,17 @@ async function getMocks() {
     },
   };
 
+  const testPlansId = {
+    subscription: {
+      exists: 'price_1PLMerFAOdcgaBMQ17q27CtN',
+      doesNotExist: 'price_1PLMerFAOdcgaBMQ17q27Cas',
+    },
+    lifetime: {
+      exists: 'price_1PLMVCFAOdcgaBMQxIQgdXtc',
+      doesNotExist: 'price_1PLMVCFAOdcgaBMQxIQgdXsds',
+    },
+  };
+
   function getValidToken(userUuid: string): string {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
   }
@@ -61,6 +72,7 @@ async function getMocks() {
     validToken:
       // eslint-disable-next-line max-len
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7InV1aWQiOiJiODQyODk3YS01MDg2LTQxODMtYWZiMS1mYTAwNGVlMzljNjYiLCJlbWFpbCI6InByZXBheW1lbnRzbGF1bmNoQGlueHQuY29tIiwibmFtZSI6ImhlbGxvIiwibGFzdG5hbWUiOiJoZWxsbyIsInVzZXJuYW1lIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJzaGFyZWRXb3Jrc3BhY2UiOnRydWUsIm5ldHdvcmtDcmVkZW50aWFscyI6eyJ1c2VyIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJwYXNzIjoiJDJhJDA4JFRRSmppNS9wUHpWUlp0UWNxOW9hd3VsdEFUYUlMTjdlUHNjWHg2Vy95WDhzNGJyM1FtOWJtIn19LCJpYXQiOjE2NTUxMDQwOTZ9.s3791sv4gmWgt5Ni1a8DnRw_5JyJ8g9Ff0bpIlqo6LM',
+    testPlansId,
   };
 }
 describe('controller e2e tests', () => {
@@ -759,6 +771,82 @@ describe('controller e2e tests', () => {
           });
 
           expect(response.statusCode).toBe(403);
+        });
+      });
+    });
+
+    describe('Fetching plan object by ID and contains the basic params', () => {
+      describe('Fetch subscription plan object', () => {
+        it('When the planId is valid', async () => {
+          const { testPlansId } = await getMocks();
+
+          const expectedKeys = {
+            planId: expect.anything(),
+            amount: expect.anything(),
+            currency: expect.anything(),
+            interval: expect.anything(),
+            metadata: {
+              maxSpaceBytes: expect.anything(),
+            },
+          };
+
+          const response = await app.inject({
+            path: `/plan-by-id?planId=${testPlansId.subscription.exists}`,
+            method: 'GET',
+          });
+
+          const responseBody = JSON.parse(response.body);
+
+          expect(response.statusCode).toBe(200);
+          expect(responseBody).toMatchObject(expectedKeys);
+        });
+
+        it('When the planId is valid', async () => {
+          const { testPlansId } = await getMocks();
+
+          const response = await app.inject({
+            path: `/plan-by-id?planId=${testPlansId.subscription.doesNotExist}`,
+            method: 'GET',
+          });
+
+          expect(response.statusCode).toBe(404);
+        });
+      });
+
+      describe('Fetch Lifetime plan object', () => {
+        it('When the planId is valid', async () => {
+          const { testPlansId } = await getMocks();
+
+          const expectedKeys = {
+            planId: expect.anything(),
+            amount: expect.anything(),
+            currency: expect.anything(),
+            interval: expect.anything(),
+            metadata: {
+              maxSpaceBytes: expect.anything(),
+            },
+          };
+
+          const response = await app.inject({
+            path: `/plan-by-id?planId=${testPlansId.lifetime.exists}`,
+            method: 'GET',
+          });
+
+          const responseBody = JSON.parse(response.body);
+
+          expect(response.statusCode).toBe(200);
+          expect(responseBody).toMatchObject(expectedKeys);
+        });
+
+        it('When the planId is valid', async () => {
+          const { testPlansId } = await getMocks();
+
+          const response = await app.inject({
+            path: `/plan-by-id?planId=${testPlansId.lifetime.doesNotExist}`,
+            method: 'GET',
+          });
+
+          expect(response.statusCode).toBe(404);
         });
       });
     });

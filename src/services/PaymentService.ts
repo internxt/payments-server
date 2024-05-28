@@ -7,7 +7,10 @@ type CustomerId = Customer['id'];
 type CustomerEmail = Customer['email'];
 
 type Price = Stripe.Price;
+type Plan = Stripe.Plan;
+
 type PriceId = Price['id'];
+export type PlanId = Plan['id'];
 
 type Subscription = Stripe.Subscription;
 type SubscriptionId = Subscription['id'];
@@ -246,14 +249,14 @@ export class PaymentService {
     const res = await this.provider.paymentIntents.list({
       customer: customerId,
       limit: pagination.limit,
-      starting_after: pagination.startingAfter
+      starting_after: pagination.startingAfter,
     });
 
     const lastPaymentIntent = res.data
-      .filter(pi => pi.status === 'succeeded')
+      .filter((pi) => pi.status === 'succeeded')
       .sort((a, b) => b.created - a.created)
       .at(0);
-    
+
     if (!lastPaymentIntent) {
       return null;
     }
@@ -398,6 +401,22 @@ export class PaymentService {
       });
   }
 
+  async getPlanById(planId: PlanId): Promise<DisplayPrice> {
+    const planObject = await this.provider.plans.retrieve(planId);
+
+    if (!planObject) {
+      throw new NotFoundPlanByIdError(planId);
+    }
+
+    return {
+      id: planObject.id,
+      currency: planObject.currency,
+      amount: planObject.amount as number,
+      bytes: parseInt(planObject.metadata?.maxSpaceBytes as string),
+      interval: planObject.metadata?.planType === 'one_time' ? 'lifetime' : (planObject.interval as 'year' | 'month'),
+    };
+  }
+
   private getPaymentMethodTypes(
     currency: string,
     isOneTime: boolean,
@@ -488,5 +507,13 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class NotFoundPlanByIdError extends Error {
+  constructor(planId: string) {
+    super(`Plan with an id ${planId} does not exist`);
+
+    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
   }
 }

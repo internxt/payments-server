@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, PaymentService } from './services/PaymentService';
+import { CouponCodeError, NotFoundPlanByIdError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -24,6 +24,7 @@ const allowedRoutes: {
 } = {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
+  '/plan-by-id': ['GET'],
 };
 
 export default function (
@@ -221,6 +222,32 @@ export default function (
       }
 
       return paymentService.getPrices(currencyValue);
+    });
+
+    fastify.get<{
+      Querystring: { planId: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { planI: { type: 'string' } };
+        };
+      };
+    }>('/plan-by-id', async (req, rep) => {
+      const { planId } = req.query;
+
+      try {
+        const planObject = await paymentService.getPlanById(planId);
+
+        return rep.status(200).send(planObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPlanByIdError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {
