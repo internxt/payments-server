@@ -111,7 +111,8 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   if (product.metadata?.type === 'business') {
-    const address = customer.address?.line1 || undefined;
-    await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), address);
+    const amountOfSeats = lineItems.data[0]!.quantity ?? parseInt(price.metadata.minimumSeats);
+    const address = customer.address?.line1 ?? undefined;
+    await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);
   }
 }
