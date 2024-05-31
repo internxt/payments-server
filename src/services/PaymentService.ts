@@ -3,7 +3,7 @@ import { DisplayPrice } from '../core/users/DisplayPrice';
 import { User, UserSubscription } from '../core/users/User';
 
 type Customer = Stripe.Customer;
-type CustomerId = Customer['id'];
+export type CustomerId = Customer['id'];
 type CustomerEmail = Customer['email'];
 
 type Price = Stripe.Price;
@@ -51,6 +51,11 @@ export type PriceMetadata = {
   planType: 'subscription' | 'one_time';
 };
 
+type SubscriptionCreatedObject = {
+  type: 'setup' | 'payment';
+  clientSecret: string;
+};
+
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -62,6 +67,58 @@ export class PaymentService {
     const customer = await this.provider.customers.create(payload);
 
     return customer;
+  }
+
+  async createSubscription(
+    customerId: string,
+    priceId: string,
+    promotion_code?: Stripe.SubscriptionCreateParams['promotion_code'],
+  ): Promise<SubscriptionCreatedObject> {
+    const subscription = await this.provider.subscriptions.create({
+      customer: customerId,
+      promotion_code: promotion_code,
+      items: [
+        {
+          price: priceId,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        save_default_payment_method: 'on_subscription',
+      },
+      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+    });
+
+    if (subscription.pending_setup_intent !== null) {
+      return {
+        type: 'setup',
+        clientSecret: (subscription.pending_setup_intent as any).client_secret,
+      };
+    } else {
+      return {
+        type: 'payment',
+        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+      };
+    }
+  }
+
+  async getPaymentIntent(customerId: CustomerId, amount: number, currency: string, promoCode?: string) {
+    let discountedPrice = amount;
+
+    if (promoCode) {
+      const promotionCode = await this.provider.promotionCodes.retrieve(promoCode);
+
+      discountedPrice = amount - promotionCode.coupon.amount_off!;
+    }
+
+    return this.provider.paymentIntents.create({
+      customer: customerId,
+      amount: discountedPrice,
+      currency: currency,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
   }
 
   async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
@@ -402,19 +459,20 @@ export class PaymentService {
   }
 
   async getPlanById(planId: PlanId): Promise<DisplayPrice> {
-    const planObject = await this.provider.plans.retrieve(planId);
-
-    if (!planObject) {
-      throw new NotFoundPlanByIdError(planId);
+    try {
+      const planObject = await this.provider.prices.retrieve(planId);
+      return {
+        id: planObject.id,
+        currency: planObject.currency,
+        amount: planObject.unit_amount as number,
+        bytes: parseInt(planObject.metadata?.maxSpaceBytes),
+        interval: planObject.type === 'one_time' ? 'lifetime' : (planObject.recurring?.interval as 'year' | 'month'),
+      };
+    } catch (err) {
+      const error = err as Error;
+      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(planId);
+      throw new Error('Interval Server Error');
     }
-
-    return {
-      id: planObject.id,
-      currency: planObject.currency,
-      amount: planObject.amount as number,
-      bytes: parseInt(planObject.metadata?.maxSpaceBytes as string),
-      interval: planObject.metadata?.planType === 'one_time' ? 'lifetime' : (planObject.interval as 'year' | 'month'),
-    };
   }
 
   private getPaymentMethodTypes(
@@ -480,7 +538,7 @@ export class PaymentService {
   }
 
   async getLineItems(checkoutSessionId: string) {
-    return this.provider.checkout.sessions.listLineItems(checkoutSessionId);
+    return this.provider.invoices.listLineItems(checkoutSessionId);
   }
 
   getCustomer(customerId: CustomerId) {

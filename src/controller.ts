@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, NotFoundPlanByIdError, PaymentService } from './services/PaymentService';
+import { CouponCodeError, CustomerId, NotFoundPlanByIdError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -25,6 +25,7 @@ const allowedRoutes: {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
+  '/payment-intent': ['GET'],
 };
 
 export default function (
@@ -70,6 +71,77 @@ export default function (
         reply.status(401).send();
       }
     });
+
+    fastify.post<{ Body: { name: string; email: string } }>(
+      '/create-customer',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['email', 'name'],
+            properties: { name: { type: 'string' }, email: { type: 'string' } },
+          },
+        },
+      },
+      async (req, res) => {
+        const { name, email } = req.body;
+
+        try {
+          const createdCustomer = await paymentService.createCustomer({
+            name,
+            email,
+          });
+
+          return res.send({
+            customerId: createdCustomer.id,
+          });
+        } catch (err) {
+          const error = err as Error;
+
+          req.log.error('ERROR CREATING CUSTOMER', error.stack ?? error.message);
+
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
+
+    fastify.post<{ Body: { customerId: string; priceId: string } }>(
+      '/create-subscription',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId'],
+            properties: {
+              name: {
+                type: 'string',
+              },
+              email: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { customerId, priceId } = req.body;
+
+        try {
+          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId);
+
+          return res.send(subscriptionSetUp);
+        } catch (err) {
+          const error = err as Error;
+
+          req.log.error('[ERROR CREATING SUBSCRIPTION]: ', error.stack ?? error.message);
+          return res.status(400).send({
+            message: error.message,
+          });
+        }
+      },
+    );
 
     fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
       '/invoices',
@@ -150,6 +222,29 @@ export default function (
       return { clientSecret };
     });
 
+    fastify.get<{
+      Querystring: { customerId: CustomerId; amount: number; currency: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { customerId: { type: 'string' }; currency: { type: 'string' }; amount: { type: 'number' } };
+        };
+      };
+    }>('/payment-intent', async (req, rep) => {
+      const { customerId, amount, currency } = req.query;
+      try {
+        const { client_secret: clientSecret } = await paymentService.getPaymentIntent(customerId, amount, currency);
+
+        return { clientSecret };
+      } catch (err) {
+        const error = err as Error;
+        req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.message ?? error.stack);
+        return rep.status(500).send({
+          message: 'Internal Server Error',
+        });
+      }
+    });
+
     fastify.get('/default-payment-method', async (req, rep) => {
       const user = await assertUser(req, rep);
       return paymentService.getDefaultPaymentMethod(user.customerId);
@@ -172,6 +267,8 @@ export default function (
         req.log.info(`Cache hit for ${user.customerId} subscription`);
         return subscriptionInCache;
       }
+
+      console.log('USER', user);
 
       if (user.lifetime) {
         response = { type: 'lifetime' };
@@ -232,6 +329,12 @@ export default function (
           properties: { planI: { type: 'string' } };
         };
       };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
     }>('/plan-by-id', async (req, rep) => {
       const { planId } = req.query;
 
@@ -245,7 +348,7 @@ export default function (
           return rep.status(404).send({ message: err.message });
         }
 
-        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });

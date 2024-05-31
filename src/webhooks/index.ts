@@ -7,7 +7,7 @@ import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handlePaymentMethodAttached from './handlePaymentMethodAttached';
 import { PaymentService } from '../services/PaymentService';
-import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
+import handlePaymentIntentCompleted from './handlePaymentIntentCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 
@@ -69,9 +69,9 @@ export default function (
           );
           break;
 
-        case 'checkout.session.completed':
-          await handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session,
+        case 'payment_intent.succeeded':
+          await handlePaymentIntentCompleted(
+            event.data.object as Stripe.PaymentIntent,
             stripe,
             usersService,
             paymentService,
@@ -80,17 +80,17 @@ export default function (
             config,
           );
           break;
-        case 'checkout.session.async_payment_succeeded':
-          await handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session,
-            stripe,
-            usersService,
-            paymentService,
-            fastify.log,
-            cacheService,
-            config,
-          );
-          break;
+        // case 'checkout.session.async_payment_succeeded':
+        //   await handleCheckoutSessionCompleted(
+        //     event.data.object as Stripe.PaymentIntent,
+        //     stripe,
+        //     usersService,
+        //     paymentService,
+        //     fastify.log,
+        //     cacheService,
+        //     config,
+        //   );
+        //   break;
         case 'charge.refunded':
           await handleLifetimeRefunded(
             storageService,
