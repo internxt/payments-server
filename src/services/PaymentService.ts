@@ -469,6 +469,7 @@ export class PaymentService {
     trialDays,
     couponCode,
     currency,
+    seats,
   }: {
     priceId: string;
     successUrl: string;
@@ -478,6 +479,7 @@ export class PaymentService {
     trialDays?: number;
     couponCode?: string;
     currency?: string;
+    seats?: number;
   }): Promise<Stripe.Checkout.Session> {
     const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
@@ -494,17 +496,23 @@ export class PaymentService {
 
     let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
     if (product.metadata?.type === 'business') {
-      const minimumSeats = selectedPrice.metadata?.minimumSeats;
-      const maximumSeats = selectedPrice.metadata?.maximumSeats;
+      const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
+      const maximumSeats = selectedPrice.metadata?.maximumSeats
+        ? parseInt(selectedPrice.metadata.maximumSeats)
+        : undefined;
+      let seatNumber = seats ?? minimumSeats;
+
+      if (maximumSeats && seatNumber > maximumSeats) {
+        seatNumber = maximumSeats;
+      }
+
       lineItems = [
         {
           price: priceId,
           adjustable_quantity: {
-            enabled: true,
-            minimum: minimumSeats ? parseInt(minimumSeats) : undefined,
-            maximum: maximumSeats ? parseInt(maximumSeats) : undefined,
+            enabled: false,
           },
-          quantity: minimumSeats ? parseInt(minimumSeats) : 1,
+          quantity: seatNumber,
         },
       ];
     }
