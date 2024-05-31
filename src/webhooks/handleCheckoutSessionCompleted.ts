@@ -111,7 +111,7 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   if (product.metadata?.type === 'business') {
-    const amountOfSeats = lineItems.data[0]!.quantity ?? parseInt(price.metadata.minimumSeats);
+    const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);
   }
