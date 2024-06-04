@@ -23,6 +23,7 @@ export default async function handleCheckoutSessionCompleted(
   const lineItems = await paymentService.getLineItems(session.id);
 
   const price = lineItems.data[0].price;
+  const product = price?.product as Stripe.Product;
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
@@ -60,9 +61,9 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    await updateUserTier(user.uuid, price.product as string, config);
+    await updateUserTier(user.uuid, product.id, config);
   } catch (err) {
-    log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `);
+    log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
     log.error(err);
 
     throw err;
@@ -107,5 +108,10 @@ export default async function handleCheckoutSessionCompleted(
     await cacheService.clearSubscription(customer.id);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+  }
+
+  if (product.metadata?.type === 'business') {
+    const address = customer.address?.line1 || undefined;
+    await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), address);
   }
 }

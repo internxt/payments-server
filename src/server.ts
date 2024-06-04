@@ -40,6 +40,8 @@ const start = async (): Promise<FastifyInstance> => {
     displayBillingRepository,
     couponsRepository,
     usersCouponsRepository,
+    envVariablesConfig,
+    axios,
   );
   const cacheService = new CacheService(envVariablesConfig);
   const licenseCodesService = new LicenseCodesService(
