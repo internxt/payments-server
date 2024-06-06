@@ -261,14 +261,14 @@ export class PaymentService {
     const res = await this.provider.paymentIntents.list({
       customer: customerId,
       limit: pagination.limit,
-      starting_after: pagination.startingAfter
+      starting_after: pagination.startingAfter,
     });
 
     const lastPaymentIntent = res.data
-      .filter(pi => pi.status === 'succeeded')
+      .filter((pi) => pi.status === 'succeeded')
       .sort((a, b) => b.created - a.created)
       .at(0);
-    
+
     if (!lastPaymentIntent) {
       return null;
     }
@@ -431,6 +431,27 @@ export class PaymentService {
       });
   }
 
+  async getPricesRaw(currency?: string, expandProduct = false): Promise<Stripe.Price[]> {
+    const currencyValue = currency ?? 'eur';
+
+    const expandOptions = ['data.currency_options'];
+
+    if (expandProduct) {
+      expandOptions.push('data.product');
+    }
+
+    const res = await this.provider.prices.search({
+      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      expand: expandOptions,
+      limit: 100,
+    });
+
+    return res.data.filter(
+      (price) =>
+        price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
+    );
+  }
+
   private getPaymentMethodTypes(
     currency: string,
     isOneTime: boolean,
@@ -450,6 +471,7 @@ export class PaymentService {
     trialDays,
     couponCode,
     currency,
+    seats,
   }: {
     priceId: string;
     successUrl: string;
@@ -459,19 +481,43 @@ export class PaymentService {
     trialDays?: number;
     couponCode?: string;
     currency?: string;
+    seats?: number;
   }): Promise<Stripe.Checkout.Session> {
     const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    const prices = await this.getPrices(productCurrency);
-    const product = prices.find((price) => price.id === priceId);
-
+    const prices = await this.getPricesRaw(productCurrency, true);
+    const selectedPrice = prices.find((price) => price.id === priceId);
+    const product = selectedPrice?.product as Stripe.Product;
     const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
       productCurrency,
-      product?.interval === 'lifetime',
+      selectedPrice?.type === 'one_time',
     );
 
-    if (!product) throw new Error('The product does not exist');
+    if (!selectedPrice) throw new Error('The product does not exist');
+
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
+    if (product.metadata?.type === 'business') {
+      const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
+      const maximumSeats = selectedPrice.metadata?.maximumSeats
+        ? parseInt(selectedPrice.metadata.maximumSeats)
+        : undefined;
+      let seatNumber = seats ?? minimumSeats;
+
+      if (maximumSeats && seatNumber > maximumSeats) {
+        seatNumber = maximumSeats;
+      }
+
+      lineItems = [
+        {
+          price: priceId,
+          adjustable_quantity: {
+            enabled: false,
+          },
+          quantity: seatNumber,
+        },
+      ];
+    }
 
     const checkout = await this.provider.checkout.sessions.create({
       payment_method_types: paymentMethodTypes,
@@ -479,9 +525,9 @@ export class PaymentService {
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
       customer_email: typeof prefill === 'string' ? prefill : undefined,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: lineItems,
       automatic_tax: { enabled: false },
-      currency: product.currency,
+      currency: selectedPrice.currency,
       mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,

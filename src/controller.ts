@@ -293,6 +293,7 @@ export default function (
         trial_days?: number;
         mode?: string;
         currency?: string;
+        seats?: number;
       };
     }>(
       '/checkout-session',
@@ -304,6 +305,7 @@ export default function (
             properties: {
               mode: { type: 'string' },
               price_id: { type: 'string' },
+              seats: { type: 'number' },
               trial_days: { type: 'number' },
               coupon_code: { type: 'string' },
               success_url: { type: 'string' },
@@ -316,7 +318,8 @@ export default function (
       },
       async (req, rep) => {
         const { uuid } = req.user.payload;
-        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency } = req.body;
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency, seats } =
+          req.body;
 
         const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -341,6 +344,7 @@ export default function (
           trialDays: trial_days,
           couponCode: coupon_code,
           currency: currencyValue,
+          seats,
         });
 
         return { sessionId: id };

@@ -145,7 +145,7 @@ export class UsersService {
     return !!userCouponEntry;
   }
 
-  async initializeWorkspace(ownerId: string, newStorageBytes: number, address?: string): Promise<void> {
+  async initializeWorkspace(ownerId: string, newStorageBytes: number, seats: number, address?: string): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
@@ -158,7 +158,7 @@ export class UsersService {
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
       {
         ownerId,
-        maxSpaceBytes: newStorageBytes,
+        maxSpaceBytes: newStorageBytes * seats,
         address: address,
       },
       params,
