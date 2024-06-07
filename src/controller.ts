@@ -25,7 +25,6 @@ const allowedRoutes: {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
-  '/payment-intent': ['GET'],
 };
 
 export default function (
@@ -85,7 +84,7 @@ export default function (
       },
       async (req, res) => {
         const { name, email } = req.body;
-
+        console.log('CREATING USER: ', { name, email });
         try {
           const createdCustomer = await paymentService.createCustomer({
             name,
@@ -106,6 +105,35 @@ export default function (
         }
       },
     );
+
+    fastify.get<{
+      Querystring: { email: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { email: { type: 'number' } };
+        };
+      };
+    }>('/get-customer-id', async (req, res) => {
+      const { email } = req.query;
+
+      if (!email) {
+        return res.status(404).send({
+          message: 'Email should be provided',
+        });
+      }
+
+      try {
+        const { id } = await paymentService.getCustomersByEmail(email);
+        return res.status(200).send({
+          customerId: id,
+        });
+      } catch (error) {
+        return res.status(404).send({
+          message: 'CustomerId not found',
+        });
+      }
+    });
 
     fastify.post<{ Body: { customerId: string; priceId: string } }>(
       '/create-subscription',
@@ -223,22 +251,22 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { customerId: CustomerId; amount: number; currency: string };
+      Querystring: { customerId: CustomerId; amount: number; planId: string };
       schema: {
         querystring: {
           type: 'object';
-          properties: { customerId: { type: 'string' }; currency: { type: 'string' }; amount: { type: 'number' } };
+          properties: { customerId: { type: 'string' }; planId: { type: 'string' }; amount: { type: 'number' } };
         };
       };
     }>('/payment-intent', async (req, rep) => {
-      const { customerId, amount, currency } = req.query;
+      const { customerId, amount, planId } = req.query;
       try {
-        const { client_secret: clientSecret } = await paymentService.getPaymentIntent(customerId, amount, currency);
+        const { client_secret: clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId);
 
         return { clientSecret };
       } catch (err) {
         const error = err as Error;
-        req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.message ?? error.stack);
+        req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.stack ?? error.message);
         return rep.status(500).send({
           message: 'Internal Server Error',
         });

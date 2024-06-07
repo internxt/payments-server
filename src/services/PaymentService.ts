@@ -64,6 +64,7 @@ export class PaymentService {
   }
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
+    console.log('payload', payload);
     const customer = await this.provider.customers.create(payload);
 
     return customer;
@@ -102,8 +103,10 @@ export class PaymentService {
     }
   }
 
-  async getPaymentIntent(customerId: CustomerId, amount: number, currency: string, promoCode?: string) {
+  async getPaymentIntent(customerId: CustomerId, amount: number, planId: string, promoCode?: string) {
     let discountedPrice = amount;
+
+    const product = await this.provider.prices.retrieve(planId);
 
     if (promoCode) {
       const promotionCode = await this.provider.promotionCodes.retrieve(promoCode);
@@ -111,12 +114,17 @@ export class PaymentService {
       discountedPrice = amount - promotionCode.coupon.amount_off!;
     }
 
+    console.log('[PRICEID]:', planId);
+
     return this.provider.paymentIntents.create({
       customer: customerId,
       amount: discountedPrice,
-      currency: currency,
+      currency: product.currency,
       automatic_payment_methods: {
         enabled: true,
+      },
+      metadata: {
+        planId,
       },
     });
   }
@@ -293,10 +301,12 @@ export class PaymentService {
     return updatedSubscription;
   }
 
-  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
+  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
-    return res.data;
+    console.log(res);
+
+    return res.data[0];
   }
 
   async getPlanIdFromLastPayment(
@@ -543,6 +553,16 @@ export class PaymentService {
 
   getCustomer(customerId: CustomerId) {
     return this.provider.customers.retrieve(customerId);
+  }
+
+  async getCustomerIdByEmail(email: string) {
+    const { data } = await this.provider.customers.search({
+      query: `email:'${email}'`,
+    });
+
+    const customerId = data[0].email;
+
+    return customerId;
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

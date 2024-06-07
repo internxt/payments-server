@@ -12,6 +12,7 @@ export default async function handlePaymentIntentCompleted(
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
+
   cacheService: CacheService,
   config: AppConfig,
 ): Promise<void> {
@@ -20,33 +21,23 @@ export default async function handlePaymentIntentCompleted(
     return;
   }
 
-  let invoice = null;
+  let lineItems;
 
   const customer = await paymentService.getCustomer(session.customer as string);
 
   if (!session.invoice) {
-    await stripe.invoiceItems.create({
-      customer: customer.id,
-      amount: session.amount,
-      currency: session.currency,
-      description: '',
-    });
+    const { planId } = session.metadata;
 
-    const newInvoice = await stripe.invoices.create({
-      customer: customer.id,
-      auto_advance: false,
-    });
+    const product = await stripe.prices.retrieve(planId as string);
 
-    await stripe.invoices.finalizeInvoice(newInvoice.id);
-
-    invoice = newInvoice.id;
+    lineItems = product;
   } else {
-    invoice = session.invoice;
+    const items = await paymentService.getLineItems(session.invoice as string);
+
+    lineItems = items.data[0].price;
   }
 
-  const lineItems = await paymentService.getLineItems(invoice as string);
-
-  const price = lineItems.data[0].price;
+  const price = lineItems;
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.receipt_email}`);
@@ -62,7 +53,7 @@ export default async function handlePaymentIntentCompleted(
 
   const { maxSpaceBytes } = price.metadata as PriceMetadata;
 
-  console.log('METADATA', price.metadata);
+  const isLifetimePlan = (price.metadata as PriceMetadata).planType === 'one_time';
 
   if (customer.deleted) {
     log.error(
@@ -73,6 +64,7 @@ export default async function handlePaymentIntentCompleted(
 
   let user: { uuid: string };
   try {
+    // TODO: Send true if this plan is a lifetime plan
     const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
     user = res.data.user;
   } catch (err) {
@@ -95,16 +87,16 @@ export default async function handlePaymentIntentCompleted(
 
   try {
     const { customerId } = await usersService.findUserByUuid(user.uuid);
-    if ((price.metadata as PriceMetadata).planType === 'one_time') {
+    if (isLifetimePlan) {
       await usersService.updateUser(customerId, {
-        lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+        lifetime: isLifetimePlan,
       });
     }
   } catch {
     await usersService.insertUser({
       customerId: customer.id,
       uuid: user.uuid,
-      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+      lifetime: isLifetimePlan,
     });
   }
 
