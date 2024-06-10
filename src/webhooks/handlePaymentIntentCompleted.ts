@@ -4,7 +4,7 @@ import { type AppConfig } from '../config';
 import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
 
 export default async function handlePaymentIntentCompleted(
   session: Stripe.PaymentIntent,
@@ -22,11 +22,19 @@ export default async function handlePaymentIntentCompleted(
   }
 
   let lineItems;
+  let promoCodeInMetadata;
 
   const customer = await paymentService.getCustomer(session.customer as string);
+  const userSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
+
+  const activeUserSubscription = userSubscriptions.filter((subscription) => subscription.status === 'active')[0];
 
   if (!session.invoice) {
-    const { planId } = session.metadata;
+    const { planId, promotionCode } = session.metadata;
+
+    if (promotionCode) {
+      promoCodeInMetadata = promotionCode;
+    }
 
     const product = await stripe.prices.retrieve(planId as string);
 
@@ -55,6 +63,14 @@ export default async function handlePaymentIntentCompleted(
 
   const isLifetimePlan = (price.metadata as PriceMetadata).planType === 'one_time';
 
+  if (activeUserSubscription && isLifetimePlan) {
+    try {
+      await paymentService.cancelSubscription(activeUserSubscription.id);
+    } catch (error) {
+      log.error(`User with customer ID ${customer.id} could not cancel the active subscription`);
+    }
+  }
+
   if (customer.deleted) {
     log.error(
       `Customer object could not be retrieved in checkout session completed handler with id ${session.customer}`,
@@ -64,7 +80,6 @@ export default async function handlePaymentIntentCompleted(
 
   let user: { uuid: string };
   try {
-    // TODO: Send true if this plan is a lifetime plan
     const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
     user = res.data.user;
   } catch (err) {
@@ -87,11 +102,10 @@ export default async function handlePaymentIntentCompleted(
 
   try {
     const { customerId } = await usersService.findUserByUuid(user.uuid);
-    if (isLifetimePlan) {
-      await usersService.updateUser(customerId, {
-        lifetime: isLifetimePlan,
-      });
-    }
+
+    await usersService.updateUser(customerId, {
+      lifetime: isLifetimePlan,
+    });
   } catch {
     await usersService.insertUser({
       customerId: customer.id,
@@ -100,25 +114,31 @@ export default async function handlePaymentIntentCompleted(
     });
   }
 
-  // try {
-  //   if (session) {
-  //     const userData = await usersService.findUserByUuid(user.uuid);
+  try {
+    if (session.invoice || promoCodeInMetadata) {
+      let couponId;
 
-  //     const invoice = await stripe.invoices.retrieve(session.invoice as string);
+      const userData = await usersService.findUserByUuid(user.uuid);
 
-  //     const couponId = invoice.discount?.coupon.id;
+      if (promoCodeInMetadata) {
+        couponId = promoCodeInMetadata;
+      } else {
+        const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-  //     if (couponId) {
-  //       await usersService.storeCouponUsedByUser(userData, couponId);
-  //     }
-  //   }
-  // } catch (err) {
-  //   const error = err as Error;
-  //   if (!(err instanceof CouponNotBeingTrackedError)) {
-  //     log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
-  //     log.error(error);
-  //   }
-  // }
+        couponId = invoice.discount?.coupon.id;
+      }
+
+      if (couponId) {
+        await usersService.storeCouponUsedByUser(userData, couponId);
+      }
+    }
+  } catch (err) {
+    const error = err as Error;
+    if (!(err instanceof CouponNotBeingTrackedError)) {
+      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
+      log.error(error);
+    }
+  }
 
   try {
     await cacheService.clearSubscription(customer.id);

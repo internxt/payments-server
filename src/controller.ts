@@ -296,8 +296,6 @@ export default function (
         return subscriptionInCache;
       }
 
-      console.log('USER', user);
-
       if (user.lifetime) {
         response = { type: 'lifetime' };
       } else {

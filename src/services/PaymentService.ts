@@ -106,6 +106,8 @@ export class PaymentService {
   async getPaymentIntent(customerId: CustomerId, amount: number, planId: string, promoCode?: string) {
     let discountedPrice = amount;
 
+    const promoCodeInMetadata = promoCode ? { promotionCode: promoCode } : undefined;
+
     const product = await this.provider.prices.retrieve(planId);
 
     if (promoCode) {
@@ -113,8 +115,6 @@ export class PaymentService {
 
       discountedPrice = amount - promotionCode.coupon.amount_off!;
     }
-
-    console.log('[PRICEID]:', planId);
 
     return this.provider.paymentIntents.create({
       customer: customerId,
@@ -125,6 +125,7 @@ export class PaymentService {
       },
       metadata: {
         planId,
+        ...promoCodeInMetadata,
       },
     });
   }
