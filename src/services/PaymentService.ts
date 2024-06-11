@@ -317,8 +317,6 @@ export class PaymentService {
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
-    console.log(res);
-
     return res.data[0];
   }
 
@@ -598,6 +596,15 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class MissingParametersError extends Error {
+  constructor(params: string[]) {
+    const missingParams = params.forEach((params) => params);
+    super(`You must provide the following parameters: ${missingParams}`);
+
+    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
   }
 }
 

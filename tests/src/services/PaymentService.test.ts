@@ -20,8 +20,8 @@ let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 
 const customerPayload = {
-  correctPayload: { email: 'test@example.com', name: 'Test User' },
-  wrongPayload: {},
+  email: 'test@example.com',
+  name: 'Test User',
 };
 
 const requestPayload = {
@@ -38,7 +38,9 @@ const mockCreateSubscriptionResponse = {
   clientSecret: 'client_secret',
 };
 
-const paymentIntentResponse = 'client_secret';
+const paymentIntentResponse = {
+  clientSecret: 'client_secret',
+};
 
 describe('Payments Service tests', () => {
   beforeEach(() => {
@@ -59,14 +61,14 @@ describe('Payments Service tests', () => {
   });
 
   describe('Creating a customer', () => {
-    it('should create a customer with email and name as a given parameters', async () => {
+    it('should create a customer with email and name with a given parameters', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
         .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
 
-      await paymentService.createCustomer(customerPayload.correctPayload);
+      await paymentService.createCustomer(customerPayload);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload.correctPayload);
+      expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
     });
   });
 
@@ -84,12 +86,12 @@ describe('Payments Service tests', () => {
         requestPayload.promotion_code,
       );
 
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith(requestPayload.customerId, requestPayload.priceId);
-      expect(subscription).toHaveProperty([
+      expect(subscriptionCreatedSpy).toHaveBeenCalledWith(
         requestPayload.customerId,
         requestPayload.priceId,
         requestPayload.promotion_code,
-      ]);
+      );
+      expect(subscription).toEqual(mockCreateSubscriptionResponse);
     });
   });
 
@@ -112,7 +114,7 @@ describe('Payments Service tests', () => {
         requestPayload.priceId,
         requestPayload.promotion_code,
       );
-      expect(paymentIntent).toHaveProperty([paymentIntentResponse]);
+      expect(paymentIntent).toEqual(paymentIntentResponse);
     });
   });
 });

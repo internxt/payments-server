@@ -260,6 +260,11 @@ export default function (
       };
     }>('/payment-intent', async (req, rep) => {
       const { customerId, amount, planId } = req.query;
+
+      if (!customerId || !amount || !planId) {
+        throw new Error('You must provide the following parameters: customerId, amount and planId');
+      }
+
       try {
         const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId);
 
