@@ -51,9 +51,13 @@ export type PriceMetadata = {
   planType: 'subscription' | 'one_time';
 };
 
-type SubscriptionCreatedObject = {
+export type SubscriptionCreatedObject = {
   type: 'setup' | 'payment';
   clientSecret: string;
+};
+
+export type PaymentIntentObject = {
+  clientSecret: string | null;
 };
 
 export class PaymentService {
@@ -64,7 +68,6 @@ export class PaymentService {
   }
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
-    console.log('payload', payload);
     const customer = await this.provider.customers.create(payload);
 
     return customer;
@@ -103,7 +106,12 @@ export class PaymentService {
     }
   }
 
-  async getPaymentIntent(customerId: CustomerId, amount: number, planId: string, promoCode?: string) {
+  async getPaymentIntent(
+    customerId: CustomerId,
+    amount: number,
+    planId: string,
+    promoCode?: string,
+  ): Promise<PaymentIntentObject> {
     let discountedPrice = amount;
 
     const promoCodeInMetadata = promoCode ? { promotionCode: promoCode } : undefined;
@@ -116,7 +124,7 @@ export class PaymentService {
       discountedPrice = amount - promotionCode.coupon.amount_off!;
     }
 
-    return this.provider.paymentIntents.create({
+    const { client_secret } = await this.provider.paymentIntents.create({
       customer: customerId,
       amount: discountedPrice,
       currency: product.currency,
@@ -128,6 +136,10 @@ export class PaymentService {
         ...promoCodeInMetadata,
       },
     });
+
+    return {
+      clientSecret: client_secret,
+    };
   }
 
   async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {

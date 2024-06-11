@@ -261,7 +261,7 @@ export default function (
     }>('/payment-intent', async (req, rep) => {
       const { customerId, amount, planId } = req.query;
       try {
-        const { client_secret: clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId);
+        const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId);
 
         return { clientSecret };
       } catch (err) {

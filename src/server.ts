@@ -14,9 +14,9 @@ import { buildApp } from './app';
 import { LicenseCodesService } from './services/LicenseCodesService';
 import { LicenseCodesRepository } from './core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from './core/users/MongoDBLicenseCodesRepository';
-import { 
-  DisplayBillingRepository, 
-  MongoDBDisplayBillingRepository 
+import {
+  DisplayBillingRepository,
+  MongoDBDisplayBillingRepository,
 } from './core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from './core/coupons/CouponsRepository';
 import { MongoDBCouponsRepository } from './core/coupons/MongoDBCouponsRepository';
@@ -35,8 +35,8 @@ const start = async (): Promise<FastifyInstance> => {
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(
-    usersRepository, 
-    paymentService, 
+    usersRepository,
+    paymentService,
     displayBillingRepository,
     couponsRepository,
     usersCouponsRepository,
