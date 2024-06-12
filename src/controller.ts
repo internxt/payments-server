@@ -70,6 +70,12 @@ export default function (
       }
     });
 
+    fastify.get('/users/exists', async (req, rep) => {
+      await assertUser(req, rep);
+
+      return rep.status(200).send();
+    });
+
     fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
       '/invoices',
       {
