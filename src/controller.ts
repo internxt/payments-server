@@ -113,12 +113,28 @@ export default function (
       },
     );
 
-    fastify.delete('/subscriptions', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      await usersService.cancelUserIndividualSubscriptions(user.customerId);
+    fastify.delete<{
+      Querystring: { subscriptionType?: string; };
+    }>(
+      '/subscriptions',{
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { subscriptionType: { type: 'string', enum: ['B2B', 'individual'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        if (req.query.subscriptionType === 'B2B') {
+          await usersService.cancelUserB2BSuscriptions(user.customerId);
+        } else {
+          await usersService.cancelUserIndividualSubscriptions(user.customerId);
+        }
 
-      return rep.status(204).send();
-    });
+        return rep.status(204).send();
+      },
+    );
 
     fastify.put<{ Body: { price_id: string; couponCode: string } }>(
       '/subscriptions',
@@ -157,10 +173,24 @@ export default function (
       return { clientSecret };
     });
 
-    fastify.get('/default-payment-method', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      return paymentService.getDefaultPaymentMethod(user.customerId);
-    });
+    fastify.get<{
+      Querystring: { subscriptionType?: string; };
+    }>(
+      '/default-payment-method',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { subscriptionType: { type: 'string', enum: ['B2B', 'individual'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const subscriptionType = req.query.subscriptionType ?? 'individual';
+        return paymentService.getDefaultPaymentMethod(user.customerId, subscriptionType);
+      },
+    );
 
     fastify.get<{
       Querystring: { subscriptionType?: 'B2B' };
@@ -207,6 +237,39 @@ export default function (
         });
 
         return response;
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        paymentMethodId: string;
+        subscriptionType: string;
+      };
+    }>(
+      '/subscriptions/update-payment-method',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['paymentMethodId', 'subscriptionType'],
+            properties: {
+              paymentMethodId: { type: 'string' },
+              subscriptionType: { type: 'string', enum: ['B2B', 'individual'] },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const { paymentMethodId, subscriptionType } = req.body;
+
+        await paymentService.updateSubscriptionPaymentMethod(
+          user.customerId,
+          paymentMethodId,
+          subscriptionType,
+        );
+
+        return rep.status(200).send({ message: 'Subscription updated' });
       },
     );
 

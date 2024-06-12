@@ -44,7 +44,10 @@ export default class CacheService {
     );
   }
 
-  async clearSubscription(customerId: string): Promise<void> {
-    await this.redis.del(this.buildSubscriptionKey(customerId));
+  async clearSubscription(
+    customerId: string,
+    subscriptionType: SubscriptionType = 'individual',
+  ): Promise<void> {
+    await this.redis.del(this.buildSubscriptionKey(customerId, subscriptionType));
   }
 }

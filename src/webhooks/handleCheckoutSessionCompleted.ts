@@ -105,7 +105,8 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    await cacheService.clearSubscription(customer.id);
+    const type = product.metadata?.type === 'business' ? 'B2B' : 'individual';
+    await cacheService.clearSubscription(customer.id, type);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }

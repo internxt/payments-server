@@ -1,9 +1,11 @@
+import Stripe from 'stripe';
 import { PaymentService } from '../services/PaymentService';
 
-export default async function handleSubscriptionCanceled(
+export default async function handlePaymentMethodAttached(
   paymentService: PaymentService,
-  customerId: string,
-  paymentMethodId: string,
+  paymentMethod: Stripe.PaymentMethod,  
 ): Promise<void> {
-  await paymentService.updateSubscriptionPaymentMethod(customerId, paymentMethodId);
+  const customerId = paymentMethod.customer as string;
+  const type = paymentMethod.metadata?.type === 'business' ? 'B2B' : 'individual';
+  await paymentService.updateSubscriptionPaymentMethod(customerId, paymentMethod.id, type);
 }

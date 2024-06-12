@@ -238,14 +238,26 @@ export class PaymentService {
 
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
-    paymentMethod: PaymentMethod['id'],
-  ): Promise<Subscription> {
-    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
-    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
-      default_payment_method: paymentMethod,
-    });
+    paymentMethodId: PaymentMethod['id'],
+    subscriptionType: string,
+  ): Promise<Subscription | Error> {
+    const { id: subscriptionId } = subscriptionType == 'B2B'
+      ? await this.findB2BActiveSubscription(customerId)
+      : await this.findIndividualActiveSubscription(customerId);
 
-    return updatedSubscription;
+    if (!subscriptionId)
+      throw new Error('Subscription not found');
+
+    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
+      customer: customerId,
+    })
+
+    if (!id || !customer)
+      throw new Error('Payment method not attached');    
+    
+    return this.provider.subscriptions.update(subscriptionId, {
+      default_payment_method: id,
+    });
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
@@ -341,8 +353,21 @@ export class PaymentService {
    *  customer.invoice_settings.default_payment_method that precedence over
    *  customer.default_source
    */
-  async getDefaultPaymentMethod(customerId: string): Promise<PaymentMethod | CustomerSource | null> {
-    const subscriptions = await this.getActiveSubscriptions(customerId);
+  async getDefaultPaymentMethod(
+    customerId: CustomerId,
+    subscriptionType: string,
+  ): Promise<PaymentMethod | CustomerSource | null> {
+    if (!customerId)
+      throw new Error('customerId required');
+
+    let subscriptions = await this.getActiveSubscriptions(customerId);
+    if (!subscriptions.length)
+      return null;
+
+    subscriptions = subscriptionType == "B2B"
+      ? subscriptions.filter(subs => subs.product?.metadata?.type == "business")
+      : subscriptions.filter(subs => subs.product?.metadata?.type != "business");
+
     const subscriptionWithDefaultPaymentMethod = subscriptions.find(
       (subscription) => subscription.default_payment_method,
     );
@@ -360,6 +385,12 @@ export class PaymentService {
     return (
       (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
     );
+  }
+
+  getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
+    return typeof paymentMethod == 'string'
+      ? this.provider.paymentMethods.retrieve(paymentMethod)
+      : this.provider.paymentMethods.retrieve(paymentMethod.id);
   }
 
   async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
@@ -547,6 +578,10 @@ export class PaymentService {
 
   getCustomer(customerId: CustomerId) {
     return this.provider.customers.retrieve(customerId);
+  }
+
+  getProduct(productId: Stripe.Product['id']) {
+    return this.provider.products.retrieve(productId);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
