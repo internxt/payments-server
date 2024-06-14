@@ -518,10 +518,14 @@ export class PaymentService {
       code: promoCodeName,
     });
 
+    if (!data || data.length === 0) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
     const [lastActiveCoupon] = data;
 
-    if (!lastActiveCoupon.active) {
-      throw new NotFoundPromoCodeByIdError(promoCodeName);
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
     }
 
     return {
@@ -639,7 +643,7 @@ export class MissingParametersError extends Error {
     const missingParams = params.concat(', ');
     super(`You must provide the following parameters: ${missingParams}`);
 
-    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
+    Object.setPrototypeOf(this, MissingParametersError.prototype);
   }
 }
 
@@ -651,10 +655,10 @@ export class NotFoundPlanByIdError extends Error {
   }
 }
 
-export class NotFoundPromoCodeByIdError extends Error {
+export class NotFoundPromoCodeByNameError extends Error {
   constructor(promoCodeId: string) {
     super(`Promotion code with an id ${promoCodeId} does not exist`);
 
-    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
+    Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
   }
 }

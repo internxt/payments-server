@@ -36,7 +36,7 @@ export default async function handlePaymentIntentCompleted(
       promoCodeInMetadata = promotionCode;
     }
 
-    const product = await stripe.prices.retrieve(planId as string);
+    const product = await stripe.prices.retrieve(planId);
 
     lineItems = product;
   } else {
@@ -62,8 +62,9 @@ export default async function handlePaymentIntentCompleted(
   const { maxSpaceBytes } = price.metadata as PriceMetadata;
 
   const isLifetimePlan = (price.metadata as PriceMetadata).planType === 'one_time';
+  const isActiveUserPurchasingALifetimePlan = activeUserSubscription && isLifetimePlan;
 
-  if (activeUserSubscription && isLifetimePlan) {
+  if (isActiveUserPurchasingALifetimePlan) {
     try {
       await paymentService.cancelSubscription(activeUserSubscription.id);
     } catch (error) {
@@ -94,10 +95,10 @@ export default async function handlePaymentIntentCompleted(
   try {
     await updateUserTier(user.uuid, price.product as string, config);
   } catch (err) {
-    log.error(`Error while updating user tier: email: ${session.receipt_email}, planId: ${price.product} `);
+    log.error(`Error while updating user tier: email: ${session.receipt_email}, planId: ${price.product as string} `);
     log.error(err);
 
-    // throw err;
+    throw err;
   }
 
   try {

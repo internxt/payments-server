@@ -6,7 +6,7 @@ import {
   CustomerId,
   MissingParametersError,
   NotFoundPlanByIdError,
-  NotFoundPromoCodeByIdError,
+  NotFoundPromoCodeByNameError,
   PaymentService,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
@@ -175,9 +175,9 @@ export default function (
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-          if (err instanceof MissingParametersError) {
+          if (error instanceof MissingParametersError) {
             return res.status(404).send({
-              message: err.message,
+              message: error.message,
             });
           }
           req.log.error('[ERROR CREATING SUBSCRIPTION]: ', error.stack ?? error.message);
@@ -290,9 +290,9 @@ export default function (
         return { clientSecret };
       } catch (err) {
         const error = err as Error;
-        if (err instanceof MissingParametersError) {
+        if (error instanceof MissingParametersError) {
           return rep.status(404).send({
-            message: err.message,
+            message: error.message,
           });
         }
         req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.stack ?? error.message);
@@ -431,11 +431,12 @@ export default function (
         return rep.status(200).send(promoCodeObject);
       } catch (error) {
         const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByIdError) {
+        if (err instanceof NotFoundPromoCodeByNameError) {
+          console.log('SI');
           return rep.status(404).send({ message: err.message });
         }
 
-        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
@@ -672,7 +673,7 @@ export default function (
             return rep.status(404).send({ message: err.message });
           }
 
-          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },
