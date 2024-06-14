@@ -20,7 +20,7 @@ let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 
 beforeEach(() => {
-  paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' }));
+  paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }));
   usersRepository = {} as UsersRepository;
   displayBillingRepository = {} as DisplayBillingRepository;
   couponsRepository = {} as CouponsRepository;

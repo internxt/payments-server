@@ -31,7 +31,7 @@ const start = async (): Promise<FastifyInstance> => {
   const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
   const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
 
-  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' });
+  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
   const paymentService = new PaymentService(stripe);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(
