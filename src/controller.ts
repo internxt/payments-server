@@ -1,7 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
-import { CouponCodeError, CustomerId, NotFoundPlanByIdError, PaymentService } from './services/PaymentService';
+import {
+  CouponCodeError,
+  CustomerId,
+  MissingParametersError,
+  NotFoundPlanByIdError,
+  NotFoundPromoCodeByIdError,
+  PaymentService,
+} from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription } from './core/users/User';
 import CacheService from './services/CacheService';
@@ -25,6 +32,7 @@ const allowedRoutes: {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
+  '/promo-code-by-name': ['GET'],
 };
 
 export default function (
@@ -84,7 +92,13 @@ export default function (
       },
       async (req, res) => {
         const { name, email } = req.body;
-        console.log('CREATING USER: ', { name, email });
+
+        if (!email) {
+          return res.status(404).send({
+            message: 'Email should be provided',
+          });
+        }
+
         try {
           const createdCustomer = await paymentService.createCustomer({
             name,
@@ -95,10 +109,6 @@ export default function (
             customerId: createdCustomer.id,
           });
         } catch (err) {
-          const error = err as Error;
-
-          req.log.error('ERROR CREATING CUSTOMER', error.stack ?? error.message);
-
           return res.status(500).send({
             message: 'Internal Server Error',
           });
@@ -135,7 +145,7 @@ export default function (
       }
     });
 
-    fastify.post<{ Body: { customerId: string; priceId: string } }>(
+    fastify.post<{ Body: { customerId: string; priceId: string; promoCodeId: string } }>(
       '/create-subscription',
       {
         schema: {
@@ -143,10 +153,13 @@ export default function (
             type: 'object',
             required: ['customerId', 'priceId'],
             properties: {
-              name: {
+              customerId: {
                 type: 'string',
               },
-              email: {
+              priceId: {
+                type: 'string',
+              },
+              promoCodeId: {
                 type: 'string',
               },
             },
@@ -154,16 +167,21 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId } = req.body;
+        const { customerId, priceId, promoCodeId } = req.body;
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId);
+          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, promoCodeId);
 
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-
+          if (err instanceof MissingParametersError) {
+            return res.status(404).send({
+              message: err.message,
+            });
+          }
           req.log.error('[ERROR CREATING SUBSCRIPTION]: ', error.stack ?? error.message);
+
           return res.status(400).send({
             message: error.message,
           });
@@ -251,26 +269,32 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { customerId: CustomerId; amount: number; planId: string };
+      Querystring: { customerId: CustomerId; amount: number; planId: string; promoCodeName: string };
       schema: {
         querystring: {
           type: 'object';
-          properties: { customerId: { type: 'string' }; planId: { type: 'string' }; amount: { type: 'number' } };
+          properties: {
+            customerId: { type: 'string' };
+            planId: { type: 'string' };
+            amount: { type: 'number' };
+            promoCodeName: { type: 'string' };
+          };
         };
       };
     }>('/payment-intent', async (req, rep) => {
-      const { customerId, amount, planId } = req.query;
-
-      if (!customerId || !amount || !planId) {
-        throw new Error('You must provide the following parameters: customerId, amount and planId');
-      }
+      const { customerId, amount, planId, promoCodeName } = req.query;
 
       try {
-        const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId);
+        const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId, promoCodeName);
 
         return { clientSecret };
       } catch (err) {
         const error = err as Error;
+        if (err instanceof MissingParametersError) {
+          return rep.status(404).send({
+            message: err.message,
+          });
+        }
         req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.stack ?? error.message);
         return rep.status(500).send({
           message: 'Internal Server Error',
@@ -357,7 +381,7 @@ export default function (
       schema: {
         querystring: {
           type: 'object';
-          properties: { planI: { type: 'string' } };
+          properties: { planId: { type: 'string' } };
         };
       };
       config: {
@@ -380,6 +404,38 @@ export default function (
         }
 
         req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    fastify.get<{
+      Querystring: { promotionCode: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { promotionCode: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/promo-code-by-name', async (req, rep) => {
+      const { promotionCode } = req.query;
+
+      try {
+        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
+
+        return rep.status(200).send(promoCodeObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPromoCodeByIdError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });

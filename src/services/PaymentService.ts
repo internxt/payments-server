@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { User, UserSubscription } from '../core/users/User';
+import { PromotionCode } from '../core/users/PromotionCode';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -76,14 +77,22 @@ export class PaymentService {
   async createSubscription(
     customerId: string,
     priceId: string,
-    promotion_code?: Stripe.SubscriptionCreateParams['promotion_code'],
+    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
   ): Promise<SubscriptionCreatedObject> {
+    if (!customerId || !priceId) {
+      throw new MissingParametersError(['customerId', 'priceId']);
+    }
+
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
-      promotion_code: promotion_code,
       items: [
         {
           price: priceId,
+          discounts: [
+            {
+              promotion_code: promoCodeId,
+            },
+          ],
         },
       ],
       payment_behavior: 'default_incomplete',
@@ -110,23 +119,30 @@ export class PaymentService {
     customerId: CustomerId,
     amount: number,
     planId: string,
-    promoCode?: string,
+    promoCodeName?: string,
   ): Promise<PaymentIntentObject> {
-    let discountedPrice = amount;
-
-    const promoCodeInMetadata = promoCode ? { promotionCode: promoCode } : undefined;
+    if (!customerId || !amount || !planId) {
+      throw new MissingParametersError(['customerId', 'amount', 'planId']);
+    }
+    let totalAmount = amount;
 
     const product = await this.provider.prices.retrieve(planId);
+    const promoCodeInMetadata = promoCodeName ? { promotionCode: promoCodeName } : undefined;
 
-    if (promoCode) {
-      const promotionCode = await this.provider.promotionCodes.retrieve(promoCode);
+    if (promoCodeName) {
+      const promotionCode = await this.getPromotionCodeByName(promoCodeName);
 
-      discountedPrice = amount - promotionCode.coupon.amount_off!;
+      if (promotionCode.percentOff) {
+        const discount = 100 - promotionCode.percentOff;
+        totalAmount = (amount * discount) / 100;
+      } else {
+        totalAmount = amount - promotionCode.amountOff!;
+      }
     }
 
     const { client_secret } = await this.provider.paymentIntents.create({
       customer: customerId,
-      amount: discountedPrice,
+      amount: totalAmount,
       currency: product.currency,
       automatic_payment_methods: {
         enabled: true,
@@ -176,7 +192,7 @@ export class PaymentService {
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
-    await this.provider.subscriptions.del(subscriptionId, {});
+    await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<Subscription[]> {
@@ -496,6 +512,25 @@ export class PaymentService {
     }
   }
 
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const { data } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+    });
+
+    const [lastActiveCoupon] = data;
+
+    if (!lastActiveCoupon.active) {
+      throw new NotFoundPromoCodeByIdError(promoCodeName);
+    }
+
+    return {
+      codeId: lastActiveCoupon.id,
+      amountOff: lastActiveCoupon.coupon.amount_off,
+      percentOff: lastActiveCoupon.coupon.percent_off,
+    };
+  }
+
   private getPaymentMethodTypes(
     currency: string,
     isOneTime: boolean,
@@ -601,7 +636,7 @@ export class CouponCodeError extends Error {
 
 export class MissingParametersError extends Error {
   constructor(params: string[]) {
-    const missingParams = params.forEach((params) => params);
+    const missingParams = params.concat(', ');
     super(`You must provide the following parameters: ${missingParams}`);
 
     Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
@@ -611,6 +646,14 @@ export class MissingParametersError extends Error {
 export class NotFoundPlanByIdError extends Error {
   constructor(planId: string) {
     super(`Plan with an id ${planId} does not exist`);
+
+    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
+  }
+}
+
+export class NotFoundPromoCodeByIdError extends Error {
+  constructor(promoCodeId: string) {
+    super(`Promotion code with an id ${promoCodeId} does not exist`);
 
     Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
   }

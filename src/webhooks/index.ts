@@ -45,7 +45,7 @@ export default function (
           await handleSubscriptionCanceled(
             storageService,
             usersService,
-            (event.data.object as Stripe.Subscription).customer as string,
+            event.data.object.customer as string,
             cacheService,
             fastify.log,
             config,
@@ -55,23 +55,19 @@ export default function (
           await handleSubscriptionUpdated(
             storageService,
             usersService,
-            event.data.object as Stripe.Subscription,
+            event.data.object,
             cacheService,
             fastify.log,
             config,
           );
           break;
         case 'payment_method.attached':
-          await handlePaymentMethodAttached(
-            paymentService,
-            (event.data.object as Stripe.PaymentMethod).customer as string,
-            (event.data.object as Stripe.PaymentMethod).id,
-          );
+          await handlePaymentMethodAttached(paymentService, event.data.object.customer as string, event.data.object.id);
           break;
 
         case 'payment_intent.succeeded':
           await handlePaymentIntentCompleted(
-            event.data.object as Stripe.PaymentIntent,
+            event.data.object,
             stripe,
             usersService,
             paymentService,
@@ -95,7 +91,7 @@ export default function (
           await handleLifetimeRefunded(
             storageService,
             usersService,
-            (event.data.object as Stripe.Charge).customer as string,
+            event.data.object.customer as string,
             cacheService,
             fastify.log,
             config,
