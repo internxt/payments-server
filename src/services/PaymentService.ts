@@ -124,34 +124,36 @@ export class PaymentService {
     if (!customerId || !amount || !planId) {
       throw new MissingParametersError(['customerId', 'amount', 'planId']);
     }
-    let totalAmount = amount;
 
     const product = await this.provider.prices.retrieve(planId);
-    const promoCodeInMetadata = promoCodeName ? { promotionCode: promoCodeName } : undefined;
+    let promoCodeInMetadata = undefined;
 
     if (promoCodeName) {
       const promotionCode = await this.getPromotionCodeByName(promoCodeName);
 
-      if (promotionCode.percentOff) {
-        const discount = 100 - promotionCode.percentOff;
-        totalAmount = (amount * discount) / 100;
-      } else {
-        totalAmount = amount - promotionCode.amountOff!;
-      }
+      promoCodeInMetadata = promotionCode.codeId;
     }
 
-    const { client_secret } = await this.provider.paymentIntents.create({
+    const invoice = await this.provider.invoices.create({
       customer: customerId,
-      amount: totalAmount,
-      currency: product.currency,
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      metadata: {
-        planId,
-        ...promoCodeInMetadata,
-      },
     });
+
+    await this.provider.invoiceItems.create({
+      customer: customerId,
+      price: product.id,
+      invoice: invoice.id,
+      discounts: [
+        {
+          promotion_code: promoCodeInMetadata,
+        },
+      ],
+    });
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    const { client_secret } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
 
     return {
       clientSecret: client_secret,
@@ -443,6 +445,7 @@ export class PaymentService {
   }
 
   async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
+    console.log('CUSTOMER ID IN GET USER SUBSCRIPTION: ', customerId);
     let subscription;
     try {
       subscription = await this.findIndividualActiveSubscription(customerId);

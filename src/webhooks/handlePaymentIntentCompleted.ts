@@ -21,31 +21,14 @@ export default async function handlePaymentIntentCompleted(
     return;
   }
 
-  let lineItems;
-  let promoCodeInMetadata;
-
   const customer = await paymentService.getCustomer(session.customer as string);
   const userSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
 
   const activeUserSubscription = userSubscriptions.filter((subscription) => subscription.status === 'active')[0];
 
-  if (!session.invoice) {
-    const { planId, promotionCode } = session.metadata;
+  const items = await paymentService.getLineItems(session.invoice as string);
 
-    if (promotionCode) {
-      promoCodeInMetadata = promotionCode;
-    }
-
-    const product = await stripe.prices.retrieve(planId);
-
-    lineItems = product;
-  } else {
-    const items = await paymentService.getLineItems(session.invoice as string);
-
-    lineItems = items.data[0].price;
-  }
-
-  const price = lineItems;
+  const price = items.data[0].price;
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.receipt_email}`);
@@ -95,16 +78,17 @@ export default async function handlePaymentIntentCompleted(
   try {
     await updateUserTier(user.uuid, price.product as string, config);
   } catch (err) {
-    log.error(`Error while updating user tier: email: ${session.receipt_email}, planId: ${price.product as string} `);
-    log.error(err);
+    const error = err as Error;
+    log.error(
+      `Error while updating user tier: email: ${session.receipt_email}, planId: ${price.product as string} `,
+      error.stack ?? error.message,
+    );
 
     throw err;
   }
 
   try {
-    const { customerId } = await usersService.findUserByUuid(user.uuid);
-
-    await usersService.updateUser(customerId, {
+    await usersService.updateUser(customer.id, {
       lifetime: isLifetimePlan,
     });
   } catch {
@@ -116,18 +100,12 @@ export default async function handlePaymentIntentCompleted(
   }
 
   try {
-    if (session.invoice || promoCodeInMetadata) {
-      let couponId;
-
+    if (session.invoice) {
       const userData = await usersService.findUserByUuid(user.uuid);
 
-      if (promoCodeInMetadata) {
-        couponId = promoCodeInMetadata;
-      } else {
-        const invoice = await stripe.invoices.retrieve(session.invoice as string);
+      const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-        couponId = invoice.discount?.coupon.id;
-      }
+      const couponId = invoice.discount?.coupon.id;
 
       if (couponId) {
         await usersService.storeCouponUsedByUser(userData, couponId);
