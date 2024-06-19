@@ -210,15 +210,19 @@ export default function (
     }
 
     fastify.get<{
-      Querystring: { currency?: string };
+      Querystring: { currency?: string; subscriptionType?: 'individual' | 'business' };
       schema: {
         querystring: {
           type: 'object';
-          properties: { currency: { type: 'string' } };
+          properties: {
+            currency: { type: 'string' };
+            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
+          };
         };
       };
     }>('/prices', async (req, rep) => {
       const { currency } = req.query;
+      const subscriptionType = req.query.subscriptionType ?? 'individual';
 
       const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -226,7 +230,7 @@ export default function (
         return rep.status(400).send({ message: errorMessage });
       }
 
-      return paymentService.getPrices(currencyValue);
+      return paymentService.getPrices(currencyValue, subscriptionType);
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {
