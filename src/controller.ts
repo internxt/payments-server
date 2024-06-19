@@ -176,14 +176,14 @@ export default function (
         } catch (err) {
           const error = err as Error;
           if (error instanceof MissingParametersError) {
-            return res.status(404).send({
+            return res.status(400).send({
               message: error.message,
             });
           }
           req.log.error('[ERROR CREATING SUBSCRIPTION]: ', error.stack ?? error.message);
 
-          return res.status(400).send({
-            message: error.message,
+          return res.status(500).send({
+            message: 'Internal Server Error',
           });
         }
       },
@@ -295,7 +295,7 @@ export default function (
             message: error.message,
           });
         }
-        req.log.error('[ERROR WHILE CREATING PAYMENT INTENT]:', error.stack ?? error.message);
+        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
         return rep.status(500).send({
           message: 'Internal Server Error',
         });
