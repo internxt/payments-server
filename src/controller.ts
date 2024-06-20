@@ -163,14 +163,14 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'B2B' };
+      Querystring: { subscriptionType?: 'business' | 'individual' };
     }>(
       '/subscriptions',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['B2B'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['business', 'individual'] } },
           },
         },
       },
@@ -193,7 +193,7 @@ export default function (
           return subscriptionInCache;
         }
 
-        if (subscriptionType === 'B2B') {
+        if (subscriptionType === 'business') {
           response = await paymentService.getB2BSubscription(user.customerId);
         } else if (user.lifetime) {
           response = { type: 'lifetime' };

@@ -4,7 +4,7 @@ import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 
-type SubscriptionType = 'B2B' | 'individual';
+type SubscriptionType = 'business' | 'individual';
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
