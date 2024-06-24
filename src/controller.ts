@@ -114,19 +114,19 @@ export default function (
     );
 
     fastify.delete<{
-      Querystring: { subscriptionType?: string; };
+      Querystring: { subscriptionType?: 'individual' | 'business'; };
     }>(
       '/subscriptions',{
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['B2B', 'individual'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        if (req.query.subscriptionType === 'B2B') {
+        if (req.query.subscriptionType === 'business') {
           await usersService.cancelUserB2BSuscriptions(user.customerId);
         } else {
           await usersService.cancelUserIndividualSubscriptions(user.customerId);
@@ -174,14 +174,14 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { subscriptionType?: string; };
+      Querystring: { subscriptionType?: 'individual' | 'business'; };
     }>(
       '/default-payment-method',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['B2B', 'individual'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
@@ -193,14 +193,14 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'B2B' };
+      Querystring: { subscriptionType?: 'individual' | 'business' };
     }>(
       '/subscriptions',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['B2B'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
@@ -223,7 +223,7 @@ export default function (
           return subscriptionInCache;
         }
 
-        if (subscriptionType === 'B2B') {
+        if (subscriptionType === 'business') {
           response = await paymentService.getB2BSubscription(user.customerId);
         } else if (user.lifetime) {
           response = { type: 'lifetime' };
@@ -243,7 +243,7 @@ export default function (
     fastify.post<{
       Body: {
         paymentMethodId: string;
-        subscriptionType: string;
+        subscriptionType?: 'individual' | 'business';
       };
     }>(
       '/subscriptions/update-payment-method',
@@ -251,10 +251,10 @@ export default function (
         schema: {
           body: {
             type: 'object',
-            required: ['paymentMethodId', 'subscriptionType'],
+            required: ['paymentMethodId'],
             properties: {
               paymentMethodId: { type: 'string' },
-              subscriptionType: { type: 'string', enum: ['B2B', 'individual'] },
+              subscriptionType: { type: 'string', enum: ['individual', 'business'] },
             },
           },
         },
@@ -266,7 +266,7 @@ export default function (
         await paymentService.updateSubscriptionPaymentMethod(
           user.customerId,
           paymentMethodId,
-          subscriptionType,
+          subscriptionType ?? 'individual',
         );
 
         return rep.status(200).send({ message: 'Subscription updated' });

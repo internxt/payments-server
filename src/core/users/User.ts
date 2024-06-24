@@ -16,4 +16,5 @@ export type UserSubscription =
       nextPayment: number;
       priceId: string;
       planId?: string;
+      subscriptionType: 'individual' | 'business',
     };

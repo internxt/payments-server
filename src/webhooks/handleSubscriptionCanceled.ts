@@ -21,14 +21,14 @@ export default async function handleSubscriptionCanceled(
   const { uuid } = await usersService.findUserByCustomerID(customerId);
 
   const { metadata : productMetadata } = await paymentService.getProduct(productId);
-  const productType = productMetadata?.type === 'business' ? 'B2B' : 'individual';
+  const productType = productMetadata?.type === 'business' ? 'business' : 'individual';
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
-  if (productType === 'B2B') {
+  if (productType === 'business') {
     return usersService.destroyWorkspace(uuid);
   }
  

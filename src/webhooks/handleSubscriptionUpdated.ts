@@ -35,7 +35,7 @@ export default async function handleSubscriptionUpdated(
         const previousPaymentMethodId = typeof previousPaymentMethod == 'string'
           ? previousPaymentMethod
           : previousPaymentMethod.id;
-        const type = productType == 'business' ? 'B2B' : 'individual';
+        const type = productType == 'business' ? 'business' : 'individual';
         await paymentService.updateSubscriptionPaymentMethod(customerId, previousPaymentMethodId, type);
         return;
       }
@@ -47,14 +47,14 @@ export default async function handleSubscriptionUpdated(
     return;
   }
 
-  const productType = productMetadata?.type === 'business' ? 'B2B' : 'individual';
+  const productType = productMetadata?.type === 'business' ? 'business' : 'individual';
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
     log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }
 
-  if (productType == 'B2B') {
+  if (productType == 'business') {
     const customer = await paymentService.getCustomer(customerId);
     if (customer.deleted) {
       log.error(

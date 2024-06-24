@@ -239,9 +239,9 @@ export class PaymentService {
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
     paymentMethodId: PaymentMethod['id'],
-    subscriptionType: string,
-  ): Promise<Subscription | Error> {
-    const { id: subscriptionId } = subscriptionType == 'B2B'
+    subscriptionType: 'individual' | 'business' = 'individual',
+  ): Promise<Subscription> {
+    const { id: subscriptionId } = subscriptionType == 'business'
       ? await this.findB2BActiveSubscription(customerId)
       : await this.findIndividualActiveSubscription(customerId);
 
@@ -355,7 +355,7 @@ export class PaymentService {
    */
   async getDefaultPaymentMethod(
     customerId: CustomerId,
-    subscriptionType: string,
+    subscriptionType: 'individual' | 'business' = 'individual',
   ): Promise<PaymentMethod | CustomerSource | null> {
     if (!customerId)
       throw new Error('customerId required');
@@ -364,7 +364,7 @@ export class PaymentService {
     if (!subscriptions.length)
       return null;
 
-    subscriptions = subscriptionType == "B2B"
+    subscriptions = subscriptionType == 'business'
       ? subscriptions.filter(subs => subs.product?.metadata?.type == "business")
       : subscriptions.filter(subs => subs.product?.metadata?.type != "business");
 
@@ -418,6 +418,7 @@ export class PaymentService {
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       planId: price?.product as string,
+      subscriptionType: 'individual',
     };
   }
 
@@ -434,6 +435,7 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       priceId: price.id,
       planId: price?.product as string,
+      subscriptionType: 'business',
     };
   }
 
