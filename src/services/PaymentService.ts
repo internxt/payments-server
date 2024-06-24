@@ -406,20 +406,29 @@ export class PaymentService {
     };
   }
 
-  async getPrices(currency?: string): Promise<DisplayPrice[]> {
+  async getPrices(
+    currency?: string,
+    subscriptionType: 'business' | 'individual' = 'individual',
+  ): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
 
     const res = await this.provider.prices.search({
       query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
-      expand: ['data.currency_options'],
+      expand: ['data.currency_options', 'data.product'],
       limit: 100,
     });
 
     return res.data
-      .filter(
-        (price) =>
-          price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
-      )
+      .filter((price) => {
+        const priceProductType =
+          ((price.product as Stripe.Product).metadata.type as 'business' | 'individual' | undefined) ?? 'individual';
+        return (
+          price.metadata.maxSpaceBytes &&
+          price.currency_options &&
+          price.currency_options[currencyValue].unit_amount &&
+          priceProductType === subscriptionType
+        );
+      })
       .map((price) => {
         return {
           id: price.id,
