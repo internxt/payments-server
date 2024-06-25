@@ -345,11 +345,8 @@ export class PaymentService {
     customerId: CustomerId,
     subscriptionType: 'individual' | 'business' = 'individual',
   ): Promise<PaymentMethod | CustomerSource | null> {
-    if (!customerId)
-      throw new Error('customerId required');
-
     let subscriptions = await this.getActiveSubscriptions(customerId);
-    if (!subscriptions.length)
+    if (subscriptions.length === 0)
       return null;
 
     subscriptions = subscriptionType == 'business'

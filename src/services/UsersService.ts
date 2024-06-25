@@ -82,7 +82,6 @@ export class UsersService {
   }
 
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
-    if (!customerId) throw new Error('customerId required');
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
     if (activeSubscriptions.length === 0) {
@@ -90,7 +89,7 @@ export class UsersService {
     }
 
     const individualSubscriptions = activeSubscriptions.filter(
-      (subscription) => subscription.metadata.is_teams !== '1' && subscription.product?.metadata.type !== 'business',
+      (subscription) => subscription.product?.metadata.type !== 'business',
     ) as Stripe.Subscription[];
 
     for (const subscriptionToCancel of individualSubscriptions) {
@@ -99,7 +98,6 @@ export class UsersService {
   }
 
   async cancelUserB2BSuscriptions(customerId: User['customerId']): Promise<void> {
-    if (!customerId) throw new Error('customerId required');
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
     if (activeSubscriptions.length === 0) {
