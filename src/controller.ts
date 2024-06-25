@@ -246,39 +246,6 @@ export default function (
       },
     );
 
-    fastify.post<{
-      Body: {
-        paymentMethodId: string;
-        subscriptionType?: 'individual' | 'business';
-      };
-    }>(
-      '/subscriptions/update-payment-method',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['paymentMethodId'],
-            properties: {
-              paymentMethodId: { type: 'string' },
-              subscriptionType: { type: 'string', enum: ['individual', 'business'] },
-            },
-          },
-        },
-      },
-      async (req, rep) => {
-        const user = await assertUser(req, rep);
-        const { paymentMethodId, subscriptionType } = req.body;
-
-        await paymentService.updateSubscriptionPaymentMethod(
-          user.customerId,
-          paymentMethodId,
-          subscriptionType ?? 'individual',
-        );
-
-        return rep.status(200).send({ message: 'Subscription updated' });
-      },
-    );
-
     function checkCurrency(currency?: string): { currencyValue: string; isError: boolean; errorMessage?: string } {
       let currencyValue: string;
 

@@ -238,26 +238,14 @@ export class PaymentService {
 
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
-    paymentMethodId: PaymentMethod['id'],
-    subscriptionType: 'individual' | 'business' = 'individual',
+    paymentMethod: PaymentMethod['id'],
   ): Promise<Subscription> {
-    const { id: subscriptionId } = subscriptionType == 'business'
-      ? await this.findB2BActiveSubscription(customerId)
-      : await this.findIndividualActiveSubscription(customerId);
-
-    if (!subscriptionId)
-      throw new Error('Subscription not found');
-
-    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
-      customer: customerId,
-    })
-
-    if (!id || !customer)
-      throw new Error('Payment method not attached');    
-    
-    return this.provider.subscriptions.update(subscriptionId, {
-      default_payment_method: id,
+    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
+    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
+      default_payment_method: paymentMethod,
     });
+
+    return updatedSubscription;
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
