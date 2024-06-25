@@ -45,7 +45,8 @@ export default function (
           await handleSubscriptionCanceled(
             storageService,
             usersService,
-            (event.data.object as Stripe.Subscription).customer as string,
+            paymentService,
+            event.data.object as Stripe.Subscription,
             cacheService,
             fastify.log,
             config,

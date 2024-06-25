@@ -341,8 +341,18 @@ export class PaymentService {
    *  customer.invoice_settings.default_payment_method that precedence over
    *  customer.default_source
    */
-  async getDefaultPaymentMethod(customerId: string): Promise<PaymentMethod | CustomerSource | null> {
-    const subscriptions = await this.getActiveSubscriptions(customerId);
+  async getDefaultPaymentMethod(
+    customerId: CustomerId,
+    subscriptionType: 'individual' | 'business' = 'individual',
+  ): Promise<PaymentMethod | CustomerSource | null> {
+    let subscriptions = await this.getActiveSubscriptions(customerId);
+    if (subscriptions.length === 0)
+      return null;
+
+    subscriptions = subscriptionType == 'business'
+      ? subscriptions.filter(subs => subs.product?.metadata?.type == "business")
+      : subscriptions.filter(subs => subs.product?.metadata?.type != "business");
+
     const subscriptionWithDefaultPaymentMethod = subscriptions.find(
       (subscription) => subscription.default_payment_method,
     );
@@ -360,6 +370,12 @@ export class PaymentService {
     return (
       (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
     );
+  }
+
+  getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
+    return typeof paymentMethod == 'string'
+      ? this.provider.paymentMethods.retrieve(paymentMethod)
+      : this.provider.paymentMethods.retrieve(paymentMethod.id);
   }
 
   async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
@@ -387,6 +403,7 @@ export class PaymentService {
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       planId: price?.product as string,
+      subscriptionType: 'individual',
     };
   }
 
@@ -403,6 +420,7 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       priceId: price.id,
       planId: price?.product as string,
+      subscriptionType: 'business',
     };
   }
 
@@ -556,6 +574,10 @@ export class PaymentService {
 
   getCustomer(customerId: CustomerId) {
     return this.provider.customers.retrieve(customerId);
+  }
+
+  getProduct(productId: Stripe.Product['id']) {
+    return this.provider.products.retrieve(productId);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

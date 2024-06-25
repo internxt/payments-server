@@ -4,7 +4,7 @@ import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 
-type SubscriptionType = 'business' | 'individual';
+type SubscriptionType = 'individual' | 'business';
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
@@ -44,7 +44,10 @@ export default class CacheService {
     );
   }
 
-  async clearSubscription(customerId: string): Promise<void> {
-    await this.redis.del(this.buildSubscriptionKey(customerId));
+  async clearSubscription(
+    customerId: string,
+    subscriptionType: SubscriptionType = 'individual',
+  ): Promise<void> {
+    await this.redis.del(this.buildSubscriptionKey(customerId, subscriptionType));
   }
 }

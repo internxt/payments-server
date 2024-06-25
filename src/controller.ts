@@ -119,12 +119,28 @@ export default function (
       },
     );
 
-    fastify.delete('/subscriptions', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      await usersService.cancelUserIndividualSubscriptions(user.customerId);
+    fastify.delete<{
+      Querystring: { subscriptionType?: 'individual' | 'business'; };
+    }>(
+      '/subscriptions',{
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        if (req.query.subscriptionType === 'business') {
+          await usersService.cancelUserB2BSuscriptions(user.customerId);
+        } else {
+          await usersService.cancelUserIndividualSubscriptions(user.customerId);
+        }
 
-      return rep.status(204).send();
-    });
+        return rep.status(204).send();
+      },
+    );
 
     fastify.put<{ Body: { price_id: string; couponCode: string } }>(
       '/subscriptions',
@@ -163,20 +179,34 @@ export default function (
       return { clientSecret };
     });
 
-    fastify.get('/default-payment-method', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      return paymentService.getDefaultPaymentMethod(user.customerId);
-    });
+    fastify.get<{
+      Querystring: { subscriptionType?: 'individual' | 'business'; };
+    }>(
+      '/default-payment-method',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const subscriptionType = req.query.subscriptionType ?? 'individual';
+        return paymentService.getDefaultPaymentMethod(user.customerId, subscriptionType);
+      },
+    );
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'business' | 'individual' };
+      Querystring: { subscriptionType?: 'individual' | 'business' };
     }>(
       '/subscriptions',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['business', 'individual'] } },
+            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
