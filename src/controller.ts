@@ -3,7 +3,7 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import { CouponCodeError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
-import { User, UserSubscription } from './core/users/User';
+import { User, UserSubscription, UserType } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
 import {
@@ -160,14 +160,31 @@ export default function (
       return paymentService.getDefaultPaymentMethod(user.customerId);
     });
 
-    fastify.get('/subscriptions', async (req, rep) => {
+    fastify.get<{
+      Querystring: { userType?: 'individual' | 'business' };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: {
+            userType: { type: 'string'; enum: ['individual', 'business'] };
+          };
+        };
+      };
+    }>('/subscriptions', async (req, rep) => {
       let response: UserSubscription;
 
+      if (req.query.userType && !['individual', 'business'].includes(req.query.userType)) {
+        return rep.status(400).send({ message: 'Invalid "userType" query param' });
+      }
+      
+      const userType = req.query.userType || UserType.Individual;
       const user: User = await assertUser(req, rep);
 
       let subscriptionInCache: UserSubscription | null | undefined;
       try {
-        subscriptionInCache = await cacheService.getSubscription(user.customerId);
+        if (userType === UserType.Individual) {
+          subscriptionInCache = await cacheService.getSubscription(user.customerId);
+        }
       } catch (err) {
         req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
         req.log.error(err);
@@ -181,7 +198,7 @@ export default function (
       if (user.lifetime) {
         response = { type: 'lifetime' };
       } else {
-        response = await paymentService.getUserSubscription(user.customerId);
+        response = await paymentService.getUserSubscription(user.customerId, userType as UserType);
       }
 
       cacheService.setSubscription(user.customerId, response).catch((err) => {
