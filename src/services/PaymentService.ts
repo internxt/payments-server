@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
-import { User, UserSubscription } from '../core/users/User';
+import { User, UserSubscription, UserType } from '../core/users/User';
+import { ProductsRepository } from '../core/users/ProductsRepository';
 
 type Customer = Stripe.Customer;
 type CustomerId = Customer['id'];
@@ -50,9 +51,11 @@ export type PriceMetadata = {
 
 export class PaymentService {
   private readonly provider: Stripe;
+  private readonly productsRepository: ProductsRepository;
 
-  constructor(provider: Stripe) {
+  constructor(provider: Stripe, productsRepository: ProductsRepository) {
     this.provider = provider;
+    this.productsRepository = productsRepository;
   }
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
@@ -345,10 +348,14 @@ export class PaymentService {
     );
   }
 
-  async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
+  async getUserSubscription(customerId: CustomerId, type?: UserType): Promise<UserSubscription> {
     let subscription;
     try {
-      subscription = await this.findIndividualActiveSubscription(customerId);
+      if (type === UserType.Business) {
+        subscription = await this.findBusinessActiveSubscription(customerId);
+      } else {
+        subscription = await this.findIndividualActiveSubscription(customerId);
+      }
     } catch (err) {
       if (err instanceof NotFoundSubscriptionError) {
         return { type: 'free' };
@@ -370,6 +377,7 @@ export class PaymentService {
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       planId: price?.product as string,
+      userType: type,
     };
   }
 
@@ -490,6 +498,22 @@ export class PaymentService {
     }
 
     return individualActiveSubscription;
+  }
+
+  private async findBusinessActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const products = await this.productsRepository.findByType(UserType.Business);
+    const businessProductIds = products.map(product => product.paymentGatewayId);
+
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+
+    const businessSubscription = activeSubscriptions.find(
+      (subscription) => businessProductIds.includes(subscription.items.data[0].price.product.toString()),
+    );
+    if (!businessSubscription) {
+      throw new NotFoundSubscriptionError('There is no individual subscription to update');
+    }
+
+    return businessSubscription;
   }
 }
 
