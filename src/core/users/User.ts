@@ -5,6 +5,11 @@ export interface User {
   lifetime?: boolean;
 }
 
+export enum UserType {
+  Individual = 'individual',
+  Business = 'business'
+}
+
 export type UserSubscription =
   | { type: 'free' | 'lifetime' }
   | {
@@ -16,4 +21,5 @@ export type UserSubscription =
       nextPayment: number;
       priceId: string;
       planId?: string;
+      userType?: UserType
     };
