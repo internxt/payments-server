@@ -3,7 +3,7 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import { CouponCodeError, PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
-import { User, UserSubscription } from './core/users/User';
+import { User, UserSubscription, UserType } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
 import {
@@ -199,14 +199,14 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'individual' | 'business' };
+      Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/subscriptions',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
@@ -214,11 +214,11 @@ export default function (
         let response: UserSubscription;
 
         const user: User = await assertUser(req, rep);
-        const subscriptionType = req.query.subscriptionType ?? 'individual';
+        const userType = req.query.userType || UserType.Individual;
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
-          subscriptionInCache = await cacheService.getSubscription(user.customerId, subscriptionType);
+          subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
         } catch (err) {
           req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
           req.log.error(err);
@@ -229,15 +229,13 @@ export default function (
           return subscriptionInCache;
         }
 
-        if (subscriptionType === 'business') {
-          response = await paymentService.getB2BSubscription(user.customerId);
-        } else if (user.lifetime) {
+        if (user.lifetime) {
           response = { type: 'lifetime' };
         } else {
-          response = await paymentService.getUserSubscription(user.customerId);
+          response = await paymentService.getUserSubscription(user.customerId, userType as UserType);
         }
 
-        cacheService.setSubscription(user.customerId, subscriptionType, response).catch((err) => {
+        cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
           req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
           req.log.error(err);
         });
