@@ -12,7 +12,6 @@ export default async function handlePaymentIntentCompleted(
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
-
   cacheService: CacheService,
   config: AppConfig,
 ): Promise<void> {
@@ -72,15 +71,15 @@ export default async function handlePaymentIntentCompleted(
       error.stack ?? error.message,
     );
 
-    throw err;
+    // throw err;
   }
 
   try {
-    const userData = await usersService.findUserByUuid(user.uuid);
+    const customerByUuid = await usersService.findUserByUuid(user.uuid);
 
-    if (!userData) throw Error();
+    // if (!customerByUuid) throw Error();
 
-    await usersService.updateUser(customer.id, {
+    await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
     });
   } catch {

@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { DisplayPrice } from '../core/users/DisplayPrice';
+import { DisplayPrice, RequestedPlan } from '../core/users/DisplayPrice';
 import { User, UserSubscription } from '../core/users/User';
 import { PromotionCode } from '../core/users/PromotionCode';
 
@@ -127,13 +127,6 @@ export class PaymentService {
     }
 
     const product = await this.provider.prices.retrieve(planId);
-    let promoCodeInMetadata = undefined;
-
-    if (promoCodeName) {
-      const promotionCode = await this.getPromotionCodeByName(promoCodeName);
-
-      promoCodeInMetadata = promotionCode.codeId;
-    }
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
@@ -148,7 +141,7 @@ export class PaymentService {
       invoice: invoice.id,
       discounts: [
         {
-          promotion_code: promoCodeInMetadata,
+          promotion_code: promoCodeName,
         },
       ],
     });
@@ -449,7 +442,6 @@ export class PaymentService {
   }
 
   async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
-    console.log('CUSTOMER ID IN GET USER SUBSCRIPTION: ', customerId);
     let subscription;
     try {
       subscription = await this.findIndividualActiveSubscription(customerId);
@@ -502,15 +494,51 @@ export class PaymentService {
       });
   }
 
-  async getPlanById(planId: PlanId): Promise<DisplayPrice> {
+  async getUpsellProduct(productId: Stripe.Product['id']): Promise<Stripe.Price | undefined> {
+    const productData = await this.provider.prices.list({
+      active: true,
+      product: productId,
+    });
+    const upsellProduct = productData.data.find((productItem) => productItem.recurring?.interval === 'year');
+
+    return upsellProduct;
+  }
+
+  async getPlanById(planId: PlanId): Promise<RequestedPlan> {
     try {
-      const planObject = await this.provider.prices.retrieve(planId);
+      let upsellPlan: RequestedPlan['upsellPlan'];
+
+      const { id, currency, unit_amount, metadata, type, recurring, product } = await this.provider.prices.retrieve(
+        planId,
+      );
+
+      const selectedPlan: RequestedPlan['selectedPlan'] = {
+        id: id,
+        currency: currency,
+        amount: unit_amount as number,
+        bytes: parseInt(metadata?.maxSpaceBytes),
+        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
+        decimalAmount: (unit_amount as number) / 100,
+      };
+
+      if (recurring?.interval === 'month') {
+        const upsell = await this.getUpsellProduct(product as string);
+
+        if (upsell?.active) {
+          upsellPlan = {
+            id: upsell.id,
+            currency: upsell.currency,
+            amount: upsell.unit_amount as number,
+            bytes: parseInt(upsell.metadata?.maxSpaceBytes),
+            interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
+            decimalAmount: (upsell.unit_amount as number) / 100,
+          };
+        }
+      }
+
       return {
-        id: planObject.id,
-        currency: planObject.currency,
-        amount: planObject.unit_amount as number,
-        bytes: parseInt(planObject.metadata?.maxSpaceBytes),
-        interval: planObject.type === 'one_time' ? 'lifetime' : (planObject.recurring?.interval as 'year' | 'month'),
+        selectedPlan,
+        upsellPlan,
       };
     } catch (err) {
       const error = err as Error;
@@ -519,7 +547,7 @@ export class PaymentService {
     }
   }
 
-  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
     const { data } = await this.provider.promotionCodes.list({
       active: true,
       code: promoCodeName,
@@ -534,6 +562,12 @@ export class PaymentService {
     if (!lastActiveCoupon?.active) {
       throw new NotFoundPromoCodeByNameError(promoCodeName);
     }
+
+    return lastActiveCoupon;
+  }
+
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
 
     return {
       codeId: lastActiveCoupon.id,

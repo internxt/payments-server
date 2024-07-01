@@ -5,3 +5,8 @@ export interface DisplayPrice {
   amount: number;
   currency: string;
 }
+
+export interface RequestedPlan {
+  selectedPlan: DisplayPrice & { decimalAmount: number };
+  upsellPlan?: DisplayPrice & { decimalAmount: number };
+}

@@ -180,7 +180,7 @@ export default function (
               message: error.message,
             });
           }
-          req.log.error('[ERROR CREATING SUBSCRIPTION]: ', error.stack ?? error.message);
+          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',
@@ -638,7 +638,7 @@ export default function (
       }
     });
 
-    fastify.get<{ Querystring: { code: Coupon['code'] } }>(
+    fastify.get<{ Querystring: { code: Coupon['code'] | Stripe.PromotionCode['code'] } }>(
       '/coupon-in-use',
       {
         schema: {
@@ -664,12 +664,24 @@ export default function (
         }
 
         try {
-          const isBeingUsed = await usersService.isCouponBeingUsedByUser(user, code);
+          let isBeingUsed = await usersService.isCouponBeingUsedByUser(user, code);
+
+          if (!isBeingUsed) {
+            const stripePromotionCode = await paymentService.getPromotionCodeObject(code);
+
+            if (stripePromotionCode) {
+              isBeingUsed = await usersService.isCouponBeingUsedByUser(user, stripePromotionCode.coupon.id);
+            }
+          }
 
           return rep.status(200).send({ couponUsed: isBeingUsed });
         } catch (error) {
           const err = error as Error;
-          if (err instanceof LicenseCodeAlreadyAppliedError || err instanceof InvalidLicenseCodeError) {
+          if (
+            err instanceof LicenseCodeAlreadyAppliedError ||
+            err instanceof InvalidLicenseCodeError ||
+            err instanceof NotFoundPromoCodeByNameError
+          ) {
             return rep.status(404).send({ message: err.message });
           }
 

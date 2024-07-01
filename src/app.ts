@@ -31,13 +31,9 @@ export async function buildApp(
           : false,
     },
   });
-  fastify.register(
-    controller(paymentService, usersService, config, cacheService, licenseCodesService)
-  );
+  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
 
-  fastify.register(
-    controllerMigration(paymentService, usersService, config)
-  );
+  fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(webhook(stripe, storageService, usersService, paymentService, config, cacheService));
 
@@ -50,6 +46,7 @@ export async function buildApp(
       'internxt-version',
       'internxt-client',
       'internxt-mnemonic',
+      'x-csrf-token',
     ],
     exposedHeaders: ['sessionId'],
     origin: '*',
