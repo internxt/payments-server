@@ -584,20 +584,6 @@ export class PaymentService {
     return individualActiveSubscription;
   }
 
-// <<<<<<< HEAD
-//   private async findB2BActiveSubscription(customerId: CustomerId): Promise<Subscription> {
-//     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
-
-//     const b2bActiveSubscription = activeSubscriptions.find((subscription) => {
-//       const product = subscription.product;
-//       return product && product.metadata?.type === 'business';
-//     });
-//     if (!b2bActiveSubscription) {
-//       throw new NotFoundSubscriptionError('No B2B subscription found');
-//     }
-
-//     return b2bActiveSubscription;
-// =======
   private async findBusinessActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const products = await this.productsRepository.findByType(UserType.Business);
     const businessProductIds = products.map(product => product.paymentGatewayId);
@@ -612,7 +598,6 @@ export class PaymentService {
     }
 
     return businessSubscription;
-// >>>>>>> master
   }
 }
 
