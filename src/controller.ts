@@ -222,7 +222,7 @@ export default function (
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
-          // subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
+          subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
         } catch (err) {
           req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
           req.log.error(err);
@@ -239,10 +239,10 @@ export default function (
           response = await paymentService.getUserSubscription(user.customerId, userType);
         }
 
-        // cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
-        //   req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
-        //   req.log.error(err);
-        // });
+        cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
+          req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
+          req.log.error(err);
+        });
 
         return response;
       },
