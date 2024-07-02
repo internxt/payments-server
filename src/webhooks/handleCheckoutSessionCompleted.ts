@@ -5,6 +5,7 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
+import { UserType } from '../core/users/User';
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
@@ -105,13 +106,13 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    const type = product.metadata?.type === 'business' ? 'business' : 'individual';
+    const type = product.metadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
     await cacheService.clearSubscription(customer.id, type);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 
-  if (product.metadata?.type === 'business') {
+  if (product.metadata?.type === UserType.Business) {
     const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);

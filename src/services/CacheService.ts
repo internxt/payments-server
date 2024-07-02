@@ -1,10 +1,9 @@
-import { UserSubscription } from '../core/users/User';
+import { UserSubscription, UserType } from '../core/users/User';
 import Redis from 'ioredis';
 import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
 
-type SubscriptionType = 'individual' | 'business';
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
@@ -14,15 +13,15 @@ export default class CacheService {
         : new Redis({ host: config.REDIS_HOST });
   }
 
-  private buildSubscriptionKey(customerId: string, subscriptionType: SubscriptionType = 'individual'): string {
-    return `subscription-${customerId}-${subscriptionType}`;
+  private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {
+    return `subscription-${customerId}-${userType}`;
   }
 
   async getSubscription(
     customerId: string,
-    subscriptionType: SubscriptionType = 'individual',
+    userType: UserType = UserType.Individual,
   ): Promise<UserSubscription | null> {
-    const cachedSubscription = await this.redis.get(this.buildSubscriptionKey(customerId, subscriptionType));
+    const cachedSubscription = await this.redis.get(this.buildSubscriptionKey(customerId, userType));
 
     if (!cachedSubscription) {
       return null;
@@ -33,11 +32,11 @@ export default class CacheService {
 
   async setSubscription(
     customerId: string,
-    subscriptionType: SubscriptionType,
+    userType: UserType,
     subscription: UserSubscription,
   ): Promise<void> {
     await this.redis.set(
-      this.buildSubscriptionKey(customerId, subscriptionType),
+      this.buildSubscriptionKey(customerId, userType),
       JSON.stringify(subscription),
       'EX',
       SUBSCRIPTION_EXPIRATION_IN_SECONDS,
@@ -46,8 +45,8 @@ export default class CacheService {
 
   async clearSubscription(
     customerId: string,
-    subscriptionType: SubscriptionType = 'individual',
+    userType: UserType = UserType.Individual,
   ): Promise<void> {
-    await this.redis.del(this.buildSubscriptionKey(customerId, subscriptionType));
+    await this.redis.del(this.buildSubscriptionKey(customerId, userType));
   }
 }
