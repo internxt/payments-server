@@ -46,7 +46,6 @@ export async function buildApp(
       'internxt-version',
       'internxt-client',
       'internxt-mnemonic',
-      'x-csrf-token',
     ],
     exposedHeaders: ['sessionId'],
     origin: '*',
