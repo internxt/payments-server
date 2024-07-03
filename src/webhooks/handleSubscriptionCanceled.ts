@@ -1,3 +1,4 @@
+import { UserType } from './../core/users/User';
 import { FastifyLoggerInstance } from 'fastify';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/CacheService';
@@ -21,14 +22,14 @@ export default async function handleSubscriptionCanceled(
   const { uuid } = await usersService.findUserByCustomerID(customerId);
 
   const { metadata : productMetadata } = await paymentService.getProduct(productId);
-  const productType = productMetadata?.type === 'business' ? 'business' : 'individual';
+  const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
-  if (productType === 'business') {
+  if (productType === UserType.Business) {
     return usersService.destroyWorkspace(uuid);
   }
  

@@ -120,19 +120,19 @@ export default function (
     );
 
     fastify.delete<{
-      Querystring: { subscriptionType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business'; };
     }>(
       '/subscriptions',{
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        if (req.query.subscriptionType === 'business') {
+        if (req.query.userType === UserType.Business) {
           await usersService.cancelUserB2BSuscriptions(user.customerId);
         } else {
           await usersService.cancelUserIndividualSubscriptions(user.customerId);
@@ -142,19 +142,24 @@ export default function (
       },
     );
 
-    fastify.put<{ Body: { price_id: string; couponCode: string } }>(
+    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: 'individual' | 'business'; } }>(
       '/subscriptions',
       {
         schema: {
           body: {
             type: 'object',
             required: ['price_id'],
-            properties: { price_id: { type: 'string' }, couponCode: { type: 'string' } },
+            properties: {
+              price_id: { type: 'string' },
+              couponCode: { type: 'string' },
+              userType: { type: 'string', enum: ['individual', 'business'] },
+            },
           },
         },
       },
       async (req, rep) => {
         const { price_id: priceId, couponCode } = req.body;
+        const userType = req.body.userType as UserType || UserType.Individual
 
         const user = await assertUser(req, rep);
         const userUpdated = await paymentService.updateSubscriptionPrice({
@@ -163,7 +168,7 @@ export default function (
           couponCode: couponCode,
         });
 
-        const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
+        const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
         return rep.send({
           userSubscription: updatedSubscription,
           request3DSecure: userUpdated.is3DSecureRequired,
@@ -180,21 +185,21 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business'; };
     }>(
       '/default-payment-method',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { subscriptionType: { type: 'string', enum: ['individual', 'business'] } },
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
           },
         },
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        const subscriptionType = req.query.subscriptionType ?? 'individual';
-        return paymentService.getDefaultPaymentMethod(user.customerId, subscriptionType);
+        const userType = req.query.userType as UserType || UserType.Individual;
+        return paymentService.getDefaultPaymentMethod(user.customerId, userType);
       },
     );
 
@@ -214,7 +219,7 @@ export default function (
         let response: UserSubscription;
 
         const user: User = await assertUser(req, rep);
-        const userType = req.query.userType || UserType.Individual;
+        const userType = req.query.userType as UserType || UserType.Individual;
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
@@ -232,7 +237,7 @@ export default function (
         if (user.lifetime) {
           response = { type: 'lifetime' };
         } else {
-          response = await paymentService.getUserSubscription(user.customerId, userType as UserType);
+          response = await paymentService.getUserSubscription(user.customerId, userType);
         }
 
         cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
@@ -262,19 +267,19 @@ export default function (
     }
 
     fastify.get<{
-      Querystring: { currency?: string; subscriptionType?: 'individual' | 'business' };
+      Querystring: { currency?: string; userType?: 'individual' | 'business' };
       schema: {
         querystring: {
           type: 'object';
           properties: {
             currency: { type: 'string' };
-            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
+            userType: { type: 'string'; enum: ['individual', 'business'] };
           };
         };
       };
     }>('/prices', async (req, rep) => {
       const { currency } = req.query;
-      const subscriptionType = req.query.subscriptionType ?? 'individual';
+      const userType = req.query.userType as UserType || UserType.Individual;
 
       const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -282,7 +287,7 @@ export default function (
         return rep.status(400).send({ message: errorMessage });
       }
 
-      return paymentService.getPrices(currencyValue, subscriptionType);
+      return paymentService.getPrices(currencyValue, userType);
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {

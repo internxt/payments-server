@@ -1,3 +1,5 @@
+import { PlanSubscription } from "../../services/PaymentService";
+
 export interface User {
   id: string;
   customerId: string;
@@ -7,7 +9,7 @@ export interface User {
 
 export enum UserType {
   Individual = 'individual',
-  Business = 'business'
+  Business = 'business',
 }
 
 export type UserSubscription =
@@ -21,5 +23,6 @@ export type UserSubscription =
       nextPayment: number;
       priceId: string;
       planId?: string;
-      userType?: UserType
+      userType?: UserType;
+      plan: PlanSubscription;
     };

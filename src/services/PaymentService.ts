@@ -53,6 +53,31 @@ export type PriceMetadata = {
   planType: 'subscription' | 'one_time';
 };
 
+export enum RenewalPeriod {
+  Monthly = 'monthly',
+  Semiannually = 'semiannually',
+  Annually = 'annually',
+  Lifetime = 'lifetime',
+};
+
+export interface PlanSubscription {
+  status: string;
+  planId: string;
+  productId: string;
+  name: string;
+  simpleName: string;
+  type: UserType;
+  price: number;
+  monthlyPrice: number;
+  currency: string;
+  isTeam: boolean;
+  paymentInterval: string;
+  isLifetime: boolean;
+  renewalPeriod: RenewalPeriod;
+  storageLimit: number;
+  amountOfSeats: number;
+}
+
 export class PaymentService {
   private readonly provider: Stripe;
   private readonly productsRepository: ProductsRepository;
@@ -346,15 +371,15 @@ export class PaymentService {
    */
   async getDefaultPaymentMethod(
     customerId: CustomerId,
-    subscriptionType: 'individual' | 'business' = 'individual',
+    userType: UserType = UserType.Individual,
   ): Promise<PaymentMethod | CustomerSource | null> {
     let subscriptions = await this.getActiveSubscriptions(customerId);
     if (subscriptions.length === 0)
       return null;
 
-    subscriptions = subscriptionType == 'business'
-      ? subscriptions.filter(subs => subs.product?.metadata?.type == "business")
-      : subscriptions.filter(subs => subs.product?.metadata?.type != "business");
+    subscriptions = userType == UserType.Business
+      ? subscriptions.filter(subs => subs.product?.metadata?.type == UserType.Business)
+      : subscriptions.filter(subs => subs.product?.metadata?.type != UserType.Business);
 
     const subscriptionWithDefaultPaymentMethod = subscriptions.find(
       (subscription) => subscription.default_payment_method,
@@ -382,7 +407,7 @@ export class PaymentService {
   }
 
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
-    let subscription;
+    let subscription: any;
     try {
       if (userType === UserType.Business) {
         subscription = await this.findBusinessActiveSubscription(customerId);
@@ -399,6 +424,31 @@ export class PaymentService {
 
     const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
 
+    const storageLimit = Number(subscription.plan.product.metadata.size_bytes || subscription.plan.product.metadata.maxSpaceBytes || subscription.plan.metadata.size_bytes || subscription.plan.metadata.maxSpaceBytes) || 0;
+    const item = subscription.items.data[0] as Stripe.SubscriptionItem;
+
+    const plan: PlanSubscription = {
+      status: subscription.status,
+      planId: subscription.plan.id,
+      productId: subscription.plan.product.id,
+      name: subscription.plan.product.name,
+      simpleName: subscription.plan.product.metadata.simple_name,
+      type: subscription.plan.product.metadata.type || UserType.Individual,
+      price: subscription.plan.amount * 0.01,
+      monthlyPrice: this.getMonthlyAmount(
+        subscription.plan.amount * 0.01,
+        subscription.plan.interval_count,
+        subscription.plan.interval,
+      ),
+      currency: subscription.plan.currency,
+      isTeam: !!subscription.plan.product.metadata.is_teams,
+      paymentInterval: subscription.plan.nickname,
+      isLifetime: false,
+      renewalPeriod: this.getRenewalPeriod(subscription.plan.intervalCount, subscription.plan.interval),
+      storageLimit: storageLimit,
+      amountOfSeats: item.quantity || 1,
+    }
+
     const { price } = subscription.items.data[0];
 
     return {
@@ -411,12 +461,13 @@ export class PaymentService {
       priceId: price.id,
       planId: price?.product as string,
       userType,
+      plan,
     };
   }
 
   async getPrices(
     currency?: string,
-    subscriptionType: 'business' | 'individual' = 'individual',
+    userType: UserType = UserType.Individual,
   ): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
 
@@ -429,12 +480,12 @@ export class PaymentService {
     return res.data
       .filter((price) => {
         const priceProductType =
-          ((price.product as Stripe.Product).metadata.type as 'business' | 'individual' | undefined) ?? 'individual';
+          ((price.product as Stripe.Product).metadata.type as UserType) || UserType.Individual;
         return (
           price.metadata.maxSpaceBytes &&
           price.currency_options &&
           price.currency_options[currencyValue].unit_amount &&
-          priceProductType === subscriptionType
+          priceProductType === userType
         );
       })
       .map((price) => {
@@ -594,10 +645,38 @@ export class PaymentService {
       (subscription) => businessProductIds.includes(subscription.items.data[0].price.product.toString()),
     );
     if (!businessSubscription) {
-      throw new NotFoundSubscriptionError('There is no individual subscription to update');
+      throw new NotFoundSubscriptionError('There is no business subscription to update');
     }
 
     return businessSubscription;
+  }
+
+  private getMonthCount(intervalCount: number, timeInterval: string): number {
+    const byTimeIntervalCalculator: any = {
+      "month": (): number => intervalCount,
+      "year": (): number => intervalCount * 12,
+    };
+
+    return byTimeIntervalCalculator[timeInterval]();
+  }
+
+  private getMonthlyAmount(totalPrice: number, intervalCount: number, timeInterval: string): number {
+    const monthCount = this.getMonthCount(intervalCount, timeInterval);
+    const monthlyPrice = totalPrice / monthCount;
+
+    return monthlyPrice;
+  }
+
+  private getRenewalPeriod(intervalCount: number, interval: string): RenewalPeriod {
+    let renewalPeriod = RenewalPeriod.Monthly;
+
+    if (interval === 'month' && intervalCount === 6) {
+      renewalPeriod = RenewalPeriod.Semiannually;
+    } else if (interval === 'year') {
+      renewalPeriod = RenewalPeriod.Annually;
+    }
+
+    return renewalPeriod;
   }
 }
 
