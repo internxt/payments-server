@@ -120,7 +120,7 @@ export default function (
     );
 
     fastify.delete<{
-      Querystring: { userType?: UserType; };
+      Querystring: { userType?: 'individual' | 'business'; };
     }>(
       '/subscriptions',{
         schema: {
@@ -142,7 +142,7 @@ export default function (
       },
     );
 
-    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: UserType; } }>(
+    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: 'individual' | 'business'; } }>(
       '/subscriptions',
       {
         schema: {
@@ -158,7 +158,8 @@ export default function (
         },
       },
       async (req, rep) => {
-        const { price_id: priceId, couponCode, userType } = req.body;
+        const { price_id: priceId, couponCode } = req.body;
+        const userType = req.body.userType as UserType || UserType.Individual
 
         const user = await assertUser(req, rep);
         const userUpdated = await paymentService.updateSubscriptionPrice({
@@ -167,7 +168,7 @@ export default function (
           couponCode: couponCode,
         });
 
-        const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType || UserType.Individual);
+        const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
         return rep.send({
           userSubscription: updatedSubscription,
           request3DSecure: userUpdated.is3DSecureRequired,
@@ -184,7 +185,7 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { userType?: UserType; };
+      Querystring: { userType?: 'individual' | 'business'; };
     }>(
       '/default-payment-method',
       {
@@ -197,13 +198,13 @@ export default function (
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        const userType = req.query.userType || UserType.Individual;
+        const userType = req.query.userType as UserType || UserType.Individual;
         return paymentService.getDefaultPaymentMethod(user.customerId, userType);
       },
     );
 
     fastify.get<{
-      Querystring: { userType?: UserType };
+      Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/subscriptions',
       {
@@ -218,7 +219,7 @@ export default function (
         let response: UserSubscription;
 
         const user: User = await assertUser(req, rep);
-        const userType = req.query.userType || UserType.Individual;
+        const userType = req.query.userType as UserType || UserType.Individual;
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
@@ -266,7 +267,7 @@ export default function (
     }
 
     fastify.get<{
-      Querystring: { currency?: string; userType?: UserType };
+      Querystring: { currency?: string; userType?: 'individual' | 'business' };
       schema: {
         querystring: {
           type: 'object';
@@ -278,7 +279,7 @@ export default function (
       };
     }>('/prices', async (req, rep) => {
       const { currency } = req.query;
-      const userType = req.query.userType || UserType.Individual;
+      const userType = req.query.userType as UserType || UserType.Individual;
 
       const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 

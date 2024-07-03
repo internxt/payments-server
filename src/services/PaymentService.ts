@@ -60,6 +60,24 @@ export enum RenewalPeriod {
   Lifetime = 'lifetime',
 };
 
+export interface PlanSubscription {
+  status: string;
+  planId: string;
+  productId: string;
+  name: string;
+  simpleName: string;
+  type: UserType;
+  price: number;
+  monthlyPrice: number;
+  currency: string;
+  isTeam: boolean;
+  paymentInterval: string;
+  isLifetime: boolean;
+  renewalPeriod: RenewalPeriod;
+  storageLimit: number;
+  amountOfSeats: number;
+}
+
 export class PaymentService {
   private readonly provider: Stripe;
   private readonly productsRepository: ProductsRepository;
@@ -409,7 +427,7 @@ export class PaymentService {
     const storageLimit = Number(subscription.plan.product.metadata.size_bytes || subscription.plan.product.metadata.maxSpaceBytes || subscription.plan.metadata.size_bytes || subscription.plan.metadata.maxSpaceBytes) || 0;
     const item = subscription.items.data[0] as Stripe.SubscriptionItem;
 
-    const plan = {
+    const plan: PlanSubscription = {
       status: subscription.status,
       planId: subscription.plan.id,
       productId: subscription.plan.product.id,
@@ -443,7 +461,7 @@ export class PaymentService {
       priceId: price.id,
       planId: price?.product as string,
       userType,
-      plan, 
+      plan,
     };
   }
 

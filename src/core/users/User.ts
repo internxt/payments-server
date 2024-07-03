@@ -1,3 +1,5 @@
+import { PlanSubscription } from "../../services/PaymentService";
+
 export interface User {
   id: string;
   customerId: string;
@@ -22,5 +24,5 @@ export type UserSubscription =
       priceId: string;
       planId?: string;
       userType?: UserType;
-      plan: any;
+      plan: PlanSubscription;
     };
