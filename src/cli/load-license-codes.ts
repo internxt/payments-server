@@ -21,6 +21,8 @@ import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
 import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
+import { ProductsRepository } from '../core/users/ProductsRepository';
+import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -62,8 +64,9 @@ async function main() {
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
+    const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
 
-    const paymentService = new PaymentService(stripe);
+    const paymentService = new PaymentService(stripe, productsRepository);
     const usersService = new UsersService(
       usersRepository,
       paymentService,
