@@ -16,6 +16,7 @@ export type UserSubscription =
   | { type: 'free' | 'lifetime' }
   | {
       type: 'subscription';
+      subscriptionId: string;
       amount: number;
       currency: string;
       amountAfterCoupon?: number;

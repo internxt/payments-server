@@ -112,6 +112,8 @@ export default function (
               created: invoice.created,
               pdf: invoice.invoice_pdf,
               bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+              total: invoice.total,
+              currency: invoice.currency,
             };
           });
 
@@ -178,13 +180,21 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { subscriptionType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business'; };
     }>(
       '/setup-intent',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        const { subscriptionType } = req.query;
-        const metadata: Stripe.MetadataParam = subscriptionType ? { subscriptionType } : {};
+        const userType = req.query.userType as UserType || UserType.Individual;
+        const metadata: Stripe.MetadataParam = { userType };
         const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId, metadata);
 
         return { clientSecret };

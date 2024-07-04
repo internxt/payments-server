@@ -267,10 +267,10 @@ export class PaymentService {
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
     paymentMethodId: PaymentMethod['id'],
-    subscriptionType: 'individual' | 'business' = 'individual',
+    userType: UserType = UserType.Individual,
   ): Promise<Subscription> {
-    const { id: subscriptionId } = subscriptionType == 'business'
-      ? await this.findB2BActiveSubscription(customerId)
+    const { id: subscriptionId } = userType == UserType.Business
+      ? await this.findBusinessActiveSubscription(customerId)
       : await this.findIndividualActiveSubscription(customerId);
 
     if (!subscriptionId)
@@ -469,6 +469,7 @@ export class PaymentService {
 
     return {
       type: 'subscription',
+      subscriptionId: subscription.id,
       amount: price.unit_amount!,
       currency: price.currency,
       interval: price.recurring!.interval as 'year' | 'month',

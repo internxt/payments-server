@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import { PaymentService } from '../services/PaymentService';
-
-type SubscriptionType = 'individual' | 'business';
+import { UserType } from '../core/users/User';
 
 export default async function handleSetupIntentSucceded(
   setupIntent: Stripe.SetupIntent,
@@ -9,12 +8,11 @@ export default async function handleSetupIntentSucceded(
 ): Promise<void> {
   const customerId = setupIntent.customer as string;
   const paymentMethodId = setupIntent.payment_method as string;
-  const setupIntentMetdata = setupIntent.metadata as Stripe.Metadata;
+  const setupIntentMetadata = setupIntent.metadata as Stripe.Metadata;
   
-  const subscriptionType: SubscriptionType = setupIntentMetdata?.subscriptionType as SubscriptionType;
-  const setupSubscriptionPayment = subscriptionType === 'business' || subscriptionType === 'individual';
+  const userType = setupIntentMetadata?.userType as UserType;
 
-  if (setupSubscriptionPayment) {
-    await paymentService.updateSubscriptionPaymentMethod(customerId, paymentMethodId, subscriptionType);
+  if ([UserType.Individual, UserType.Business].includes(userType)) {
+    await paymentService.updateSubscriptionPaymentMethod(customerId, paymentMethodId, userType);
   }
 }

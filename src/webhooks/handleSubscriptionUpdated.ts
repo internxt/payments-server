@@ -6,6 +6,7 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { StorageService, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import { AppConfig } from '../config';
+import { UserType } from '../core/users/User';
 
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
@@ -24,7 +25,7 @@ export default async function handleSubscriptionUpdated(
 
   const productId = subscription.items.data[0].price.product as string;
   const { metadata : productMetadata } = await paymentService.getProduct(productId);
-  const productType = productMetadata?.type === 'business' ? 'business' : 'individual';
+  const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   try {
     await cacheService.clearSubscription(customerId, productType);
@@ -32,7 +33,7 @@ export default async function handleSubscriptionUpdated(
     log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }
 
-  if (productType == 'business') {
+  if (productType == UserType.Business) {
     const customer = await paymentService.getCustomer(customerId);
     if (customer.deleted) {
       log.error(

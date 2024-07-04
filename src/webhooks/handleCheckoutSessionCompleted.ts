@@ -25,6 +25,7 @@ export default async function handleCheckoutSessionCompleted(
 
   const price = lineItems.data[0].price;
   const product = price?.product as Stripe.Product;
+  const userType = product.metadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
@@ -48,71 +49,73 @@ export default async function handleCheckoutSessionCompleted(
     return;
   }
 
-  let user: { uuid: string };
-  try {
-    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
-    user = res.data.user;
-  } catch (err) {
-    log.error(
-      `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
-    );
-    log.error(err);
+  if (userType === UserType.Individual) {
+    let user: { uuid: string };
+    try {
+      const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
+      user = res.data.user;
+    } catch (err) {
+      log.error(
+        `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+      );
+      log.error(err);
 
-    throw err;
-  }
+      throw err;
+    }
 
-  try {
-    await updateUserTier(user.uuid, product.id, config);
-  } catch (err) {
-    log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
-    log.error(err);
+    try {
+      await updateUserTier(user.uuid, product.id, config);
+    } catch (err) {
+      log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
+      log.error(err);
 
-    throw err;
-  }
+      throw err;
+    }
 
-  try {
-    const { customerId } = await usersService.findUserByUuid(user.uuid);
-    if ((price.metadata as PriceMetadata).planType === 'one_time') {
-      await usersService.updateUser(customerId, {
+    try {
+      const { customerId } = await usersService.findUserByUuid(user.uuid);
+      if ((price.metadata as PriceMetadata).planType === 'one_time') {
+        await usersService.updateUser(customerId, {
+          lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+        });
+      }
+    } catch {
+      await usersService.insertUser({
+        customerId: customer.id,
+        uuid: user.uuid,
         lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
       });
     }
-  } catch {
-    await usersService.insertUser({
-      customerId: customer.id,
-      uuid: user.uuid,
-      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
-    });
-  }
 
-  try {
-    if (session.total_details?.amount_discount) {
-      const userData = await usersService.findUserByUuid(user.uuid);
+    try {
+      if (session.total_details?.amount_discount) {
+        const userData = await usersService.findUserByUuid(user.uuid);
 
-      const invoice = await stripe.invoices.retrieve(session.invoice as string);
+        const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-      const couponId = invoice.discount?.coupon.id;
+        const couponId = invoice.discount?.coupon.id;
 
-      if (couponId) {
-        await usersService.storeCouponUsedByUser(userData, couponId);
+        if (couponId) {
+          await usersService.storeCouponUsedByUser(userData, couponId);
+        }
+      }
+    } catch (err) {
+      const error = err as Error;
+      if (!(err instanceof CouponNotBeingTrackedError)) {
+        log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
+        log.error(error);
       }
     }
-  } catch (err) {
-    const error = err as Error;
-    if (!(err instanceof CouponNotBeingTrackedError)) {
-      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
-      log.error(error);
-    }
   }
 
   try {
-    const type = product.metadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
-    await cacheService.clearSubscription(customer.id, type);
+    await cacheService.clearSubscription(customer.id, userType);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 
-  if (product.metadata?.type === UserType.Business) {
+  if (userType === UserType.Business) {
+    const user = await usersService.findUserByCustomerID(customer.id);
     const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);
