@@ -33,7 +33,7 @@ export default async function handleSubscriptionUpdated(
     log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }
 
-  if (productType == UserType.Business) {
+  if (productType === UserType.Business) {
     const customer = await paymentService.getCustomer(customerId);
     if (customer.deleted) {
       log.error(
