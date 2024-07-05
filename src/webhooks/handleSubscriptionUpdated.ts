@@ -23,6 +23,8 @@ export default async function handleSubscriptionUpdated(
     return;
   }
 
+  const isSubscriptionCanceled = subscription.status === 'canceled';
+
   const productId = subscription.items.data[0].price.product as string;
   const { metadata : productMetadata } = await paymentService.getProduct(productId);
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
@@ -34,6 +36,11 @@ export default async function handleSubscriptionUpdated(
   }
 
   if (productType === UserType.Business) {
+
+    if (isSubscriptionCanceled) {
+      return usersService.destroyWorkspace(uuid);
+    }
+
     const customer = await paymentService.getCustomer(customerId);
     if (customer.deleted) {
       log.error(
@@ -48,7 +55,6 @@ export default async function handleSubscriptionUpdated(
     return usersService.updateWorkspaceStorage(uuid, totalSpaceBytes);
   }
 
-  const isSubscriptionCanceled = subscription.status === 'canceled';
   const bytesSpace = isSubscriptionCanceled
     ? FREE_PLAN_BYTES_SPACE
     : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
