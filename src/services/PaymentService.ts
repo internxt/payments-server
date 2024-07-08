@@ -266,14 +266,26 @@ export class PaymentService {
 
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
-    paymentMethod: PaymentMethod['id'],
+    paymentMethodId: PaymentMethod['id'],
+    userType: UserType = UserType.Individual,
   ): Promise<Subscription> {
-    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
-    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
-      default_payment_method: paymentMethod,
-    });
+    const { id: subscriptionId } = userType === UserType.Business
+      ? await this.findBusinessActiveSubscription(customerId)
+      : await this.findIndividualActiveSubscription(customerId);
 
-    return updatedSubscription;
+    if (!subscriptionId)
+      throw new Error('Subscription not found');
+
+    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
+      customer: customerId,
+    })
+
+    if (!id || !customer)
+      throw new Error('Payment method not attached');    
+
+    return this.provider.subscriptions.update(subscriptionId, {
+      default_payment_method: id,
+    });
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
@@ -358,8 +370,12 @@ export class PaymentService {
     }
   }
 
-  getSetupIntent(customerId: string): Promise<SetupIntent> {
-    return this.provider.setupIntents.create({ customer: customerId, usage: 'off_session' });
+  getSetupIntent(customerId: string, metadata: Stripe.MetadataParam): Promise<SetupIntent> {
+    return this.provider.setupIntents.create({
+      customer: customerId,
+      usage: 'off_session',
+      metadata,
+    });
   }
 
   /*
@@ -377,9 +393,9 @@ export class PaymentService {
     if (subscriptions.length === 0)
       return null;
 
-    subscriptions = userType == UserType.Business
-      ? subscriptions.filter(subs => subs.product?.metadata?.type == UserType.Business)
-      : subscriptions.filter(subs => subs.product?.metadata?.type != UserType.Business);
+    subscriptions = userType === UserType.Business
+      ? subscriptions.filter(subs => subs.product?.metadata?.type === UserType.Business)
+      : subscriptions.filter(subs => subs.product?.metadata?.type !== UserType.Business);
 
     const subscriptionWithDefaultPaymentMethod = subscriptions.find(
       (subscription) => subscription.default_payment_method,
@@ -401,7 +417,7 @@ export class PaymentService {
   }
 
   getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
-    return typeof paymentMethod == 'string'
+    return typeof paymentMethod === 'string'
       ? this.provider.paymentMethods.retrieve(paymentMethod)
       : this.provider.paymentMethods.retrieve(paymentMethod.id);
   }
@@ -453,6 +469,7 @@ export class PaymentService {
 
     return {
       type: 'subscription',
+      subscriptionId: subscription.id,
       amount: price.unit_amount!,
       currency: price.currency,
       interval: price.recurring!.interval as 'year' | 'month',
