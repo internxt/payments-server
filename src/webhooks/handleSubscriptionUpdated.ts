@@ -6,7 +6,7 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { StorageService, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import { AppConfig } from '../config';
-import { User, UserType } from '../core/users/User';
+import { UserType } from '../core/users/User';
 
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,

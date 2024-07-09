@@ -225,10 +225,13 @@ export class UsersService {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
       },
+      params: {
+        email,
+      }
     };
 
     return this.axios.get(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${email}`,
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`,
       requestConfig,
     );
   }
