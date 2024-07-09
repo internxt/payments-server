@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
-import { createOrUpdateUser, updateUserTier, findUserByEmail } from '../services/StorageService';
+import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
 import { UserType } from '../core/users/User';
 
@@ -80,8 +80,8 @@ export default async function handleCheckoutSessionCompleted(
       user = await usersService.findUserByCustomerID(customer.id);
     } catch (err) {
       if (email) {
-        const response = await findUserByEmail(email, config);
-        user = response.data.user;
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
       } else {
         log.error(
           `Error searching for an user by email in checkout session completed handler, email: ${email}`,
