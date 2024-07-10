@@ -49,8 +49,8 @@ export default async function handleCheckoutSessionCompleted(
     return;
   }
 
+  let user: { uuid: string } | null = null;
   if (userType === UserType.Individual) {
-    let user: { uuid: string };
     try {
       const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
       user = res.data.user;
@@ -63,48 +63,74 @@ export default async function handleCheckoutSessionCompleted(
       throw err;
     }
 
-    try {
-      await updateUserTier(user.uuid, product.id, config);
-    } catch (err) {
-      log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
-      log.error(err);
+    if (user) {
+      try {
+        await updateUserTier(user.uuid, product.id, config);
+      } catch (err) {
+        log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
+        log.error(err);
 
-      throw err;
-    }
-
-    try {
-      const { customerId } = await usersService.findUserByUuid(user.uuid);
-      if ((price.metadata as PriceMetadata).planType === 'one_time') {
-        await usersService.updateUser(customerId, {
-          lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
-        });
+        throw err;
       }
-    } catch {
-      await usersService.insertUser({
-        customerId: customer.id,
-        uuid: user.uuid,
+    }
+  } else {
+    const email = customer.email || session.customer_email;
+    
+    try {
+      user = await usersService.findUserByCustomerID(customer.id);
+    } catch (err) {
+      if (email) {
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
+      } else {
+        log.error(
+          `Error searching for an user by email in checkout session completed handler, email: ${email}`,
+        );
+        log.error(err);
+        throw err;
+      }
+    }
+  }
+
+  if (!user) {
+    log.error(
+      `Error searching for user in checkout session completed handler, email: ${session.customer_email}`,
+    );
+    return;
+  }
+
+  try {
+    const { customerId } = await usersService.findUserByUuid(user.uuid);
+    if ((price.metadata as PriceMetadata).planType === 'one_time') {
+      await usersService.updateUser(customerId, {
         lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
       });
     }
+  } catch {
+    await usersService.insertUser({
+      customerId: customer.id,
+      uuid: user.uuid,
+      lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
+    });
+  }
 
-    try {
-      if (session.total_details?.amount_discount) {
-        const userData = await usersService.findUserByUuid(user.uuid);
+  try {
+    if (session.total_details?.amount_discount) {
+      const userData = await usersService.findUserByUuid(user.uuid);
 
-        const invoice = await stripe.invoices.retrieve(session.invoice as string);
+      const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-        const couponId = invoice.discount?.coupon.id;
+      const couponId = invoice.discount?.coupon.id;
 
-        if (couponId) {
-          await usersService.storeCouponUsedByUser(userData, couponId);
-        }
+      if (couponId) {
+        await usersService.storeCouponUsedByUser(userData, couponId);
       }
-    } catch (err) {
-      const error = err as Error;
-      if (!(err instanceof CouponNotBeingTrackedError)) {
-        log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
-        log.error(error);
-      }
+    }
+  } catch (err) {
+    const error = err as Error;
+    if (!(err instanceof CouponNotBeingTrackedError)) {
+      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
+      log.error(error);
     }
   }
 
@@ -115,7 +141,6 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   if (userType === UserType.Business) {
-    const user = await usersService.findUserByCustomerID(customer.id);
     const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);

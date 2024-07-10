@@ -217,6 +217,24 @@ export class UsersService {
       requestConfig,
     );
   }
+
+  async findUserByEmail(email: string): Promise<{data:{ uuid: string; email: string; }}> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      params: {
+        email,
+      }
+    };
+
+    return this.axios.get(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`,
+      requestConfig,
+    );
+  }
 }
 
 export class UserNotFoundError extends Error {}
