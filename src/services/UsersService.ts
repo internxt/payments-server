@@ -89,10 +89,26 @@ export class UsersService {
     }
 
     const individualSubscriptions = activeSubscriptions.filter(
-      (subscription) => subscription.metadata.is_teams !== '1',
+      (subscription) => subscription.product?.metadata.type !== 'business',
     ) as Stripe.Subscription[];
 
     for (const subscriptionToCancel of individualSubscriptions) {
+      await this.paymentService.cancelSubscription(subscriptionToCancel.id);
+    }
+  }
+
+  async cancelUserB2BSuscriptions(customerId: User['customerId']): Promise<void> {
+    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
+
+    if (activeSubscriptions.length === 0) {
+      throw new Error('Subscriptions not found');
+    }
+
+    let b2bSubscriptions = activeSubscriptions.filter(
+      (subs) => subs.product?.metadata.type === 'business',
+    ) as Stripe.Subscription[];
+
+    for (const subscriptionToCancel of b2bSubscriptions) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
   }
@@ -145,7 +161,7 @@ export class UsersService {
     return !!userCouponEntry;
   }
 
-  async initializeWorkspace(ownerId: string, newStorageBytes: number, address?: string): Promise<void> {
+  async initializeWorkspace(ownerId: string, newStorageBytes: number, seats: number, address?: string): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
@@ -158,10 +174,65 @@ export class UsersService {
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
       {
         ownerId,
-        maxSpaceBytes: newStorageBytes,
+        maxSpaceBytes: newStorageBytes * seats,
         address: address,
       },
       params,
+    );
+  }
+
+  async updateWorkspaceStorage(ownerId: string, maxSpaceBytes: number): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        ownerId,
+        maxSpaceBytes,
+      },
+    };
+
+    await this.axios.put(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`,
+      requestConfig,
+    );
+  }
+
+  async destroyWorkspace(ownerId: string): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        ownerId,
+      }
+    };
+
+    await this.axios.delete(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
+      requestConfig,
+    );
+  }
+
+  async findUserByEmail(email: string): Promise<{data:{ uuid: string; email: string; }}> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      params: {
+        email,
+      }
+    };
+
+    return this.axios.get(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`,
+      requestConfig,
     );
   }
 }
