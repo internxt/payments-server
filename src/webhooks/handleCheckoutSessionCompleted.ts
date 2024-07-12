@@ -20,6 +20,7 @@ export default async function handleCheckoutSessionCompleted(
     log.info(`Checkout processed without action, ${session.customer_email} has not paid successfully`);
     return;
   }
+  console.log('[DEBUG CHKOUT PAYMENTS] checkout session completed');
 
   const lineItems = await paymentService.getLineItems(session.id);
 
@@ -28,11 +29,13 @@ export default async function handleCheckoutSessionCompleted(
   const userType = product.metadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   if (!price) {
+    console.log('[DEBUG CHKOUT PAYMENTS] price not found');
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
     return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
+    console.log('[DEBUG CHKOUT PAYMENTS] maxSpaceBytes not found');
     log.error(
       `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
     );
@@ -43,6 +46,7 @@ export default async function handleCheckoutSessionCompleted(
 
   const customer = await paymentService.getCustomer(session.customer as string);
   if (customer.deleted) {
+    console.log('[DEBUG CHKOUT PAYMENTS] customer deleted');
     log.error(
       `Customer object could not be retrieved in checkout session completed handler with id ${session.customer}`,
     );
@@ -55,6 +59,7 @@ export default async function handleCheckoutSessionCompleted(
       const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
       user = res.data.user;
     } catch (err) {
+      console.log('[DEBUG CHKOUT PAYMENTS] error creating or updating user');
       log.error(
         `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
       );
@@ -67,6 +72,7 @@ export default async function handleCheckoutSessionCompleted(
       try {
         await updateUserTier(user.uuid, product.id, config);
       } catch (err) {
+        console.log('[DEBUG CHKOUT PAYMENTS] error updating user tier');
         log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
         log.error(err);
 
@@ -75,7 +81,7 @@ export default async function handleCheckoutSessionCompleted(
     }
   } else {
     const email = customer.email || session.customer_email;
-    
+
     try {
       user = await usersService.findUserByCustomerID(customer.id);
     } catch (err) {
@@ -83,9 +89,8 @@ export default async function handleCheckoutSessionCompleted(
         const response = await usersService.findUserByEmail(email);
         user = response.data;
       } else {
-        log.error(
-          `Error searching for an user by email in checkout session completed handler, email: ${email}`,
-        );
+        console.log('[DEBUG CHKOUT PAYMENTS] error searching for user by email');
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
         log.error(err);
         throw err;
       }
@@ -93,20 +98,21 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   if (!user) {
-    log.error(
-      `Error searching for user in checkout session completed handler, email: ${session.customer_email}`,
-    );
+    console.log('[DEBUG CHKOUT PAYMENTS] user not found');
+    log.error(`Error searching for user in checkout session completed handler, email: ${session.customer_email}`);
     return;
   }
 
   try {
     const { customerId } = await usersService.findUserByUuid(user.uuid);
     if ((price.metadata as PriceMetadata).planType === 'one_time') {
+      console.log('[DEBUG CHKOUT PAYMENTS] updating user');
       await usersService.updateUser(customerId, {
         lifetime: (price.metadata as PriceMetadata).planType === 'one_time',
       });
     }
   } catch {
+    console.log('[DEBUG CHKOUT PAYMENTS] inserting user');
     await usersService.insertUser({
       customerId: customer.id,
       uuid: user.uuid,
@@ -143,6 +149,7 @@ export default async function handleCheckoutSessionCompleted(
   if (userType === UserType.Business) {
     const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
+    console.log('[DEBUG CHKOUT PAYMENTS] attempting to initialize workspace');
     await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);
   }
 }
