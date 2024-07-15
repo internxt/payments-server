@@ -104,7 +104,7 @@ export class UsersService {
       throw new Error('Subscriptions not found');
     }
 
-    let b2bSubscriptions = activeSubscriptions.filter(
+    const b2bSubscriptions = activeSubscriptions.filter(
       (subs) => subs.product?.metadata.type === 'business',
     ) as Stripe.Subscription[];
 
@@ -176,12 +176,13 @@ export class UsersService {
         ownerId,
         maxSpaceBytes: newStorageBytes * seats,
         address: address,
+        numberOfSeats: seats,
       },
       params,
     );
   }
 
-  async updateWorkspaceStorage(ownerId: string, maxSpaceBytes: number): Promise<void> {
+  async updateWorkspaceStorage(ownerId: string, maxSpaceBytes: number, seats: number): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -190,14 +191,12 @@ export class UsersService {
       },
       data: {
         ownerId,
-        maxSpaceBytes,
+        maxSpaceBytes: maxSpaceBytes * seats,
+        numberOfSeats: seats,
       },
     };
 
-    await this.axios.put(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`,
-      requestConfig,
-    );
+    await this.axios.put(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`, requestConfig);
   }
 
   async destroyWorkspace(ownerId: string): Promise<void> {
@@ -209,16 +208,13 @@ export class UsersService {
       },
       data: {
         ownerId,
-      }
+      },
     };
 
-    await this.axios.delete(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
-      requestConfig,
-    );
+    await this.axios.delete(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`, requestConfig);
   }
 
-  async findUserByEmail(email: string): Promise<{data:{ uuid: string; email: string; }}> {
+  async findUserByEmail(email: string): Promise<{ data: { uuid: string; email: string } }> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -227,13 +223,10 @@ export class UsersService {
       },
       params: {
         email,
-      }
+      },
     };
 
-    return this.axios.get(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`,
-      requestConfig,
-    );
+    return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
   }
 }
 

@@ -26,7 +26,7 @@ export default async function handleSubscriptionUpdated(
   const isSubscriptionCanceled = subscription.status === 'canceled';
 
   const productId = subscription.items.data[0].price.product as string;
-  const { metadata : productMetadata } = await paymentService.getProduct(productId);
+  const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   try {
@@ -36,23 +36,19 @@ export default async function handleSubscriptionUpdated(
   }
 
   if (productType === UserType.Business) {
-
     if (isSubscriptionCanceled) {
       return usersService.destroyWorkspace(uuid);
     }
 
     const customer = await paymentService.getCustomer(customerId);
     if (customer.deleted) {
-      log.error(
-        `Customer object could not be retrieved in subscription updated handler with id ${customer.id}`,
-      );
+      log.error(`Customer object could not be retrieved in subscription updated handler with id ${customer.id}`);
       return;
     }
     const { maxSpaceBytes: priceMaxSpaceBytes } = subscription.items.data[0].price.metadata as PriceMetadata;
     const amountOfSeats = subscription.items.data[0]!.quantity!;
 
-    const totalSpaceBytes = parseInt(priceMaxSpaceBytes) * amountOfSeats;
-    return usersService.updateWorkspaceStorage(uuid, totalSpaceBytes);
+    return usersService.updateWorkspaceStorage(uuid, parseInt(priceMaxSpaceBytes), amountOfSeats);
   }
 
   const bytesSpace = isSubscriptionCanceled
