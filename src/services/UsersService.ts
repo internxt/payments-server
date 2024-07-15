@@ -104,7 +104,7 @@ export class UsersService {
       throw new Error('Subscriptions not found');
     }
 
-    let b2bSubscriptions = activeSubscriptions.filter(
+    const b2bSubscriptions = activeSubscriptions.filter(
       (subs) => subs.product?.metadata.type === 'business',
     ) as Stripe.Subscription[];
 
@@ -176,6 +176,7 @@ export class UsersService {
         ownerId,
         maxSpaceBytes: newStorageBytes * seats,
         address: address,
+        numberOfSeats: seats,
       },
       params,
     );
