@@ -587,7 +587,7 @@ export class PaymentService {
       const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
       const maximumSeats = selectedPrice.metadata?.maximumSeats
         ? parseInt(selectedPrice.metadata.maximumSeats)
-        : undefined;
+        : 100;
       let seatNumber = seats ?? minimumSeats;
 
       if (maximumSeats && seatNumber > maximumSeats) {
@@ -599,6 +599,8 @@ export class PaymentService {
           price: priceId,
           adjustable_quantity: {
             enabled: true,
+            minimum: minimumSeats,
+            maximum: maximumSeats,
           },
           quantity: seatNumber,
         },
