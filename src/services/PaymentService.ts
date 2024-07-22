@@ -93,6 +93,15 @@ export class PaymentService {
     return customer;
   }
 
+  async updateCustomerBillingInfo(
+    customerId: CustomerId,
+    payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
+  ): Promise<Stripe.Customer> {
+    const customer = await this.provider.customers.update(customerId, payload);
+
+    return customer;
+  }
+
   async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
     const price = await this.provider.prices.retrieve(priceId);
     const isRecurring = price.type === 'recurring';
@@ -585,9 +594,7 @@ export class PaymentService {
     let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
     if (product.metadata?.type === 'business') {
       const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
-      const maximumSeats = selectedPrice.metadata?.maximumSeats
-        ? parseInt(selectedPrice.metadata.maximumSeats)
-        : 100;
+      const maximumSeats = selectedPrice.metadata?.maximumSeats ? parseInt(selectedPrice.metadata.maximumSeats) : 100;
       let seatNumber = seats ?? minimumSeats;
 
       if (maximumSeats && seatNumber > maximumSeats) {

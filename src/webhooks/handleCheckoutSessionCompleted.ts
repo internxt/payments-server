@@ -75,7 +75,7 @@ export default async function handleCheckoutSessionCompleted(
     }
   } else {
     const email = customer.email || session.customer_email;
-    
+
     try {
       user = await usersService.findUserByCustomerID(customer.id);
     } catch (err) {
@@ -83,9 +83,7 @@ export default async function handleCheckoutSessionCompleted(
         const response = await usersService.findUserByEmail(email);
         user = response.data;
       } else {
-        log.error(
-          `Error searching for an user by email in checkout session completed handler, email: ${email}`,
-        );
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
         log.error(err);
         throw err;
       }
@@ -93,9 +91,7 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   if (!user) {
-    log.error(
-      `Error searching for user in checkout session completed handler, email: ${session.customer_email}`,
-    );
+    log.error(`Error searching for user in checkout session completed handler, email: ${session.customer_email}`);
     return;
   }
 
@@ -143,6 +139,13 @@ export default async function handleCheckoutSessionCompleted(
   if (userType === UserType.Business) {
     const amountOfSeats = lineItems.data[0]!.quantity!;
     const address = customer.address?.line1 ?? undefined;
-    await usersService.initializeWorkspace(user.uuid, Number(maxSpaceBytes), amountOfSeats, address);
+    const phoneNumber = customer.phone ?? undefined;
+
+    await usersService.initializeWorkspace(user.uuid, {
+      newStorageBytes: Number(maxSpaceBytes),
+      seats: amountOfSeats,
+      address,
+      phoneNumber,
+    });
   }
 }
