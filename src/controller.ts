@@ -122,9 +122,10 @@ export default function (
     );
 
     fastify.delete<{
-      Querystring: { userType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business' };
     }>(
-      '/subscriptions',{
+      '/subscriptions',
+      {
         schema: {
           querystring: {
             type: 'object',
@@ -144,7 +145,34 @@ export default function (
       },
     );
 
-    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: 'individual' | 'business'; } }>(
+    fastify.patch<{ Body: { address?: string; phoneNumber?: string } }>(
+      '/billing',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              address: { type: 'string' },
+              phoneNumber: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const { address, phoneNumber } = req.body;
+        await paymentService.updateCustomerBillingInfo(user.customerId, {
+          address: {
+            line1: address,
+          },
+          phone: phoneNumber,
+        });
+
+        return rep.status(204).send();
+      },
+    );
+
+    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: 'individual' | 'business' } }>(
       '/subscriptions',
       {
         schema: {
@@ -161,7 +189,7 @@ export default function (
       },
       async (req, rep) => {
         const { price_id: priceId, couponCode } = req.body;
-        const userType = req.body.userType as UserType || UserType.Individual
+        const userType = (req.body.userType as UserType) || UserType.Individual;
 
         const user = await assertUser(req, rep);
         const userUpdated = await paymentService.updateSubscriptionPrice({
@@ -180,7 +208,7 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { userType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/setup-intent',
       {
@@ -193,7 +221,7 @@ export default function (
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        const userType = req.query.userType as UserType || UserType.Individual;
+        const userType = (req.query.userType as UserType) || UserType.Individual;
         const metadata: Stripe.MetadataParam = { userType };
         const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId, metadata);
 
@@ -202,7 +230,7 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { userType?: 'individual' | 'business'; };
+      Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/default-payment-method',
       {
@@ -215,7 +243,7 @@ export default function (
       },
       async (req, rep) => {
         const user = await assertUser(req, rep);
-        const userType = req.query.userType as UserType || UserType.Individual;
+        const userType = (req.query.userType as UserType) || UserType.Individual;
         return paymentService.getDefaultPaymentMethod(user.customerId, userType);
       },
     );
@@ -236,7 +264,7 @@ export default function (
         let response: UserSubscription;
 
         const user: User = await assertUser(req, rep);
-        const userType = req.query.userType as UserType || UserType.Individual;
+        const userType = (req.query.userType as UserType) || UserType.Individual;
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
@@ -296,7 +324,7 @@ export default function (
       };
     }>('/prices', async (req, rep) => {
       const { currency } = req.query;
-      const userType = req.query.userType as UserType || UserType.Individual;
+      const userType = (req.query.userType as UserType) || UserType.Individual;
 
       const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
