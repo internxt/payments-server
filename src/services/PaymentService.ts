@@ -622,7 +622,7 @@ export class PaymentService {
       customer_email: typeof prefill === 'string' ? prefill : undefined,
       line_items: lineItems,
       automatic_tax: { enabled: false },
-      currency: selectedPrice.currency,
+      currency: productCurrency,
       mode,
       discounts: couponCode ? [{ coupon: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
