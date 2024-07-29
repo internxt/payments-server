@@ -609,7 +609,7 @@ export class PaymentService {
     prefill: User | string;
     mode: Stripe.Checkout.SessionCreateParams.Mode;
     trialDays?: number;
-    couponCode?: string;
+    couponCode?: Stripe.PromotionCode['id'];
     currency?: string;
     seats?: number;
   }): Promise<Stripe.Checkout.Session> {
@@ -659,7 +659,7 @@ export class PaymentService {
       automatic_tax: { enabled: false },
       currency: productCurrency,
       mode,
-      discounts: couponCode ? [{ coupon: couponCode }] : undefined,
+      discounts: couponCode ? [{ promotion_code: couponCode }] : undefined,
       allow_promotion_codes: couponCode ? undefined : true,
       billing_address_collection: 'required',
       ...invoiceCreation,
