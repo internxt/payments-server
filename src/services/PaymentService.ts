@@ -167,7 +167,7 @@ export class PaymentService {
    * @param additionalOptions - Additional options to update the subscription (all the options from Stripe.SubscriptionUpdateParams)
    * @returns The updated subscription
    */
-  async updateSub({
+  async updateIndividualSub({
     customerId,
     priceId,
     additionalOptions,
@@ -185,6 +185,34 @@ export class PaymentService {
         {
           id: individualActiveSubscription.items.data[0].id,
           price: priceId,
+        },
+      ],
+      ...additionalOptions,
+    });
+
+    return updatedSubscription;
+  }
+
+  async updateBusinessSub({
+    customerId,
+    priceId,
+    additionalOptions,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode?: string;
+    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+  }) {
+    const businessActiveSubscription = await this.findBusinessActiveSubscription(customerId);
+    const currentItem = businessActiveSubscription.items.data[0];
+    const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
+      cancel_at_period_end: false,
+      proration_behavior: 'none',
+      items: [
+        {
+          id: businessActiveSubscription.items.data[0].id,
+          price: priceId,
+          quantity: currentItem.quantity,
         },
       ],
       ...additionalOptions,
@@ -214,7 +242,7 @@ export class PaymentService {
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
-    return this.updateSub({
+    return this.updateIndividualSub({
       customerId: customerId,
       priceId: priceId,
       additionalOptions: {
@@ -231,25 +259,39 @@ export class PaymentService {
    * @param couponCode - The coupon code
    * @returns updated subscription
    */
-  async updateSubscriptionPrice({
-    customerId,
-    priceId,
-    couponCode,
-  }: {
-    customerId: CustomerId;
-    priceId: PriceId;
-    couponCode: string;
-  }) {
+  async updateSubscriptionPrice(
+    {
+      customerId,
+      priceId,
+      couponCode,
+    }: {
+      customerId: CustomerId;
+      priceId: PriceId;
+      couponCode: string;
+    },
+    userType: UserType = UserType.Individual,
+  ) {
     let is3DSecureRequired = false;
     let clientSecret = '';
-    const updatedSubscription = await this.updateSub({
-      customerId: customerId,
-      priceId: priceId,
-      additionalOptions: {
-        coupon: couponCode,
-        billing_cycle_anchor: 'now',
-      },
-    });
+
+    const updatedSubscription =
+      userType === UserType.Individual
+        ? await this.updateIndividualSub({
+            customerId: customerId,
+            priceId: priceId,
+            additionalOptions: {
+              coupon: couponCode,
+              billing_cycle_anchor: 'now',
+            },
+          })
+        : await this.updateBusinessSub({
+            customerId: customerId,
+            priceId: priceId,
+            additionalOptions: {
+              coupon: couponCode,
+              billing_cycle_anchor: 'now',
+            },
+          });
 
     const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
 

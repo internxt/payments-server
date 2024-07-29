@@ -192,11 +192,14 @@ export default function (
         const userType = (req.body.userType as UserType) || UserType.Individual;
 
         const user = await assertUser(req, rep);
-        const userUpdated = await paymentService.updateSubscriptionPrice({
-          customerId: user.customerId,
-          priceId: priceId,
-          couponCode: couponCode,
-        });
+        const userUpdated = await paymentService.updateSubscriptionPrice(
+          {
+            customerId: user.customerId,
+            priceId: priceId,
+            couponCode: couponCode,
+          },
+          userType,
+        );
 
         const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
         return rep.send({
