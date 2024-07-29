@@ -79,6 +79,7 @@ export interface PlanSubscription {
 }
 
 export interface PromotionCode {
+  promoCodeName: Stripe.PromotionCode['code'];
   codeId: Stripe.PromotionCode['id'];
   amountOff: Stripe.PromotionCode['coupon']['amount_off'];
   percentOff: Stripe.PromotionCode['coupon']['percent_off'];
@@ -586,6 +587,7 @@ export class PaymentService {
     const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
 
     return {
+      promoCodeName,
       codeId: lastActiveCoupon.id,
       amountOff: lastActiveCoupon.coupon.amount_off,
       percentOff: lastActiveCoupon.coupon.percent_off,

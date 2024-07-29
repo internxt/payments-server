@@ -396,7 +396,6 @@ export default function (
       } catch (error) {
         const err = error as Error;
         if (err instanceof NotFoundPromoCodeByNameError) {
-          console.log('SI');
           return rep.status(404).send({ message: err.message });
         }
 
