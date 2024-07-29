@@ -78,6 +78,12 @@ export interface PlanSubscription {
   amountOfSeats: number;
 }
 
+export interface PromotionCode {
+  codeId: Stripe.PromotionCode['id'];
+  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
+  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
 export class PaymentService {
   private readonly provider: Stripe;
   private readonly productsRepository: ProductsRepository;
@@ -557,6 +563,35 @@ export class PaymentService {
     return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
+  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
+    const { data } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+    });
+
+    if (!data || data.length === 0) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    const [lastActiveCoupon] = data;
+
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    return lastActiveCoupon;
+  }
+
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
+
+    return {
+      codeId: lastActiveCoupon.id,
+      amountOff: lastActiveCoupon.coupon.amount_off,
+      percentOff: lastActiveCoupon.coupon.percent_off,
+    };
+  }
+
   async getCheckoutSession({
     priceId,
     successUrl,
@@ -713,5 +748,13 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class NotFoundPromoCodeByNameError extends Error {
+  constructor(promoCodeId: string) {
+    super(`Promotion code with an id ${promoCodeId} does not exist`);
+
+    Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
   }
 }
