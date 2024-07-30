@@ -78,6 +78,13 @@ export interface PlanSubscription {
   amountOfSeats: number;
 }
 
+export interface PromotionCode {
+  promoCodeName: Stripe.PromotionCode['code'];
+  codeId: Stripe.PromotionCode['id'];
+  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
+  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
 export class PaymentService {
   private readonly provider: Stripe;
   private readonly productsRepository: ProductsRepository;
@@ -557,7 +564,38 @@ export class PaymentService {
     return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
+  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
+    const { data: promotionCodes } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+    });
+
+    if (!promotionCodes || promotionCodes.length === 0) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    const [lastActiveCoupon] = promotionCodes;
+
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    return lastActiveCoupon;
+  }
+
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
+
+    return {
+      promoCodeName,
+      codeId: lastActiveCoupon.id,
+      amountOff: lastActiveCoupon.coupon.amount_off,
+      percentOff: lastActiveCoupon.coupon.percent_off,
+    };
+  }
+
   async getCheckoutSession({
+    customerId,
     priceId,
     successUrl,
     cancelUrl,
@@ -573,11 +611,14 @@ export class PaymentService {
     cancelUrl: string;
     prefill: User | string;
     mode: Stripe.Checkout.SessionCreateParams.Mode;
+    customerId: CustomerId | undefined;
     trialDays?: number;
-    couponCode?: string;
+    couponCode?: Stripe.PromotionCode['id'];
     currency?: string;
     seats?: number;
   }): Promise<Stripe.Checkout.Session> {
+    let promoCodeId: Stripe.PromotionCode['id'] | undefined;
+
     const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
@@ -614,6 +655,20 @@ export class PaymentService {
       ];
     }
 
+    if (couponCode) {
+      const { restrictions } = await this.provider.promotionCodes.retrieve(couponCode as string);
+
+      const isCouponOnlyForFirstPurchase = restrictions.first_time_transaction;
+
+      const userInvoices = await this.provider.invoices.list({
+        customer: customerId,
+      });
+
+      if (!isCouponOnlyForFirstPurchase || (isCouponOnlyForFirstPurchase && !userInvoices)) {
+        promoCodeId = couponCode;
+      }
+    }
+
     const checkout = await this.provider.checkout.sessions.create({
       payment_method_types: paymentMethodTypes,
       success_url: successUrl,
@@ -624,8 +679,8 @@ export class PaymentService {
       automatic_tax: { enabled: false },
       currency: productCurrency,
       mode,
-      discounts: couponCode ? [{ coupon: couponCode }] : undefined,
-      allow_promotion_codes: couponCode ? undefined : true,
+      discounts: promoCodeId ? [{ promotion_code: promoCodeId }] : undefined,
+      allow_promotion_codes: promoCodeId ? undefined : true,
       billing_address_collection: 'required',
       ...invoiceCreation,
       ...subscriptionData,
@@ -713,5 +768,13 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class NotFoundPromoCodeByNameError extends Error {
+  constructor(promoCodeId: string) {
+    super(`Promotion code with an id ${promoCodeId} does not exist`);
+
+    Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
   }
 }
