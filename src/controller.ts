@@ -460,6 +460,7 @@ export default function (
           priceId: price_id,
           successUrl: success_url,
           cancelUrl: cancel_url,
+          customerId: user?.customerId,
           prefill: user ?? customer_email,
           mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
           trialDays: trial_days,

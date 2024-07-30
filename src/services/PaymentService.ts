@@ -565,16 +565,16 @@ export class PaymentService {
   }
 
   async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
-    const { data } = await this.provider.promotionCodes.list({
+    const { data: promotionCodes } = await this.provider.promotionCodes.list({
       active: true,
       code: promoCodeName,
     });
 
-    if (!data || data.length === 0) {
+    if (!promotionCodes || promotionCodes.length === 0) {
       throw new NotFoundPromoCodeByNameError(promoCodeName);
     }
 
-    const [lastActiveCoupon] = data;
+    const [lastActiveCoupon] = promotionCodes;
 
     if (!lastActiveCoupon?.active) {
       throw new NotFoundPromoCodeByNameError(promoCodeName);
@@ -595,6 +595,7 @@ export class PaymentService {
   }
 
   async getCheckoutSession({
+    customerId,
     priceId,
     successUrl,
     cancelUrl,
@@ -610,11 +611,14 @@ export class PaymentService {
     cancelUrl: string;
     prefill: User | string;
     mode: Stripe.Checkout.SessionCreateParams.Mode;
+    customerId: CustomerId | undefined;
     trialDays?: number;
     couponCode?: Stripe.PromotionCode['id'];
     currency?: string;
     seats?: number;
   }): Promise<Stripe.Checkout.Session> {
+    let promoCodeId: Stripe.PromotionCode['id'] | undefined;
+
     const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
@@ -651,6 +655,20 @@ export class PaymentService {
       ];
     }
 
+    if (couponCode) {
+      const { restrictions } = await this.provider.promotionCodes.retrieve(couponCode as string);
+
+      const isCouponOnlyForFirstPurchase = restrictions.first_time_transaction;
+
+      const userInvoices = await this.provider.invoices.list({
+        customer: customerId,
+      });
+
+      if (!isCouponOnlyForFirstPurchase || (isCouponOnlyForFirstPurchase && !userInvoices)) {
+        promoCodeId = couponCode;
+      }
+    }
+
     const checkout = await this.provider.checkout.sessions.create({
       payment_method_types: paymentMethodTypes,
       success_url: successUrl,
@@ -661,8 +679,8 @@ export class PaymentService {
       automatic_tax: { enabled: false },
       currency: productCurrency,
       mode,
-      discounts: couponCode ? [{ promotion_code: couponCode }] : undefined,
-      allow_promotion_codes: couponCode ? undefined : true,
+      discounts: promoCodeId ? [{ promotion_code: promoCodeId }] : undefined,
+      allow_promotion_codes: promoCodeId ? undefined : true,
       billing_address_collection: 'required',
       ...invoiceCreation,
       ...subscriptionData,
