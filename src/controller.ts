@@ -3,6 +3,7 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import {
   CouponCodeError,
+  NotFoundPromoCodeByNameError,
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
   PaymentService,
@@ -29,6 +30,7 @@ const allowedRoutes: {
 } = {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
+  '/promo-code-by-name': ['GET'],
 };
 
 export default function (
@@ -386,6 +388,38 @@ export default function (
       }
     });
 
+    fastify.get<{
+      Querystring: { promotionCode: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { promotionCode: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/promo-code-by-name', async (req, rep) => {
+      const { promotionCode } = req.query;
+
+      try {
+        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
+
+        return rep.status(200).send(promoCodeObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPromoCodeByNameError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
     fastify.post<{
       Body: {
         price_id: string;
@@ -442,6 +476,7 @@ export default function (
           priceId: price_id,
           successUrl: success_url,
           cancelUrl: cancel_url,
+          customerId: user?.customerId,
           prefill: user ?? customer_email,
           mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
           trialDays: trial_days,
