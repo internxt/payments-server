@@ -178,6 +178,16 @@ export class PaymentService {
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
   }) {
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
+
+    const newPrice = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const newProduct = newPrice.product as Stripe.Product;
+
+    if (newProduct.metadata.type === UserType.Business) {
+      throw new IncompatibleSubscriptionTypesError('The new price is not an individual price');
+    }
+
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
@@ -205,6 +215,24 @@ export class PaymentService {
   }) {
     const businessActiveSubscription = await this.findBusinessActiveSubscription(customerId);
     const currentItem = businessActiveSubscription.items.data[0];
+
+    const newPrice = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const newProduct = newPrice.product as Stripe.Product;
+
+    if (newProduct.metadata.type !== UserType.Business) {
+      throw new IncompatibleSubscriptionTypesError('The new price is not a business price');
+    }
+
+    if ((currentItem.quantity ?? 1) > parseInt(newPrice.metadata.maximumSeats)) {
+      throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+    }
+
+    if ((currentItem.quantity ?? 1) < parseInt(newPrice.metadata.minimumSeats)) {
+      throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+    }
+
     const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
@@ -755,5 +783,21 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class InvalidSeatNumberError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, InvalidSeatNumberError.prototype);
+  }
+}
+
+export class IncompatibleSubscriptionTypesError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, IncompatibleSubscriptionTypesError.prototype);
   }
 }
