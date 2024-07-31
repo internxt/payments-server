@@ -10,6 +10,7 @@ import handlePaymentIntentCompleted from './handlePaymentIntentCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
+import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 
 export default function (
   stripe: Stripe,
@@ -63,10 +64,6 @@ export default function (
             config,
           );
           break;
-        case 'payment_method.attached':
-          await handlePaymentMethodAttached(paymentService, event.data.object.customer as string, event.data.object.id);
-          break;
-
         case 'payment_intent.succeeded':
           await handlePaymentIntentCompleted(
             event.data.object,

@@ -713,35 +713,6 @@ export class PaymentService {
     }
   }
 
-  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
-    const { data } = await this.provider.promotionCodes.list({
-      active: true,
-      code: promoCodeName,
-    });
-
-    if (!data || data.length === 0) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    const [lastActiveCoupon] = data;
-
-    if (!lastActiveCoupon?.active) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    return lastActiveCoupon;
-  }
-
-  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
-    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
-
-    return {
-      codeId: lastActiveCoupon.id,
-      amountOff: lastActiveCoupon.coupon.amount_off,
-      percentOff: lastActiveCoupon.coupon.percent_off,
-    };
-  }
-
   private getPaymentMethodTypes(
     currency: string,
     isOneTime: boolean,
