@@ -5,12 +5,11 @@ import {
   CouponCodeError,
   CustomerId,
   MissingParametersError,
-  NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
   PaymentService,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
-import { User, UserSubscription } from './core/users/User';
+import { User, UserSubscription, UserType } from './core/users/User';
 import CacheService from './services/CacheService';
 import Stripe from 'stripe';
 import {
@@ -189,22 +188,152 @@ export default function (
       },
     );
 
-    fastify.get<{ Querystring: { limit: number; starting_after?: string } }>(
+    fastify.get('/users/exists', async (req, rep) => {
+      await assertUser(req, rep);
+
+      return rep.status(200).send();
+    });
+
+    fastify.post<{ Body: { name: string; email: string } }>(
+      '/create-customer',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['email', 'name'],
+            properties: { name: { type: 'string' }, email: { type: 'string' } },
+          },
+        },
+      },
+      async (req, res) => {
+        const { name, email } = req.body;
+
+        if (!email) {
+          return res.status(404).send({
+            message: 'Email should be provided',
+          });
+        }
+
+        try {
+          const createdCustomer = await paymentService.createCustomer({
+            name,
+            email,
+          });
+
+          return res.send({
+            customerId: createdCustomer.id,
+          });
+        } catch (err) {
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
+
+    fastify.get<{
+      Querystring: { email: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { email: { type: 'number' } };
+        };
+      };
+    }>('/get-customer-id', async (req, res) => {
+      const { email } = req.query;
+
+      if (!email) {
+        return res.status(404).send({
+          message: 'Email should be provided',
+        });
+      }
+
+      try {
+        const { id } = await paymentService.getCustomersByEmail(email);
+        return res.status(200).send({
+          customerId: id,
+        });
+      } catch (error) {
+        return res.status(404).send({
+          message: 'CustomerId not found',
+        });
+      }
+    });
+
+    fastify.post<{ Body: { customerId: string; priceId: string; promoCodeId: string } }>(
+      '/create-subscription',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              promoCodeId: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { customerId, priceId, promoCodeId } = req.body;
+
+        try {
+          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, promoCodeId);
+
+          return res.send(subscriptionSetUp);
+        } catch (err) {
+          const error = err as Error;
+          if (error instanceof MissingParametersError) {
+            return res.status(400).send({
+              message: error.message,
+            });
+          }
+          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
+
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
+
+    fastify.get('/users/exists', async (req, rep) => {
+      await assertUser(req, rep);
+
+      return rep.status(200).send();
+    });
+
+    fastify.get<{ Querystring: { limit: number; starting_after?: string; subscription?: string } }>(
       '/invoices',
       {
         schema: {
           querystring: {
             type: 'object',
-            properties: { limit: { type: 'number', default: 10 }, starting_after: { type: 'string' } },
+            properties: {
+              limit: { type: 'number', default: 10 },
+              starting_after: { type: 'string' },
+              subscription: { type: 'string' },
+            },
           },
         },
       },
       async (req, rep) => {
-        const { limit, starting_after: startingAfter } = req.query;
+        const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
 
         const user = await assertUser(req, rep);
 
-        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit, startingAfter });
+        const invoices = await paymentService.getInvoicesFromUser(
+          user.customerId,
+          { limit, startingAfter },
+          subscriptionId,
+        );
 
         const invoicesMapped = invoices
           .filter(
@@ -217,6 +346,8 @@ export default function (
               created: invoice.created,
               pdf: invoice.invoice_pdf,
               bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+              total: invoice.total,
+              currency: invoice.currency,
             };
           });
 
@@ -224,26 +355,75 @@ export default function (
       },
     );
 
-    fastify.delete('/subscriptions', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      await usersService.cancelUserIndividualSubscriptions(user.customerId);
+    fastify.delete<{
+      Querystring: { userType?: 'individual' | 'business' };
+    }>(
+      '/subscriptions',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        if (req.query.userType === UserType.Business) {
+          await usersService.cancelUserB2BSuscriptions(user.customerId);
+        } else {
+          await usersService.cancelUserIndividualSubscriptions(user.customerId);
+        }
 
-      return rep.status(204).send();
-    });
+        return rep.status(204).send();
+      },
+    );
 
-    fastify.put<{ Body: { price_id: string; couponCode: string } }>(
+    fastify.patch<{ Body: { address?: string; phoneNumber?: string } }>(
+      '/billing',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              address: { type: 'string' },
+              phoneNumber: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const { address, phoneNumber } = req.body;
+        await paymentService.updateCustomerBillingInfo(user.customerId, {
+          address: {
+            line1: address,
+          },
+          phone: phoneNumber,
+        });
+
+        return rep.status(204).send();
+      },
+    );
+
+    fastify.put<{ Body: { price_id: string; couponCode: string; userType?: 'individual' | 'business' } }>(
       '/subscriptions',
       {
         schema: {
           body: {
             type: 'object',
             required: ['price_id'],
-            properties: { price_id: { type: 'string' }, couponCode: { type: 'string' } },
+            properties: {
+              price_id: { type: 'string' },
+              couponCode: { type: 'string' },
+              userType: { type: 'string', enum: ['individual', 'business'] },
+            },
           },
         },
       },
       async (req, rep) => {
         const { price_id: priceId, couponCode } = req.body;
+        const userType = (req.body.userType as UserType) || UserType.Individual;
 
         const user = await assertUser(req, rep);
         const userUpdated = await paymentService.updateSubscriptionPrice({
@@ -252,7 +432,7 @@ export default function (
           couponCode: couponCode,
         });
 
-        const updatedSubscription = await paymentService.getUserSubscription(user.customerId);
+        const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
         return rep.send({
           userSubscription: updatedSubscription,
           request3DSecure: userUpdated.is3DSecureRequired,
@@ -261,12 +441,27 @@ export default function (
       },
     );
 
-    fastify.get('/setup-intent', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId);
+    fastify.get<{
+      Querystring: { userType?: 'individual' | 'business' };
+    }>(
+      '/setup-intent',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const userType = (req.query.userType as UserType) || UserType.Individual;
+        const metadata: Stripe.MetadataParam = { userType };
+        const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId, metadata);
 
-      return { clientSecret };
-    });
+        return { clientSecret };
+      },
+    );
 
     fastify.get<{
       Querystring: { customerId: CustomerId; amount: number; planId: string; promoCodeName: string };
@@ -302,42 +497,70 @@ export default function (
       }
     });
 
-    fastify.get('/default-payment-method', async (req, rep) => {
-      const user = await assertUser(req, rep);
-      return paymentService.getDefaultPaymentMethod(user.customerId);
-    });
+    fastify.get<{
+      Querystring: { userType?: 'individual' | 'business' };
+    }>(
+      '/default-payment-method',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        const user = await assertUser(req, rep);
+        const userType = (req.query.userType as UserType) || UserType.Individual;
+        return paymentService.getDefaultPaymentMethod(user.customerId, userType);
+      },
+    );
 
-    fastify.get('/subscriptions', async (req, rep) => {
-      let response: UserSubscription;
+    fastify.get<{
+      Querystring: { userType?: 'individual' | 'business' };
+    }>(
+      '/subscriptions',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+          },
+        },
+      },
+      async (req, rep) => {
+        let response: UserSubscription;
 
-      const user: User = await assertUser(req, rep);
+        const user: User = await assertUser(req, rep);
+        const userType = (req.query.userType as UserType) || UserType.Individual;
 
-      let subscriptionInCache: UserSubscription | null | undefined;
-      try {
-        subscriptionInCache = await cacheService.getSubscription(user.customerId);
-      } catch (err) {
-        req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
-        req.log.error(err);
-      }
+        let subscriptionInCache: UserSubscription | null | undefined;
+        try {
+          subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
+        } catch (err) {
+          req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
+          req.log.error(err);
+        }
 
-      if (subscriptionInCache) {
-        req.log.info(`Cache hit for ${user.customerId} subscription`);
-        return subscriptionInCache;
-      }
+        if (subscriptionInCache) {
+          req.log.info(`Cache hit for ${user.customerId} subscription`);
+          return subscriptionInCache;
+        }
 
-      if (user.lifetime) {
-        response = { type: 'lifetime' };
-      } else {
-        response = await paymentService.getUserSubscription(user.customerId);
-      }
+        if (user.lifetime) {
+          response = { type: 'lifetime' };
+        } else {
+          response = await paymentService.getUserSubscription(user.customerId, userType);
+        }
 
-      cacheService.setSubscription(user.customerId, response).catch((err) => {
-        req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
-        req.log.error(err);
-      });
+        cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
+          req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
+          req.log.error(err);
+        });
 
-      return response;
-    });
+        return response;
+      },
+    );
 
     function checkCurrency(currency?: string): { currencyValue: string; isError: boolean; errorMessage?: string } {
       let currencyValue: string;
@@ -357,15 +580,19 @@ export default function (
     }
 
     fastify.get<{
-      Querystring: { currency?: string };
+      Querystring: { currency?: string; userType?: 'individual' | 'business' };
       schema: {
         querystring: {
           type: 'object';
-          properties: { currency: { type: 'string' } };
+          properties: {
+            currency: { type: 'string' };
+            userType: { type: 'string'; enum: ['individual', 'business'] };
+          };
         };
       };
     }>('/prices', async (req, rep) => {
       const { currency } = req.query;
+      const userType = (req.query.userType as UserType) || UserType.Individual;
 
       const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -373,72 +600,7 @@ export default function (
         return rep.status(400).send({ message: errorMessage });
       }
 
-      return paymentService.getPrices(currencyValue);
-    });
-
-    fastify.get<{
-      Querystring: { planId: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { planId: { type: 'string' } };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 minute';
-        };
-      };
-    }>('/plan-by-id', async (req, rep) => {
-      const { planId } = req.query;
-
-      try {
-        const planObject = await paymentService.getPlanById(planId);
-
-        return rep.status(200).send(planObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send({ message: err.message });
-        }
-
-        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
-
-    fastify.get<{
-      Querystring: { promotionCode: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { promotionCode: { type: 'string' } };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 minute';
-        };
-      };
-    }>('/promo-code-by-name', async (req, rep) => {
-      const { promotionCode } = req.query;
-
-      try {
-        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
-
-        return rep.status(200).send(promoCodeObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError) {
-          console.log('SI');
-          return rep.status(404).send({ message: err.message });
-        }
-
-        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
+      return paymentService.getPrices(currencyValue, userType);
     });
 
     fastify.get('/request-prevent-cancellation', async (req) => {
@@ -477,6 +639,38 @@ export default function (
       }
     });
 
+    fastify.get<{
+      Querystring: { promotionCode: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { promotionCode: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/promo-code-by-name', async (req, rep) => {
+      const { promotionCode } = req.query;
+
+      try {
+        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
+
+        return rep.status(200).send(promoCodeObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPromoCodeByNameError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
     fastify.post<{
       Body: {
         price_id: string;
@@ -487,6 +681,7 @@ export default function (
         trial_days?: number;
         mode?: string;
         currency?: string;
+        seats?: number;
       };
     }>(
       '/checkout-session',
@@ -498,6 +693,7 @@ export default function (
             properties: {
               mode: { type: 'string' },
               price_id: { type: 'string' },
+              seats: { type: 'number' },
               trial_days: { type: 'number' },
               coupon_code: { type: 'string' },
               success_url: { type: 'string' },
@@ -510,7 +706,8 @@ export default function (
       },
       async (req, rep) => {
         const { uuid } = req.user.payload;
-        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency } = req.body;
+        const { price_id, success_url, cancel_url, customer_email, trial_days, mode, coupon_code, currency, seats } =
+          req.body;
 
         const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -530,11 +727,13 @@ export default function (
           priceId: price_id,
           successUrl: success_url,
           cancelUrl: cancel_url,
+          customerId: user?.customerId,
           prefill: user ?? customer_email,
           mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
           trialDays: trial_days,
           couponCode: coupon_code,
           currency: currencyValue,
+          seats,
         });
 
         return { sessionId: id };

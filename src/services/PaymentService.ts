@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
-import { User, UserSubscription } from '../core/users/User';
+import { User, UserSubscription, UserType } from '../core/users/User';
+import { ProductsRepository } from '../core/users/ProductsRepository';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -27,6 +28,10 @@ type HasUserAppliedCouponResponse = {
   elegible: boolean;
   reason?: Reason;
 };
+
+interface ExtendedSubscription extends Subscription {
+  product?: Stripe.Product;
+}
 
 export interface RequestedPlan {
   selectedPlan: DisplayPrice & { decimalAmount: number };
@@ -71,11 +76,45 @@ export type PriceMetadata = {
   planType: 'subscription' | 'one_time';
 };
 
+export enum RenewalPeriod {
+  Monthly = 'monthly',
+  Semiannually = 'semiannually',
+  Annually = 'annually',
+  Lifetime = 'lifetime',
+}
+
+export interface PlanSubscription {
+  status: string;
+  planId: string;
+  productId: string;
+  name: string;
+  simpleName: string;
+  type: UserType;
+  price: number;
+  monthlyPrice: number;
+  currency: string;
+  isTeam: boolean;
+  paymentInterval: string;
+  isLifetime: boolean;
+  renewalPeriod: RenewalPeriod;
+  storageLimit: number;
+  amountOfSeats: number;
+}
+
+export interface PromotionCode {
+  promoCodeName: Stripe.PromotionCode['code'];
+  codeId: Stripe.PromotionCode['id'];
+  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
+  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
 export class PaymentService {
   private readonly provider: Stripe;
+  private readonly productsRepository: ProductsRepository;
 
-  constructor(provider: Stripe) {
+  constructor(provider: Stripe, productsRepository: ProductsRepository) {
     this.provider = provider;
+    this.productsRepository = productsRepository;
   }
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
@@ -167,6 +206,15 @@ export class PaymentService {
     };
   }
 
+  async updateCustomerBillingInfo(
+    customerId: CustomerId,
+    payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
+  ): Promise<Stripe.Customer> {
+    const customer = await this.provider.customers.update(customerId, payload);
+
+    return customer;
+  }
+
   async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
     const price = await this.provider.prices.retrieve(priceId);
     const isRecurring = price.type === 'recurring';
@@ -204,13 +252,24 @@ export class PaymentService {
     await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
-  async getActiveSubscriptions(customerId: CustomerId): Promise<Subscription[]> {
+  async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
-      expand: ['data.default_payment_method', 'data.default_source'],
+      expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
-    return res.data;
+    const transformedData: ExtendedSubscription[] = res.data.map((subscription) => {
+      const untypedSubscription = subscription as any;
+      if ('plan' in untypedSubscription) {
+        return {
+          ...subscription,
+          product: (untypedSubscription.plan as Stripe.Plan).product as Stripe.Product,
+        };
+      }
+      return subscription;
+    });
+
+    return transformedData;
   }
 
   /**
@@ -329,14 +388,25 @@ export class PaymentService {
 
   async updateSubscriptionPaymentMethod(
     customerId: CustomerId,
-    paymentMethod: PaymentMethod['id'],
+    paymentMethodId: PaymentMethod['id'],
+    userType: UserType = UserType.Individual,
   ): Promise<Subscription> {
-    const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
-    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
-      default_payment_method: paymentMethod,
+    const { id: subscriptionId } =
+      userType === UserType.Business
+        ? await this.findBusinessActiveSubscription(customerId)
+        : await this.findIndividualActiveSubscription(customerId);
+
+    if (!subscriptionId) throw new Error('Subscription not found');
+
+    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
+      customer: customerId,
     });
 
-    return updatedSubscription;
+    if (!id || !customer) throw new Error('Payment method not attached');
+
+    return this.provider.subscriptions.update(subscriptionId, {
+      default_payment_method: id,
+    });
   }
 
   async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer> {
@@ -374,11 +444,13 @@ export class PaymentService {
   async getInvoicesFromUser(
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
+    subscriptionId?: SubscriptionId,
   ): Promise<Invoice[]> {
     const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
+      subscription: subscriptionId,
     });
 
     return res.data;
@@ -419,8 +491,12 @@ export class PaymentService {
     }
   }
 
-  getSetupIntent(customerId: string): Promise<SetupIntent> {
-    return this.provider.setupIntents.create({ customer: customerId, usage: 'off_session' });
+  getSetupIntent(customerId: string, metadata: Stripe.MetadataParam): Promise<SetupIntent> {
+    return this.provider.setupIntents.create({
+      customer: customerId,
+      usage: 'off_session',
+      metadata,
+    });
   }
 
   /*
@@ -430,8 +506,18 @@ export class PaymentService {
    *  customer.invoice_settings.default_payment_method that precedence over
    *  customer.default_source
    */
-  async getDefaultPaymentMethod(customerId: string): Promise<PaymentMethod | CustomerSource | null> {
-    const subscriptions = await this.getActiveSubscriptions(customerId);
+  async getDefaultPaymentMethod(
+    customerId: CustomerId,
+    userType: UserType = UserType.Individual,
+  ): Promise<PaymentMethod | CustomerSource | null> {
+    let subscriptions = await this.getActiveSubscriptions(customerId);
+    if (subscriptions.length === 0) return null;
+
+    subscriptions =
+      userType === UserType.Business
+        ? subscriptions.filter((subs) => subs.product?.metadata?.type === UserType.Business)
+        : subscriptions.filter((subs) => subs.product?.metadata?.type !== UserType.Business);
+
     const subscriptionWithDefaultPaymentMethod = subscriptions.find(
       (subscription) => subscription.default_payment_method,
     );
@@ -451,10 +537,20 @@ export class PaymentService {
     );
   }
 
-  async getUserSubscription(customerId: CustomerId): Promise<UserSubscription> {
-    let subscription;
+  getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
+    return typeof paymentMethod === 'string'
+      ? this.provider.paymentMethods.retrieve(paymentMethod)
+      : this.provider.paymentMethods.retrieve(paymentMethod.id);
+  }
+
+  async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
+    let subscription: any;
     try {
-      subscription = await this.findIndividualActiveSubscription(customerId);
+      if (userType === UserType.Business) {
+        subscription = await this.findBusinessActiveSubscription(customerId);
+      } else {
+        subscription = await this.findIndividualActiveSubscription(customerId);
+      }
     } catch (err) {
       if (err instanceof NotFoundSubscriptionError) {
         return { type: 'free' };
@@ -465,10 +561,42 @@ export class PaymentService {
 
     const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
 
+    const storageLimit =
+      Number(
+        subscription.plan.product.metadata.size_bytes ||
+          subscription.plan.product.metadata.maxSpaceBytes ||
+          subscription.plan.metadata.size_bytes ||
+          subscription.plan.metadata.maxSpaceBytes,
+      ) || 0;
+    const item = subscription.items.data[0] as Stripe.SubscriptionItem;
+
+    const plan: PlanSubscription = {
+      status: subscription.status,
+      planId: subscription.plan.id,
+      productId: subscription.plan.product.id,
+      name: subscription.plan.product.name,
+      simpleName: subscription.plan.product.metadata.simple_name,
+      type: subscription.plan.product.metadata.type || UserType.Individual,
+      price: subscription.plan.amount * 0.01,
+      monthlyPrice: this.getMonthlyAmount(
+        subscription.plan.amount * 0.01,
+        subscription.plan.interval_count,
+        subscription.plan.interval,
+      ),
+      currency: subscription.plan.currency,
+      isTeam: !!subscription.plan.product.metadata.is_teams,
+      paymentInterval: subscription.plan.nickname,
+      isLifetime: false,
+      renewalPeriod: this.getRenewalPeriod(subscription.plan.intervalCount, subscription.plan.interval),
+      storageLimit: storageLimit,
+      amountOfSeats: item.quantity || 1,
+    };
+
     const { price } = subscription.items.data[0];
 
     return {
       type: 'subscription',
+      subscriptionId: subscription.id,
       amount: price.unit_amount!,
       currency: price.currency,
       interval: price.recurring!.interval as 'year' | 'month',
@@ -476,23 +604,30 @@ export class PaymentService {
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       planId: price?.product as string,
+      userType,
+      plan,
     };
   }
 
-  async getPrices(currency?: string): Promise<DisplayPrice[]> {
+  async getPrices(currency?: string, userType: UserType = UserType.Individual): Promise<DisplayPrice[]> {
     const currencyValue = currency ?? 'eur';
 
     const res = await this.provider.prices.search({
       query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
-      expand: ['data.currency_options'],
+      expand: ['data.currency_options', 'data.product'],
       limit: 100,
     });
 
     return res.data
-      .filter(
-        (price) =>
-          price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
-      )
+      .filter((price) => {
+        const priceProductType = ((price.product as Stripe.Product).metadata.type as UserType) || UserType.Individual;
+        return (
+          price.metadata.maxSpaceBytes &&
+          price.currency_options &&
+          price.currency_options[currencyValue].unit_amount &&
+          priceProductType === userType
+        );
+      })
       .map((price) => {
         return {
           id: price.id,
@@ -502,6 +637,27 @@ export class PaymentService {
           interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
         };
       });
+  }
+
+  async getPricesRaw(currency?: string, expandProduct = false): Promise<Stripe.Price[]> {
+    const currencyValue = currency ?? 'eur';
+
+    const expandOptions = ['data.currency_options'];
+
+    if (expandProduct) {
+      expandOptions.push('data.product');
+    }
+
+    const res = await this.provider.prices.search({
+      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      expand: expandOptions,
+      limit: 100,
+    });
+
+    return res.data.filter(
+      (price) =>
+        price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
+    );
   }
 
   async getUpsellProduct(productId: Stripe.Product['id']): Promise<Stripe.Price | undefined> {
@@ -596,7 +752,38 @@ export class PaymentService {
     return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
+  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
+    const { data: promotionCodes } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+    });
+
+    if (!promotionCodes || promotionCodes.length === 0) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    const [lastActiveCoupon] = promotionCodes;
+
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundPromoCodeByNameError(promoCodeName);
+    }
+
+    return lastActiveCoupon;
+  }
+
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
+
+    return {
+      promoCodeName,
+      codeId: lastActiveCoupon.id,
+      amountOff: lastActiveCoupon.coupon.amount_off,
+      percentOff: lastActiveCoupon.coupon.percent_off,
+    };
+  }
+
   async getCheckoutSession({
+    customerId,
     priceId,
     successUrl,
     cancelUrl,
@@ -605,28 +792,70 @@ export class PaymentService {
     trialDays,
     couponCode,
     currency,
+    seats,
   }: {
     priceId: string;
     successUrl: string;
     cancelUrl: string;
     prefill: User | string;
     mode: Stripe.Checkout.SessionCreateParams.Mode;
+    customerId: CustomerId | undefined;
     trialDays?: number;
-    couponCode?: string;
+    couponCode?: Stripe.PromotionCode['id'];
     currency?: string;
+    seats?: number;
   }): Promise<Stripe.Checkout.Session> {
+    let promoCodeId: Stripe.PromotionCode['id'] | undefined;
+
     const productCurrency = currency ?? 'eur';
     const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
     const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    const prices = await this.getPrices(productCurrency);
-    const product = prices.find((price) => price.id === priceId);
-
+    const prices = await this.getPricesRaw(productCurrency, true);
+    const selectedPrice = prices.find((price) => price.id === priceId);
+    const product = selectedPrice?.product as Stripe.Product;
     const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
       productCurrency,
-      product?.interval === 'lifetime',
+      selectedPrice?.type === 'one_time',
     );
 
-    if (!product) throw new Error('The product does not exist');
+    if (!selectedPrice) throw new Error('The product does not exist');
+
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
+    if (product.metadata?.type === 'business') {
+      const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
+      const maximumSeats = selectedPrice.metadata?.maximumSeats ? parseInt(selectedPrice.metadata.maximumSeats) : 100;
+      let seatNumber = seats ?? minimumSeats;
+
+      if (maximumSeats && seatNumber > maximumSeats) {
+        seatNumber = maximumSeats;
+      }
+
+      lineItems = [
+        {
+          price: priceId,
+          adjustable_quantity: {
+            enabled: true,
+            minimum: minimumSeats,
+            maximum: maximumSeats,
+          },
+          quantity: seatNumber,
+        },
+      ];
+    }
+
+    if (couponCode) {
+      const { restrictions } = await this.provider.promotionCodes.retrieve(couponCode as string);
+
+      const isCouponOnlyForFirstPurchase = restrictions.first_time_transaction;
+
+      const userInvoices = await this.provider.invoices.list({
+        customer: customerId,
+      });
+
+      if (!isCouponOnlyForFirstPurchase || (isCouponOnlyForFirstPurchase && !userInvoices)) {
+        promoCodeId = couponCode;
+      }
+    }
 
     const checkout = await this.provider.checkout.sessions.create({
       payment_method_types: paymentMethodTypes,
@@ -634,12 +863,12 @@ export class PaymentService {
       cancel_url: cancelUrl,
       customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
       customer_email: typeof prefill === 'string' ? prefill : undefined,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: lineItems,
       automatic_tax: { enabled: false },
-      currency: product.currency,
+      currency: productCurrency,
       mode,
-      discounts: couponCode ? [{ coupon: couponCode }] : undefined,
-      allow_promotion_codes: couponCode ? undefined : true,
+      discounts: promoCodeId ? [{ promotion_code: promoCodeId }] : undefined,
+      allow_promotion_codes: promoCodeId ? undefined : true,
       billing_address_collection: 'required',
       ...invoiceCreation,
       ...subscriptionData,
@@ -649,11 +878,17 @@ export class PaymentService {
   }
 
   async getLineItems(checkoutSessionId: string) {
-    return this.provider.invoices.listLineItems(checkoutSessionId);
+    return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
+      expand: ['data.price.product'],
+    });
   }
 
   getCustomer(customerId: CustomerId) {
     return this.provider.customers.retrieve(customerId);
+  }
+
+  getProduct(productId: Stripe.Product['id']) {
+    return this.provider.products.retrieve(productId);
   }
 
   async getCustomerIdByEmail(email: string) {
@@ -669,14 +904,59 @@ export class PaymentService {
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
-    const individualActiveSubscription = activeSubscriptions.find(
-      (subscription) => subscription.items.data[0].price.metadata.is_teams !== '1',
-    );
+    const individualActiveSubscription = activeSubscriptions.find((subscription) => {
+      const isNotBusiness = subscription.product?.metadata?.type !== 'business';
+      return isNotBusiness;
+    });
     if (!individualActiveSubscription) {
       throw new NotFoundSubscriptionError('There is no individual subscription to update');
     }
 
     return individualActiveSubscription;
+  }
+
+  private async findBusinessActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const products = await this.productsRepository.findByType(UserType.Business);
+    const businessProductIds = products.map((product) => product.paymentGatewayId);
+
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+
+    const businessSubscription = activeSubscriptions.find((subscription) =>
+      businessProductIds.includes(subscription.items.data[0].price.product.toString()),
+    );
+    if (!businessSubscription) {
+      throw new NotFoundSubscriptionError('There is no business subscription to update');
+    }
+
+    return businessSubscription;
+  }
+
+  private getMonthCount(intervalCount: number, timeInterval: string): number {
+    const byTimeIntervalCalculator: any = {
+      month: (): number => intervalCount,
+      year: (): number => intervalCount * 12,
+    };
+
+    return byTimeIntervalCalculator[timeInterval]();
+  }
+
+  private getMonthlyAmount(totalPrice: number, intervalCount: number, timeInterval: string): number {
+    const monthCount = this.getMonthCount(intervalCount, timeInterval);
+    const monthlyPrice = totalPrice / monthCount;
+
+    return monthlyPrice;
+  }
+
+  private getRenewalPeriod(intervalCount: number, interval: string): RenewalPeriod {
+    let renewalPeriod = RenewalPeriod.Monthly;
+
+    if (interval === 'month' && intervalCount === 6) {
+      renewalPeriod = RenewalPeriod.Semiannually;
+    } else if (interval === 'year') {
+      renewalPeriod = RenewalPeriod.Annually;
+    }
+
+    return renewalPeriod;
   }
 }
 

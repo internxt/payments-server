@@ -5,6 +5,7 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
+import { UserType } from '../core/users/User';
 
 export default async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
@@ -23,6 +24,8 @@ export default async function handleCheckoutSessionCompleted(
   const lineItems = await paymentService.getLineItems(session.id);
 
   const price = lineItems.data[0].price;
+  const product = price?.product as Stripe.Product;
+  const userType = product.metadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   if (!price) {
     log.error(`Checkout session completed does not contain price, customer: ${session.customer_email}`);
@@ -46,26 +49,50 @@ export default async function handleCheckoutSessionCompleted(
     return;
   }
 
-  let user: { uuid: string };
-  try {
-    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
-    user = res.data.user;
-  } catch (err) {
-    log.error(
-      `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
-    );
-    log.error(err);
+  let user: { uuid: string } | null = null;
+  if (userType === UserType.Individual) {
+    try {
+      const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
+      user = res.data.user;
+    } catch (err) {
+      log.error(
+        `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+      );
+      log.error(err);
 
-    throw err;
+      throw err;
+    }
+
+    if (user) {
+      try {
+        await updateUserTier(user.uuid, product.id, config);
+      } catch (err) {
+        log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
+        log.error(err);
+
+        throw err;
+      }
+    }
+  } else {
+    const email = customer.email || session.customer_email;
+
+    try {
+      user = await usersService.findUserByCustomerID(customer.id);
+    } catch (err) {
+      if (email) {
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
+      } else {
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
+        log.error(err);
+        throw err;
+      }
+    }
   }
 
-  try {
-    await updateUserTier(user.uuid, price.product as string, config);
-  } catch (err) {
-    log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${price.product} `);
-    log.error(err);
-
-    throw err;
+  if (!user) {
+    log.error(`Error searching for user in checkout session completed handler, email: ${session.customer_email}`);
+    return;
   }
 
   try {
@@ -104,8 +131,21 @@ export default async function handleCheckoutSessionCompleted(
   }
 
   try {
-    await cacheService.clearSubscription(customer.id);
+    await cacheService.clearSubscription(customer.id, userType);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+  }
+
+  if (userType === UserType.Business) {
+    const amountOfSeats = lineItems.data[0]!.quantity!;
+    const address = customer.address?.line1 ?? undefined;
+    const phoneNumber = customer.phone ?? undefined;
+
+    await usersService.initializeWorkspace(user.uuid, {
+      newStorageBytes: Number(maxSpaceBytes),
+      seats: amountOfSeats,
+      address,
+      phoneNumber,
+    });
   }
 }

@@ -6,6 +6,16 @@ import { DisplayBilling, DisplayBillingRepository } from '../core/users/MongoDBD
 import { Coupon } from '../core/coupons/Coupon';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
+import { sign } from 'jsonwebtoken';
+import { Axios, AxiosRequestConfig } from 'axios';
+import { type AppConfig } from '../config';
+
+function signToken(duration: string, secret: string) {
+  return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
+    algorithm: 'RS256',
+    expiresIn: duration,
+  });
+}
 
 export class CouponNotBeingTrackedError extends Error {
   constructor(couponName: Coupon['code']) {
@@ -22,6 +32,8 @@ export class UsersService {
     private readonly displayBillingRepository: DisplayBillingRepository,
     private readonly couponsRepository: CouponsRepository,
     private readonly usersCouponsRepository: UsersCouponsRepository,
+    private readonly config: AppConfig,
+    private readonly axios: Axios,
   ) {}
 
   async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
@@ -77,10 +89,26 @@ export class UsersService {
     }
 
     const individualSubscriptions = activeSubscriptions.filter(
-      (subscription) => subscription.metadata.is_teams !== '1',
+      (subscription) => subscription.product?.metadata.type !== 'business',
     ) as Stripe.Subscription[];
 
     for (const subscriptionToCancel of individualSubscriptions) {
+      await this.paymentService.cancelSubscription(subscriptionToCancel.id);
+    }
+  }
+
+  async cancelUserB2BSuscriptions(customerId: User['customerId']): Promise<void> {
+    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
+
+    if (activeSubscriptions.length === 0) {
+      throw new Error('Subscriptions not found');
+    }
+
+    const b2bSubscriptions = activeSubscriptions.filter(
+      (subs) => subs.product?.metadata.type === 'business',
+    ) as Stripe.Subscription[];
+
+    for (const subscriptionToCancel of b2bSubscriptions) {
       await this.paymentService.cancelSubscription(subscriptionToCancel.id);
     }
   }
@@ -131,6 +159,78 @@ export class UsersService {
     const userCouponEntry = await this.usersCouponsRepository.findByUserAndCoupon(user.id, coupon.id);
 
     return !!userCouponEntry;
+  }
+
+  async initializeWorkspace(
+    ownerId: string,
+    payload: { newStorageBytes: number; seats: number; address?: string; phoneNumber?: string },
+  ): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const params: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
+      {
+        ownerId,
+        maxSpaceBytes: payload.newStorageBytes * payload.seats,
+        address: payload.address,
+        numberOfSeats: payload.seats,
+        phoneNumber: payload.phoneNumber,
+      },
+      params,
+    );
+  }
+
+  async updateWorkspaceStorage(ownerId: string, maxSpaceBytes: number, seats: number): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        ownerId,
+        maxSpaceBytes: maxSpaceBytes * seats,
+        numberOfSeats: seats,
+      },
+    };
+
+    await this.axios.put(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`, requestConfig);
+  }
+
+  async destroyWorkspace(ownerId: string): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        ownerId,
+      },
+    };
+
+    await this.axios.delete(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`, requestConfig);
+  }
+
+  async findUserByEmail(email: string): Promise<{ data: { uuid: string; email: string } }> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      params: {
+        email,
+      },
+    };
+
+    return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
   }
 }
 

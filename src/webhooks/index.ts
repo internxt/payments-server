@@ -5,12 +5,11 @@ import { StorageService } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
-import handlePaymentMethodAttached from './handlePaymentMethodAttached';
 import { PaymentService } from '../services/PaymentService';
 import handlePaymentIntentCompleted from './handlePaymentIntentCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
-import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
+import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 
 export default function (
   stripe: Stripe,
@@ -46,7 +45,8 @@ export default function (
           await handleSubscriptionCanceled(
             storageService,
             usersService,
-            event.data.object.customer as string,
+            paymentService,
+            event.data.object as Stripe.Subscription,
             cacheService,
             fastify.log,
             config,
@@ -58,6 +58,7 @@ export default function (
             usersService,
             event.data.object,
             cacheService,
+            paymentService,
             fastify.log,
             config,
           );
@@ -87,6 +88,9 @@ export default function (
             cacheService,
             config,
           );
+          break;
+        case 'setup_intent.succeeded':
+          await handleSetupIntentSucceded(event.data.object as Stripe.SetupIntent, paymentService);
           break;
         case 'checkout.session.async_payment_succeeded':
           await handleCheckoutSessionCompleted(

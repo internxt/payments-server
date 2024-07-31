@@ -2,16 +2,18 @@ import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/CacheService';
-import { PriceMetadata } from '../services/PaymentService';
+import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { StorageService, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import { AppConfig } from '../config';
+import { UserType } from '../core/users/User';
 
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
   usersService: UsersService,
   subscription: Stripe.Subscription,
   cacheService: CacheService,
+  paymentService: PaymentService,
   log: FastifyLoggerInstance,
   config: AppConfig,
 ): Promise<void> {
@@ -20,20 +22,40 @@ export default async function handleSubscriptionUpdated(
   if (lifetime) {
     return;
   }
+
   const isSubscriptionCanceled = subscription.status === 'canceled';
+
+  const productId = subscription.items.data[0].price.product as string;
+  const { metadata: productMetadata } = await paymentService.getProduct(productId);
+  const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
+
+  try {
+    await cacheService.clearSubscription(customerId, productType);
+  } catch (err) {
+    log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
+  }
+
+  if (productType === UserType.Business) {
+    if (isSubscriptionCanceled) {
+      return usersService.destroyWorkspace(uuid);
+    }
+
+    const customer = await paymentService.getCustomer(customerId);
+    if (customer.deleted) {
+      log.error(`Customer object could not be retrieved in subscription updated handler with id ${customer.id}`);
+      return;
+    }
+    const { maxSpaceBytes: priceMaxSpaceBytes } = subscription.items.data[0].price.metadata as PriceMetadata;
+    const amountOfSeats = subscription.items.data[0]!.quantity!;
+
+    return usersService.updateWorkspaceStorage(uuid, parseInt(priceMaxSpaceBytes), amountOfSeats);
+  }
 
   const bytesSpace = isSubscriptionCanceled
     ? FREE_PLAN_BYTES_SPACE
     : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
 
-  const planId = isSubscriptionCanceled ? FREE_INDIVIDUAL_TIER : (subscription.items.data[0].price.product as string);
-
-  try {
-    await cacheService.clearSubscription(customerId);
-  } catch (err) {
-    log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
-  }
-
+  const planId = isSubscriptionCanceled ? FREE_INDIVIDUAL_TIER : productId;
   try {
     await updateUserTier(uuid, planId, config);
   } catch (err) {
