@@ -45,6 +45,7 @@ export default async function handleCheckoutSessionCompleted(
     );
     return;
   }
+
   let user: { uuid: string };
   try {
     const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
@@ -57,6 +58,7 @@ export default async function handleCheckoutSessionCompleted(
 
     throw err;
   }
+
   try {
     await updateUserTier(user.uuid, price.product as string, config);
   } catch (err) {
@@ -86,7 +88,9 @@ export default async function handleCheckoutSessionCompleted(
       const userData = await usersService.findUserByUuid(user.uuid);
 
       const invoice = await stripe.invoices.retrieve(session.invoice as string);
+
       const couponId = invoice.discount?.coupon.id;
+
       if (couponId) {
         await usersService.storeCouponUsedByUser(userData, couponId);
       }
@@ -98,6 +102,7 @@ export default async function handleCheckoutSessionCompleted(
       log.error(error);
     }
   }
+
   try {
     await cacheService.clearSubscription(customer.id);
   } catch (err) {

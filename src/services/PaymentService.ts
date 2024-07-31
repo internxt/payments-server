@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
-import { DisplayPrice, RequestedPlan } from '../core/users/DisplayPrice';
+import { DisplayPrice } from '../core/users/DisplayPrice';
 import { User, UserSubscription } from '../core/users/User';
-import { PromotionCode } from '../core/users/PromotionCode';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -28,6 +27,17 @@ type HasUserAppliedCouponResponse = {
   elegible: boolean;
   reason?: Reason;
 };
+
+export interface RequestedPlan {
+  selectedPlan: DisplayPrice & { decimalAmount: number };
+  upsellPlan?: DisplayPrice & { decimalAmount: number };
+}
+
+export interface PromotionCode {
+  codeId: Stripe.PromotionCode['id'];
+  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
+  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
 
 export type Reason = {
   name: 'prevent-cancellation';
