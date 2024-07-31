@@ -39,6 +39,15 @@ export interface PromotionCode {
   percentOff: Stripe.PromotionCode['coupon']['percent_off'];
 }
 
+export interface SubscriptionCreated {
+  type: 'setup' | 'payment';
+  clientSecret: string;
+}
+
+export interface PaymentIntent {
+  clientSecret: string | null;
+}
+
 export type Reason = {
   name: 'prevent-cancellation';
 };
@@ -62,15 +71,6 @@ export type PriceMetadata = {
   planType: 'subscription' | 'one_time';
 };
 
-export type SubscriptionCreatedObject = {
-  type: 'setup' | 'payment';
-  clientSecret: string;
-};
-
-export type PaymentIntentObject = {
-  clientSecret: string | null;
-};
-
 export class PaymentService {
   private readonly provider: Stripe;
 
@@ -88,7 +88,7 @@ export class PaymentService {
     customerId: string,
     priceId: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
-  ): Promise<SubscriptionCreatedObject> {
+  ): Promise<SubscriptionCreated> {
     if (!customerId || !priceId) {
       throw new MissingParametersError(['customerId', 'priceId']);
     }
@@ -131,7 +131,7 @@ export class PaymentService {
     amount: number,
     planId: string,
     promoCodeName?: string,
-  ): Promise<PaymentIntentObject> {
+  ): Promise<PaymentIntent> {
     if (!customerId || !amount || !planId) {
       throw new MissingParametersError(['customerId', 'amount', 'planId']);
     }
