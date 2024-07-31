@@ -1,6 +1,7 @@
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
+import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 
 const getUsersRepositoryForTest = (): UsersRepository => {
@@ -12,6 +13,14 @@ const getUsersRepositoryForTest = (): UsersRepository => {
   };
 
   return usersRepositoryMock;
+};
+
+const getProductsRepositoryForTest = (): ProductsRepository => {
+  const productsRepository: ProductsRepository = {
+    findByType: jest.fn(),
+  };
+
+  return productsRepository;
 };
 
 const getUsersCouponsRepositoryForTest = (): UsersCouponsRepository => {
@@ -43,6 +52,7 @@ const displayBillingRepositoryForTest = (): DisplayBillingRepository => {
 
 const testFactory = {
   getUsersRepositoryForTest,
+  getProductsRepositoryForTest,
   getUsersCouponsRepositoryForTest,
   getCouponsRepositoryForTest,
   displayBillingRepositoryForTest,

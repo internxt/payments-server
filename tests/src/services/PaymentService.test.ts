@@ -1,16 +1,23 @@
 import axios from 'axios';
 import Stripe from 'stripe';
 
-import { PaymentIntentObject, PaymentService, SubscriptionCreatedObject } from '../../../src/services/PaymentService';
+import {
+  PaymentIntent,
+  PaymentService,
+  PromotionCode,
+  SubscriptionCreated,
+} from '../../../src/services/PaymentService';
 import { StorageService } from '../../../src/services/StorageService';
 import { UsersService } from '../../../src/services/UsersService';
-import config from '../../../src/config';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import testFactory from '../utils/factory';
+import envVariablesConfig from '../../../src/config';
+import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 
+let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
 let storageService: StorageService;
 let usersService: UsersService;
@@ -33,6 +40,12 @@ const requestPayload = {
 
 const mockCustomer = { id: 'cus_12345', email: 'test@example.com', name: 'Test User' };
 
+const mockPromotionCodeResponse = {
+  id: 'promo_id',
+  amountOff: null,
+  discountOff: 75,
+};
+
 const mockCreateSubscriptionResponse = {
   type: 'payment',
   clientSecret: 'client_secret',
@@ -42,16 +55,24 @@ const paymentIntentResponse = {
   clientSecret: 'client_secret',
 };
 
+const promotionCodeName = 'PROMOCODE';
+
 describe('Payments Service tests', () => {
   beforeEach(() => {
-    paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' }));
-    storageService = new StorageService(config, axios);
+    productsRepository = testFactory.getProductsRepositoryForTest();
+    paymentService = new PaymentService(
+      new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
+      productsRepository,
+    );
+    storageService = new StorageService(envVariablesConfig, axios);
     usersService = new UsersService(
       usersRepository,
       paymentService,
       displayBillingRepository,
       couponsRepository,
       usersCouponsRepository,
+      envVariablesConfig,
+      axios,
     );
 
     usersRepository = testFactory.getUsersRepositoryForTest();
@@ -72,13 +93,24 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Fetching the promotion code object', () => {
+    it('should get the promo code ID, amount off or discounted off', async () => {
+      const customerCreatedSpy = jest
+        .spyOn(paymentService, 'getPromotionCodeByName')
+        .mockImplementation(() => Promise.resolve(mockPromotionCodeResponse as unknown as PromotionCode));
+
+      const promotionCode = await paymentService.getPromotionCodeByName(promotionCodeName);
+
+      expect(customerCreatedSpy).toHaveBeenCalledWith(promotionCodeName);
+      expect(promotionCode).toEqual(mockPromotionCodeResponse);
+    });
+  });
+
   describe('Creating a subscription', () => {
     it('Should create a subscription with all params', async () => {
       const subscriptionCreatedSpy = jest
         .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() =>
-          Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreatedObject),
-        );
+        .mockImplementation(() => Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreated));
 
       const subscription = await paymentService.createSubscription(
         requestPayload.customerId,
@@ -99,7 +131,7 @@ describe('Payments Service tests', () => {
     it('Should return the client secret to pay in the client side', async () => {
       const paymentIntentSpy = jest
         .spyOn(paymentService, 'getPaymentIntent')
-        .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntentObject));
+        .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntent));
 
       const paymentIntent = await paymentService.getPaymentIntent(
         requestPayload.customerId,
