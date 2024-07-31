@@ -146,7 +146,7 @@ export class PaymentService {
       ],
       payment_behavior: 'default_incomplete',
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: ['card', 'paypal', 'ideal', 'sofort'],
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
@@ -180,7 +180,7 @@ export class PaymentService {
     const invoice = await this.provider.invoices.create({
       customer: customerId,
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: ['card', 'paypal', 'ideal', 'sofort'],
       },
     });
 
@@ -848,10 +848,14 @@ export class PaymentService {
     return checkout;
   }
 
-  async getLineItems(checkoutSessionId: string) {
+  async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
       expand: ['data.price.product'],
     });
+  }
+
+  async getInvoiceLineItems(invoiceId: string) {
+    return this.provider.invoices.listLineItems(invoiceId);
   }
 
   getCustomer(customerId: CustomerId) {

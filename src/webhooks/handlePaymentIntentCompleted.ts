@@ -22,18 +22,18 @@ export default async function handlePaymentIntentCompleted(
 
   const customer = await paymentService.getCustomer(session.customer as string);
 
-  const items = await paymentService.getLineItems(session.invoice as string);
+  const items = await paymentService.getInvoiceLineItems(session.invoice as string);
 
   const price = items.data[0].price;
 
   if (!price) {
-    log.error(`Checkout session completed does not contain price, customer: ${session.receipt_email}`);
+    log.error(`Payment intent completed does not contain price, customer: ${session.receipt_email}`);
     return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
     log.error(
-      `Checkout session completed with a price without maxSpaceBytes as metadata. customer: ${session.receipt_email}`,
+      `Payment intent completed with a price without maxSpaceBytes as metadata. customer: ${session.receipt_email}`,
     );
     return;
   }
@@ -43,9 +43,7 @@ export default async function handlePaymentIntentCompleted(
   const isLifetimePlan = (price.metadata as PriceMetadata).planType === 'one_time';
 
   if (customer.deleted) {
-    log.error(
-      `Customer object could not be retrieved in checkout session completed handler with id ${session.customer}`,
-    );
+    log.error(`Customer object could not be retrieved in payment intent completed handler with id ${session.customer}`);
     return;
   }
 
@@ -55,7 +53,7 @@ export default async function handlePaymentIntentCompleted(
     user = res.data.user;
   } catch (err) {
     log.error(
-      `Error while creating or updating user in checkout session completed handler, email: ${session.receipt_email}`,
+      `Error while creating or updating user in payment intent completed handler, email: ${session.receipt_email}`,
     );
     log.error(err);
 

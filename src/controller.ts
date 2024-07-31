@@ -349,7 +349,12 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: { customerId: CustomerId; amount: number; planId: string; promoCodeName: string };
+      Querystring: {
+        customerId: CustomerId;
+        amount: number;
+        planId: string;
+        promoCodeName: string;
+      };
       schema: {
         querystring: {
           type: 'object';

@@ -21,7 +21,7 @@ export default async function handleCheckoutSessionCompleted(
     return;
   }
 
-  const lineItems = await paymentService.getLineItems(session.id);
+  const lineItems = await paymentService.getCheckoutLineItems(session.id);
 
   const price = lineItems.data[0].price;
   const product = price?.product as Stripe.Product;
