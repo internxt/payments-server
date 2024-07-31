@@ -5,6 +5,7 @@ import {
   CouponCodeError,
   CustomerId,
   MissingParametersError,
+  NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
   PaymentService,
 } from './services/PaymentService';
@@ -520,6 +521,38 @@ export default function (
           req.log.error(err);
           return rep.status(500).send({ message: 'Internal server error' });
         }
+      }
+    });
+
+    fastify.get<{
+      Querystring: { planId: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { planId: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/plan-by-id', async (req, rep) => {
+      const { planId } = req.query;
+
+      try {
+        const planObject = await paymentService.getPlanById(planId);
+
+        return rep.status(200).send(planObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPlanByIdError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
 
