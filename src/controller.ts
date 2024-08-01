@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import jwt from 'jsonwebtoken';
 import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import {
@@ -107,13 +108,21 @@ export default function (
         }
 
         try {
-          const createdCustomer = await paymentService.createCustomer({
+          const { id } = await paymentService.createCustomer({
             name,
             email,
           });
 
+          const token = jwt.sign(
+            {
+              customerId: id,
+            },
+            config.JWT_SECRET,
+          );
+
           return res.send({
-            customerId: createdCustomer.id,
+            customerId: id,
+            token,
           });
         } catch (err) {
           return res.status(500).send({
@@ -142,8 +151,20 @@ export default function (
 
       try {
         const { id } = await paymentService.getCustomerIdByEmail(email);
+
+        const token = jwt.sign(
+          {
+            customerId: id,
+          },
+          config.JWT_SECRET,
+          {
+            expiresIn: '1h',
+          },
+        );
+
         return res.status(200).send({
           customerId: id,
+          token,
         });
       } catch (error) {
         if (error instanceof CustomerNotFoundError) {
@@ -161,7 +182,7 @@ export default function (
       }
     });
 
-    fastify.post<{ Body: { customerId: string; priceId: string; promoCodeId: string } }>(
+    fastify.post<{ Body: { customerId: string; priceId: string; token: string; promoCodeId?: string } }>(
       '/create-subscription',
       {
         schema: {
@@ -175,6 +196,9 @@ export default function (
               priceId: {
                 type: 'string',
               },
+              token: {
+                type: 'string',
+              },
               promoCodeId: {
                 type: 'string',
               },
@@ -183,7 +207,20 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, promoCodeId } = req.body;
+        const { customerId, priceId, token, promoCodeId } = req.body;
+
+        try {
+          const payload = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          const tokenCustomerId = payload.customerId;
+
+          if (customerId !== tokenCustomerId) {
+            return res.status(403).send();
+          }
+        } catch (error) {
+          return res.status(403).send();
+        }
 
         try {
           const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, promoCodeId);
@@ -369,7 +406,8 @@ export default function (
         customerId: CustomerId;
         amount: number;
         planId: string;
-        promoCodeName: string;
+        token: string;
+        promoCodeName?: string;
       };
       schema: {
         querystring: {
@@ -378,12 +416,26 @@ export default function (
             customerId: { type: 'string' };
             planId: { type: 'string' };
             amount: { type: 'number' };
+            token: { type: 'number' };
             promoCodeName: { type: 'string' };
           };
         };
       };
-    }>('/payment-intent', async (req, rep) => {
-      const { customerId, amount, planId, promoCodeName } = req.query;
+    }>('/payment-intent', async (req, res) => {
+      const { customerId, amount, planId, token, promoCodeName } = req.query;
+
+      try {
+        const payload = jwt.verify(token, config.JWT_SECRET) as {
+          customerId: string;
+        };
+        const tokenCustomerId = payload.customerId;
+
+        if (customerId !== tokenCustomerId) {
+          return res.status(403).send();
+        }
+      } catch (error) {
+        return res.status(403).send();
+      }
 
       try {
         const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId, promoCodeName);
@@ -392,12 +444,12 @@ export default function (
       } catch (err) {
         const error = err as Error;
         if (error instanceof MissingParametersError) {
-          return rep.status(404).send({
+          return res.status(404).send({
             message: error.message,
           });
         }
         req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
-        return rep.status(500).send({
+        return res.status(500).send({
           message: 'Internal Server Error',
         });
       }

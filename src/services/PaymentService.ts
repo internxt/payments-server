@@ -870,7 +870,7 @@ export class PaymentService {
     const { data: customer } = await this.provider.customers.search({
       query: `email:'${email}'`,
     });
-    const userExists = !!customer;
+    const userExists = !!customer.length;
 
     if (!userExists) {
       throw new CustomerNotFoundError(email);
