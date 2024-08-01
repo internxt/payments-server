@@ -4,11 +4,14 @@ import { User, UserSubscription, UserType } from '../core/users/User';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 
 type Customer = Stripe.Customer;
-type CustomerId = Customer['id'];
+export type CustomerId = Customer['id'];
 type CustomerEmail = Customer['email'];
 
 type Price = Stripe.Price;
+type Plan = Stripe.Plan;
+
 type PriceId = Price['id'];
+export type PlanId = Plan['id'];
 
 type Subscription = Stripe.Subscription;
 type SubscriptionId = Subscription['id'];
@@ -28,6 +31,26 @@ type HasUserAppliedCouponResponse = {
 
 interface ExtendedSubscription extends Subscription {
   product?: Stripe.Product;
+}
+
+export interface RequestedPlan {
+  selectedPlan: DisplayPrice & { decimalAmount: number };
+  upsellPlan?: DisplayPrice & { decimalAmount: number };
+}
+
+export interface PromotionCode {
+  codeId: Stripe.PromotionCode['id'];
+  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
+  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
+export interface SubscriptionCreated {
+  type: 'setup' | 'payment';
+  clientSecret: string;
+}
+
+export interface PaymentIntent {
+  clientSecret: string | null;
 }
 
 export type Reason = {
@@ -100,6 +123,89 @@ export class PaymentService {
     return customer;
   }
 
+  async createSubscription(
+    customerId: string,
+    priceId: string,
+    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
+  ): Promise<SubscriptionCreated> {
+    if (!customerId || !priceId) {
+      throw new MissingParametersError(['customerId', 'priceId']);
+    }
+
+    const subscription = await this.provider.subscriptions.create({
+      customer: customerId,
+      items: [
+        {
+          price: priceId,
+          discounts: [
+            {
+              promotion_code: promoCodeId,
+            },
+          ],
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        payment_method_types: ['card', 'paypal'],
+        save_default_payment_method: 'on_subscription',
+      },
+      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+    });
+
+    if (subscription.pending_setup_intent !== null) {
+      return {
+        type: 'setup',
+        clientSecret: (subscription.pending_setup_intent as any).client_secret,
+      };
+    } else {
+      return {
+        type: 'payment',
+        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+      };
+    }
+  }
+
+  async getPaymentIntent(
+    customerId: CustomerId,
+    amount: number,
+    priceId: string,
+    promoCodeName?: string,
+  ): Promise<PaymentIntent> {
+    if (!customerId || !amount || !priceId) {
+      throw new MissingParametersError(['customerId', 'amount', 'priceId']);
+    }
+
+    const product = await this.provider.prices.retrieve(priceId);
+
+    const invoice = await this.provider.invoices.create({
+      customer: customerId,
+      payment_settings: {
+        payment_method_types: ['card', 'paypal'],
+      },
+    });
+
+    await this.provider.invoiceItems.create({
+      customer: customerId,
+      price: product.id,
+      invoice: invoice.id,
+      discounts: [
+        {
+          promotion_code: promoCodeName,
+        },
+      ],
+    });
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    const { client_secret } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
+
+    return {
+      clientSecret: client_secret,
+    };
+  }
+
   async updateCustomerBillingInfo(
     customerId: CustomerId,
     payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
@@ -143,7 +249,7 @@ export class PaymentService {
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
-    await this.provider.subscriptions.del(subscriptionId, {});
+    await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
@@ -554,6 +660,59 @@ export class PaymentService {
     );
   }
 
+  async getUpsellProduct(productId: Stripe.Product['id']): Promise<Stripe.Price | undefined> {
+    const productData = await this.provider.prices.list({
+      active: true,
+      product: productId,
+    });
+    const upsellProduct = productData.data.find((productItem) => productItem.recurring?.interval === 'year');
+
+    return upsellProduct;
+  }
+
+  async getPlanById(priceId: PlanId): Promise<RequestedPlan> {
+    try {
+      let upsellPlan: RequestedPlan['upsellPlan'];
+
+      const { id, currency, unit_amount, metadata, type, recurring, product } = await this.provider.prices.retrieve(
+        priceId,
+      );
+
+      const selectedPlan: RequestedPlan['selectedPlan'] = {
+        id: id,
+        currency: currency,
+        amount: unit_amount as number,
+        bytes: parseInt(metadata?.maxSpaceBytes),
+        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
+        decimalAmount: (unit_amount as number) / 100,
+      };
+
+      if (recurring?.interval === 'month') {
+        const upsell = await this.getUpsellProduct(product as string);
+
+        if (upsell?.active) {
+          upsellPlan = {
+            id: upsell.id,
+            currency: upsell.currency,
+            amount: upsell.unit_amount as number,
+            bytes: parseInt(upsell.metadata?.maxSpaceBytes),
+            interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
+            decimalAmount: (upsell.unit_amount as number) / 100,
+          };
+        }
+      }
+
+      return {
+        selectedPlan,
+        upsellPlan,
+      };
+    } catch (err) {
+      const error = err as Error;
+      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
+      throw new Error('Interval Server Error');
+    }
+  }
+
   private getPaymentMethodTypes(
     currency: string,
     isOneTime: boolean,
@@ -689,10 +848,14 @@ export class PaymentService {
     return checkout;
   }
 
-  async getLineItems(checkoutSessionId: string) {
+  async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
       expand: ['data.price.product'],
     });
+  }
+
+  async getInvoiceLineItems(invoiceId: string) {
+    return this.provider.invoices.listLineItems(invoiceId);
   }
 
   getCustomer(customerId: CustomerId) {
@@ -701,6 +864,23 @@ export class PaymentService {
 
   getProduct(productId: Stripe.Product['id']) {
     return this.provider.products.retrieve(productId);
+  }
+
+  async getCustomerIdByEmail(email: string) {
+    const { data: customer } = await this.provider.customers.search({
+      query: `email:'${email}'`,
+    });
+    const userExists = !!customer.length;
+
+    if (!userExists) {
+      throw new CustomerNotFoundError(email);
+    }
+
+    const customerId = customer[0].id;
+
+    return {
+      id: customerId,
+    };
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
@@ -768,6 +948,30 @@ export class CouponCodeError extends Error {
     super(message);
 
     Object.setPrototypeOf(this, CouponCodeError.prototype);
+  }
+}
+
+export class CustomerNotFoundError extends Error {
+  constructor(email: string) {
+    super(`Customer with email ${email} does not exist`);
+    Object.setPrototypeOf(this, CustomerNotFoundError.prototype);
+  }
+}
+
+export class MissingParametersError extends Error {
+  constructor(params: string[]) {
+    const missingParams = params.concat(', ');
+    super(`You must provide the following parameters: ${missingParams}`);
+
+    Object.setPrototypeOf(this, MissingParametersError.prototype);
+  }
+}
+
+export class NotFoundPlanByIdError extends Error {
+  constructor(priceId: string) {
+    super(`Plan with an id ${priceId} does not exist`);
+
+    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
   }
 }
 
