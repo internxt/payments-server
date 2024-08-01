@@ -35,7 +35,7 @@ export default async function handleSubscriptionCanceled(
   }
 
   if (hasBoughtALifetime) {
-    // This user has purchased a lifetime plan by having a subscription.
+    // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
     // The space should not be set to Free plan.
     return;
   }

@@ -168,14 +168,14 @@ export class PaymentService {
   async getPaymentIntent(
     customerId: CustomerId,
     amount: number,
-    planId: string,
+    priceId: string,
     promoCodeName?: string,
   ): Promise<PaymentIntent> {
-    if (!customerId || !amount || !planId) {
-      throw new MissingParametersError(['customerId', 'amount', 'planId']);
+    if (!customerId || !amount || !priceId) {
+      throw new MissingParametersError(['customerId', 'amount', 'priceId']);
     }
 
-    const product = await this.provider.prices.retrieve(planId);
+    const product = await this.provider.prices.retrieve(priceId);
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
@@ -670,12 +670,12 @@ export class PaymentService {
     return upsellProduct;
   }
 
-  async getPlanById(planId: PlanId): Promise<RequestedPlan> {
+  async getPlanById(priceId: PlanId): Promise<RequestedPlan> {
     try {
       let upsellPlan: RequestedPlan['upsellPlan'];
 
       const { id, currency, unit_amount, metadata, type, recurring, product } = await this.provider.prices.retrieve(
-        planId,
+        priceId,
       );
 
       const selectedPlan: RequestedPlan['selectedPlan'] = {
@@ -708,7 +708,7 @@ export class PaymentService {
       };
     } catch (err) {
       const error = err as Error;
-      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(planId);
+      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
       throw new Error('Interval Server Error');
     }
   }
@@ -867,11 +867,16 @@ export class PaymentService {
   }
 
   async getCustomerIdByEmail(email: string) {
-    const { data } = await this.provider.customers.search({
+    const { data: customer } = await this.provider.customers.search({
       query: `email:'${email}'`,
     });
+    const userExists = !!customer;
 
-    const customerId = data[0].id;
+    if (!userExists) {
+      throw new CustomerNotFoundError(email);
+    }
+
+    const customerId = customer[0].id;
 
     return {
       id: customerId,
@@ -946,6 +951,13 @@ export class CouponCodeError extends Error {
   }
 }
 
+export class CustomerNotFoundError extends Error {
+  constructor(email: string) {
+    super(`Customer with email ${email} does not exist`);
+    Object.setPrototypeOf(this, CustomerNotFoundError.prototype);
+  }
+}
+
 export class MissingParametersError extends Error {
   constructor(params: string[]) {
     const missingParams = params.concat(', ');
@@ -956,8 +968,8 @@ export class MissingParametersError extends Error {
 }
 
 export class NotFoundPlanByIdError extends Error {
-  constructor(planId: string) {
-    super(`Plan with an id ${planId} does not exist`);
+  constructor(priceId: string) {
+    super(`Plan with an id ${priceId} does not exist`);
 
     Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
   }

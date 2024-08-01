@@ -4,6 +4,7 @@ import { UserNotFoundError, UsersService } from './services/UsersService';
 import {
   CouponCodeError,
   CustomerId,
+  CustomerNotFoundError,
   MissingParametersError,
   NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
@@ -89,6 +90,12 @@ export default function (
             properties: { name: { type: 'string' }, email: { type: 'string' } },
           },
         },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 hour',
+          },
+        },
       },
       async (req, res) => {
         const { name, email } = req.body;
@@ -139,8 +146,17 @@ export default function (
           customerId: id,
         });
       } catch (error) {
-        return res.status(404).send({
-          message: 'CustomerId not found',
+        if (error instanceof CustomerNotFoundError) {
+          return res.status(404).send({
+            message: error.message,
+          });
+        }
+
+        const err = error as Error;
+        req.log.error(`[ERROR FETCHING THE CUSTOMER ID]: ${err.stack ?? err.message}`);
+
+        return res.status(500).send({
+          message: 'Internal Server Error',
         });
       }
     });

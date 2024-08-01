@@ -86,7 +86,7 @@ export default async function handlePaymentIntentCompleted(
   } catch (err) {
     const error = err as Error;
     log.error(
-      `Error while updating user tier: email: ${session.receipt_email}, planId: ${price.product as string} `,
+      `Error while updating user tier: email: ${session.receipt_email}, priceId: ${price.product as string} `,
       error.stack ?? error.message,
     );
 
@@ -95,8 +95,6 @@ export default async function handlePaymentIntentCompleted(
 
   try {
     const customerByUuid = await usersService.findUserByUuid(user.uuid);
-
-    // if (!customerByUuid) throw Error();
 
     await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
