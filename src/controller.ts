@@ -134,7 +134,7 @@ export default function (
       }
 
       try {
-        const { id } = await paymentService.getCustomersByEmail(email);
+        const { id } = await paymentService.getCustomerIdByEmail(email);
         return res.status(200).send({
           customerId: id,
         });

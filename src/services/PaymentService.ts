@@ -409,10 +409,10 @@ export class PaymentService {
     });
   }
 
-  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer> {
+  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
-    return res.data[0];
+    return res.data;
   }
 
   async getPlanIdFromLastPayment(
@@ -871,9 +871,11 @@ export class PaymentService {
       query: `email:'${email}'`,
     });
 
-    const customerId = data[0].email;
+    const customerId = data[0].id;
 
-    return customerId;
+    return {
+      id: customerId,
+    };
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

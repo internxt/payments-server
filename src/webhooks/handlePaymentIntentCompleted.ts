@@ -55,16 +55,20 @@ export default async function handlePaymentIntentCompleted(
     return;
   }
 
-  const { maxSpaceBytes } = price.metadata as PriceMetadata;
-
-  const isLifetimePlan = (price.metadata as PriceMetadata).planType === 'one_time';
-
   if (customer.deleted) {
     log.error(`Customer object could not be retrieved in payment intent completed handler with id ${session.customer}`);
     return;
   }
 
   let user: { uuid: string };
+  const { maxSpaceBytes, planType } = price.metadata as PriceMetadata;
+  const isLifetimePlan = planType === 'one_time';
+  const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
+
+  if (isLifetimePlan && userActiveSubscription) {
+    await paymentService.cancelSubscription(userActiveSubscription[0].id);
+  }
+
   try {
     const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
     user = res.data.user;
@@ -86,7 +90,7 @@ export default async function handlePaymentIntentCompleted(
       error.stack ?? error.message,
     );
 
-    // throw err;
+    throw err;
   }
 
   try {
