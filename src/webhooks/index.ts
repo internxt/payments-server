@@ -6,10 +6,11 @@ import { UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/PaymentService';
-import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
+import handlePaymentIntentCompleted from './handlePaymentIntentCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
+import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 
 export default function (
   stripe: Stripe,
@@ -38,6 +39,7 @@ export default function (
           throw err;
         }
       }
+
       fastify.log.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
@@ -52,20 +54,34 @@ export default function (
             config,
           );
           break;
+
         case 'customer.subscription.updated':
           await handleSubscriptionUpdated(
             storageService,
             usersService,
-            event.data.object as Stripe.Subscription,
+            event.data.object,
             cacheService,
             paymentService,
             fastify.log,
             config,
           );
           break;
+
+        case 'payment_intent.succeeded':
+          await handlePaymentIntentCompleted(
+            event.data.object,
+            stripe,
+            usersService,
+            paymentService,
+            fastify.log,
+            cacheService,
+            config,
+          );
+          break;
+
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session,
+            event.data.object,
             stripe,
             usersService,
             paymentService,
@@ -74,15 +90,14 @@ export default function (
             config,
           );
           break;
+
         case 'setup_intent.succeeded':
-          await handleSetupIntentSucceded(
-            event.data.object as Stripe.SetupIntent,
-            paymentService,
-          );
+          await handleSetupIntentSucceded(event.data.object as Stripe.SetupIntent, paymentService);
           break;
+
         case 'checkout.session.async_payment_succeeded':
           await handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session,
+            event.data.object,
             stripe,
             usersService,
             paymentService,
@@ -91,16 +106,18 @@ export default function (
             config,
           );
           break;
+
         case 'charge.refunded':
           await handleLifetimeRefunded(
             storageService,
             usersService,
-            (event.data.object as Stripe.Charge).customer as string,
+            event.data.object.customer as string,
             cacheService,
             fastify.log,
             config,
           );
           break;
+
         default:
           fastify.log.info(`No handler registered for event: ${event.type}, id: ${event.id}`);
       }

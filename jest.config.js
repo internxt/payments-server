@@ -1,6 +1,11 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  modulePathIgnorePatterns: ['utils']
+  testMatch: ['**/tests/**/*.test.ts'],
+  moduleFileExtensions: ['ts', 'js'],
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
+  // collectCoverage: true,
+  // coverageDirectory: 'coverage',
 };

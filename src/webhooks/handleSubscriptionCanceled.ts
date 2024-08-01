@@ -19,10 +19,11 @@ export default async function handleSubscriptionCanceled(
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
-  const { uuid } = await usersService.findUserByCustomerID(customerId);
+  const { uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
 
-  const { metadata : productMetadata } = await paymentService.getProduct(productId);
+  const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
+
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
@@ -32,15 +33,19 @@ export default async function handleSubscriptionCanceled(
   if (productType === UserType.Business) {
     return usersService.destroyWorkspace(uuid);
   }
- 
+
+  if (hasBoughtALifetime) {
+    // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
+    // The space should not be set to Free plan.
+    return;
+  }
+
   try {
     await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
   } catch (err) {
-    log.error(
-      `[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `,
-    );
+    log.error(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `);
     log.error(err);
   }
-  
+
   return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
 }
