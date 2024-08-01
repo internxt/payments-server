@@ -146,7 +146,7 @@ export class PaymentService {
       ],
       payment_behavior: 'default_incomplete',
       payment_settings: {
-        payment_method_types: ['card', 'paypal', 'ideal', 'sofort'],
+        payment_method_types: ['card', 'paypal'],
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
@@ -180,7 +180,7 @@ export class PaymentService {
     const invoice = await this.provider.invoices.create({
       customer: customerId,
       payment_settings: {
-        payment_method_types: ['card', 'paypal', 'ideal', 'sofort'],
+        payment_method_types: ['card', 'paypal'],
       },
     });
 

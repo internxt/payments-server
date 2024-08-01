@@ -24,6 +24,23 @@ export default async function handlePaymentIntentCompleted(
 
   const items = await paymentService.getInvoiceLineItems(session.invoice as string);
 
+  const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method as string);
+
+  const userAddressBillingDetails = paymentMethod.billing_details.address;
+
+  if (userAddressBillingDetails) {
+    await stripe.customers.update(customer.id, {
+      address: {
+        city: userAddressBillingDetails.city as string,
+        line1: userAddressBillingDetails.line1 as string,
+        line2: userAddressBillingDetails.line2 as string,
+        country: userAddressBillingDetails.country as string,
+        postal_code: userAddressBillingDetails.postal_code as string,
+        state: userAddressBillingDetails.state as string,
+      },
+    });
+  }
+
   const price = items.data[0].price;
 
   if (!price) {
