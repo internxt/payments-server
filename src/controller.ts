@@ -6,6 +6,7 @@ import {
   CouponCodeError,
   CustomerId,
   CustomerNotFoundError,
+  ExistingSubscriptionError,
   MissingParametersError,
   NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
@@ -713,20 +714,26 @@ export default function (
           req.log.info(`User with uuid ${uuid} not found in DB`);
         }
 
-        const { id } = await paymentService.getCheckoutSession({
-          priceId: price_id,
-          successUrl: success_url,
-          cancelUrl: cancel_url,
-          customerId: user?.customerId,
-          prefill: user ?? customer_email,
-          mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
-          trialDays: trial_days,
-          couponCode: coupon_code,
-          currency: currencyValue,
-          seats,
-        });
+        try {
+          const { id } = await paymentService.getCheckoutSession({
+            priceId: price_id,
+            successUrl: success_url,
+            cancelUrl: cancel_url,
+            customerId: user?.customerId,
+            prefill: user ?? customer_email,
+            mode: (mode as Stripe.Checkout.SessionCreateParams.Mode) || 'subscription',
+            trialDays: trial_days,
+            couponCode: coupon_code,
+            currency: currencyValue,
+            seats,
+          });
 
-        return { sessionId: id };
+          return { sessionId: id };
+        } catch (err) {
+          if (err instanceof ExistingSubscriptionError) {
+            return rep.status(400).send({ message: err.message });
+          }
+        }
       },
     );
 
