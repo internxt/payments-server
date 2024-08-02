@@ -182,7 +182,9 @@ export default function (
       }
     });
 
-    fastify.post<{ Body: { customerId: string; priceId: string; token: string; promoCodeId?: string } }>(
+    fastify.post<{
+      Body: { customerId: string; priceId: string; currency: string; token: string; promoCodeId?: string };
+    }>(
       '/create-subscription',
       {
         schema: {
@@ -199,6 +201,9 @@ export default function (
               token: {
                 type: 'string',
               },
+              currency: {
+                type: 'string',
+              },
               promoCodeId: {
                 type: 'string',
               },
@@ -207,7 +212,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, token, promoCodeId } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -223,7 +228,7 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, promoCodeId);
+          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency, promoCodeId);
 
           return res.send(subscriptionSetUp);
         } catch (err) {
@@ -407,6 +412,7 @@ export default function (
         amount: number;
         planId: string;
         token: string;
+        currency?: string;
         promoCodeName?: string;
       };
       schema: {
@@ -416,13 +422,14 @@ export default function (
             customerId: { type: 'string' };
             planId: { type: 'string' };
             amount: { type: 'number' };
-            token: { type: 'number' };
+            token: { type: 'string' };
+            currency: { type: 'string' };
             promoCodeName: { type: 'string' };
           };
         };
       };
     }>('/payment-intent', async (req, res) => {
-      const { customerId, amount, planId, token, promoCodeName } = req.query;
+      const { customerId, amount, planId, currency, token, promoCodeName } = req.query;
 
       try {
         const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -438,7 +445,13 @@ export default function (
       }
 
       try {
-        const { clientSecret } = await paymentService.getPaymentIntent(customerId, amount, planId, promoCodeName);
+        const { clientSecret } = await paymentService.createPaymentIntent(
+          customerId,
+          amount,
+          planId,
+          currency,
+          promoCodeName,
+        );
 
         return { clientSecret };
       } catch (err) {
@@ -598,11 +611,11 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: { planId: string };
+      Querystring: { planId: string; currency?: string };
       schema: {
         querystring: {
           type: 'object';
-          properties: { planId: { type: 'string' } };
+          properties: { planId: { type: 'string' }; currency: { type: 'string' } };
         };
       };
       config: {
@@ -612,10 +625,10 @@ export default function (
         };
       };
     }>('/plan-by-id', async (req, rep) => {
-      const { planId } = req.query;
+      const { planId, currency } = req.query;
 
       try {
-        const planObject = await paymentService.getPlanById(planId);
+        const planObject = await paymentService.getPlanById(planId, currency);
 
         return rep.status(200).send(planObject);
       } catch (error) {
