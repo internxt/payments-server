@@ -64,8 +64,9 @@ export default async function handlePaymentIntentCompleted(
   const { maxSpaceBytes, planType } = price.metadata as PriceMetadata;
   const isLifetimePlan = planType === 'one_time';
   const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
+  const hasActiveSubscription = !!userActiveSubscription.length;
 
-  if (isLifetimePlan && userActiveSubscription && userActiveSubscription[0]?.status === 'active') {
+  if (isLifetimePlan && !!hasActiveSubscription && userActiveSubscription[0]?.status === 'active') {
     await paymentService.cancelSubscription(userActiveSubscription[0].id);
   }
 
