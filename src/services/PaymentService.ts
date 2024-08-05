@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { ProductsRepository } from '../core/users/ProductsRepository';
+import { UsersRepository } from '../core/users/UsersRepository';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -111,10 +112,12 @@ export interface PromotionCode {
 export class PaymentService {
   private readonly provider: Stripe;
   private readonly productsRepository: ProductsRepository;
+  private readonly usersRepository: UsersRepository;
 
-  constructor(provider: Stripe, productsRepository: ProductsRepository) {
+  constructor(provider: Stripe, productsRepository: ProductsRepository, usersRepository: UsersRepository) {
     this.provider = provider;
     this.productsRepository = productsRepository;
+    this.usersRepository = usersRepository;
   }
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
@@ -840,6 +843,24 @@ export class PaymentService {
     };
   }
 
+  async checkActiveSubscriptions(customerId: string, productType: UserType): Promise<void> {
+    let activeSubscriptions;
+    try {
+      activeSubscriptions =
+        productType === 'business'
+          ? await this.findBusinessActiveSubscription(customerId)
+          : await this.findIndividualActiveSubscription(customerId);
+    } catch (error) {
+      if (!(error instanceof NotFoundSubscriptionError)) {
+        throw error;
+      }
+    }
+
+    if (activeSubscriptions) {
+      throw new ExistingSubscriptionError('User already has an active subscription of the same type');
+    }
+  }
+
   async getCheckoutSession({
     customerId,
     priceId,
@@ -877,6 +898,13 @@ export class PaymentService {
     );
 
     if (!selectedPrice) throw new Error('The product does not exist');
+
+    const customerIsRegistered = customerId ? await this.getCustomer(customerId) : undefined;
+    const newPriceIsNotLifetime = selectedPrice.type !== 'one_time';
+
+    if (customerIsRegistered && newPriceIsNotLifetime && customerId) {
+      await this.checkActiveSubscriptions(customerId, (product.metadata.type as UserType) || UserType.Individual);
+    }
 
     let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
     if (product.metadata?.type === 'business') {
@@ -1082,5 +1110,13 @@ export class NotFoundPromoCodeByNameError extends Error {
     super(`Promotion code with an id ${promoCodeId} does not exist`);
 
     Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
+  }
+}
+
+export class ExistingSubscriptionError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
   }
 }
