@@ -676,7 +676,6 @@ export class PaymentService {
     });
 
     const upsellProduct = productData.data.find((productItem) => productItem.recurring?.interval === 'year');
-    console.log('UPSELL PRODUCT', upsellProduct);
 
     return upsellProduct;
   }
