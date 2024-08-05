@@ -193,14 +193,17 @@ export class UsersService {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
       },
-      data: {
+    };
+
+    await this.axios.put(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`,
+      {
         ownerId,
         maxSpaceBytes: maxSpaceBytes * seats,
         numberOfSeats: seats,
       },
-    };
-
-    await this.axios.put(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`, requestConfig);
+      requestConfig,
+    );
   }
 
   async destroyWorkspace(ownerId: string): Promise<void> {

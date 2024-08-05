@@ -4,6 +4,8 @@ import { type AppConfig } from './config';
 import { UserNotFoundError, UsersService } from './services/UsersService';
 import {
   CouponCodeError,
+  IncompatibleSubscriptionTypesError,
+  InvalidSeatNumberError,
   CustomerId,
   CustomerNotFoundError,
   MissingParametersError,
@@ -369,18 +371,28 @@ export default function (
         const userType = (req.body.userType as UserType) || UserType.Individual;
 
         const user = await assertUser(req, rep);
-        const userUpdated = await paymentService.updateSubscriptionPrice({
-          customerId: user.customerId,
-          priceId: priceId,
-          couponCode: couponCode,
-        });
+        try {
+          const userUpdated = await paymentService.updateSubscriptionPrice(
+            {
+              customerId: user.customerId,
+              priceId: priceId,
+              couponCode: couponCode,
+            },
+            userType,
+          );
 
-        const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
-        return rep.send({
-          userSubscription: updatedSubscription,
-          request3DSecure: userUpdated.is3DSecureRequired,
-          clientSecret: userUpdated.clientSecret,
-        });
+          const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
+          return rep.send({
+            userSubscription: updatedSubscription,
+            request3DSecure: userUpdated.is3DSecureRequired,
+            clientSecret: userUpdated.clientSecret,
+          });
+        } catch (err) {
+          if (err instanceof InvalidSeatNumberError || err instanceof IncompatibleSubscriptionTypesError) {
+            return rep.status(400).send({ message: err.message });
+          }
+          throw err;
+        }
       },
     );
 

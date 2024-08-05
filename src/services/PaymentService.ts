@@ -287,7 +287,7 @@ export class PaymentService {
    * @param additionalOptions - Additional options to update the subscription (all the options from Stripe.SubscriptionUpdateParams)
    * @returns The updated subscription
    */
-  async updateSub({
+  async updateIndividualSub({
     customerId,
     priceId,
     additionalOptions,
@@ -298,6 +298,16 @@ export class PaymentService {
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
   }) {
     const individualActiveSubscription = await this.findIndividualActiveSubscription(customerId);
+
+    const newPrice = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const newProduct = newPrice.product as Stripe.Product;
+
+    if (newProduct.metadata.type === UserType.Business) {
+      throw new IncompatibleSubscriptionTypesError('The new price is not an individual price');
+    }
+
     const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
@@ -305,6 +315,52 @@ export class PaymentService {
         {
           id: individualActiveSubscription.items.data[0].id,
           price: priceId,
+        },
+      ],
+      ...additionalOptions,
+    });
+
+    return updatedSubscription;
+  }
+
+  async updateBusinessSub({
+    customerId,
+    priceId,
+    additionalOptions,
+  }: {
+    customerId: CustomerId;
+    priceId: PriceId;
+    couponCode?: string;
+    additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
+  }) {
+    const businessActiveSubscription = await this.findBusinessActiveSubscription(customerId);
+    const currentItem = businessActiveSubscription.items.data[0];
+
+    const newPrice = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const newProduct = newPrice.product as Stripe.Product;
+
+    if (newProduct.metadata.type !== UserType.Business) {
+      throw new IncompatibleSubscriptionTypesError('The new price is not a business price');
+    }
+
+    if ((currentItem.quantity ?? 1) > parseInt(newPrice.metadata.maximumSeats)) {
+      throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+    }
+
+    if ((currentItem.quantity ?? 1) < parseInt(newPrice.metadata.minimumSeats)) {
+      throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+    }
+
+    const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
+      cancel_at_period_end: false,
+      proration_behavior: 'none',
+      items: [
+        {
+          id: businessActiveSubscription.items.data[0].id,
+          price: priceId,
+          quantity: currentItem.quantity,
         },
       ],
       ...additionalOptions,
@@ -334,7 +390,7 @@ export class PaymentService {
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
-    return this.updateSub({
+    return this.updateIndividualSub({
       customerId: customerId,
       priceId: priceId,
       additionalOptions: {
@@ -351,25 +407,39 @@ export class PaymentService {
    * @param couponCode - The coupon code
    * @returns updated subscription
    */
-  async updateSubscriptionPrice({
-    customerId,
-    priceId,
-    couponCode,
-  }: {
-    customerId: CustomerId;
-    priceId: PriceId;
-    couponCode: string;
-  }) {
+  async updateSubscriptionPrice(
+    {
+      customerId,
+      priceId,
+      couponCode,
+    }: {
+      customerId: CustomerId;
+      priceId: PriceId;
+      couponCode: string;
+    },
+    userType: UserType = UserType.Individual,
+  ) {
     let is3DSecureRequired = false;
     let clientSecret = '';
-    const updatedSubscription = await this.updateSub({
-      customerId: customerId,
-      priceId: priceId,
-      additionalOptions: {
-        coupon: couponCode,
-        billing_cycle_anchor: 'now',
-      },
-    });
+
+    const updatedSubscription =
+      userType === UserType.Individual
+        ? await this.updateIndividualSub({
+            customerId: customerId,
+            priceId: priceId,
+            additionalOptions: {
+              coupon: couponCode,
+              billing_cycle_anchor: 'now',
+            },
+          })
+        : await this.updateBusinessSub({
+            customerId: customerId,
+            priceId: priceId,
+            additionalOptions: {
+              coupon: couponCode,
+              billing_cycle_anchor: 'now',
+            },
+          });
 
     const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
 
@@ -968,6 +1038,21 @@ export class CouponCodeError extends Error {
   }
 }
 
+export class InvalidSeatNumberError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, InvalidSeatNumberError.prototype);
+  }
+}
+
+export class IncompatibleSubscriptionTypesError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, IncompatibleSubscriptionTypesError.prototype);
+  }
+}
 export class CustomerNotFoundError extends Error {
   constructor(email: string) {
     super(`Customer with email ${email} does not exist`);
