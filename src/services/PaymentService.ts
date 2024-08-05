@@ -126,14 +126,17 @@ export class PaymentService {
   async createSubscription(
     customerId: string,
     priceId: string,
+    currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
   ): Promise<SubscriptionCreated> {
+    const currencyValue = currency ?? 'eur';
     if (!customerId || !priceId) {
       throw new MissingParametersError(['customerId', 'priceId']);
     }
 
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
+      currency: currencyValue,
       items: [
         {
           price: priceId,
@@ -165,12 +168,15 @@ export class PaymentService {
     }
   }
 
-  async getPaymentIntent(
+  async createPaymentIntent(
     customerId: CustomerId,
     amount: number,
     priceId: string,
+    currency?: string,
     promoCodeName?: string,
   ): Promise<PaymentIntent> {
+    const currencyValue = currency ?? 'eur';
+
     if (!customerId || !amount || !priceId) {
       throw new MissingParametersError(['customerId', 'amount', 'priceId']);
     }
@@ -179,6 +185,7 @@ export class PaymentService {
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
+      currency: currencyValue,
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
       },
@@ -660,44 +667,54 @@ export class PaymentService {
     );
   }
 
-  async getUpsellProduct(productId: Stripe.Product['id']): Promise<Stripe.Price | undefined> {
+  async getUpsellProduct(productId: Stripe.Product['id'], currency: string): Promise<Stripe.Price | undefined> {
     const productData = await this.provider.prices.list({
       active: true,
       product: productId,
+      currency: currency,
+      expand: ['data.currency_options'],
     });
+
     const upsellProduct = productData.data.find((productItem) => productItem.recurring?.interval === 'year');
 
     return upsellProduct;
   }
 
-  async getPlanById(priceId: PlanId): Promise<RequestedPlan> {
-    try {
-      let upsellPlan: RequestedPlan['upsellPlan'];
+  async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
+    let upsellPlan: RequestedPlan['upsellPlan'];
+    const currencyValue = currency ?? 'eur';
 
-      const { id, currency, unit_amount, metadata, type, recurring, product } = await this.provider.prices.retrieve(
-        priceId,
-      );
+    try {
+      const prices = await this.getPricesRaw(currencyValue);
+
+      const price = prices.find((price) => price.id === priceId);
+
+      if (!price) {
+        throw new NotFoundPlanByIdError(priceId);
+      }
+
+      const { id, currency, metadata, type, recurring, product: productId } = price;
 
       const selectedPlan: RequestedPlan['selectedPlan'] = {
         id: id,
-        currency: currency,
-        amount: unit_amount as number,
+        currency: currencyValue,
+        amount: price.currency_options![currencyValue].unit_amount as number,
         bytes: parseInt(metadata?.maxSpaceBytes),
         interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
-        decimalAmount: (unit_amount as number) / 100,
+        decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
       };
 
       if (recurring?.interval === 'month') {
-        const upsell = await this.getUpsellProduct(product as string);
+        const upsell = await this.getUpsellProduct(productId as string, currency);
 
         if (upsell?.active) {
           upsellPlan = {
             id: upsell.id,
-            currency: upsell.currency,
-            amount: upsell.unit_amount as number,
+            currency: currencyValue,
+            amount: upsell.currency_options![currencyValue].unit_amount as number,
             bytes: parseInt(upsell.metadata?.maxSpaceBytes),
             interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
-            decimalAmount: (upsell.unit_amount as number) / 100,
+            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number as number) / 100,
           };
         }
       }
