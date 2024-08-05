@@ -6,8 +6,8 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
 
-export default async function handlePaymentIntentCompleted(
-  session: Stripe.PaymentIntent,
+export default async function handleInvoiceCompleted(
+  session: Stripe.Invoice,
   stripe: Stripe,
   usersService: UsersService,
   paymentService: PaymentService,
@@ -15,39 +15,24 @@ export default async function handlePaymentIntentCompleted(
   cacheService: CacheService,
   config: AppConfig,
 ): Promise<void> {
-  if (session.status !== 'succeeded') {
-    log.info(`Payment Intent processed without action, ${session.receipt_email} has not paid successfully`);
+  if (session.status !== 'paid') {
+    log.info(`Invoice processed without action, ${session.customer_email} has not paid successfully`);
     return;
   }
 
   const customer = await paymentService.getCustomer(session.customer as string);
-  const items = await paymentService.getInvoiceLineItems(session.invoice as string);
-  const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method as string);
-  const userAddressBillingDetails = paymentMethod.billing_details.address;
-
-  if (userAddressBillingDetails) {
-    await stripe.customers.update(customer.id, {
-      address: {
-        city: userAddressBillingDetails.city as string,
-        line1: userAddressBillingDetails.line1 as string,
-        line2: userAddressBillingDetails.line2 as string,
-        country: userAddressBillingDetails.country as string,
-        postal_code: userAddressBillingDetails.postal_code as string,
-        state: userAddressBillingDetails.state as string,
-      },
-    });
-  }
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
 
   const price = items.data[0].price;
 
   if (!price) {
-    log.error(`Payment intent completed does not contain price, customer: ${session.receipt_email}`);
+    log.error(`Payment intent completed does not contain price, customer: ${session.customer_email}`);
     return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
     log.error(
-      `Payment intent completed with a price without maxSpaceBytes as metadata. customer: ${session.receipt_email}`,
+      `Payment intent completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
     );
     return;
   }
@@ -60,6 +45,7 @@ export default async function handlePaymentIntentCompleted(
   let user: { uuid: string };
   const { maxSpaceBytes, planType } = price.metadata as PriceMetadata;
   const isLifetimePlan = planType === 'one_time';
+
   try {
     const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
     const hasActiveSubscription = userActiveSubscription.length > 0;
@@ -69,7 +55,7 @@ export default async function handlePaymentIntentCompleted(
     }
   } catch (error) {
     log.error(
-      `Error getting active user subscriptions in payment intent completed handler, email: ${session.receipt_email}`,
+      `Error getting active user subscriptions in payment intent completed handler, email: ${session.customer_email}`,
     );
   }
 
@@ -78,7 +64,7 @@ export default async function handlePaymentIntentCompleted(
     user = res.data.user;
   } catch (err) {
     log.error(
-      `Error while creating or updating user in payment intent completed handler, email: ${session.receipt_email}`,
+      `Error while creating or updating user in payment intent completed handler, email: ${session.customer_email}`,
     );
     log.error(err);
 
@@ -90,7 +76,7 @@ export default async function handlePaymentIntentCompleted(
   } catch (err) {
     const error = err as Error;
     log.error(
-      `Error while updating user tier: email: ${session.receipt_email}, priceId: ${price.product as string} `,
+      `Error while updating user tier: email: ${session.customer_email}, priceId: ${price.product as string} `,
       error.stack ?? error.message,
     );
 
@@ -112,10 +98,10 @@ export default async function handlePaymentIntentCompleted(
   }
 
   try {
-    if (session.invoice) {
+    if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
 
-      const invoice = await stripe.invoices.retrieve(session.invoice as string);
+      const invoice = await stripe.invoices.retrieve(session.id as string);
 
       const couponId = invoice.discount?.coupon.id;
 

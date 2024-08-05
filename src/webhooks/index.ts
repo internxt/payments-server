@@ -6,7 +6,7 @@ import { UsersService } from '../services/UsersService';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/PaymentService';
-import handlePaymentIntentCompleted from './handlePaymentIntentCompleted';
+import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
@@ -68,7 +68,27 @@ export default function (
           break;
 
         case 'payment_intent.succeeded':
-          await handlePaymentIntentCompleted(
+          {
+            const paymentMethod = await stripe.paymentMethods.retrieve(event.data.object.payment_method as string);
+            const userAddressBillingDetails = paymentMethod.billing_details.address;
+
+            if (userAddressBillingDetails) {
+              await stripe.customers.update(event.data.object.customer as string, {
+                address: {
+                  city: userAddressBillingDetails.city as string,
+                  line1: userAddressBillingDetails.line1 as string,
+                  line2: userAddressBillingDetails.line2 as string,
+                  country: userAddressBillingDetails.country as string,
+                  postal_code: userAddressBillingDetails.postal_code as string,
+                  state: userAddressBillingDetails.state as string,
+                },
+              });
+            }
+          }
+          break;
+
+        case 'invoice.payment_succeeded':
+          await handleInvoiceCompleted(
             event.data.object,
             stripe,
             usersService,
