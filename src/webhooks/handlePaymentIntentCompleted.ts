@@ -60,11 +60,17 @@ export default async function handlePaymentIntentCompleted(
   let user: { uuid: string };
   const { maxSpaceBytes, planType } = price.metadata as PriceMetadata;
   const isLifetimePlan = planType === 'one_time';
-  const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
-  const hasActiveSubscription = userActiveSubscription.length > 0;
+  try {
+    const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
+    const hasActiveSubscription = userActiveSubscription.length > 0;
 
-  if (isLifetimePlan && hasActiveSubscription) {
-    await paymentService.cancelSubscription(userActiveSubscription[0].id);
+    if (isLifetimePlan && hasActiveSubscription) {
+      await paymentService.cancelSubscription(userActiveSubscription[0].id);
+    }
+  } catch (error) {
+    log.error(
+      `Error getting active user subscriptions in payment intent completed handler, email: ${session.receipt_email}`,
+    );
   }
 
   try {
