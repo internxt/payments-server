@@ -125,7 +125,7 @@ export default async function handleCheckoutSessionCompleted(
   } catch (err) {
     const error = err as Error;
     if (!(err instanceof CouponNotBeingTrackedError)) {
-      log.error(`Error while adding user ${user.uuid} and coupon: `, error.stack ?? error.message);
+      log.error(`Error while adding user ${user.uuid} and coupon: ${error.stack ?? error.message} `);
       log.error(error);
     }
   }

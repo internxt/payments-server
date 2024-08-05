@@ -21,11 +21,8 @@ export default async function handlePaymentIntentCompleted(
   }
 
   const customer = await paymentService.getCustomer(session.customer as string);
-
   const items = await paymentService.getInvoiceLineItems(session.invoice as string);
-
   const paymentMethod = await stripe.paymentMethods.retrieve(session.payment_method as string);
-
   const userAddressBillingDetails = paymentMethod.billing_details.address;
 
   if (userAddressBillingDetails) {
@@ -66,7 +63,7 @@ export default async function handlePaymentIntentCompleted(
   const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
   const hasActiveSubscription = userActiveSubscription.length > 0;
 
-  if (isLifetimePlan && hasActiveSubscription && userActiveSubscription[0]?.status === 'active') {
+  if (isLifetimePlan && hasActiveSubscription) {
     await paymentService.cancelSubscription(userActiveSubscription[0].id);
   }
 
