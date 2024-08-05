@@ -17,17 +17,9 @@ export default async function handleSubscriptionUpdated(
   log: FastifyLoggerInstance,
   config: AppConfig,
 ): Promise<void> {
-  let uuid = '';
   const customerId = subscription.customer as string;
-
-  try {
-    const { uuid: userUuid, lifetime } = await usersService.findUserByCustomerID(customerId);
-    uuid = userUuid;
-    if (lifetime) {
-      return;
-    }
-  } catch (error) {
-    log.error(`Error in handleSubscriptionUpdated trying to fetch the customer by ID ${customerId}`);
+  const { uuid, lifetime } = await usersService.findUserByCustomerID(customerId);
+  if (lifetime) {
     return;
   }
 
