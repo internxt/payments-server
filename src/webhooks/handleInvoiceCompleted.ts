@@ -26,14 +26,12 @@ export default async function handleInvoiceCompleted(
   const price = items.data[0].price;
 
   if (!price) {
-    log.error(`Payment intent completed does not contain price, customer: ${session.customer_email}`);
+    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
     return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
-    log.error(
-      `Payment intent completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`,
-    );
+    log.error(`Invoice completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`);
     return;
   }
 
