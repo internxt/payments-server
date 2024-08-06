@@ -6,6 +6,17 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
 
+function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
+  return (product as Stripe.Product).metadata !== undefined;
+}
+
+function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
+  return typeof item.price?.product === 'object' &&
+    isProduct(item.price?.product) && 
+    !!item.price.product.metadata.type && 
+    item.price.product.metadata.type === 'object-storage';
+}
+
 export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   stripe: Stripe,
@@ -22,6 +33,15 @@ export default async function handleInvoiceCompleted(
 
   const customer = await paymentService.getCustomer(session.customer as string);
   const items = await paymentService.getInvoiceLineItems(session.id as string);
+
+  if (items.data.length === 1 && isObjectStorageOneTimePayment(items.data[0])) {
+    const [{ currency }] = items.data;
+    await paymentService.createSubscription(
+      customer.id,
+      config.STRIPE_OBJECT_STORAGE_PRICE_ID,
+      currency,
+    );
+  }
 
   const price = items.data[0].price;
 

@@ -970,7 +970,9 @@ export class PaymentService {
   }
 
   async getInvoiceLineItems(invoiceId: string) {
-    return this.provider.invoices.listLineItems(invoiceId);
+    return this.provider.invoices.listLineItems(invoiceId, {
+      expand: ['data.price.product']
+    });
   }
 
   getCustomer(customerId: CustomerId) {
