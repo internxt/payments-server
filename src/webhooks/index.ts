@@ -68,11 +68,12 @@ export default function (
           break;
 
         case 'payment_intent.succeeded': {
-          const paymentMethod = await stripe.paymentMethods.retrieve(event.data.object.payment_method as string);
+          const eventData = event.data.object;
+          const paymentMethod = await stripe.paymentMethods.retrieve(eventData.payment_method as string);
           const userAddressBillingDetails = paymentMethod.billing_details.address;
 
           if (userAddressBillingDetails) {
-            await stripe.customers.update(event.data.object.customer as string, {
+            await stripe.customers.update(eventData.customer as string, {
               address: {
                 city: userAddressBillingDetails.city as string,
                 line1: userAddressBillingDetails.line1 as string,
