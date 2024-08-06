@@ -647,7 +647,7 @@ export default function (
       } catch (error) {
         const err = error as Error;
         if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send({ message: err.message });
+          return rep.status(404).send(err.message);
         }
 
         req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
@@ -679,7 +679,7 @@ export default function (
       } catch (error) {
         const err = error as Error;
         if (err instanceof NotFoundPromoCodeByNameError) {
-          return rep.status(404).send({ message: err.message });
+          return rep.status(404).send(err.message);
         }
 
         req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
