@@ -11,10 +11,12 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
 }
 
 function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
-  return typeof item.price?.product === 'object' &&
-    isProduct(item.price?.product) && 
-    !!item.price.product.metadata.type && 
-    item.price.product.metadata.type === 'object-storage';
+  return (
+    typeof item.price?.product === 'object' &&
+    isProduct(item.price?.product) &&
+    !!item.price.product.metadata.type &&
+    item.price.product.metadata.type === 'object-storage'
+  );
 }
 
 export default async function handleInvoiceCompleted(
@@ -36,11 +38,7 @@ export default async function handleInvoiceCompleted(
 
   if (items.data.length === 1 && isObjectStorageOneTimePayment(items.data[0])) {
     const [{ currency }] = items.data;
-    await paymentService.createSubscription(
-      customer.id,
-      config.STRIPE_OBJECT_STORAGE_PRICE_ID,
-      currency,
-    );
+    await paymentService.createSubscription(customer.id, config.STRIPE_OBJECT_STORAGE_PRICE_ID, currency);
   }
 
   const price = items.data[0].price;

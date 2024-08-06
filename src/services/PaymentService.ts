@@ -753,6 +753,30 @@ export class PaymentService {
     return upsellProduct;
   }
 
+  async getObjectStoragePlanById(priceId: PlanId, currency?: string) {
+    const currencyValue = currency ?? 'eur';
+    try {
+      const price = await this.provider.prices.retrieve(priceId, {});
+
+      const { id, metadata, type, recurring } = price;
+
+      const selectedPlan: RequestedPlan['selectedPlan'] = {
+        id: id,
+        currency: currencyValue,
+        amount: price.unit_amount as number,
+        bytes: parseInt(metadata?.maxSpaceBytes),
+        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
+        decimalAmount: (price.unit_amount as number) / 100,
+      };
+
+      return selectedPlan;
+    } catch (err) {
+      const error = err as Error;
+      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
+      throw new Error(error.message);
+    }
+  }
+
   async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
     let upsellPlan: RequestedPlan['upsellPlan'];
     const currencyValue = currency ?? 'eur';
@@ -971,7 +995,7 @@ export class PaymentService {
 
   async getInvoiceLineItems(invoiceId: string) {
     return this.provider.invoices.listLineItems(invoiceId, {
-      expand: ['data.price.product']
+      expand: ['data.price.product'],
     });
   }
 
