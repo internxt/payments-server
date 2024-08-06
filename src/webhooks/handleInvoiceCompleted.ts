@@ -84,6 +84,8 @@ export default async function handleInvoiceCompleted(
   try {
     const customerByUuid = await usersService.findUserByUuid(user.uuid);
 
+    if (!customerByUuid) throw Error();
+
     await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
     });
