@@ -143,11 +143,11 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          discounts: [
-            {
-              promotion_code: promoCodeId,
-            },
-          ],
+        },
+      ],
+      discounts: [
+        {
+          promotion_code: promoCodeId,
         },
       ],
       payment_behavior: 'default_incomplete',
