@@ -237,9 +237,7 @@ export default function (
         } catch (err) {
           const error = err as Error;
           if (error instanceof MissingParametersError) {
-            return res.status(400).send({
-              message: error.message,
-            });
+            return res.status(400).send(error.message);
           }
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
