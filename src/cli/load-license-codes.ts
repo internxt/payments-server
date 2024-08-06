@@ -66,7 +66,7 @@ async function main() {
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
     const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
 
-    const paymentService = new PaymentService(stripe, productsRepository);
+    const paymentService = new PaymentService(stripe, productsRepository, usersRepository);
     const usersService = new UsersService(
       usersRepository,
       paymentService,
