@@ -855,21 +855,24 @@ export class PaymentService {
     return lastActiveCoupon;
   }
 
-  async getPromotionCodeByName(priceId: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
-    if (!promoCodeName || !priceId) {
+  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code'], priceId?: string): Promise<PromotionCode> {
+    if (!promoCodeName) {
       throw new MissingParametersError(['promoCode', 'priceId']);
     }
 
     const promoCode = await this.getPromotionCodeObject(promoCodeName);
-    const product = await this.provider.prices.retrieve(priceId);
 
-    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+    if (priceId) {
+      const product = await this.provider.prices.retrieve(priceId);
 
-    const isProductIdAllowed =
-      promoCodeIsAppliedTo && promoCodeIsAppliedTo.find((productId) => productId === (product.product as string));
+      const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
 
-    if (promoCodeIsAppliedTo && !isProductIdAllowed) {
-      throw new PromoCodeIsNotValidError(promoCodeName);
+      const isProductIdAllowed =
+        promoCodeIsAppliedTo && promoCodeIsAppliedTo.find((productId) => productId === (product.product as string));
+
+      if (promoCodeIsAppliedTo && !isProductIdAllowed) {
+        throw new PromoCodeIsNotValidError(promoCodeName);
+      }
     }
 
     return {

@@ -39,6 +39,7 @@ const allowedRoutes: {
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
   '/promo-code-by-name': ['GET'],
+  '/promo-code-info': ['GET'],
 };
 
 export default function (
@@ -673,6 +674,42 @@ export default function (
 
       try {
         const promoCodeObject = await paymentService.getPromotionCodeByName(priceId, promotionCode);
+
+        return rep.status(200).send(promoCodeObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+          return rep.status(404).send(err.message);
+        }
+
+        if (err instanceof MissingParametersError) {
+          return rep.status(400).send(err.message);
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    fastify.get<{
+      Querystring: { promotionCode: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { promotionCode: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/promo-code-info', async (req, rep) => {
+      const { promotionCode } = req.query;
+
+      try {
+        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
 
         return rep.status(200).send(promoCodeObject);
       } catch (error) {
