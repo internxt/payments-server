@@ -861,6 +861,7 @@ export class PaymentService {
     }
 
     const promoCode = await this.getPromotionCodeObject(promoCodeName);
+
     const product = await this.provider.prices.retrieve(priceId);
 
     const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
