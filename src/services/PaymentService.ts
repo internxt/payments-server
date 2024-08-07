@@ -1003,7 +1003,7 @@ export class PaymentService {
 
   async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
-      expand: ['data.price.product'],
+      expand: ['data.price.product', 'data.discounts'],
     });
   }
 
