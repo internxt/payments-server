@@ -856,7 +856,7 @@ export class PaymentService {
   }
 
   async getPromotionCodeByName(priceId: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
-    if (!promoCodeName) {
+    if (!promoCodeName || !priceId) {
       throw new MissingParametersError(['promoCode', 'priceId']);
     }
 
