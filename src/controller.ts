@@ -709,9 +709,16 @@ export default function (
       const { promotionCode } = req.query;
 
       try {
-        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
+        const promoCode = await paymentService.getPromotionCodeObject(promotionCode);
 
-        return rep.status(200).send(promoCodeObject);
+        const promoCodeObj = {
+          promoCodeName: promotionCode,
+          codeId: promoCode.id,
+          amountOff: promoCode.coupon.amount_off,
+          percentOff: promoCode.coupon.percent_off,
+        };
+
+        return rep.status(200).send(promoCodeObj);
       } catch (error) {
         const err = error as Error;
         if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
