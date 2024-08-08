@@ -56,8 +56,6 @@ export default async function handleInvoiceCompleted(
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
 
-  console.log('PRODUCT DATA: ', product);
-
   if (productType === UserType.Business) return;
 
   if (!price) {
