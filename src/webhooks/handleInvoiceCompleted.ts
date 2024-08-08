@@ -111,13 +111,11 @@ export default async function handleInvoiceCompleted(
       error.stack ?? error.message,
     );
 
-    throw err;
+    // throw err;
   }
 
   try {
     const customerByUuid = await usersService.findUserByUuid(user.uuid);
-
-    if (!customerByUuid) throw Error();
 
     await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
