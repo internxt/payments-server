@@ -1027,13 +1027,13 @@ export class PaymentService {
 
   async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
-      expand: ['data.price.product', 'data.discounts'],
+      expand: ['data.price.product'],
     });
   }
 
   async getInvoiceLineItems(invoiceId: string) {
     return this.provider.invoices.listLineItems(invoiceId, {
-      expand: ['data.price.product'],
+      expand: ['data.price.product', 'data.discounts'],
     });
   }
 

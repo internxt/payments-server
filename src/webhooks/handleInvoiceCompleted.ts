@@ -6,6 +6,7 @@ import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
 import { ObjectStorageService } from '../services/ObjectStorageService';
+import { UserType } from '../core/users/User';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (product as Stripe.Product).metadata !== undefined;
@@ -27,7 +28,7 @@ export default async function handleInvoiceCompleted(
   log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
-  objectStorageService: ObjectStorageService
+  objectStorageService: ObjectStorageService,
 ): Promise<void> {
   if (session.status !== 'paid') {
     log.info(`Invoice processed without action, ${session.customer_email} has not paid successfully`);
@@ -48,10 +49,14 @@ export default async function handleInvoiceCompleted(
       email: session.customer_email,
       currency,
       customerId: customer.id,
-    })
+    });
   }
 
   const price = items.data[0].price;
+  const product = price?.product as Stripe.Product;
+  const productType = product.metadata?.type;
+
+  if (productType === UserType.Business) return;
 
   if (!price) {
     log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
