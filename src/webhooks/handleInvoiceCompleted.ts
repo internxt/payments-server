@@ -103,7 +103,7 @@ export default async function handleInvoiceCompleted(
   }
 
   try {
-    await updateUserTier(user.uuid, price.product as string, config);
+    await updateUserTier(user.uuid, product.id, config);
   } catch (err) {
     const error = err as Error;
     log.error(
@@ -116,8 +116,6 @@ export default async function handleInvoiceCompleted(
 
   try {
     const customerByUuid = await usersService.findUserByUuid(user.uuid);
-
-    if (!customerByUuid) throw Error();
 
     await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
