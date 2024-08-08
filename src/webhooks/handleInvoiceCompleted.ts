@@ -5,6 +5,7 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
+import { ObjectStorageService } from '../services/ObjectStorageService';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (product as Stripe.Product).metadata !== undefined;
@@ -21,12 +22,12 @@ function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
 
 export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
-  stripe: Stripe,
   usersService: UsersService,
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
+  objectStorageService: ObjectStorageService
 ): Promise<void> {
   if (session.status !== 'paid') {
     log.info(`Invoice processed without action, ${session.customer_email} has not paid successfully`);
@@ -38,7 +39,16 @@ export default async function handleInvoiceCompleted(
 
   if (items.data.length === 1 && isObjectStorageOneTimePayment(items.data[0])) {
     const [{ currency }] = items.data;
-    await paymentService.createSubscription(customer.id, config.STRIPE_OBJECT_STORAGE_PRICE_ID, currency);
+
+    if (!session.customer_email) {
+      throw new Error('Missing customer email on session object');
+    }
+
+    await objectStorageService.initObjectStorageUser({
+      email: session.customer_email,
+      currency,
+      customerId: customer.id,
+    })
   }
 
   const price = items.data[0].price;
