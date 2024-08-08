@@ -56,6 +56,8 @@ export default async function handleInvoiceCompleted(
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
 
+  console.log('PRODUCT DATA: ', product);
+
   if (productType === UserType.Business) return;
 
   if (!price) {
@@ -103,7 +105,7 @@ export default async function handleInvoiceCompleted(
   }
 
   try {
-    await updateUserTier(user.uuid, price.product as string, config);
+    await updateUserTier(user.uuid, product.id, config);
   } catch (err) {
     const error = err as Error;
     log.error(
@@ -111,7 +113,7 @@ export default async function handleInvoiceCompleted(
       error.stack ?? error.message,
     );
 
-    // throw err;
+    throw err;
   }
 
   try {
