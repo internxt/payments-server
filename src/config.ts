@@ -14,6 +14,7 @@ const mandatoryVariables = [
   'DRIVE_GATEWAY_PASSWORD',
   'DRIVE_NEW_GATEWAY_URL',
   'DRIVE_NEW_GATEWAY_SECRET',
+  'STRIPE_OBJECT_STORAGE_PRICE_ID'
 ] as const;
 
 

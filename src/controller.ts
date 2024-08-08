@@ -40,6 +40,9 @@ const allowedRoutes: {
   '/plan-by-id': ['GET'],
   '/promo-code-by-name': ['GET'],
   '/promo-code-info': ['GET'],
+  '/object-storage-plan-by-id': ['GET'],
+  '/create-customer-for-object-storage': ['POST'],
+  '/payment-intent-for-object-storage': ['GET'],
 };
 
 export default function (
@@ -85,6 +88,57 @@ export default function (
         reply.status(401).send();
       }
     });
+
+    fastify.post<{ Body: { name: string; email: string } }>(
+      '/create-customer-for-object-storage',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['email', 'name'],
+            properties: { name: { type: 'string' }, email: { type: 'string' } },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 hour',
+          },
+        },
+      },
+      async (req, res) => {
+        const { name, email } = req.body;
+
+        if (!email) {
+          return res.status(404).send({
+            message: 'Email should be provided',
+          });
+        }
+
+        try {
+          const { id } = await paymentService.createCustomer({
+            name,
+            email,
+          });
+
+          const token = jwt.sign(
+            {
+              customerId: id,
+            },
+            config.JWT_SECRET,
+          );
+
+          return res.send({
+            customerId: id,
+            token,
+          });
+        } catch (err) {
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
 
     fastify.post<{ Body: { name: string; email: string } }>(
       '/create-customer',
@@ -482,6 +536,66 @@ export default function (
     });
 
     fastify.get<{
+      Querystring: {
+        customerId: CustomerId;
+        amount: number;
+        planId: string;
+        token: string;
+        currency?: string;
+      };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: {
+            customerId: { type: 'string' };
+            planId: { type: 'string' };
+            amount: { type: 'number' };
+            token: { type: 'string' };
+            currency: { type: 'string' };
+          };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 hour';
+        };
+      };
+    }>('/payment-intent-for-object-storage', async (req, res) => {
+      const { customerId, amount, planId, currency, token } = req.query;
+
+      try {
+        const payload = jwt.verify(token, config.JWT_SECRET) as {
+          customerId: string;
+        };
+        const tokenCustomerId = payload.customerId;
+
+        if (customerId !== tokenCustomerId) {
+          return res.status(403).send();
+        }
+      } catch (error) {
+        return res.status(403).send();
+      }
+
+      try {
+        const { clientSecret } = await paymentService.createPaymentIntent(customerId, amount, planId, currency);
+
+        return { clientSecret };
+      } catch (err) {
+        const error = err as Error;
+        if (error instanceof MissingParametersError) {
+          return res.status(404).send({
+            message: error.message,
+          });
+        }
+        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
+        return res.status(500).send({
+          message: 'Internal Server Error',
+        });
+      }
+    });
+
+    fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/default-payment-method',
@@ -687,6 +801,38 @@ export default function (
         }
 
         req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    fastify.get<{
+      Querystring: { planId: string; currency?: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { planId: { type: 'string' }; currency: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/object-storage-plan-by-id', async (req, rep) => {
+      const { planId, currency } = req.query;
+
+      try {
+        const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
+
+        return rep.status(200).send(planObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPlanByIdError) {
+          return rep.status(404).send({ message: err.message });
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
