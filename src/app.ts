@@ -10,6 +10,7 @@ import { StorageService } from './services/StorageService';
 import { UsersService } from './services/UsersService';
 import webhook from './webhooks';
 import { LicenseCodesService } from './services/LicenseCodesService';
+import { ObjectStorageService } from './services/ObjectStorageService';
 
 export async function buildApp(
   paymentService: PaymentService,
@@ -17,6 +18,7 @@ export async function buildApp(
   usersService: UsersService,
   cacheService: CacheService,
   licenseCodesService: LicenseCodesService,
+  objectStorageService: ObjectStorageService,
   stripe: Stripe,
   config: AppConfig,
 ): Promise<FastifyInstance> {
@@ -35,7 +37,9 @@ export async function buildApp(
 
   fastify.register(controllerMigration(paymentService, usersService, config));
 
-  fastify.register(webhook(stripe, storageService, usersService, paymentService, config, cacheService));
+  fastify.register(
+    webhook(stripe, storageService, usersService, paymentService, config, cacheService, objectStorageService)
+  );
 
   fastify.register(fastifyCors, {
     allowedHeaders: [

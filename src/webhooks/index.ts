@@ -11,6 +11,7 @@ import CacheService from '../services/CacheService';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
+import { ObjectStorageService } from '../services/ObjectStorageService';
 
 export default function (
   stripe: Stripe,
@@ -19,6 +20,7 @@ export default function (
   paymentService: PaymentService,
   config: AppConfig,
   cacheService: CacheService,
+  objectStorageService: ObjectStorageService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -90,12 +92,12 @@ export default function (
         case 'invoice.payment_succeeded':
           await handleInvoiceCompleted(
             event.data.object,
-            stripe,
             usersService,
             paymentService,
             fastify.log,
             cacheService,
             config,
+            objectStorageService,
           );
           break;
 

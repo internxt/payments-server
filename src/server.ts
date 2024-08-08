@@ -24,6 +24,7 @@ import { UsersCouponsRepository } from './core/coupons/UsersCouponsRepository';
 import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCouponsRepository';
 import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
+import { ObjectStorageService } from './services/ObjectStorageService';
 
 const start = async (): Promise<FastifyInstance> => {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
@@ -53,13 +54,14 @@ const start = async (): Promise<FastifyInstance> => {
     storageService,
     licenseCodesRepository,
   );
-
+  const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
   const fastify = await buildApp(
     paymentService,
     storageService,
     usersService,
     cacheService,
     licenseCodesService,
+    objectStorageService,
     stripe,
     envVariablesConfig,
   );
