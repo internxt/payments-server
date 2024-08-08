@@ -13,6 +13,7 @@ import {
   NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
   PaymentService,
+  PromoCodeIsNotValidError,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription, UserType } from './core/users/User';
@@ -38,6 +39,7 @@ const allowedRoutes: {
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
   '/promo-code-by-name': ['GET'],
+  '/promo-code-info': ['GET'],
   '/object-storage-plan-by-id': ['GET'],
   '/create-customer-for-object-storage': ['POST'],
   '/payment-intent-for-object-storage': ['GET'],
@@ -290,10 +292,8 @@ export default function (
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-          if (error instanceof MissingParametersError) {
-            return res.status(400).send({
-              message: error.message,
-            });
+          if (error instanceof MissingParametersError || error instanceof PromoCodeIsNotValidError) {
+            return res.status(400).send(error.message);
           }
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
@@ -761,10 +761,46 @@ export default function (
       } catch (error) {
         const err = error as Error;
         if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send({ message: err.message });
+          return rep.status(404).send(err.message);
         }
 
         req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+        return rep.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    fastify.get<{
+      Querystring: { priceId: string; promotionCode: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { priceId: { type: 'string' }; promotionCode: { type: 'string' } };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 minute';
+        };
+      };
+    }>('/promo-code-by-name', async (req, rep) => {
+      const { priceId, promotionCode } = req.query;
+
+      try {
+        const promoCodeObject = await paymentService.getPromotionCodeByName(priceId, promotionCode);
+
+        return rep.status(200).send(promoCodeObject);
+      } catch (error) {
+        const err = error as Error;
+        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+          return rep.status(404).send(err.message);
+        }
+
+        if (err instanceof MissingParametersError) {
+          return rep.status(400).send(err.message);
+        }
+
+        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
@@ -815,17 +851,28 @@ export default function (
           timeWindow: '1 minute';
         };
       };
-    }>('/promo-code-by-name', async (req, rep) => {
+    }>('/promo-code-info', async (req, rep) => {
       const { promotionCode } = req.query;
 
       try {
-        const promoCodeObject = await paymentService.getPromotionCodeByName(promotionCode);
+        const promoCode = await paymentService.getPromotionCodeObject(promotionCode);
 
-        return rep.status(200).send(promoCodeObject);
+        const promoCodeObj = {
+          promoCodeName: promotionCode,
+          codeId: promoCode.id,
+          amountOff: promoCode.coupon.amount_off,
+          percentOff: promoCode.coupon.percent_off,
+        };
+
+        return rep.status(200).send(promoCodeObj);
       } catch (error) {
         const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError) {
-          return rep.status(404).send({ message: err.message });
+        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+          return rep.status(404).send(err.message);
+        }
+
+        if (err instanceof MissingParametersError) {
+          return rep.status(400).send(err.message);
         }
 
         req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);

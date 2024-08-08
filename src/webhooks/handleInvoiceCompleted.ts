@@ -102,6 +102,8 @@ export default async function handleInvoiceCompleted(
   try {
     const customerByUuid = await usersService.findUserByUuid(user.uuid);
 
+    if (!customerByUuid) throw Error();
+
     await usersService.updateUser(customerByUuid.customerId, {
       lifetime: isLifetimePlan,
     });
@@ -117,9 +119,7 @@ export default async function handleInvoiceCompleted(
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
 
-      const invoice = await stripe.invoices.retrieve(session.id as string);
-
-      const couponId = invoice.discount?.coupon.id;
+      const couponId = (items.data[0].discounts[0] as any).coupon.id;
 
       if (couponId) {
         await usersService.storeCouponUsedByUser(userData, couponId);

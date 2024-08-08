@@ -120,6 +120,20 @@ export class PaymentService {
     this.usersRepository = usersRepository;
   }
 
+  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
+    const userInvoices = await this.getInvoicesFromUser(customerId, {});
+    const hasUserExistingInvoices = userInvoices.length > 0;
+
+    if (promoCodeId) {
+      const promoCode = await this.provider.promotionCodes.retrieve(promoCodeId);
+      const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
+
+      if (hasUserExistingInvoices && isPromoOnlyForFirstPurchase) {
+        throw new PromoCodeIsNotValidError(promoCodeId);
+      }
+    }
+  }
+
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
     const customer = await this.provider.customers.create(payload);
 
@@ -135,6 +149,10 @@ export class PaymentService {
     const currencyValue = currency ?? 'eur';
     if (!customerId || !priceId) {
       throw new MissingParametersError(['customerId', 'priceId']);
+    }
+
+    if (promoCodeId) {
+      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
     const subscription = await this.provider.subscriptions.create({
@@ -176,12 +194,16 @@ export class PaymentService {
     amount: number,
     priceId: string,
     currency?: string,
-    promoCodeName?: string,
+    promoCodeId?: Stripe.PromotionCode['id'],
   ): Promise<PaymentIntent> {
     const currencyValue = currency ?? 'eur';
 
     if (!customerId || !amount || !priceId) {
       throw new MissingParametersError(['customerId', 'amount', 'priceId']);
+    }
+
+    if (promoCodeId) {
+      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
     const product = await this.provider.prices.retrieve(priceId);
@@ -200,7 +222,7 @@ export class PaymentService {
       invoice: invoice.id,
       discounts: [
         {
-          promotion_code: promoCodeName,
+          promotion_code: promoCodeId,
         },
       ],
     });
@@ -841,6 +863,7 @@ export class PaymentService {
     const { data: promotionCodes } = await this.provider.promotionCodes.list({
       active: true,
       code: promoCodeName,
+      expand: ['data.coupon.applies_to'],
     });
 
     if (!promotionCodes || promotionCodes.length === 0) {
@@ -856,14 +879,29 @@ export class PaymentService {
     return lastActiveCoupon;
   }
 
-  async getPromotionCodeByName(promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
-    const lastActiveCoupon = await this.getPromotionCodeObject(promoCodeName);
+  async getPromotionCodeByName(priceId: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    if (!promoCodeName || !priceId) {
+      throw new MissingParametersError(['promoCode', 'priceId']);
+    }
+
+    const promoCode = await this.getPromotionCodeObject(promoCodeName);
+
+    const product = await this.provider.prices.retrieve(priceId);
+
+    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+
+    const isProductIdAllowed =
+      promoCodeIsAppliedTo && promoCodeIsAppliedTo.find((productId) => productId === (product.product as string));
+
+    if (promoCodeIsAppliedTo && !isProductIdAllowed) {
+      throw new PromoCodeIsNotValidError(promoCodeName);
+    }
 
     return {
       promoCodeName,
-      codeId: lastActiveCoupon.id,
-      amountOff: lastActiveCoupon.coupon.amount_off,
-      percentOff: lastActiveCoupon.coupon.percent_off,
+      codeId: promoCode.id,
+      amountOff: promoCode.coupon.amount_off,
+      percentOff: promoCode.coupon.percent_off,
     };
   }
 
@@ -989,7 +1027,7 @@ export class PaymentService {
 
   async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
-      expand: ['data.price.product'],
+      expand: ['data.price.product', 'data.discounts'],
     });
   }
 
@@ -1136,6 +1174,14 @@ export class NotFoundPromoCodeByNameError extends Error {
     super(`Promotion code with an id ${promoCodeId} does not exist`);
 
     Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
+  }
+}
+
+export class PromoCodeIsNotValidError extends Error {
+  constructor(promoCodeId: string) {
+    super(`Promotion code with an id ${promoCodeId} is not valid`);
+
+    Object.setPrototypeOf(this, PromoCodeIsNotValidError.prototype);
   }
 }
 
