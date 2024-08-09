@@ -43,6 +43,7 @@ const allowedRoutes: {
   '/object-storage-plan-by-id': ['GET'],
   '/create-customer-for-object-storage': ['POST'],
   '/payment-intent-for-object-storage': ['GET'],
+  '/create-subscription-for-object-storage': ['POST'],
 };
 
 export default function (
@@ -288,6 +289,71 @@ export default function (
 
         try {
           const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency, promoCodeId);
+
+          return res.send(subscriptionSetUp);
+        } catch (err) {
+          const error = err as Error;
+          if (
+            error instanceof MissingParametersError ||
+            error instanceof PromoCodeIsNotValidError ||
+            error instanceof ExistingSubscriptionError
+          ) {
+            return res.status(400).send(error.message);
+          }
+
+          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
+
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
+
+    fastify.post<{
+      Body: { customerId: string; priceId: string; currency: string; token: string };
+    }>(
+      '/create-subscription-for-object-storage',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              token: {
+                type: 'string',
+              },
+              currency: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { customerId, priceId, currency, token } = req.body;
+
+        try {
+          const payload = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          const tokenCustomerId = payload.customerId;
+
+          if (customerId !== tokenCustomerId) {
+            return res.status(403).send();
+          }
+        } catch (error) {
+          return res.status(403).send();
+        }
+
+        try {
+          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency);
 
           return res.send(subscriptionSetUp);
         } catch (err) {
