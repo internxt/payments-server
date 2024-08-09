@@ -149,7 +149,7 @@ export class PaymentService {
     const currencyValue = currency ?? 'eur';
     const userSubscription = await this.getUserSubscription(customerId);
 
-    if (userSubscription) {
+    if (userSubscription.type === 'subscription') {
       throw new ExistingSubscriptionError('User already has an active subscription of the same type');
     }
 
