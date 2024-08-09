@@ -292,9 +292,14 @@ export default function (
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-          if (error instanceof MissingParametersError || error instanceof PromoCodeIsNotValidError) {
+          if (
+            error instanceof MissingParametersError ||
+            error instanceof PromoCodeIsNotValidError ||
+            error instanceof ExistingSubscriptionError
+          ) {
             return res.status(400).send(error.message);
           }
+
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
