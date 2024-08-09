@@ -147,11 +147,6 @@ export class PaymentService {
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
   ): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
-    const userSubscription = await this.getUserSubscription(customerId);
-
-    if (userSubscription.type === 'subscription') {
-      throw new ExistingSubscriptionError('User already has an active subscription of the same type');
-    }
 
     if (!customerId || !priceId) {
       throw new MissingParametersError(['customerId', 'priceId']);
