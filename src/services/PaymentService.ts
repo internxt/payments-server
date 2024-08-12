@@ -140,6 +140,23 @@ export class PaymentService {
     return customer;
   }
 
+  async billCardVerificationCharge(
+    customerId: string,
+    paymentMethodId: string,
+    currency: string,
+  ) {
+    const paymentIntent = await this.provider.paymentIntents.create({
+      amount: 1,
+      currency,
+      customer: customerId,
+      description: 'Card verification charge',
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+    });
+
+  }
+
   async createSubscription(
     customerId: string,
     priceId: string,
