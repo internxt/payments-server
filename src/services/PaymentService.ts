@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
-import { User, UserSubscription, UserType } from '../core/users/User';
 import { ProductsRepository } from '../core/users/ProductsRepository';
+import { User, UserSubscription, UserType } from '../core/users/User';
 import { UsersRepository } from '../core/users/UsersRepository';
 
 type Customer = Stripe.Customer;
@@ -48,6 +48,8 @@ export interface PromotionCode {
 export interface SubscriptionCreated {
   type: 'setup' | 'payment';
   clientSecret: string;
+  subscriptionId?: string;
+  paymentIntentId?: string;
 }
 
 export interface PaymentIntent {
@@ -186,6 +188,8 @@ export class PaymentService {
       return {
         type: 'payment',
         clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        subscriptionId: subscription.id,
+        paymentIntentId: (subscription.latest_invoice as any).payment_intent.id,
       };
     }
   }
