@@ -5,21 +5,8 @@ import CacheService from '../services/CacheService';
 import { PaymentService, PriceMetadata } from '../services/PaymentService';
 import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
 import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
-import { ObjectStorageService } from '../services/ObjectStorageService';
 import { UserType } from '../core/users/User';
 
-function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
-  return (product as Stripe.Product).metadata !== undefined;
-}
-
-function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
-  return (
-    typeof item.price?.product === 'object' &&
-    isProduct(item.price?.product) &&
-    !!item.price.product.metadata.type &&
-    item.price.product.metadata.type === 'object-storage'
-  );
-}
 
 export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
@@ -28,7 +15,6 @@ export default async function handleInvoiceCompleted(
   log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
-  objectStorageService: ObjectStorageService,
 ): Promise<void> {
   if (session.status !== 'paid') {
     log.info(`Invoice processed without action, ${session.customer_email} has not paid successfully`);
@@ -37,21 +23,6 @@ export default async function handleInvoiceCompleted(
 
   const customer = await paymentService.getCustomer(session.customer as string);
   const items = await paymentService.getInvoiceLineItems(session.id as string);
-
-  if (items.data.length === 1 && isObjectStorageOneTimePayment(items.data[0])) {
-    const [{ currency }] = items.data;
-
-    if (!session.customer_email) {
-      throw new Error('Missing customer email on session object');
-    }
-
-    await objectStorageService.initObjectStorageUser({
-      email: session.customer_email,
-      currency,
-      customerId: customer.id,
-    });
-  }
-
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
