@@ -12,6 +12,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/ObjectStorageService';
+import handleSubscriptionCreated from './handleSubscriptionCreated';
 
 export default function (
   stripe: Stripe,
@@ -45,6 +46,14 @@ export default function (
       fastify.log.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
+        case 'customer.subscription.created':
+          await handleSubscriptionCreated(
+            event.data.object as Stripe.Subscription,
+            paymentService,
+            objectStorageService,
+          );
+          break;
+
         case 'customer.subscription.deleted':
           await handleSubscriptionCanceled(
             storageService,
@@ -96,8 +105,7 @@ export default function (
             paymentService,
             fastify.log,
             cacheService,
-            config,
-            objectStorageService,
+            config
           );
           break;
 
