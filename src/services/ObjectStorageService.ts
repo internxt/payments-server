@@ -32,6 +32,38 @@ export class ObjectStorageService {
     await this.createUser(email, customerId);
   }
 
+  async reactivateAccount(payload: { customerId : string }): Promise<void> {
+    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const params: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.put(
+      `${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}/reactivate`,
+      {},
+      params,
+    );
+  }
+
+  async suspendAccount(payload: { customerId : string }): Promise<void> {
+    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const params: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.put(
+      `${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}/deactivate`,
+      {},
+      params,
+    );
+  }
+
   private async createUser(
     email: string,
     customerId: string

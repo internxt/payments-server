@@ -12,6 +12,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/ObjectStorageService';
+import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 
 export default function (
   stripe: Stripe,
@@ -45,6 +46,14 @@ export default function (
       fastify.log.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
+        case 'invoice.payment_failed':
+          await handleInvoicePaymentFailed(
+            event.data.object as Stripe.Invoice,
+            objectStorageService,
+            paymentService,
+          );
+          break;
+
         case 'customer.subscription.deleted':
           await handleSubscriptionCanceled(
             storageService,
