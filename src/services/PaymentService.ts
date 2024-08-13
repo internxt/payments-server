@@ -183,6 +183,7 @@ export class PaymentService {
       return {
         type: 'setup',
         clientSecret: (subscription.pending_setup_intent as any).client_secret,
+        subscriptionId: subscription.id,
       };
     } else {
       return {
