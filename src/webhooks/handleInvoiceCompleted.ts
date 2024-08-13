@@ -21,6 +21,63 @@ function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
   );
 }
 
+async function handleObjectStorageInvoiceCompleted(
+  customer: Stripe.Customer,
+  invoice: Stripe.Invoice,
+  objectStorageService: ObjectStorageService,
+  paymentService: PaymentService,
+  log: FastifyLoggerInstance,
+) {
+
+  if (invoice.lines.data.length !== 1) {
+    log.info(`E1: Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
+    return;
+  }
+
+  const [item] = invoice.lines.data;
+  const { currency, customer_email } = invoice;
+  const isTheVerificationCharge = isObjectStorageOneTimePayment(item);
+
+  if (isTheVerificationCharge) {
+    log.info(`Object Storage verification charge received for user ${customer_email} (customer ${customer.id})`);
+
+    if (!customer_email) {
+      throw new Error('Missing customer email on session object');
+    }
+
+    await objectStorageService.initObjectStorageUser({
+      email: customer_email,
+      currency,
+      customerId: customer.id,
+    });
+
+    log.info(`S1: Object Storage for user ${customer_email} (customer ${customer.id}) has been initialized`);
+  } else {
+    if (!invoice.subscription) {
+      log.info(`E1: Invoice ${invoice.id} is not due to object-storage sub`);
+      return;
+    }  
+
+    const { plan } = item;
+
+    if (!plan) {
+      log.info(`E2: Invoice ${invoice.id} not handled by object-storage handler`);
+      return;
+    }
+
+    const product = await paymentService.getProduct(plan.product as string);
+
+    if (!isProduct(product)) {
+      log.info(`E3: Invoice ${invoice.id} for product ${plan.product} is not an object-storage product`);
+      return;
+    }
+
+    await objectStorageService.reactivateAccount({ customerId: customer.id });
+
+    log.info(`S2: Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`);
+  }
+}
+
 export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   usersService: UsersService,
@@ -36,25 +93,24 @@ export default async function handleInvoiceCompleted(
   }
 
   const customer = await paymentService.getCustomer(session.customer as string);
-  const items = await paymentService.getInvoiceLineItems(session.id as string);
 
-  if (items.data.length === 1 && isObjectStorageOneTimePayment(items.data[0])) {
-    const [{ currency }] = items.data;
-
-    if (!session.customer_email) {
-      throw new Error('Missing customer email on session object');
-    }
-
-    await objectStorageService.initObjectStorageUser({
-      email: session.customer_email,
-      currency,
-      customerId: customer.id,
-    });
+  if (customer.deleted) {
+    log.error(`Customer ${session.customer} could not be retrieved in invoice.payment_succeeded event for invoice ${session.id}`);
+    return;
   }
 
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
+
+  await handleObjectStorageInvoiceCompleted(
+    customer, 
+    session, 
+    objectStorageService, 
+    paymentService, 
+    log
+  );
 
   if (productType === UserType.Business) return;
 
@@ -65,11 +121,6 @@ export default async function handleInvoiceCompleted(
 
   if (!price.metadata.maxSpaceBytes) {
     log.error(`Invoice completed with a price without maxSpaceBytes as metadata. customer: ${session.customer_email}`);
-    return;
-  }
-
-  if (customer.deleted) {
-    log.error(`Customer object could not be retrieved in payment intent completed handler with id ${session.customer}`);
     return;
   }
 
