@@ -54,6 +54,7 @@ export interface SubscriptionCreated {
 
 export interface PaymentIntent {
   clientSecret: string | null;
+  id: string;
 }
 
 export type Reason = {
@@ -237,10 +238,11 @@ export class PaymentService {
 
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
 
-    const { client_secret } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
+    const { client_secret, id } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
 
     return {
       clientSecret: client_secret,
+      id,
     };
   }
 
