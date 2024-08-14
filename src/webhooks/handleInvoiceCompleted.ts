@@ -9,7 +9,9 @@ import { ObjectStorageService } from '../services/ObjectStorageService';
 import { UserType } from '../core/users/User';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
-  return (product as Stripe.Product).metadata !== undefined;
+  return (product as Stripe.Product).metadata && 
+    !!(product as Stripe.Product).metadata.type && 
+    (product as Stripe.Product).metadata.type === 'object-storage';
 }
 
 function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
@@ -28,6 +30,7 @@ async function handleObjectStorageInvoiceCompleted(
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
 ) {
+  console.log({ customer, invoice });
 
   if (invoice.lines.data.length !== 1) {
     log.info(`E1: Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
