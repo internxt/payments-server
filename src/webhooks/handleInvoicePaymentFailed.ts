@@ -32,14 +32,14 @@ export default async function handleInvoicePaymentFailed(
 
   const [{ price }] = invoice.lines.data;
 
-  if (!price.product) {
+  if (!price || !price.product) {
     throw new Error(`Product not found for not paid invoice ${invoice.id}`);
   }
 
   const product = await paymentService.getProduct(price.product as string);
 
   if (!isProduct(product)) {
-    throw new Error(`Unexpected product ${plan.id} for not paid invoice ${invoice.id}`);
+    throw new Error(`Unexpected product ${product.id} for not paid invoice ${invoice.id}`);
   }
 
   const customer = await paymentService.getCustomer(invoice.customer as string) as Stripe.Customer;
