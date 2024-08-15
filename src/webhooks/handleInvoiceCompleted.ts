@@ -56,22 +56,17 @@ async function handleObjectStorageInvoiceCompleted(
 
     log.info(`S1: Object Storage for user ${customer_email} (customer ${customer.id}) has been initialized`);
   } else {
-    if (!invoice.subscription) {
-      log.info(`E1: Invoice ${invoice.id} is not due to object-storage sub`);
-      return;
-    }  
+    const { price } = item;
 
-    const { plan } = item;
-
-    if (!plan) {
-      log.info(`E2: Invoice ${invoice.id} not handled by object-storage handler`);
+    if (!price || !price.product) {
+      log.info(`E1: Invoice ${invoice.id} not handled by object-storage handler`);
       return;
     }
 
-    const product = await paymentService.getProduct(plan.product as string);
+    const product = await paymentService.getProduct(price.product as string);
 
     if (!isProduct(product)) {
-      log.info(`E3: Invoice ${invoice.id} for product ${plan.product} is not an object-storage product`);
+      log.info(`E2: Invoice ${invoice.id} for product ${price.product} is not an object-storage product`);
       return;
     }
 
