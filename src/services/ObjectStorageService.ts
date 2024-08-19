@@ -20,15 +20,9 @@ export class ObjectStorageService {
   async initObjectStorageUser(payload: {
     email: string;
     customerId: string,
-    currency: string
   }) {
-    const { email, customerId, currency } = payload;
-
-    await this.paymentService.createSubscription(
-      customerId, 
-      this.config.STRIPE_OBJECT_STORAGE_PRICE_ID, 
-      currency
-    );
+    const { email, customerId } = payload;
+  
     await this.createUser(email, customerId);
   }
 

@@ -50,7 +50,6 @@ async function handleObjectStorageInvoiceCompleted(
 
     await objectStorageService.initObjectStorageUser({
       email: customer_email,
-      currency,
       customerId: customer.id,
     });
 

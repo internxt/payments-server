@@ -1127,6 +1127,22 @@ export class PaymentService {
 
     return renewalPeriod;
   }
+
+  async billCardVerificationCharge(
+    customerId: string,
+    paymentMethodId: string,
+    currency: string,
+  ) {
+    await this.provider.paymentIntents.create({
+      amount: 1,
+      currency,
+      customer: customerId,
+      description: 'Card verification charge',
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+    });
+  }
 }
 
 class NotFoundSubscriptionError extends Error {}
