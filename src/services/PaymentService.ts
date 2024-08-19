@@ -1130,16 +1130,17 @@ export class PaymentService {
 
   async billCardVerificationCharge(
     customerId: string,
-    paymentMethodId: string,
     currency: string,
   ) {
     const methods = await this.getCustomerPaymentMethods(customerId);
 
     if (methods.length === 0) {
-      throw new Error(`No payment methods found for customer ${paymentMethodId}`);
+      throw new Error(`No payment methods found for customer ${customerId}`);
     }
     
     const [firstMethod] = methods;
+
+    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`)
 
     await this.provider.paymentIntents.create({
       amount: 1,

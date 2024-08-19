@@ -43,15 +43,10 @@ export default async function handleSubscriptionCreated(
     throw new Error('Missing customer email on subscription created');
   }
 
-  const paymentMethodId = subscription.default_payment_method as string;
-
-  if (!paymentMethodId) {
-    throw new Error('No default payment method has been set')
-  }
-
   await paymentsService.billCardVerificationCharge(
     customer.id, 
-    paymentMethodId,
     subscription.currency
   );
+
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
 }
