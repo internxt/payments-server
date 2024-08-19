@@ -8,6 +8,37 @@ import { UsersService } from '../services/UsersService';
 import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
 
+function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
+  return !!meta && !!meta.type && meta.type === 'object-storage';
+}
+
+async function handleObjectStorageProduct(
+  product: Stripe.Product,
+  customer: Stripe.Customer,
+  subscription: Stripe.Subscription,
+  paymentsService: PaymentService,
+  logger: FastifyLoggerInstance,
+): Promise<void> { 
+  if (customer.deleted) {
+    throw new Error('Customer has been deleted');
+  }
+
+  if (subscription.items.data.length !== 1) {
+    throw new Error('Unexpected items length for object storage');
+  }
+
+  if (!customer.email) {
+    throw new Error('Missing customer email on subscription updated');
+  }
+
+  await paymentsService.billCardVerificationCharge(
+    customer.id, 
+    subscription.currency
+  );
+
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
+}
+
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
   usersService: UsersService,
@@ -19,6 +50,25 @@ export default async function handleSubscriptionUpdated(
 ): Promise<void> {
   let uuid = '';
   const customerId = subscription.customer as string;
+  const isSubscriptionCanceled = subscription.status === 'canceled';
+  const productId = subscription.items.data[0].price.product as string;
+  const product = await paymentService.getProduct(productId);
+  const { metadata: productMetadata } = product;
+  
+  if (isObjectStorageProduct(productMetadata)) {
+    if (!isSubscriptionCanceled) {
+      await handleObjectStorageProduct(
+        product, 
+        await paymentService.getCustomer(customerId) as Stripe.Customer, 
+        subscription,
+        paymentService,
+        log,
+      );
+    } else {
+      // TODO: Destroy account on subscription cancelled
+    }
+    return;
+  }
 
   try {
     const { uuid: userUuid, lifetime } = await usersService.findUserByCustomerID(customerId);
@@ -31,10 +81,6 @@ export default async function handleSubscriptionUpdated(
     return;
   }
 
-  const isSubscriptionCanceled = subscription.status === 'canceled';
-
-  const productId = subscription.items.data[0].price.product as string;
-  const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   try {

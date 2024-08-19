@@ -13,7 +13,6 @@ import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/ObjectStorageService';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
-import handleSubscriptionCreated from './handleSubscriptionCreated';
 
 export default function (
   stripe: Stripe,
@@ -52,14 +51,6 @@ export default function (
             event.data.object as Stripe.Invoice,
             objectStorageService,
             paymentService,
-          );
-          break;
-
-        case 'customer.subscription.created':
-          await handleSubscriptionCreated(
-            event.data.object as Stripe.Subscription,
-            paymentService,
-            fastify.log,
           );
           break;
 
