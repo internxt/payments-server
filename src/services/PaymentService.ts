@@ -1133,15 +1133,33 @@ export class PaymentService {
     paymentMethodId: string,
     currency: string,
   ) {
+    const methods = await this.getCustomerPaymentMethods(customerId);
+
+    if (methods.length === 0) {
+      throw new Error(`No payment methods found for customer ${paymentMethodId}`);
+    }
+    
+    const [firstMethod] = methods;
+
     await this.provider.paymentIntents.create({
       amount: 1,
       currency,
       customer: customerId,
       description: 'Card verification charge',
-      payment_method: paymentMethodId,
+      payment_method: firstMethod.id,
       off_session: true,
       confirm: true,
     });
+  }
+
+  async getCustomerPaymentMethods(
+    customerId: Stripe.Customer['id']
+  ): Promise<Stripe.PaymentMethod[]> {
+    const res = await this.provider.paymentMethods.list({
+      customer: customerId,
+    });
+
+    return res.data;
   }
 }
 
