@@ -1143,7 +1143,7 @@ export class PaymentService {
     console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`)
 
     await this.provider.paymentIntents.create({
-      amount: 1,
+      amount: 100,
       currency,
       customer: customerId,
       description: 'Card verification charge',
