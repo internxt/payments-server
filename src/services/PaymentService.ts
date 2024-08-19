@@ -1145,6 +1145,9 @@ export class PaymentService {
     await this.provider.paymentIntents.create({
       amount: 100,
       currency,
+      metadata: {
+        type: 'object-storage'
+      },
       customer: customerId,
       description: 'Card verification charge',
       payment_method: firstMethod.id,

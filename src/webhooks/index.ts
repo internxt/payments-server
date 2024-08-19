@@ -13,6 +13,7 @@ import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/ObjectStorageService';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
+import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 
 export default function (
   stripe: Stripe,
@@ -95,6 +96,13 @@ export default function (
               },
             });
           }
+
+          await handlePaymentIntentSucceeded(
+            eventData,
+            paymentService,
+            objectStorageService,
+            fastify.log
+          );
           break;
         }
 
