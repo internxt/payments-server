@@ -14,15 +14,6 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
     (product as Stripe.Product).metadata.type === 'object-storage';
 }
 
-function isObjectStorageOneTimePayment(item: Stripe.InvoiceLineItem): boolean {
-  return (
-    typeof item.price?.product === 'object' &&
-    isProduct(item.price?.product) &&
-    !!item.price.product.metadata.type &&
-    item.price.product.metadata.type === 'object-storage'
-  );
-}
-
 async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
   invoice: Stripe.Invoice,
@@ -30,49 +21,30 @@ async function handleObjectStorageInvoiceCompleted(
   paymentService: PaymentService,
   log: FastifyLoggerInstance,
 ) {
-  console.log({ customer, invoice });
-
   if (invoice.lines.data.length !== 1) {
-    log.info(`E1: Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
+    log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
     return;
   }
 
   const [item] = invoice.lines.data;
-  const { currency, customer_email } = invoice;
-  const isTheVerificationCharge = isObjectStorageOneTimePayment(item);
+  const { customer_email } = invoice;
+  const { price } = item;
 
-  if (isTheVerificationCharge) {
-    log.info(`Object Storage verification charge received for user ${customer_email} (customer ${customer.id})`);
-
-    if (!customer_email) {
-      throw new Error('Missing customer email on session object');
-    }
-
-    await objectStorageService.initObjectStorageUser({
-      email: customer_email,
-      customerId: customer.id,
-    });
-
-    log.info(`S1: Object Storage for user ${customer_email} (customer ${customer.id}) has been initialized`);
-  } else {
-    const { price } = item;
-
-    if (!price || !price.product) {
-      log.info(`E1: Invoice ${invoice.id} not handled by object-storage handler`);
-      return;
-    }
-
-    const product = await paymentService.getProduct(price.product as string);
-
-    if (!isProduct(product)) {
-      log.info(`E2: Invoice ${invoice.id} for product ${price.product} is not an object-storage product`);
-      return;
-    }
-
-    await objectStorageService.reactivateAccount({ customerId: customer.id });
-
-    log.info(`S2: Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`);
+  if (!price || !price.product) {
+    log.info(`Invoice ${invoice.id} not handled by object-storage handler`);
+    return;
   }
+
+  const product = await paymentService.getProduct(price.product as string);
+
+  if (!isProduct(product)) {
+    log.info(`Invoice ${invoice.id} for product ${price.product} is not an object-storage product`);
+    return;
+  }
+
+  await objectStorageService.reactivateAccount({ customerId: customer.id });
+
+  log.info(`Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`);
 }
 
 export default async function handleInvoiceCompleted(
