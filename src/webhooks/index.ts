@@ -61,6 +61,7 @@ export default function (
             paymentService,
             fastify.log,
           );
+          break;
 
         case 'customer.subscription.deleted':
           await handleSubscriptionCanceled(
