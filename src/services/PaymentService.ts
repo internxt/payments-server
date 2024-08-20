@@ -269,7 +269,7 @@ export class PaymentService {
       invoice: invoice.id,
       discounts: [
         {
-          promotion_code: couponId,
+          coupon: couponId,
         },
       ],
     });
