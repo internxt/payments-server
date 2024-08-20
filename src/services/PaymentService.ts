@@ -194,7 +194,7 @@ export class PaymentService {
     const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
 
     if (promoCodeId) {
-      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
     const subscription = await this.provider.subscriptions.create({
