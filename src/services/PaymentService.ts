@@ -123,20 +123,6 @@ export class PaymentService {
     this.usersRepository = usersRepository;
   }
 
-  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
-    const userInvoices = await this.getInvoicesFromUser(customerId, {});
-    const hasUserExistingPaidInvoices = userInvoices.length > 0 && userInvoices.some((invoice) => invoice.paid);
-
-    if (promoCodeId) {
-      const promoCode = await this.provider.promotionCodes.retrieve(promoCodeId);
-      const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
-
-      if (hasUserExistingPaidInvoices && isPromoOnlyForFirstPurchase) {
-        throw new PromoCodeIsNotValidError('The promotional code is only for the first purchase');
-      }
-    }
-  }
-
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
     const customer = await this.provider.customers.create(payload);
 
@@ -155,14 +141,17 @@ export class PaymentService {
       throw new MissingParametersError(['customerId', 'priceId']);
     }
 
-    if (promoCodeId) {
-      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
-    }
-
     try {
+      const customerSubscriptions = await this.provider.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
+      });
+      const customerSubscription = customerSubscriptions.data[0];
+
       const customer = await this.getUserSubscription(customerId, UserType.Individual);
 
-      if (customer.type === 'subscription') {
+      if (customerSubscription && customer.type === 'subscription') {
         throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
@@ -219,10 +208,6 @@ export class PaymentService {
 
     if (!customerId || !amount || !priceId) {
       throw new MissingParametersError(['customerId', 'amount', 'priceId']);
-    }
-
-    if (promoCodeId) {
-      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
     const product = await this.provider.prices.retrieve(priceId);
