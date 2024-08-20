@@ -1,4 +1,6 @@
 import Stripe from 'stripe';
+import dayjs from 'dayjs';
+
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
@@ -144,6 +146,14 @@ export class PaymentService {
     return promoCode.coupon.id;
   }
 
+  private calculateNextBillingCycleAnchor() {
+    const today = dayjs();
+
+    const lastDayOfThisMonth = today.endOf('month').unix();
+
+    return lastDayOfThisMonth;
+  }
+
   async createSubscription(
     customerId: string,
     priceId: string,
@@ -177,6 +187,12 @@ export class PaymentService {
       }
     }
 
+    const price = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const product = price.product as Stripe.Product;
+    const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+
     if (promoCodeId) {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
@@ -184,6 +200,7 @@ export class PaymentService {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
+      billing_cycle_anchor: isObjectStorageProduct ? this.calculateNextBillingCycleAnchor() : undefined,
       items: [
         {
           price: priceId,
