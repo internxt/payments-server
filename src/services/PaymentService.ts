@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import dayjs from 'dayjs'
+import dayjs from 'dayjs';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -125,20 +125,6 @@ export class PaymentService {
     this.usersRepository = usersRepository;
   }
 
-  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
-    const userInvoices = await this.getInvoicesFromUser(customerId, {});
-    const hasUserExistingInvoices = userInvoices.length > 0;
-
-    if (promoCodeId) {
-      const promoCode = await this.provider.promotionCodes.retrieve(promoCodeId);
-      const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
-
-      if (hasUserExistingInvoices && isPromoOnlyForFirstPurchase) {
-        throw new PromoCodeIsNotValidError(promoCodeId);
-      }
-    }
-  }
-
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
     const customer = await this.provider.customers.create(payload);
 
@@ -147,7 +133,7 @@ export class PaymentService {
 
   private calculateNextBillingCycleAnchor() {
     const today = dayjs();
-  
+
     const lastDayOfThisMonth = today.endOf('month').unix();
 
     return lastDayOfThisMonth;
@@ -165,14 +151,10 @@ export class PaymentService {
       throw new MissingParametersError(['customerId', 'priceId']);
     }
 
-    if (promoCodeId) {
-      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
-    }
-
     const price = await this.provider.prices.retrieve(priceId, {
-      expand: ['product']
+      expand: ['product'],
     });
-    const product = (price.product as Stripe.Product);
+    const product = price.product as Stripe.Product;
     const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
 
     const subscription = await this.provider.subscriptions.create({
@@ -226,10 +208,6 @@ export class PaymentService {
       throw new MissingParametersError(['customerId', 'amount', 'priceId']);
     }
 
-    if (promoCodeId) {
-      await this.checkIfCouponIsAplicable(customerId, promoCodeId);
-    }
-
     const product = await this.provider.prices.retrieve(priceId);
 
     const invoice = await this.provider.invoices.create({
@@ -255,7 +233,9 @@ export class PaymentService {
 
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
 
-    const { client_secret, id } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
+    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
+      paymentIntentForFinalizedInvoice as string,
+    );
 
     return {
       clientSecret: client_secret,
@@ -1145,25 +1125,22 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  async billCardVerificationCharge(
-    customerId: string,
-    currency: string,
-  ) {
+  async billCardVerificationCharge(customerId: string, currency: string) {
     const methods = await this.getCustomerPaymentMethods(customerId);
 
     if (methods.length === 0) {
       throw new Error(`No payment methods found for customer ${customerId}`);
     }
-    
+
     const [firstMethod] = methods;
 
-    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`)
+    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`);
 
     await this.provider.paymentIntents.create({
       amount: 100,
       currency,
       metadata: {
-        type: 'object-storage'
+        type: 'object-storage',
       },
       customer: customerId,
       description: 'Card verification charge',
@@ -1173,9 +1150,7 @@ export class PaymentService {
     });
   }
 
-  async getCustomerPaymentMethods(
-    customerId: Stripe.Customer['id']
-  ): Promise<Stripe.PaymentMethod[]> {
+  async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
     const res = await this.provider.paymentMethods.list({
       customer: customerId,
     });
