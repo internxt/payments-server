@@ -125,14 +125,14 @@ export class PaymentService {
 
   private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
-    const hasUserExistingInvoices = userInvoices.length > 0;
+    const hasUserExistingPaidInvoices = userInvoices.length > 0 && userInvoices.some((invoice) => invoice.paid);
 
     if (promoCodeId) {
       const promoCode = await this.provider.promotionCodes.retrieve(promoCodeId);
       const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
 
-      if (hasUserExistingInvoices && isPromoOnlyForFirstPurchase) {
-        throw new PromoCodeIsNotValidError(promoCodeId);
+      if (hasUserExistingPaidInvoices && isPromoOnlyForFirstPurchase) {
+        throw new PromoCodeIsNotValidError('The promotional code is only for the first purchase');
       }
     }
   }
@@ -157,6 +157,18 @@ export class PaymentService {
 
     if (promoCodeId) {
       await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
+    try {
+      const customer = await this.getUserSubscription(customerId, UserType.Individual);
+
+      if (customer.type === 'subscription') {
+        throw new ExistingSubscriptionError('User already has an active subscription');
+      }
+    } catch (error) {
+      if (!(error instanceof NotFoundSubscriptionError)) {
+        throw error;
+      }
     }
 
     const subscription = await this.provider.subscriptions.create({
@@ -238,7 +250,9 @@ export class PaymentService {
 
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
 
-    const { client_secret, id } = await this.provider.paymentIntents.retrieve(paymentIntentForFinalizedInvoice as string);
+    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
+      paymentIntentForFinalizedInvoice as string,
+    );
 
     return {
       clientSecret: client_secret,
@@ -898,11 +912,11 @@ export class PaymentService {
 
     const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
 
-    const isProductIdAllowed =
+    const isProductAllowed =
       promoCodeIsAppliedTo && promoCodeIsAppliedTo.find((productId) => productId === (product.product as string));
 
-    if (promoCodeIsAppliedTo && !isProductIdAllowed) {
-      throw new PromoCodeIsNotValidError(promoCodeName);
+    if (promoCodeIsAppliedTo && !isProductAllowed) {
+      throw new PromoCodeIsNotValidError(`Promo code ${promoCodeName} is not valid`);
     }
 
     return {
@@ -1128,25 +1142,22 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  async billCardVerificationCharge(
-    customerId: string,
-    currency: string,
-  ) {
+  async billCardVerificationCharge(customerId: string, currency: string) {
     const methods = await this.getCustomerPaymentMethods(customerId);
 
     if (methods.length === 0) {
       throw new Error(`No payment methods found for customer ${customerId}`);
     }
-    
+
     const [firstMethod] = methods;
 
-    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`)
+    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`);
 
     await this.provider.paymentIntents.create({
       amount: 100,
       currency,
       metadata: {
-        type: 'object-storage'
+        type: 'object-storage',
       },
       customer: customerId,
       description: 'Card verification charge',
@@ -1156,9 +1167,7 @@ export class PaymentService {
     });
   }
 
-  async getCustomerPaymentMethods(
-    customerId: Stripe.Customer['id']
-  ): Promise<Stripe.PaymentMethod[]> {
+  async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
     const res = await this.provider.paymentMethods.list({
       customer: customerId,
     });
@@ -1224,8 +1233,8 @@ export class NotFoundPromoCodeByNameError extends Error {
 }
 
 export class PromoCodeIsNotValidError extends Error {
-  constructor(promoCodeId: string) {
-    super(`Promotion code with an id ${promoCodeId} is not valid`);
+  constructor(message: string) {
+    super(message);
 
     Object.setPrototypeOf(this, PromoCodeIsNotValidError.prototype);
   }
