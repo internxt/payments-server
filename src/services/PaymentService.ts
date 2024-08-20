@@ -129,6 +129,21 @@ export class PaymentService {
     return customer;
   }
 
+  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
+    const userInvoices = await this.getInvoicesFromUser(customerId, {});
+    const hasUserExistingInvoices = userInvoices.length > 0;
+    const hasUserPaidInvoices = userInvoices.some((invoice) => invoice.status === 'paid');
+
+    const promoCode = await this.provider.promotionCodes.retrieve(promoCodeId);
+    const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
+
+    if (hasUserExistingInvoices && hasUserPaidInvoices && isPromoOnlyForFirstPurchase) {
+      throw new PromoCodeIsNotValidError(promoCodeId);
+    }
+
+    return promoCode.coupon.id;
+  }
+
   async createSubscription(
     customerId: string,
     priceId: string,
@@ -136,6 +151,7 @@ export class PaymentService {
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
   ): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
+    let couponId;
 
     if (!customerId || !priceId) {
       throw new MissingParametersError(['customerId', 'priceId']);
@@ -147,11 +163,12 @@ export class PaymentService {
         status: 'active',
         expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
       });
-      const customerSubscription = customerSubscriptions.data[0];
+      const customerHasSubscription = customerSubscriptions.data.length > 0;
+      const hasActiveSubscription = customerHasSubscription && customerSubscriptions.data[0].status === 'active';
 
       const customer = await this.getUserSubscription(customerId, UserType.Individual);
 
-      if (customerSubscription && customer.type === 'subscription') {
+      if (hasActiveSubscription && customer.type === 'subscription') {
         throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
@@ -160,17 +177,21 @@ export class PaymentService {
       }
     }
 
+    if (promoCodeId) {
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
       items: [
         {
           price: priceId,
-          discounts: [
-            {
-              promotion_code: promoCodeId,
-            },
-          ],
+        },
+      ],
+      discounts: [
+        {
+          coupon: couponId,
         },
       ],
       payment_behavior: 'default_incomplete',
@@ -204,6 +225,7 @@ export class PaymentService {
     currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
   ): Promise<PaymentIntent> {
+    let couponId;
     const currencyValue = currency ?? 'eur';
 
     if (!customerId || !amount || !priceId) {
@@ -220,13 +242,17 @@ export class PaymentService {
       },
     });
 
+    if (promoCodeId) {
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
     await this.provider.invoiceItems.create({
       customer: customerId,
       price: product.id,
       invoice: invoice.id,
       discounts: [
         {
-          promotion_code: promoCodeId,
+          promotion_code: couponId,
         },
       ],
     });

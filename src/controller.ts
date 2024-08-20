@@ -293,11 +293,13 @@ export default function (
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-          if (error instanceof MissingParametersError || error instanceof PromoCodeIsNotValidError) {
+          if (error instanceof MissingParametersError) {
             return res.status(400).send(error);
-          }
-
-          if (error instanceof ExistingSubscriptionError) {
+          } else if (error instanceof PromoCodeIsNotValidError) {
+            return res
+              .status(422)
+              .send({ message: 'The promotion code is not applicable under the current conditions' });
+          } else if (error instanceof ExistingSubscriptionError) {
             return res.status(409).send(error);
           }
 
