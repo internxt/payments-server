@@ -131,6 +131,23 @@ export class PaymentService {
     return customer;
   }
 
+  async createCustomerForObjectStorage(payload: Stripe.CustomerCreateParams) {
+    if (!payload.email) {
+      throw new MissingParametersError(['email']);
+    }
+
+    const { data: customer } = await this.provider.customers.search({
+      query: `email:'${payload.email}'`,
+    });
+    const userExists = !!customer.length;
+
+    if (userExists) {
+      throw new UserAlreadyExistsError(payload.email);
+    }
+
+    return this.createCustomer(payload);
+  }
+
   private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
@@ -1271,6 +1288,14 @@ export class PromoCodeIsNotValidError extends Error {
 export class ExistingSubscriptionError extends Error {
   constructor(message: string) {
     super(message);
+
+    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
+  }
+}
+
+export class UserAlreadyExistsError extends Error {
+  constructor(email: string) {
+    super(`User with email ${email} already exists.`);
 
     Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
   }

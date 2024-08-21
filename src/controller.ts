@@ -14,6 +14,7 @@ import {
   NotFoundPromoCodeByNameError,
   PaymentService,
   PromoCodeIsNotValidError,
+  UserAlreadyExistsError,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription, UserType } from './core/users/User';
@@ -117,7 +118,7 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomer({
+          const { id } = await paymentService.createCustomerForObjectStorage({
             name,
             email,
           });
@@ -134,6 +135,9 @@ export default function (
             token,
           });
         } catch (err) {
+          if (err instanceof UserAlreadyExistsError) {
+            return res.status(409).send(err.message);
+          }
           return res.status(500).send({
             message: 'Internal Server Error',
           });
