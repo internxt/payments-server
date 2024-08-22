@@ -1,5 +1,4 @@
 import Stripe from 'stripe';
-import dayjs from 'dayjs';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -163,19 +162,13 @@ export class PaymentService {
     return promoCode.coupon.id;
   }
 
-  private calculateNextBillingCycleAnchor() {
-    const today = dayjs();
-
-    const lastDayOfThisMonth = today.endOf('month').unix();
-
-    return lastDayOfThisMonth;
-  }
-
   async createSubscription(
     customerId: string,
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
+    companyName?: string,
+    companyVatId?: string,
   ): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -217,7 +210,11 @@ export class PaymentService {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
-      billing_cycle_anchor: isObjectStorageProduct ? this.calculateNextBillingCycleAnchor() : undefined,
+      billing_cycle_anchor_config: isObjectStorageProduct
+        ? {
+            day_of_month: 1,
+          }
+        : undefined,
       items: [
         {
           price: priceId,
@@ -228,6 +225,10 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
+      metadata: {
+        companyName: companyName ?? null,
+        companyVatId: companyVatId ?? null,
+      },
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: ['card', 'paypal'],

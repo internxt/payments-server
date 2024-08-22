@@ -317,7 +317,14 @@ export default function (
     );
 
     fastify.post<{
-      Body: { customerId: string; priceId: string; currency: string; token: string };
+      Body: {
+        customerId: string;
+        priceId: string;
+        currency: string;
+        token: string;
+        companyName: string;
+        companyVatId: string;
+      };
     }>(
       '/create-subscription-for-object-storage',
       {
@@ -338,12 +345,18 @@ export default function (
               currency: {
                 type: 'string',
               },
+              companyName: {
+                type: 'string',
+              },
+              companyVatId: {
+                type: 'string',
+              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token } = req.body;
+        const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -359,17 +372,22 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency);
+          const subscriptionSetUp = await paymentService.createSubscription(
+            customerId,
+            priceId,
+            currency,
+            undefined, // Promo code ID, which we don't need for obj storage
+            companyName,
+            companyVatId,
+          );
 
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
-          if (
-            error instanceof MissingParametersError ||
-            error instanceof PromoCodeIsNotValidError ||
-            error instanceof ExistingSubscriptionError
-          ) {
-            return res.status(400).send(error.message);
+          if (error instanceof MissingParametersError) {
+            return res.status(400).send(error);
+          } else if (error instanceof ExistingSubscriptionError) {
+            return res.status(409).send(error);
           }
 
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
