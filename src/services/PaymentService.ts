@@ -171,49 +171,30 @@ export class PaymentService {
     return lastDayOfThisMonth;
   }
 
-  async createSubscription(
-    customerId: string,
-    priceId: string,
-    currency?: string,
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
-  ): Promise<SubscriptionCreated> {
-    const currencyValue = currency ?? 'eur';
-    let couponId;
-
-    if (!customerId || !priceId) {
-      throw new MissingParametersError(['customerId', 'priceId']);
-    }
-
-    try {
-      const customerSubscriptions = await this.provider.subscriptions.list({
-        customer: customerId,
-        status: 'active',
-        expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
-      });
-      const customerHasSubscription = customerSubscriptions.data.length > 0;
-      const hasActiveSubscription = customerHasSubscription && customerSubscriptions.data[0].status === 'active';
-
-      const customer = await this.getUserSubscription(customerId, UserType.Individual);
-
-      if (hasActiveSubscription && customer.type === 'subscription') {
-        throw new ExistingSubscriptionError('User already has an active subscription');
-      }
-    } catch (error) {
-      if (!(error instanceof NotFoundSubscriptionError)) {
-        throw error;
-      }
-    }
-
-    const price = await this.provider.prices.retrieve(priceId, {
-      expand: ['product'],
+  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, userType: UserType = UserType.Individual) {
+    const customerSubscriptions = await this.provider.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
-    const product = price.product as Stripe.Product;
-    const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+    const customerHasSubscription = customerSubscriptions.data.length > 0;
+    const hasActiveSubscription = customerHasSubscription && customerSubscriptions.data[0].status === 'active';
 
-    if (promoCodeId) {
-      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    const customer = await this.getUserSubscription(customerId, userType);
+
+    if (hasActiveSubscription && customer.type === 'subscription') {
+      throw new ExistingSubscriptionError('User already has an active subscription');
     }
+  }
 
+  async createSubscription(
+    customerId: CustomerId,
+    currencyValue: string,
+    isObjectStorageProduct: boolean,
+    priceId: PriceId,
+    couponId?: Stripe.Coupon['id'],
+    additionalOptions?: Partial<Stripe.SubscriptionCreateParams>,
+  ) {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
@@ -234,7 +215,88 @@ export class PaymentService {
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      ...additionalOptions,
     });
+
+    return subscription;
+  }
+
+  async createSubscriptionForProduct(
+    customerId: string,
+    priceId: string,
+    currency?: string,
+    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
+  ): Promise<SubscriptionCreated> {
+    const currencyValue = currency ?? 'eur';
+    let couponId;
+
+    if (!customerId || !priceId) {
+      throw new MissingParametersError(['customerId', 'priceId']);
+    }
+
+    try {
+      await this.checkIfUserAlreadyHasASubscription(customerId);
+    } catch (error) {
+      if (!(error instanceof NotFoundSubscriptionError)) {
+        throw error;
+      }
+    }
+
+    if (promoCodeId) {
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
+    const subscription = await this.createSubscription(customerId, currencyValue, false, priceId, couponId);
+
+    if (subscription.pending_setup_intent !== null) {
+      return {
+        type: 'setup',
+        clientSecret: (subscription.pending_setup_intent as any).client_secret,
+        subscriptionId: subscription.id,
+      };
+    } else {
+      return {
+        type: 'payment',
+        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        subscriptionId: subscription.id,
+        paymentIntentId: (subscription.latest_invoice as any).payment_intent.id,
+      };
+    }
+  }
+
+  async createSubscriptionForObjectStorage(
+    customerId: string,
+    priceId: string,
+    currency?: string,
+    companyName?: string,
+    companyVatId?: string,
+  ) {
+    if (!customerId || !priceId) {
+      throw new MissingParametersError(['customerId', 'priceId']);
+    }
+
+    const currencyValue = currency ?? 'eur';
+    const metadata: Stripe.Emptyable<Stripe.MetadataParam> = {
+      companyName: companyName || null,
+      companyVatId: companyVatId || null,
+    };
+
+    const price = await this.provider.prices.retrieve(priceId, {
+      expand: ['product'],
+    });
+    const product = price.product as Stripe.Product;
+    const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+
+    const subscription = await this.createSubscription(
+      customerId,
+      currencyValue,
+      isObjectStorageProduct,
+      priceId,
+      undefined,
+      {
+        metadata: metadata,
+      },
+    );
 
     if (subscription.pending_setup_intent !== null) {
       return {

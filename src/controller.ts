@@ -292,7 +292,12 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency, promoCodeId);
+          const subscriptionSetUp = await paymentService.createSubscriptionForProduct(
+            customerId,
+            priceId,
+            currency,
+            promoCodeId,
+          );
 
           return res.send(subscriptionSetUp);
         } catch (err) {
@@ -317,7 +322,14 @@ export default function (
     );
 
     fastify.post<{
-      Body: { customerId: string; priceId: string; currency: string; token: string };
+      Body: {
+        customerId: string;
+        priceId: string;
+        currency: string;
+        token: string;
+        companyName?: string;
+        companyVatId?: string;
+      };
     }>(
       '/create-subscription-for-object-storage',
       {
@@ -338,12 +350,18 @@ export default function (
               currency: {
                 type: 'string',
               },
+              companyName: {
+                type: 'string',
+              },
+              companyVatId: {
+                type: 'string',
+              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token } = req.body;
+        const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -359,7 +377,13 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency);
+          const subscriptionSetUp = await paymentService.createSubscriptionForObjectStorage(
+            customerId,
+            priceId,
+            currency,
+            companyName,
+            companyVatId,
+          );
 
           return res.send(subscriptionSetUp);
         } catch (err) {

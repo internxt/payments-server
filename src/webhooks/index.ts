@@ -48,11 +48,7 @@ export default function (
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(
-            event.data.object as Stripe.Invoice,
-            objectStorageService,
-            paymentService,
-          );
+          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, objectStorageService, paymentService);
           break;
 
         case 'customer.subscription.deleted':
@@ -82,10 +78,12 @@ export default function (
         case 'payment_intent.succeeded': {
           const eventData = event.data.object;
           const paymentMethod = await stripe.paymentMethods.retrieve(eventData.payment_method as string);
+          const userName = paymentMethod.billing_details.name;
           const userAddressBillingDetails = paymentMethod.billing_details.address;
 
-          if (userAddressBillingDetails) {
+          if (userAddressBillingDetails && userName) {
             await stripe.customers.update(eventData.customer as string, {
+              name: userName,
               address: {
                 city: userAddressBillingDetails.city as string,
                 line1: userAddressBillingDetails.line1 as string,
@@ -97,12 +95,7 @@ export default function (
             });
           }
 
-          await handlePaymentIntentSucceeded(
-            eventData,
-            paymentService,
-            objectStorageService,
-            fastify.log
-          );
+          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
           break;
         }
 
