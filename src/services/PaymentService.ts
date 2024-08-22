@@ -176,6 +176,8 @@ export class PaymentService {
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
+    companyName?: string,
+    companyVatId?: string,
   ): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -228,6 +230,10 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
+      metadata: {
+        companyName: companyName ?? null,
+        companyVatId: companyVatId ?? null,
+      },
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
