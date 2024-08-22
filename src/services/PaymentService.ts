@@ -142,7 +142,7 @@ export class PaymentService {
     const userExists = !!customer.length;
 
     if (userExists) {
-      throw new UserAlreadyExistsError(payload.email);
+      return customer[0];
     }
 
     return this.createCustomer(payload);
