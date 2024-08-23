@@ -56,6 +56,8 @@ async function handleObjectStorageProduct(
     }
   } 
 
+  logger.info(`Customer ${customer.id} address data is ${JSON.stringify(customer.address)}`);
+
   if (!!subscription.metadata.companyVatId && !!customer.address?.country) {
     const taxIds = paymentsService.getVatIdFromCountry(customer.address.country);
 
