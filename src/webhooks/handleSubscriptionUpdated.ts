@@ -36,6 +36,8 @@ async function handleObjectStorageProduct(
     subscription.currency
   );
 
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
+
   const updatableAttributes: { 
     customer?: {
       name?: string;
@@ -53,6 +55,7 @@ async function handleObjectStorageProduct(
       name: subscription.metadata.companyName,
     }
   } 
+
   if (subscription.metadata.companyVatId && customer.address?.country) {
     const taxIds = paymentsService.getVatIdFromCountry(customer.address.country);
 
@@ -66,9 +69,11 @@ async function handleObjectStorageProduct(
     }
   }
 
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify(updatableAttributes)}`);
+
   await paymentsService.updateCustomer(customer.id, updatableAttributes);
 
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been updated successfully`);
 }
 
 export default async function handleSubscriptionUpdated(
