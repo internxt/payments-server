@@ -56,7 +56,7 @@ async function handleObjectStorageProduct(
     }
   } 
 
-  if (subscription.metadata.companyVatId && customer.address?.country) {
+  if (!!subscription.metadata.companyVatId && !!customer.address?.country) {
     const taxIds = paymentsService.getVatIdFromCountry(customer.address.country);
 
     logger.info(`Updating customer ${customer.id} VAT ID to ${subscription.metadata.companyVatId}-${taxIds[0]}`);
@@ -69,7 +69,10 @@ async function handleObjectStorageProduct(
     }
   }
 
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify(updatableAttributes)}`);
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify({
+    metadata: subscription.metadata, 
+    updatableAttributes
+  })}`);
 
   await paymentsService.updateCustomer(customer.id, updatableAttributes);
 
