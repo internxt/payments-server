@@ -1213,6 +1213,96 @@ export class PaymentService {
     });
   }
 
+  getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[]  {
+    const map: Record<string, Stripe.TaxIdCreateParams.Type[]> = {
+      AD: ['ad_nrt'],
+      AE: ['ae_trn'],
+      AR: ['ar_cuit'],
+      AU: ['au_abn', 'au_arn'],
+      BG: ['bg_uic'],
+      BH: ['bh_vat'],
+      BO: ['bo_tin'],
+      BR: ['br_cnpj', 'br_cpf'],
+      CA: ['ca_bn', 'ca_gst_hst', 'ca_pst_bc', 'ca_pst_mb', 'ca_pst_sk', 'ca_qst'],
+      CH: ['ch_vat'],
+      CL: ['cl_tin'],
+      CN: ['cn_tin'],
+      CO: ['co_nit'],
+      CR: ['cr_tin'],
+      DO: ['do_rcn'],
+      EC: ['ec_ruc'],
+      EG: ['eg_tin'],
+      ES: ['es_cif'],
+      EU: ['eu_oss_vat', 'eu_vat'],
+      GB: ['gb_vat'],
+      GE: ['ge_vat'],
+      HK: ['hk_br'],
+      HU: ['hu_tin'],
+      ID: ['id_npwp'],
+      IL: ['il_vat'],
+      IN: ['in_gst'],
+      IS: ['is_vat'],
+      JP: ['jp_cn', 'jp_rn', 'jp_trn'],
+      KE: ['ke_pin'],
+      KR: ['kr_brn'],
+      KZ: ['kz_bin'],
+      LI: ['li_uid'],
+      MX: ['mx_rfc'],
+      MY: ['my_frp', 'my_itn', 'my_sst'],
+      NG: ['ng_tin'],
+      NO: ['no_vat', 'no_voec'],
+      NZ: ['nz_gst'],
+      OM: ['om_vat'],
+      PE: ['pe_ruc'],
+      PH: ['ph_tin'],
+      RO: ['ro_tin'],
+      RS: ['rs_pib'],
+      RU: ['ru_inn', 'ru_kpp'],
+      SA: ['sa_vat'],
+      SG: ['sg_gst', 'sg_uen'],
+      SI: ['si_tin'],
+      SV: ['sv_nit'],
+      TH: ['th_vat'],
+      TR: ['tr_tin'],
+      TW: ['tw_vat'],
+      UA: ['ua_vat'],
+      US: ['us_ein'],
+      UY: ['uy_ruc'],
+      VE: ['ve_rif'],
+      VN: ['vn_tin'],
+      ZA: ['za_vat']
+    };
+
+    return map[country];
+  }
+
+  async updateCustomer(
+    customerId: Stripe.Customer['id'],
+    updatableAttributes: {
+      customer?: Partial<Pick<Stripe.CustomerUpdateParams, 'name'>>,
+      tax?: {
+        id: string,
+        type: Stripe.TaxIdCreateParams.Type
+      } 
+    }
+  ): Promise<void> {
+    if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
+      await this.provider.customers.update(customerId, {
+        name: updatableAttributes.customer.name
+      });
+    }
+    if (updatableAttributes.tax) {
+      await this.provider.taxIds.create({
+        owner: {
+          customer: customerId,
+          type: 'customer',
+        },
+        type: updatableAttributes.tax.type,
+        value: updatableAttributes.tax.id,
+      })
+    }
+  }
+
   async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
     const res = await this.provider.paymentMethods.list({
       customer: customerId,
