@@ -130,7 +130,7 @@ export class PaymentService {
     return customer;
   }
 
-  async createCustomerForObjectStorage(payload: Stripe.CustomerCreateParams) {
+  async createCustomerForObjectStorage(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
     }
@@ -144,7 +144,17 @@ export class PaymentService {
       return customer[0];
     }
 
-    return this.createCustomer(payload);
+    const newCustomer = await this.createCustomer(payload);
+
+    if (country && companyVatId) {
+      const taxIds = this.getVatIdFromCountry(country);
+
+      if (taxIds.length > 0) {
+        await this.attachTaxIdToCustomer(newCustomer.id, companyVatId, taxIds[0]);
+      }
+    }
+
+    return newCustomer;
   }
 
   private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
@@ -1213,7 +1223,7 @@ export class PaymentService {
     });
   }
 
-  getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[]  {
+  getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {
     const map: Record<string, Stripe.TaxIdCreateParams.Type[]> = {
       AD: ['ad_nrt'],
       AE: ['ae_trn'],
@@ -1270,25 +1280,32 @@ export class PaymentService {
       UY: ['uy_ruc'],
       VE: ['ve_rif'],
       VN: ['vn_tin'],
-      ZA: ['za_vat']
+      ZA: ['za_vat'],
     };
 
     return map[country];
   }
 
+  async attachTaxIdToCustomer(customerId: CustomerId, id: string, type: Stripe.TaxIdCreateParams.Type) {
+    await this.provider.customers.createTaxId(customerId, {
+      type,
+      value: id,
+    });
+  }
+
   async updateCustomer(
     customerId: Stripe.Customer['id'],
     updatableAttributes: {
-      customer?: Partial<Pick<Stripe.CustomerUpdateParams, 'name'>>,
+      customer?: Partial<Pick<Stripe.CustomerUpdateParams, 'name'>>;
       tax?: {
-        id: string,
-        type: Stripe.TaxIdCreateParams.Type
-      } 
-    }
+        id: string;
+        type: Stripe.TaxIdCreateParams.Type;
+      };
+    },
   ): Promise<void> {
     if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
       await this.provider.customers.update(customerId, {
-        name: updatableAttributes.customer.name
+        name: updatableAttributes.customer.name,
       });
     }
     if (updatableAttributes.tax) {
@@ -1297,9 +1314,10 @@ export class PaymentService {
           customer: customerId,
           type: 'customer',
         },
+
         type: updatableAttributes.tax.type,
         value: updatableAttributes.tax.id,
-      })
+      });
     }
   }
 
