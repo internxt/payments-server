@@ -91,14 +91,19 @@ export default function (
       }
     });
 
-    fastify.post<{ Body: { name: string; email: string } }>(
+    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer-for-object-storage',
       {
         schema: {
           body: {
             type: 'object',
             required: ['email', 'name'],
-            properties: { name: { type: 'string' }, email: { type: 'string' } },
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string' },
+              country: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
           },
         },
         config: {
@@ -109,19 +114,22 @@ export default function (
         },
       },
       async (req, res) => {
-        const { name, email } = req.body;
+        const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
           return res.status(404).send({
             message: 'Email should be provided',
           });
         }
-
         try {
-          const { id } = await paymentService.createCustomerForObjectStorage({
-            name,
-            email,
-          });
+          const { id } = await paymentService.createCustomerForObjectStorage(
+            {
+              name,
+              email,
+            },
+            country,
+            companyVatId,
+          );
 
           const token = jwt.sign(
             {
@@ -135,9 +143,11 @@ export default function (
             token,
           });
         } catch (err) {
+          const error = err as Error;
           if (err instanceof UserAlreadyExistsError) {
             return res.status(409).send(err.message);
           }
+          req.log.error(`ERROR WHILE CREATING CUSTOMER: ${error.stack ?? error.message}`);
           return res.status(500).send({
             message: 'Internal Server Error',
           });

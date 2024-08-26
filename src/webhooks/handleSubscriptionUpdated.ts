@@ -18,7 +18,7 @@ async function handleObjectStorageProduct(
   subscription: Stripe.Subscription,
   paymentsService: PaymentService,
   logger: FastifyLoggerInstance,
-): Promise<void> { 
+): Promise<void> {
   if (customer.deleted) {
     throw new Error('Customer has been deleted');
   }
@@ -31,21 +31,18 @@ async function handleObjectStorageProduct(
     throw new Error('Missing customer email on subscription updated');
   }
 
-  await paymentsService.billCardVerificationCharge(
-    customer.id, 
-    subscription.currency
-  );
+  await paymentsService.billCardVerificationCharge(customer.id, subscription.currency);
 
   logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
 
-  const updatableAttributes: { 
+  const updatableAttributes: {
     customer?: {
       name?: string;
-    }
+    };
     tax?: {
       id: string;
-      type: Stripe.TaxIdCreateParams.Type
-    }
+      type: Stripe.TaxIdCreateParams.Type;
+    };
   } = {};
 
   if (subscription.metadata.companyName) {
@@ -53,8 +50,8 @@ async function handleObjectStorageProduct(
 
     updatableAttributes['customer'] = {
       name: subscription.metadata.companyName,
-    }
-  } 
+    };
+  }
 
   logger.info(`Customer ${customer.id} address data is ${JSON.stringify(customer.address)}`);
 
@@ -66,17 +63,19 @@ async function handleObjectStorageProduct(
     if (taxIds.length > 0) {
       updatableAttributes['tax'] = {
         id: subscription.metadata.companyVatId,
-        type: taxIds[0]
-      }
+        type: taxIds[0],
+      };
     }
   }
 
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify({
-    metadata: subscription.metadata, 
-    updatableAttributes
-  })}`);
+  logger.info(
+    `Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify({
+      metadata: subscription.metadata,
+      updatableAttributes,
+    })}`,
+  );
 
-  await paymentsService.updateCustomer(customer.id, updatableAttributes);
+  // await paymentsService.updateCustomer(customer.id, updatableAttributes);
 
   logger.info(`Customer ${customer.id} with sub ${subscription.id} has been updated successfully`);
 }
@@ -96,12 +95,12 @@ export default async function handleSubscriptionUpdated(
   const productId = subscription.items.data[0].price.product as string;
   const product = await paymentService.getProduct(productId);
   const { metadata: productMetadata } = product;
-  
+
   if (isObjectStorageProduct(productMetadata)) {
     if (!isSubscriptionCanceled) {
       await handleObjectStorageProduct(
-        product, 
-        await paymentService.getCustomer(customerId) as Stripe.Customer, 
+        product,
+        (await paymentService.getCustomer(customerId)) as Stripe.Customer,
         subscription,
         paymentService,
         log,
