@@ -7,6 +7,26 @@ import { UsersService } from '../services/UsersService';
 import { PaymentService } from '../services/PaymentService';
 import { AppConfig } from '../config';
 import Stripe from 'stripe';
+import { ObjectStorageService } from '../services/ObjectStorageService';
+
+function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
+  return !!meta && !!meta.type && meta.type === 'object-storage';
+}
+
+async function handleObjectStorageSubscriptionCancelled(
+  customer: Stripe.Customer,
+  subscription: Stripe.Subscription,
+  objectStorageService: ObjectStorageService,
+  logger: FastifyLoggerInstance,
+): Promise<void> {
+  logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
+
+  await objectStorageService.deleteAccount({
+    customerId: customer.id
+  });
+
+  logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
+}
 
 export default async function handleSubscriptionCanceled(
   storageService: StorageService,
@@ -14,14 +34,27 @@ export default async function handleSubscriptionCanceled(
   paymentService: PaymentService,
   subscription: Stripe.Subscription,
   cacheService: CacheService,
+  objectStorageService: ObjectStorageService,
   log: FastifyLoggerInstance,
   config: AppConfig,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
+  const { metadata: productMetadata } = await paymentService.getProduct(productId);
+
+  if (isObjectStorageProduct(productMetadata)) {
+    await handleObjectStorageSubscriptionCancelled(
+      await paymentService.getCustomer(customerId) as Stripe.Customer,
+      subscription,
+      objectStorageService,
+      log, 
+    )
+    return;
+  }
+  
   const { uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
 
-  const { metadata: productMetadata } = await paymentService.getProduct(productId);
+
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   try {
