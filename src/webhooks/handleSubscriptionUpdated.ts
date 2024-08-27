@@ -7,9 +7,25 @@ import { StorageService, updateUserTier } from '../services/StorageService';
 import { UsersService } from '../services/UsersService';
 import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
+import { ObjectStorageService } from '../services/ObjectStorageService';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
+}
+
+async function handleObjectStorageSubscriptionCancelled(
+  customer: Stripe.Customer,
+  subscription: Stripe.Subscription,
+  objectStorageService: ObjectStorageService,
+  logger: FastifyLoggerInstance,
+): Promise<void> {
+  logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
+
+  await objectStorageService.deleteAccount({
+    customerId: customer.id
+  });
+
+  logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
 }
 
 async function handleObjectStorageProduct(
@@ -86,6 +102,7 @@ export default async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription,
   cacheService: CacheService,
   paymentService: PaymentService,
+  objectStorageService: ObjectStorageService,
   log: FastifyLoggerInstance,
   config: AppConfig,
 ): Promise<void> {
@@ -97,7 +114,14 @@ export default async function handleSubscriptionUpdated(
   const { metadata: productMetadata } = product;
 
   if (isObjectStorageProduct(productMetadata)) {
-    if (!isSubscriptionCanceled) {
+    if (isSubscriptionCanceled) {
+      await handleObjectStorageSubscriptionCancelled(
+        (await paymentService.getCustomer(customerId)) as Stripe.Customer,
+        subscription,
+        objectStorageService,
+        log,
+      )
+    } else {
       await handleObjectStorageProduct(
         product,
         (await paymentService.getCustomer(customerId)) as Stripe.Customer,
@@ -105,8 +129,6 @@ export default async function handleSubscriptionUpdated(
         paymentService,
         log,
       );
-    } else {
-      // TODO: Destroy account on subscription cancelled
     }
     return;
   }

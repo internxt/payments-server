@@ -74,6 +74,7 @@ export default function (
             event.data.object,
             cacheService,
             paymentService,
+            objectStorageService,
             fastify.log,
             config,
           );
