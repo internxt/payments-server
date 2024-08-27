@@ -403,9 +403,13 @@ export default function (
         } catch (err) {
           const error = err as Error;
           if (error instanceof MissingParametersError) {
-            return res.status(400).send(error);
+            return res.status(400).send({
+              message: error.message,
+            });
           } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send(error);
+            return res.status(409).send({
+              message: error.message,
+            });
           }
 
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
