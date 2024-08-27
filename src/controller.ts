@@ -288,6 +288,10 @@ export default function (
       async (req, res) => {
         const { customerId, priceId, currency, token, promoCodeId } = req.body;
 
+        if (!customerId || !priceId) {
+          throw new MissingParametersError([`customerId: ${customerId}`, `priceId: ${priceId}`]);
+        }
+
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
             customerId: string;
@@ -307,17 +311,21 @@ export default function (
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
+          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
+
           if (error instanceof MissingParametersError) {
-            return res.status(400).send(error);
+            return res.status(400).send({
+              message: error.message,
+            });
           } else if (error instanceof PromoCodeIsNotValidError) {
             return res
               .status(422)
               .send({ message: 'The promotion code is not applicable under the current conditions' });
           } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send(error);
+            return res.status(409).send({
+              message: error.message,
+            });
           }
-
-          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',
@@ -395,9 +403,13 @@ export default function (
         } catch (err) {
           const error = err as Error;
           if (error instanceof MissingParametersError) {
-            return res.status(400).send(error);
+            return res.status(400).send({
+              message: error.message,
+            });
           } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send(error);
+            return res.status(409).send({
+              message: error.message,
+            });
           }
 
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);

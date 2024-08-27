@@ -176,16 +176,12 @@ export class PaymentService {
     customerId: string,
     priceId: string,
     currency?: string,
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
+    promoCodeId?: string,
     companyName?: string,
     companyVatId?: string,
   ): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
-
-    if (!customerId || !priceId) {
-      throw new MissingParametersError(['customerId', 'priceId']);
-    }
 
     try {
       const customerSubscriptions = await this.provider.subscriptions.list({
