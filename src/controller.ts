@@ -289,7 +289,7 @@ export default function (
         const { customerId, priceId, currency, token, promoCodeId } = req.body;
 
         if (!customerId || !priceId) {
-          throw new MissingParametersError(['customerId', 'priceId']);
+          throw new MissingParametersError([`customerId: ${customerId}`, `priceId: ${priceId}`]);
         }
 
         try {
