@@ -288,7 +288,7 @@ export default function (
       async (req, res) => {
         const { customerId, priceId, currency, token, promoCodeId } = req.body;
 
-        if (customerId === undefined || priceId === undefined) {
+        if (!customerId || !priceId) {
           throw new MissingParametersError(['customerId', 'priceId']);
         }
 
