@@ -13,7 +13,7 @@ function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
 }
 
-async function handleObjectStorageSubscriptionCancelled(
+async function handleObjectStorageScheduledForCancelation(
   customer: Stripe.Customer,
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
@@ -35,6 +35,15 @@ async function handleObjectStorageProduct(
   paymentsService: PaymentService,
   logger: FastifyLoggerInstance,
 ): Promise<void> {
+  const subscriptionScheduledForCancelation = subscription.cancellation_details && 
+    subscription.cancellation_details.reason === 'cancellation_requested';
+  const subscriptionCancelled = subscription.status === 'canceled';
+
+  if (subscriptionCancelled || subscriptionScheduledForCancelation) {
+    logger.error(`Sub ${subscription.id} is/is being canceled, it should not be processed by object storage handler`);
+    throw new Error(`Sub ${subscription.id} is/is being canceled, it should not be processed by object storage handler`);
+  }
+
   if (customer.deleted) {
     throw new Error('Customer has been deleted');
   }
@@ -109,13 +118,21 @@ export default async function handleSubscriptionUpdated(
   let uuid = '';
   const customerId = subscription.customer as string;
   const isSubscriptionCanceled = subscription.status === 'canceled';
+  const subscriptionScheduledForCancelation = subscription.cancellation_details && 
+    subscription.cancellation_details.reason === 'cancellation_requested';
   const productId = subscription.items.data[0].price.product as string;
   const product = await paymentService.getProduct(productId);
   const { metadata: productMetadata } = product;
 
   if (isObjectStorageProduct(productMetadata)) {
+    log.info(`Object storage customer ${customerId} with sub ${subscription.id} updated its sub`);
+
     if (isSubscriptionCanceled) {
-      await handleObjectStorageSubscriptionCancelled(
+      log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been canceled`);
+    } else if (subscriptionScheduledForCancelation) {
+      log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been scheduled for cancelation`);
+
+      await handleObjectStorageScheduledForCancelation(
         (await paymentService.getCustomer(customerId)) as Stripe.Customer,
         subscription,
         objectStorageService,
