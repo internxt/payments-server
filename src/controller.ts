@@ -155,14 +155,19 @@ export default function (
       },
     );
 
-    fastify.post<{ Body: { name: string; email: string } }>(
+    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer',
       {
         schema: {
           body: {
             type: 'object',
             required: ['email', 'name'],
-            properties: { name: { type: 'string' }, email: { type: 'string' } },
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string' },
+              country: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
           },
         },
         config: {
@@ -173,7 +178,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { name, email } = req.body;
+        const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
           return res.status(404).send({
@@ -182,10 +187,14 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomer({
-            name,
-            email,
-          });
+          const { id } = await paymentService.createCustomerForObjectStorage(
+            {
+              name,
+              email,
+            },
+            country,
+            companyVatId,
+          );
 
           const token = jwt.sign(
             {
@@ -257,7 +266,14 @@ export default function (
     });
 
     fastify.post<{
-      Body: { customerId: string; priceId: string; currency: string; token: string; promoCodeId?: string };
+      Body: {
+        customerId: string;
+        priceId: string;
+        currency: string;
+        quantity: number;
+        token: string;
+        promoCodeId?: string;
+      };
     }>(
       '/create-subscription',
       {
@@ -281,12 +297,15 @@ export default function (
               promoCodeId: {
                 type: 'string',
               },
+              quantity: {
+                type: 'number',
+              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, quantity } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -302,19 +321,29 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency, promoCodeId);
+          const subscriptionSetUp = await paymentService.createSubscription(
+            customerId,
+            priceId,
+            quantity,
+            currency,
+            promoCodeId,
+          );
 
           return res.send(subscriptionSetUp);
         } catch (err) {
           const error = err as Error;
           if (error instanceof MissingParametersError) {
-            return res.status(400).send(error);
+            return res.status(400).send({
+              message: error.message,
+            });
           } else if (error instanceof PromoCodeIsNotValidError) {
             return res
               .status(422)
               .send({ message: 'The promotion code is not applicable under the current conditions' });
           } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send(error);
+            return res.status(409).send({
+              message: error.message,
+            });
           }
 
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
@@ -385,6 +414,7 @@ export default function (
           const subscriptionSetUp = await paymentService.createSubscription(
             customerId,
             priceId,
+            1, // How many items are purchased
             currency,
             undefined, // Promo code ID, which we don't need for obj storage
             companyName,

@@ -35,9 +35,16 @@ interface ExtendedSubscription extends Subscription {
   product?: Stripe.Product;
 }
 
+type RequestedPlanData = DisplayPrice & {
+  decimalAmount: number;
+  minimumSeats?: number;
+  maximumSeats?: number;
+  type: UserType;
+};
+
 export interface RequestedPlan {
-  selectedPlan: DisplayPrice & { decimalAmount: number };
-  upsellPlan?: DisplayPrice & { decimalAmount: number };
+  selectedPlan: RequestedPlanData;
+  upsellPlan?: RequestedPlanData;
 }
 
 export interface PromotionCode {
@@ -175,6 +182,7 @@ export class PaymentService {
   async createSubscription(
     customerId: string,
     priceId: string,
+    quantity: number,
     currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
     companyName?: string,
@@ -217,6 +225,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
+    // !TODO: Check the seats before creating the business subscription (quantity param)
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
@@ -228,6 +237,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
+          quantity,
         },
       ],
       discounts: [
@@ -867,6 +877,7 @@ export class PaymentService {
         bytes: parseInt(metadata?.maxSpaceBytes),
         interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
         decimalAmount: (price.unit_amount as number) / 100,
+        type: UserType.Individual,
       };
 
       return selectedPlan;
@@ -879,6 +890,7 @@ export class PaymentService {
 
   async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
     let upsellPlan: RequestedPlan['upsellPlan'];
+    let businessSeats;
     const currencyValue = currency ?? 'eur';
 
     try {
@@ -892,6 +904,15 @@ export class PaymentService {
 
       const { id, currency, metadata, type, recurring, product: productId } = price;
 
+      const isBusinessPrice = !!metadata.type && metadata.type === 'business';
+
+      if (isBusinessPrice) {
+        businessSeats = {
+          minimumSeats: Number(metadata.minimumSeats),
+          maximumSeats: Number(metadata.maximumSeats),
+        };
+      }
+
       const selectedPlan: RequestedPlan['selectedPlan'] = {
         id: id,
         currency: currencyValue,
@@ -899,6 +920,8 @@ export class PaymentService {
         bytes: parseInt(metadata?.maxSpaceBytes),
         interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
         decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
+        type: isBusinessPrice ? UserType.Business : UserType.Individual,
+        ...businessSeats,
       };
 
       if (recurring?.interval === 'month') {
@@ -912,6 +935,8 @@ export class PaymentService {
             bytes: parseInt(upsell.metadata?.maxSpaceBytes),
             interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
             decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number as number) / 100,
+            type: isBusinessPrice ? UserType.Business : UserType.Individual,
+            ...businessSeats,
           };
         }
       }
