@@ -216,11 +216,6 @@ export class PaymentService {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
-      billing_cycle_anchor_config: isObjectStorageProduct
-        ? {
-            day_of_month: 1,
-          }
-        : undefined,
       items: [
         {
           price: priceId,
