@@ -122,7 +122,7 @@ export default function (
           });
         }
         try {
-          const { id } = await paymentService.createCustomerForObjectStorage(
+          const { id } = await paymentService.createCustomerForProduct(
             {
               name,
               email,
@@ -187,7 +187,7 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomerForObjectStorage(
+          const { id } = await paymentService.createCustomerForProduct(
             {
               name,
               email,
@@ -270,7 +270,7 @@ export default function (
         customerId: string;
         priceId: string;
         currency: string;
-        quantity: number;
+        quantity?: number;
         token: string;
         promoCodeId?: string;
       };

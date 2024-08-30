@@ -109,31 +109,22 @@ export default async function handleInvoiceCompleted(
     );
   }
 
-  // try {
-  //   const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
-  //   user = res.data.user;
-  // } catch (err) {
-  //   log.error(
-  //     `Error while creating or updating user in payment intent completed handler, email: ${session.customer_email}`,
-  //   );
-  //   log.error(err);
+  if (productType === UserType.Business) {
+    const email = customer.email || session.customer_email;
 
-  //   throw err;
-  // }
-
-  // try {
-  //   await updateUserTier(user.uuid, product.id, config);
-  // } catch (err) {
-  //   const error = err as Error;
-  //   log.error(
-  //     `Error while updating user tier: email: ${session.customer_email}, priceId: ${price.product as string} `,
-  //     error.stack ?? error.message,
-  //   );
-
-  //   throw err;
-  // }
-
-  if (productType === UserType.Individual) {
+    try {
+      user = await usersService.findUserByCustomerID(customer.id);
+    } catch (err) {
+      if (email) {
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
+      } else {
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
+        log.error(err);
+        throw err;
+      }
+    }
+  } else {
     try {
       const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
       user = res.data.user;
@@ -156,21 +147,6 @@ export default async function handleInvoiceCompleted(
         throw err;
       }
     }
-  } else {
-    const email = customer.email || session.customer_email;
-
-    try {
-      user = await usersService.findUserByCustomerID(customer.id);
-    } catch (err) {
-      if (email) {
-        const response = await usersService.findUserByEmail(email);
-        user = response.data;
-      } else {
-        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
-        log.error(err);
-        throw err;
-      }
-    }
   }
 
   try {
@@ -190,11 +166,14 @@ export default async function handleInvoiceCompleted(
   try {
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
+      const areDiscounts = items.data[0].discounts.length > 0;
 
-      const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
+      if (areDiscounts) {
+        const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
-      if (coupon) {
-        await usersService.storeCouponUsedByUser(userData, coupon.id);
+        if (coupon) {
+          await usersService.storeCouponUsedByUser(userData, coupon.id);
+        }
       }
     }
   } catch (err) {
