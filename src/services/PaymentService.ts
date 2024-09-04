@@ -56,6 +56,7 @@ export interface SubscriptionCreated {
 export interface PaymentIntent {
   clientSecret: string | null;
   id: string;
+  invoiceStatus?: string;
 }
 
 export type Reason = {
@@ -260,7 +261,7 @@ export class PaymentService {
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<PaymentIntent & { invoiceStatus?: string }> {
+  ): Promise<PaymentIntent> {
     let couponId;
     const currencyValue = currency ?? 'eur';
 
