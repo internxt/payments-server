@@ -629,7 +629,7 @@ export default function (
       }
 
       try {
-        const { clientSecret, id } = await paymentService.createPaymentIntent(
+        const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
           customerId,
           amount,
           planId,
@@ -637,14 +637,21 @@ export default function (
           promoCodeName,
         );
 
-        return { clientSecret, id };
+        return { clientSecret, id, invoiceStatus };
       } catch (err) {
         const error = err as Error;
-        if (error instanceof MissingParametersError || error instanceof PromoCodeIsNotValidError) {
+        if (error instanceof MissingParametersError) {
           return res.status(404).send({
             message: error.message,
           });
         }
+
+        if(error instanceof PromoCodeIsNotValidError){
+          return res.status(400).send({
+            message: error.message
+          });
+        }
+
         req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
         return res.status(500).send({
           message: 'Internal Server Error',
