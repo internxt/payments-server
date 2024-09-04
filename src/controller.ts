@@ -629,7 +629,7 @@ export default function (
       }
 
       try {
-        const { clientSecret, id } = await paymentService.createPaymentIntent(
+        const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
           customerId,
           amount,
           planId,
@@ -637,7 +637,7 @@ export default function (
           promoCodeName,
         );
 
-        return { clientSecret, id };
+        return { clientSecret, id, invoiceStatus };
       } catch (err) {
         const error = err as Error;
         if (error instanceof MissingParametersError || error instanceof PromoCodeIsNotValidError) {
