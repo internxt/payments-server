@@ -122,7 +122,7 @@ export default function (
           });
         }
         try {
-          const { id } = await paymentService.createCustomerForObjectStorage(
+          const { id } = await paymentService.createCustomerForProduct(
             {
               name,
               email,
@@ -182,7 +182,7 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomer({
+          const { id } = await paymentService.createCustomerForProduct({
             name,
             email,
           });
@@ -646,9 +646,9 @@ export default function (
           });
         }
 
-        if(error instanceof PromoCodeIsNotValidError){
+        if (error instanceof PromoCodeIsNotValidError) {
           return res.status(400).send({
-            message: error.message
+            message: error.message,
           });
         }
 
