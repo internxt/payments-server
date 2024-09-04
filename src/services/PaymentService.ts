@@ -131,7 +131,7 @@ export class PaymentService {
     return customer;
   }
 
-  async createCustomerForObjectStorage(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
+  async createCustomerForProduct(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
     }
@@ -142,6 +142,14 @@ export class PaymentService {
     const userExists = !!customer.length;
 
     if (userExists) {
+      if (country && companyVatId) {
+        const taxIds = this.getVatIdFromCountry(country);
+
+        if (taxIds.length > 0) {
+          await this.attachTaxIdToCustomer(customer[0].id, companyVatId, taxIds[0]);
+        }
+      }
+
       return customer[0];
     }
 
