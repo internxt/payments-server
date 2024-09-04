@@ -63,6 +63,7 @@ export interface SubscriptionCreated {
 export interface PaymentIntent {
   clientSecret: string | null;
   id: string;
+  invoiceStatus?: string;
 }
 
 export type Reason = {
@@ -181,7 +182,7 @@ export class PaymentService {
     const isPromoOnlyForFirstPurchase = promoCode.restrictions.first_time_transaction;
 
     if (hasUserExistingInvoices && hasUserPaidInvoices && isPromoOnlyForFirstPurchase) {
-      throw new PromoCodeIsNotValidError(promoCodeId);
+      throw new PromoCodeIsNotValidError(`Promo code ${promoCode.code} is not valid`);
     }
 
     return promoCode.coupon.id;
@@ -256,11 +257,6 @@ export class PaymentService {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
-      billing_cycle_anchor_config: isObjectStorageProduct
-        ? {
-            day_of_month: 1,
-          }
-        : undefined,
       items: [
         {
           price: priceId,
@@ -342,6 +338,14 @@ export class PaymentService {
     const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
 
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+      return {
+        clientSecret: '',
+        id: '',
+        invoiceStatus: finalizedInvoice.status,
+      };
+    }
 
     const { client_secret, id } = await this.provider.paymentIntents.retrieve(
       paymentIntentForFinalizedInvoice as string,

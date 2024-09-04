@@ -62,6 +62,7 @@ export default function (
             paymentService,
             event.data.object as Stripe.Subscription,
             cacheService,
+            objectStorageService,
             fastify.log,
             config,
           );
@@ -74,6 +75,7 @@ export default function (
             event.data.object,
             cacheService,
             paymentService,
+            objectStorageService,
             fastify.log,
             config,
           );

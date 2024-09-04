@@ -58,6 +58,21 @@ export class ObjectStorageService {
     );
   }
 
+  async deleteAccount(payload: { customerId : string }): Promise<void> {
+    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const params: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.delete(
+      `${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}`,
+      params,
+    );
+  }
+
   private async createUser(
     email: string,
     customerId: string
