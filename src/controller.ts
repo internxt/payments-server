@@ -122,7 +122,7 @@ export default function (
           });
         }
         try {
-          const { id } = await paymentService.createCustomerForProduct(
+          const { id } = await paymentService.createOrGetCustomer(
             {
               name,
               email,
@@ -187,7 +187,7 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomerForProduct({
+          const { id } = await paymentService.createOrGetCustomer({
             name,
             email,
           });

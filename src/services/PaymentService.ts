@@ -138,7 +138,7 @@ export class PaymentService {
     return customer;
   }
 
-  async createCustomerForProduct(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
+  async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
     }
@@ -215,7 +215,7 @@ export class PaymentService {
   async createSubscription(
     customerId: string,
     priceId: string,
-    quantity?: number,
+    seats?: number,
     currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
     companyName?: string,
@@ -237,11 +237,11 @@ export class PaymentService {
     const maximumSeats = price.metadata.maximumSeats ?? 1;
 
     if (isBusinessProduct && minimumSeats && maximumSeats) {
-      if ((quantity ?? 1) > parseInt(maximumSeats)) {
+      if ((seats ?? 1) > parseInt(maximumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
 
-      if ((quantity ?? 1) < parseInt(minimumSeats)) {
+      if ((seats ?? 1) < parseInt(minimumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
     }
@@ -260,7 +260,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          quantity,
+          quantity: seats,
         },
       ],
       discounts: [
