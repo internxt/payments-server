@@ -39,7 +39,7 @@ type RequestedPlanData = DisplayPrice & {
   decimalAmount: number;
   minimumSeats?: number;
   maximumSeats?: number;
-  type: UserType;
+  type?: UserType;
 };
 
 export interface RequestedPlan {
@@ -197,12 +197,17 @@ export class PaymentService {
       });
       const customerHasSubscription = customerSubscriptions.data.length > 0;
       const customerSubscription = customerSubscriptions.data[0];
+      const subscriptionProduct = (customerSubscription as any).plan.product as Stripe.Product;
+      const productTypeInSubscription = !!subscriptionProduct.metadata.type && subscriptionProduct.metadata.type;
       const hasActiveSubscription = customerHasSubscription && customerSubscription.status === 'active';
       const userType = (product.metadata.type as UserType) ?? UserType.Individual;
+      const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+
+      const isObjStorageSubscriptionActive = isObjectStorageProduct && productTypeInSubscription === 'object-storage';
 
       const customer = await this.getUserSubscription(customerId, userType);
 
-      if (hasActiveSubscription && customer.type === 'subscription') {
+      if (hasActiveSubscription && !isObjStorageSubscriptionActive && customer.type === 'subscription') {
         throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
@@ -908,7 +913,6 @@ export class PaymentService {
         bytes: parseInt(metadata?.maxSpaceBytes),
         interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
         decimalAmount: (price.unit_amount as number) / 100,
-        type: UserType.Individual,
       };
 
       return selectedPlan;
