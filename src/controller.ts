@@ -187,10 +187,14 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createOrGetCustomer({
-            name,
-            email,
-          });
+          const { id } = await paymentService.createOrGetCustomer(
+            {
+              name,
+              email,
+            },
+            country,
+            companyVatId,
+          );
 
           const token = jwt.sign(
             {
@@ -266,8 +270,8 @@ export default function (
         customerId: string;
         priceId: string;
         currency: string;
-        quantity?: number;
         token: string;
+        seatsForBusinessSubscription?: number;
         promoCodeId?: string;
       };
     }>(
@@ -293,7 +297,7 @@ export default function (
               promoCodeId: {
                 type: 'string',
               },
-              quantity: {
+              seatsForBusinessSubscription: {
                 type: 'number',
               },
             },
@@ -301,7 +305,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId, quantity } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, seatsForBusinessSubscription } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -320,7 +324,7 @@ export default function (
           const subscriptionSetUp = await paymentService.createSubscription(
             customerId,
             priceId,
-            quantity,
+            seatsForBusinessSubscription,
             currency,
             promoCodeId,
           );

@@ -220,7 +220,7 @@ export class PaymentService {
   async createSubscription(
     customerId: string,
     priceId: string,
-    seats?: number,
+    seatsForBusinessSubscription?: number,
     currency?: string,
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
     companyName?: string,
@@ -242,11 +242,11 @@ export class PaymentService {
     const maximumSeats = price.metadata.maximumSeats ?? 1;
 
     if (isBusinessProduct && minimumSeats && maximumSeats) {
-      if ((seats ?? 1) > parseInt(maximumSeats)) {
+      if ((seatsForBusinessSubscription ?? 1) > parseInt(maximumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
 
-      if ((seats ?? 1) < parseInt(minimumSeats)) {
+      if ((seatsForBusinessSubscription ?? 1) < parseInt(minimumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
     }
@@ -265,7 +265,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          quantity: seats,
+          quantity: seatsForBusinessSubscription,
         },
       ],
       discounts: [
@@ -969,7 +969,7 @@ export class PaymentService {
             amount: upsell.currency_options![currencyValue].unit_amount as number,
             bytes: parseInt(upsell.metadata?.maxSpaceBytes),
             interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
-            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number as number) / 100,
+            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number) / 100,
             type: isBusinessPrice ? UserType.Business : UserType.Individual,
             ...businessSeats,
           };
