@@ -369,7 +369,6 @@ export default function (
           const subscriptionSetUp = await paymentService.createSubscription({
             customerId,
             priceId,
-            seatsForBusinessSubscription: 1, // How many items are purchased
             currency,
             companyName,
             companyVatId,

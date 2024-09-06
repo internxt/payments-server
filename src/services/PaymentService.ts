@@ -220,7 +220,7 @@ export class PaymentService {
   async createSubscription({
     customerId,
     priceId,
-    seatsForBusinessSubscription,
+    seatsForBusinessSubscription = 1,
     currency,
     promoCodeId,
     companyName,
@@ -248,10 +248,6 @@ export class PaymentService {
     const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
     const minimumSeats = price.metadata.minimumSeats ?? 1;
     const maximumSeats = price.metadata.maximumSeats ?? 1;
-
-    console.log(price.metadata);
-
-    console.log({ seatsForBusinessSubscription, minimumSeats, maximumSeats });
 
     if (isBusinessProduct && minimumSeats && maximumSeats) {
       if ((seatsForBusinessSubscription ?? 1) > parseInt(maximumSeats)) {
