@@ -188,7 +188,7 @@ export class PaymentService {
     return promoCode.coupon.id;
   }
 
-  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
+  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product, userType: string) {
     try {
       const customerSubscriptions = await this.provider.subscriptions.list({
         customer: customerId,
@@ -196,19 +196,19 @@ export class PaymentService {
         expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
       });
       const customerHasSubscription = customerSubscriptions.data.length > 0;
-      const customerSubscription = customerSubscriptions.data[0];
-      const subscriptionProduct = (customerSubscription as any).plan.product as Stripe.Product;
-      const productTypeInSubscription = !!subscriptionProduct.metadata.type && subscriptionProduct.metadata.type;
-      const hasActiveSubscription = customerHasSubscription && customerSubscription.status === 'active';
-      const userType = (product.metadata.type as UserType) ?? UserType.Individual;
-      const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+      if (customerHasSubscription) {
+        const customerSubscription = customerSubscriptions.data[0];
+        const hasActiveSubscription = customerSubscription.status === 'active';
+        const subscriptionProduct = (customerSubscription as any).plan.product as Stripe.Product;
+        const productTypeInSubscription = !!subscriptionProduct.metadata.type && subscriptionProduct.metadata.type;
+        const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+        const customer = await this.getUserSubscription(customerId, (userType as UserType) ?? UserType.Individual);
 
-      const isObjStorageSubscriptionActive = isObjectStorageProduct && productTypeInSubscription === 'object-storage';
+        const isObjStorageSubscriptionActive = isObjectStorageProduct && productTypeInSubscription === 'object-storage';
 
-      const customer = await this.getUserSubscription(customerId, userType);
-
-      if (hasActiveSubscription && !isObjStorageSubscriptionActive && customer.type === 'subscription') {
-        throw new ExistingSubscriptionError('User already has an active subscription');
+        if (isObjStorageSubscriptionActive || (hasActiveSubscription && customer.type === 'subscription')) {
+          throw new ExistingSubscriptionError('User already has an active subscription');
+        }
       }
     } catch (error) {
       if (!(error instanceof NotFoundSubscriptionError)) {
@@ -217,15 +217,23 @@ export class PaymentService {
     }
   }
 
-  async createSubscription(
-    customerId: string,
-    priceId: string,
-    seatsForBusinessSubscription?: number,
-    currency?: string,
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'],
-    companyName?: string,
-    companyVatId?: string,
-  ): Promise<SubscriptionCreated> {
+  async createSubscription({
+    customerId,
+    priceId,
+    seatsForBusinessSubscription,
+    currency,
+    promoCodeId,
+    companyName,
+    companyVatId,
+  }: {
+    customerId: string;
+    priceId: string;
+    seatsForBusinessSubscription?: number;
+    currency?: string;
+    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+    companyName?: string;
+    companyVatId?: string;
+  }): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
 
@@ -241,6 +249,10 @@ export class PaymentService {
     const minimumSeats = price.metadata.minimumSeats ?? 1;
     const maximumSeats = price.metadata.maximumSeats ?? 1;
 
+    console.log(price.metadata);
+
+    console.log({ seatsForBusinessSubscription, minimumSeats, maximumSeats });
+
     if (isBusinessProduct && minimumSeats && maximumSeats) {
       if ((seatsForBusinessSubscription ?? 1) > parseInt(maximumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
@@ -251,9 +263,9 @@ export class PaymentService {
       }
     }
 
-    await this.checkIfUserAlreadyHasASubscription(customerId, product);
+    const userType = (product.metadata.type as UserType) ?? UserType.Individual;
 
-    const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+    await this.checkIfUserAlreadyHasASubscription(customerId, product, userType);
 
     if (promoCodeId) {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
@@ -1346,10 +1358,19 @@ export class PaymentService {
     return map[country];
   }
 
-  async attachTaxIdToCustomer(customerId: CustomerId, id: string, type: Stripe.TaxIdCreateParams.Type) {
+  async attachTaxIdToCustomer(customerId: CustomerId, value: string, type: Stripe.TaxIdCreateParams.Type) {
+    const customerTaxIds = await this.provider.customers.listTaxIds(customerId, {});
+    const hasTaxIds = customerTaxIds.data.length > 0;
+
+    if (hasTaxIds) {
+      const isTaxIdAlreadyAttached = customerTaxIds.data.find((taxId) => taxId.value === value);
+
+      if (isTaxIdAlreadyAttached) return;
+    }
+
     await this.provider.customers.createTaxId(customerId, {
       type,
-      value: id,
+      value,
     });
   }
 
