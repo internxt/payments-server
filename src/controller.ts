@@ -14,6 +14,7 @@ import {
   PaymentService,
   PromoCodeIsNotValidError,
   UserAlreadyExistsError,
+  CustomerNotFoundError,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription, UserType } from './core/users/User';
@@ -154,11 +155,11 @@ export default function (
       },
     );
 
-    fastify.get<{ Querystring: { name: string; email: string; country?: string; companyVatId?: string } }>(
-      '/get-customer-id',
+    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
+      '/create-customer',
       {
         schema: {
-          querystring: {
+          body: {
             type: 'object',
             required: ['email', 'name'],
             properties: {
@@ -177,7 +178,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { name, email, country, companyVatId } = req.query;
+        const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
           return res.status(404).send({
@@ -217,6 +218,56 @@ export default function (
         }
       },
     );
+
+    fastify.get<{
+      Querystring: { email: string };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: { email: { type: 'number' } };
+        };
+      };
+    }>('/get-customer-id', async (req, res) => {
+      const { email } = req.query;
+
+      if (!email) {
+        return res.status(404).send({
+          message: 'Email should be provided',
+        });
+      }
+
+      try {
+        const { id } = await paymentService.getCustomerIdByEmail(email);
+
+        const token = jwt.sign(
+          {
+            customerId: id,
+          },
+          config.JWT_SECRET,
+          {
+            expiresIn: '1h',
+          },
+        );
+
+        return res.status(200).send({
+          customerId: id,
+          token,
+        });
+      } catch (error) {
+        if (error instanceof CustomerNotFoundError) {
+          return res.status(404).send({
+            message: error.message,
+          });
+        }
+
+        const err = error as Error;
+        req.log.error(`[ERROR FETCHING THE CUSTOMER ID]: ${err.stack ?? err.message}`);
+
+        return res.status(500).send({
+          message: 'Internal Server Error',
+        });
+      }
+    });
 
     fastify.post<{
       Body: {
@@ -565,20 +616,20 @@ export default function (
       },
     );
 
-    fastify.post<{
-      Body: {
+    fastify.get<{
+      Querystring: {
         customerId: CustomerId;
         amount: number;
-        priceId: string;
+        planId: string;
         token: string;
         currency?: string;
         promoCodeName?: string;
       };
       schema: {
-        body: {
+        querystring: {
           properties: {
             customerId: { type: 'string' };
-            priceId: { type: 'string' };
+            planId: { type: 'string' };
             amount: { type: 'number' };
             token: { type: 'string' };
             currency: { type: 'string' };
@@ -587,7 +638,7 @@ export default function (
         };
       };
     }>('/payment-intent', async (req, res) => {
-      const { customerId, amount, priceId, currency, token, promoCodeName } = req.body;
+      const { customerId, amount, planId, currency, token, promoCodeName } = req.query;
 
       try {
         const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -606,7 +657,7 @@ export default function (
         const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
           customerId,
           amount,
-          priceId,
+          planId,
           currency,
           promoCodeName,
         );
