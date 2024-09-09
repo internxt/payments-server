@@ -188,7 +188,12 @@ export class PaymentService {
     return promoCode.coupon.id;
   }
 
-  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product, userType: string) {
+  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
+    let userSubscription;
+    const userType = (!!product.metadata.type && product.metadata.type) ?? UserType.Individual;
+
+    console.log(userType);
+
     try {
       const customerSubscriptions = await this.provider.subscriptions.list({
         customer: customerId,
@@ -197,16 +202,17 @@ export class PaymentService {
       });
       const customerHasSubscription = customerSubscriptions.data.length > 0;
       if (customerHasSubscription) {
+        userSubscription =
+          customerSubscriptions.data.find(
+            (subscription) => (subscription as any).plan.product.metadata.type === product.metadata.type,
+          )?.status === 'active';
+
         const customerSubscription = customerSubscriptions.data[0];
         const hasActiveSubscription = customerSubscription.status === 'active';
         const subscriptionProduct = (customerSubscription as any).plan.product as Stripe.Product;
-        const productTypeInSubscription = !!subscriptionProduct.metadata.type && subscriptionProduct.metadata.type;
-        const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
         const customer = await this.getUserSubscription(customerId, (userType as UserType) ?? UserType.Individual);
 
-        const isObjStorageSubscriptionActive = isObjectStorageProduct && productTypeInSubscription === 'object-storage';
-
-        if (isObjStorageSubscriptionActive || (hasActiveSubscription && customer.type === 'subscription')) {
+        if (hasActiveSubscription && (userSubscription || customer.type === 'subscription')) {
           throw new ExistingSubscriptionError('User already has an active subscription');
         }
       }
@@ -259,9 +265,7 @@ export class PaymentService {
       }
     }
 
-    const userType = (product.metadata.type as UserType) ?? UserType.Individual;
-
-    await this.checkIfUserAlreadyHasASubscription(customerId, product, userType);
+    await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
     if (promoCodeId) {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
