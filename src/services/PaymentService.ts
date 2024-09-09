@@ -189,32 +189,15 @@ export class PaymentService {
   }
 
   private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
-    let userSubscription;
     const userType = (!!product.metadata.type && product.metadata.type) ?? UserType.Individual;
 
-    console.log(userType);
+    console.log('[USER TYPE]: ', userType);
 
     try {
-      const customerSubscriptions = await this.provider.subscriptions.list({
-        customer: customerId,
-        status: 'active',
-        expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
-      });
-      const customerHasSubscription = customerSubscriptions.data.length > 0;
-      if (customerHasSubscription) {
-        userSubscription =
-          customerSubscriptions.data.find(
-            (subscription) => (subscription as any).plan.product.metadata.type === product.metadata.type,
-          )?.status === 'active';
+      const customer = await this.getUserSubscription(customerId, userType as UserType);
 
-        const customerSubscription = customerSubscriptions.data[0];
-        const hasActiveSubscription = customerSubscription.status === 'active';
-        const subscriptionProduct = (customerSubscription as any).plan.product as Stripe.Product;
-        const customer = await this.getUserSubscription(customerId, (userType as UserType) ?? UserType.Individual);
-
-        if (hasActiveSubscription && (userSubscription || customer.type === 'subscription')) {
-          throw new ExistingSubscriptionError('User already has an active subscription');
-        }
+      if (customer && customer.type === 'subscription') {
+        throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
       if (!(error instanceof NotFoundSubscriptionError)) {
@@ -252,6 +235,8 @@ export class PaymentService {
     });
     const product = price.product as Stripe.Product;
     const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
+    const isObjStorageProduct = !!product.metadata.type && product.metadata.type === UserType.ObjectStorage;
+    const seats = isObjStorageProduct ? undefined : seatsForBusinessSubscription;
     const minimumSeats = price.metadata.minimumSeats ?? 1;
     const maximumSeats = price.metadata.maximumSeats ?? 1;
 
@@ -277,7 +262,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          quantity: seatsForBusinessSubscription,
+          quantity: seats,
         },
       ],
       discounts: [
@@ -784,7 +769,9 @@ export class PaymentService {
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
     let subscription: any;
     try {
-      if (userType === UserType.Business) {
+      if (userType === UserType.ObjectStorage) {
+        subscription = await this.findObjectStorageActiveSubscription(customerId);
+      } else if (userType === UserType.Business) {
         subscription = await this.findBusinessActiveSubscription(customerId);
       } else {
         subscription = await this.findIndividualActiveSubscription(customerId);
@@ -1240,6 +1227,19 @@ export class PaymentService {
     }
 
     return businessSubscription;
+  }
+
+  private async findObjectStorageActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+    const objStorageSubscription = activeSubscriptions.find(
+      (subscription) => (subscription as any).plan.product.metadata.type === UserType.ObjectStorage,
+    );
+
+    if (!objStorageSubscription) {
+      throw new NotFoundSubscriptionError('There is no object storage subscription');
+    }
+
+    return objStorageSubscription;
   }
 
   private getMonthCount(intervalCount: number, timeInterval: string): number {

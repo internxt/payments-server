@@ -1,4 +1,4 @@
-import { PlanSubscription } from "../../services/PaymentService";
+import { PlanSubscription } from '../../services/PaymentService';
 
 export interface User {
   id: string;
@@ -10,6 +10,7 @@ export interface User {
 export enum UserType {
   Individual = 'individual',
   Business = 'business',
+  ObjectStorage = 'object-storage',
 }
 
 export type UserSubscription =
