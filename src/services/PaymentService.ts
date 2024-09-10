@@ -191,8 +191,6 @@ export class PaymentService {
   private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
     const userType = (!!product.metadata.type && product.metadata.type) ?? UserType.Individual;
 
-    console.log('[USER TYPE]: ', userType);
-
     try {
       const customer = await this.getUserSubscription(customerId, userType as UserType);
 
@@ -226,10 +224,6 @@ export class PaymentService {
     const currencyValue = currency ?? 'eur';
     let couponId;
 
-    if (!customerId || !priceId) {
-      throw new MissingParametersError(['customerId', 'priceId']);
-    }
-
     const price = await this.provider.prices.retrieve(priceId, {
       expand: ['product'],
     });
@@ -241,11 +235,11 @@ export class PaymentService {
     const maximumSeats = price.metadata.maximumSeats ?? 1;
 
     if (isBusinessProduct && minimumSeats && maximumSeats) {
-      if ((seatsForBusinessSubscription ?? 1) > parseInt(maximumSeats)) {
+      if (seatsForBusinessSubscription > parseInt(maximumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
 
-      if ((seatsForBusinessSubscription ?? 1) < parseInt(minimumSeats)) {
+      if (seatsForBusinessSubscription < parseInt(minimumSeats)) {
         throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
       }
     }

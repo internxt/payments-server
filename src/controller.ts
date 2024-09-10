@@ -311,6 +311,10 @@ export default function (
       async (req, res) => {
         const { customerId, priceId, currency, token, promoCodeId, quantity: seatsForBusinessSubscription } = req.body;
 
+        if (!customerId || !priceId) {
+          throw new MissingParametersError(['customerId', 'priceId']);
+        }
+
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
             customerId: string;
@@ -402,6 +406,10 @@ export default function (
       },
       async (req, res) => {
         const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
+
+        if (!customerId || !priceId) {
+          throw new MissingParametersError(['customerId', 'priceId']);
+        }
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
