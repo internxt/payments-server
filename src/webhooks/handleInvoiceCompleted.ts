@@ -79,6 +79,7 @@ export default async function handleInvoiceCompleted(
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
+  const isBusinessPlan = productType === UserType.Business;
 
   await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
 
@@ -109,8 +110,8 @@ export default async function handleInvoiceCompleted(
     );
   }
 
-  if (productType === UserType.Business) {
-    const email = customer.email || session.customer_email;
+  if (isBusinessPlan) {
+    const email = customer.email ?? session.customer_email;
 
     try {
       user = await usersService.findUserByCustomerID(customer.id);
@@ -190,7 +191,7 @@ export default async function handleInvoiceCompleted(
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 
-  if (productType === UserType.Business) {
+  if (isBusinessPlan) {
     const amountOfSeats = items.data[0].quantity;
     if (!amountOfSeats) return;
 
