@@ -275,7 +275,7 @@ export default function (
         priceId: string;
         currency: string;
         token: string;
-        seatsForBusinessSubscription?: number;
+        quantity?: number;
         promoCodeId?: string;
       };
     }>(
@@ -301,7 +301,7 @@ export default function (
               promoCodeId: {
                 type: 'string',
               },
-              seatsForBusinessSubscription: {
+              quantity: {
                 type: 'number',
               },
             },
@@ -309,7 +309,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId, seatsForBusinessSubscription } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, quantity: seatsForBusinessSubscription } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
