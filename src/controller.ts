@@ -949,11 +949,11 @@ export default function (
         return rep.status(200).send(promoCodeObject);
       } catch (error) {
         const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+        if (err instanceof NotFoundPromoCodeByNameError) {
           return rep.status(404).send(err.message);
         }
 
-        if (err instanceof MissingParametersError) {
+        if (err instanceof MissingParametersError || err instanceof PromoCodeIsNotValidError) {
           return rep.status(400).send(err.message);
         }
 
