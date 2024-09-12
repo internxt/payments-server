@@ -195,6 +195,7 @@ export class PaymentService {
       const customer = await this.getUserSubscription(customerId, userType as UserType);
 
       if (customer && customer.type === 'subscription') {
+        console.log(`USER ALREADY EXISTS WITH USER TYPE ${userType}`);
         throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
@@ -402,6 +403,7 @@ export class PaymentService {
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
+      status: 'active',
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 

@@ -198,11 +198,33 @@ export default async function handleInvoiceCompleted(
     const address = customer.address?.line1 ?? undefined;
     const phoneNumber = customer.phone ?? undefined;
 
-    await usersService.initializeWorkspace(user.uuid, {
-      newStorageBytes: Number(maxSpaceBytes),
-      seats: amountOfSeats,
-      address,
-      phoneNumber,
-    });
+    try {
+      await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), amountOfSeats);
+      log.info(
+        `USER WITH: CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } HAS BEEN UPDATED HIS WORKSPACE`,
+      );
+    } catch (err) {
+      const error = err as Error;
+      const statusCode = (err as any).response.status;
+
+      if (!statusCode || statusCode !== 404) {
+        log.error(`[ERROR UPDATING WORKSPACE]: ${error.stack ?? error.message}`);
+        throw err;
+      }
+
+      log.info(
+        `USER WITH: CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } DOES NOT HAVE ANY WORKSPACE TO UPDATE, CREATING A NEW ONE`,
+      );
+      await usersService.initializeWorkspace(user.uuid, {
+        newStorageBytes: Number(maxSpaceBytes),
+        seats: amountOfSeats,
+        address,
+        phoneNumber,
+      });
+    }
   }
 }
