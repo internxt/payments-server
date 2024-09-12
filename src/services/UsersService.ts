@@ -37,7 +37,7 @@ export class UsersService {
   ) {}
 
   async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
-    const updated = this.usersRepository.updateUser(customerId, body);
+    const updated = await this.usersRepository.updateUser(customerId, body);
     if (!updated) {
       throw new UserNotFoundError();
     }
