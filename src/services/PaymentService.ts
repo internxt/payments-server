@@ -1206,16 +1206,35 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  async billCardVerificationCharge(customerId: string, currency: string) {
-    const methods = await this.getCustomerPaymentMethods(customerId);
+  async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
+    const methods = paymentMethodId ? [{
+      id: paymentMethodId
+    }] : await this.getCustomerPaymentMethods(customerId);
 
     if (methods.length === 0) {
       throw new Error(`No payment methods found for customer ${customerId}`);
     }
-
     const [firstMethod] = methods;
 
     console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`);
+
+    const { data: charges } = await this.provider.charges.list({
+      customer: customerId,
+      limit: 100
+    });
+    const oneTimeChargesWithThatPaymentMethod = charges.filter((c) => 
+      c.paid && 
+      c.metadata.type === 'object-storage' &&
+      c.payment_method === firstMethod.id
+    );
+    const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
+
+    if (paymentMethodAlreadyVerified) {
+      console.info(`Payment method ${firstMethod.id} has been already verified, skipping one time charge`);
+      return;
+    }
+
+    console.log(`Payment method ${firstMethod.id} is going to be charged in order to verify it`);
 
     await this.provider.paymentIntents.create({
       amount: 100,
