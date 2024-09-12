@@ -201,7 +201,7 @@ export default async function handleInvoiceCompleted(
     try {
       await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), amountOfSeats);
       log.info(
-        `USER WITH: CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
           customer.email ?? session.customer_email
         } HAS BEEN UPDATED HIS WORKSPACE`,
       );
@@ -215,7 +215,7 @@ export default async function handleInvoiceCompleted(
       }
 
       log.info(
-        `USER WITH: CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
           customer.email ?? session.customer_email
         } DOES NOT HAVE ANY WORKSPACE TO UPDATE, CREATING A NEW ONE`,
       );
