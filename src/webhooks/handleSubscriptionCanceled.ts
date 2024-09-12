@@ -17,8 +17,19 @@ async function handleObjectStorageSubscriptionCancelled(
   customer: Stripe.Customer,
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
+  paymentService: PaymentService,
   logger: FastifyLoggerInstance,
 ): Promise<void> {
+  const activeSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
+  const objectStorageActiveSubscriptions = activeSubscriptions.filter((s) => s.product?.metadata.type === 'object-storage');
+
+  if (objectStorageActiveSubscriptions.length > 0) {
+    logger.info(
+      `Preventing removal of an object storage customer ${customer.id} with sub ${subscription.id} due to the existence of another active subscription`
+    );
+    return;
+  } 
+ 
   logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
   await objectStorageService.deleteAccount({
@@ -47,6 +58,7 @@ export default async function handleSubscriptionCanceled(
       await paymentService.getCustomer(customerId) as Stripe.Customer,
       subscription,
       objectStorageService,
+      paymentService,
       log, 
     )
     return;
