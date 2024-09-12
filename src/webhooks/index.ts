@@ -52,6 +52,7 @@ export default function (
             event.data.object as Stripe.Invoice,
             objectStorageService,
             paymentService,
+            fastify.log,
           );
           break;
 
