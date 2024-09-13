@@ -150,14 +150,18 @@ export default function (
           break;
 
         case 'charge.refunded':
-          await handleLifetimeRefunded(
-            storageService,
-            usersService,
-            event.data.object.customer as string,
-            cacheService,
-            fastify.log,
-            config,
-          );
+          if (event.data.object.metadata.type === 'object-storage') {
+            // no op
+          } else {
+            await handleLifetimeRefunded(
+              storageService,
+              usersService,
+              event.data.object.customer as string,
+              cacheService,
+              fastify.log,
+              config,
+            );
+          }
           break;
 
         default:

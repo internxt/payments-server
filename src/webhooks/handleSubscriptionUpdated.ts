@@ -57,51 +57,13 @@ async function handleObjectStorageProduct(
     throw new Error('Missing customer email on subscription updated');
   }
 
-  await paymentsService.billCardVerificationCharge(customer.id, subscription.currency);
-
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
-
-  const updatableAttributes: {
-    customer?: {
-      name?: string;
-    };
-    tax?: {
-      id: string;
-      type: Stripe.TaxIdCreateParams.Type;
-    };
-  } = {};
-
-  if (subscription.metadata.companyName) {
-    logger.info(`Updating customer ${customer.id} name to ${subscription.metadata.companyName}`);
-
-    updatableAttributes['customer'] = {
-      name: subscription.metadata.companyName,
-    };
-  }
-
-  logger.info(`Customer ${customer.id} address data is ${JSON.stringify(customer.address)}`);
-
-  if (!!subscription.metadata.companyVatId && !!customer.address?.country) {
-    const taxIds = paymentsService.getVatIdFromCountry(customer.address.country);
-
-    logger.info(`Updating customer ${customer.id} VAT ID to ${subscription.metadata.companyVatId}-${taxIds[0]}`);
-
-    if (taxIds.length > 0) {
-      updatableAttributes['tax'] = {
-        id: subscription.metadata.companyVatId,
-        type: taxIds[0],
-      };
-    }
-  }
-
-  logger.info(
-    `Customer ${customer.id} with sub ${subscription.id} is being updated... ${JSON.stringify({
-      metadata: subscription.metadata,
-      updatableAttributes,
-    })}`,
+  await paymentsService.billCardVerificationCharge(
+    customer.id,
+    subscription.currency,
+    subscription.default_payment_method ? (subscription.default_payment_method as string) : undefined,
   );
 
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been updated successfully`);
+  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
 }
 
 export default async function handleSubscriptionUpdated(
