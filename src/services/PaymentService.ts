@@ -35,9 +35,16 @@ interface ExtendedSubscription extends Subscription {
   product?: Stripe.Product;
 }
 
+type RequestedPlanData = DisplayPrice & {
+  decimalAmount: number;
+  minimumSeats?: number;
+  maximumSeats?: number;
+  type?: UserType;
+};
+
 export interface RequestedPlan {
-  selectedPlan: DisplayPrice & { decimalAmount: number };
-  upsellPlan?: DisplayPrice & { decimalAmount: number };
+  selectedPlan: RequestedPlanData;
+  upsellPlan?: RequestedPlanData;
 }
 
 export interface PromotionCode {
@@ -131,7 +138,7 @@ export class PaymentService {
     return customer;
   }
 
-  async createCustomerForProduct(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
+  async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
     }
@@ -181,29 +188,13 @@ export class PaymentService {
     return promoCode.coupon.id;
   }
 
-  async createSubscription(
-    customerId: string,
-    priceId: string,
-    currency?: string,
-    promoCodeId?: string,
-    companyName?: string,
-    companyVatId?: string,
-  ): Promise<SubscriptionCreated> {
-    const currencyValue = currency ?? 'eur';
-    let couponId;
+  private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
+    const userType = (!!product.metadata.type && product.metadata.type) ?? UserType.Individual;
 
     try {
-      const customerSubscriptions = await this.provider.subscriptions.list({
-        customer: customerId,
-        status: 'active',
-        expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
-      });
-      const customerHasSubscription = customerSubscriptions.data.length > 0;
-      const hasActiveSubscription = customerHasSubscription && customerSubscriptions.data[0].status === 'active';
+      const customer = await this.getUserSubscription(customerId, userType as UserType);
 
-      const customer = await this.getUserSubscription(customerId, UserType.Individual);
-
-      if (hasActiveSubscription && customer.type === 'subscription') {
+      if (customer && customer.type === 'subscription') {
         throw new ExistingSubscriptionError('User already has an active subscription');
       }
     } catch (error) {
@@ -211,12 +202,49 @@ export class PaymentService {
         throw error;
       }
     }
+  }
+
+  async createSubscription({
+    customerId,
+    priceId,
+    seatsForBusinessSubscription = 1,
+    currency,
+    promoCodeId,
+    companyName,
+    companyVatId,
+  }: {
+    customerId: string;
+    priceId: string;
+    seatsForBusinessSubscription?: number;
+    currency?: string;
+    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+    companyName?: string;
+    companyVatId?: string;
+  }): Promise<SubscriptionCreated> {
+    const currencyValue = currency ?? 'eur';
+    let couponId;
 
     const price = await this.provider.prices.retrieve(priceId, {
       expand: ['product'],
     });
     const product = price.product as Stripe.Product;
-    const isObjectStorageProduct = !!product.metadata.type && product.metadata.type === 'object-storage';
+    const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
+    const isObjStorageProduct = !!product.metadata.type && product.metadata.type === UserType.ObjectStorage;
+    const seats = isObjStorageProduct ? undefined : seatsForBusinessSubscription;
+    const minimumSeats = price.metadata.minimumSeats ?? 1;
+    const maximumSeats = price.metadata.maximumSeats ?? 1;
+
+    if (isBusinessProduct && minimumSeats && maximumSeats) {
+      if (seatsForBusinessSubscription > parseInt(maximumSeats)) {
+        throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+      }
+
+      if (seatsForBusinessSubscription < parseInt(minimumSeats)) {
+        throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+      }
+    }
+
+    await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
     if (promoCodeId) {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
@@ -228,6 +256,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
+          quantity: seats,
         },
       ],
       discounts: [
@@ -373,6 +402,7 @@ export class PaymentService {
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
+      status: 'active',
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
@@ -734,7 +764,9 @@ export class PaymentService {
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
     let subscription: any;
     try {
-      if (userType === UserType.Business) {
+      if (userType === UserType.ObjectStorage) {
+        subscription = await this.findObjectStorageActiveSubscription(customerId);
+      } else if (userType === UserType.Business) {
         subscription = await this.findBusinessActiveSubscription(customerId);
       } else {
         subscription = await this.findIndividualActiveSubscription(customerId);
@@ -887,6 +919,7 @@ export class PaymentService {
 
   async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
     let upsellPlan: RequestedPlan['upsellPlan'];
+    let businessSeats;
     const currencyValue = currency ?? 'eur';
 
     try {
@@ -900,6 +933,15 @@ export class PaymentService {
 
       const { id, currency, metadata, type, recurring, product: productId } = price;
 
+      const isBusinessPrice = !!metadata.type && metadata.type === 'business';
+
+      if (isBusinessPrice) {
+        businessSeats = {
+          minimumSeats: Number(metadata.minimumSeats),
+          maximumSeats: Number(metadata.maximumSeats),
+        };
+      }
+
       const selectedPlan: RequestedPlan['selectedPlan'] = {
         id: id,
         currency: currencyValue,
@@ -907,6 +949,8 @@ export class PaymentService {
         bytes: parseInt(metadata?.maxSpaceBytes),
         interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
         decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
+        type: isBusinessPrice ? UserType.Business : UserType.Individual,
+        ...businessSeats,
       };
 
       if (recurring?.interval === 'month') {
@@ -919,7 +963,9 @@ export class PaymentService {
             amount: upsell.currency_options![currencyValue].unit_amount as number,
             bytes: parseInt(upsell.metadata?.maxSpaceBytes),
             interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
-            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number as number) / 100,
+            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number) / 100,
+            type: isBusinessPrice ? UserType.Business : UserType.Individual,
+            ...businessSeats,
           };
         }
       }
@@ -1178,6 +1224,19 @@ export class PaymentService {
     return businessSubscription;
   }
 
+  private async findObjectStorageActiveSubscription(customerId: CustomerId): Promise<Subscription> {
+    const activeSubscriptions = await this.getActiveSubscriptions(customerId);
+    const objStorageSubscription = activeSubscriptions.find(
+      (subscription) => (subscription as any).plan.product.metadata.type === UserType.ObjectStorage,
+    );
+
+    if (!objStorageSubscription) {
+      throw new NotFoundSubscriptionError('There is no object storage subscription');
+    }
+
+    return objStorageSubscription;
+  }
+
   private getMonthCount(intervalCount: number, timeInterval: string): number {
     const byTimeIntervalCalculator: any = {
       month: (): number => intervalCount,
@@ -1313,10 +1372,19 @@ export class PaymentService {
     return map[country];
   }
 
-  async attachTaxIdToCustomer(customerId: CustomerId, id: string, type: Stripe.TaxIdCreateParams.Type) {
+  async attachTaxIdToCustomer(customerId: CustomerId, value: string, type: Stripe.TaxIdCreateParams.Type) {
+    const customerTaxIds = await this.provider.customers.listTaxIds(customerId, {});
+    const hasTaxIds = customerTaxIds.data.length > 0;
+
+    if (hasTaxIds) {
+      const isTaxIdAlreadyAttached = customerTaxIds.data.find((taxId) => taxId.value === value);
+
+      if (isTaxIdAlreadyAttached) return;
+    }
+
     await this.provider.customers.createTaxId(customerId, {
       type,
-      value: id,
+      value,
     });
   }
 

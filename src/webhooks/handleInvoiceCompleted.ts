@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
@@ -9,9 +10,11 @@ import { ObjectStorageService } from '../services/ObjectStorageService';
 import { UserType } from '../core/users/User';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
-  return (product as Stripe.Product).metadata && 
-    !!(product as Stripe.Product).metadata.type && 
-    (product as Stripe.Product).metadata.type === 'object-storage';
+  return (
+    (product as Stripe.Product).metadata &&
+    !!(product as Stripe.Product).metadata.type &&
+    (product as Stripe.Product).metadata.type === 'object-storage'
+  );
 }
 
 async function handleObjectStorageInvoiceCompleted(
@@ -44,7 +47,9 @@ async function handleObjectStorageInvoiceCompleted(
 
   await objectStorageService.reactivateAccount({ customerId: customer.id });
 
-  log.info(`Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`);
+  log.info(
+    `Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`,
+  );
 }
 
 export default async function handleInvoiceCompleted(
@@ -64,7 +69,9 @@ export default async function handleInvoiceCompleted(
   const customer = await paymentService.getCustomer(session.customer as string);
 
   if (customer.deleted) {
-    log.error(`Customer ${session.customer} could not be retrieved in invoice.payment_succeeded event for invoice ${session.id}`);
+    log.error(
+      `Customer ${session.customer} could not be retrieved in invoice.payment_succeeded event for invoice ${session.id}`,
+    );
     return;
   }
 
@@ -72,16 +79,9 @@ export default async function handleInvoiceCompleted(
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
+  const isBusinessPlan = productType === UserType.Business;
 
-  await handleObjectStorageInvoiceCompleted(
-    customer, 
-    session, 
-    objectStorageService, 
-    paymentService, 
-    log
-  );
-
-  if (productType === UserType.Business) return;
+  await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
 
   if (!price) {
     log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
@@ -110,28 +110,44 @@ export default async function handleInvoiceCompleted(
     );
   }
 
-  try {
-    const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
-    user = res.data.user;
-  } catch (err) {
-    log.error(
-      `Error while creating or updating user in payment intent completed handler, email: ${session.customer_email}`,
-    );
-    log.error(err);
+  if (isBusinessPlan) {
+    const email = customer.email ?? session.customer_email;
 
-    throw err;
-  }
+    try {
+      user = await usersService.findUserByCustomerID(customer.id);
+    } catch (err) {
+      if (email) {
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
+      } else {
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
+        log.error(err);
+        throw err;
+      }
+    }
+  } else {
+    try {
+      const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
+      user = res.data.user;
+    } catch (err) {
+      log.error(
+        `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+      );
+      log.error(err);
 
-  try {
-    await updateUserTier(user.uuid, product.id, config);
-  } catch (err) {
-    const error = err as Error;
-    log.error(
-      `Error while updating user tier: email: ${session.customer_email}, priceId: ${price.product as string} `,
-      error.stack ?? error.message,
-    );
+      throw err;
+    }
 
-    throw err;
+    if (user) {
+      try {
+        await updateUserTier(user.uuid, product.id, config);
+      } catch (err) {
+        log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
+        log.error(err);
+
+        throw err;
+      }
+    }
   }
 
   try {
@@ -151,11 +167,14 @@ export default async function handleInvoiceCompleted(
   try {
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
+      const areDiscounts = items.data[0].discounts.length > 0;
 
-      const couponId = (items.data[0].discounts[0] as any).coupon.id;
+      if (areDiscounts) {
+        const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
-      if (couponId) {
-        await usersService.storeCouponUsedByUser(userData, couponId);
+        if (coupon) {
+          await usersService.storeCouponUsedByUser(userData, coupon.id);
+        }
       }
     }
   } catch (err) {
@@ -170,5 +189,42 @@ export default async function handleInvoiceCompleted(
     await cacheService.clearSubscription(customer.id);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+  }
+
+  if (isBusinessPlan) {
+    const amountOfSeats = items.data[0].quantity;
+    if (!amountOfSeats) return;
+
+    const address = customer.address?.line1 ?? undefined;
+    const phoneNumber = customer.phone ?? undefined;
+
+    try {
+      await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), amountOfSeats);
+      log.info(
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } HAS BEEN UPDATED HIS WORKSPACE`,
+      );
+    } catch (err) {
+      const error = err as Error;
+      const statusCode = (err as any).response.status;
+
+      if (!statusCode || statusCode !== 404) {
+        log.error(`[ERROR UPDATING WORKSPACE]: ${error.stack ?? error.message}`);
+        throw err;
+      }
+
+      log.info(
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } DOES NOT HAVE ANY WORKSPACE TO UPDATE, CREATING A NEW ONE`,
+      );
+      await usersService.initializeWorkspace(user.uuid, {
+        newStorageBytes: Number(maxSpaceBytes),
+        seats: amountOfSeats,
+        address,
+        phoneNumber,
+      });
+    }
   }
 }

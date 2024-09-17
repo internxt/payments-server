@@ -7,7 +7,6 @@ import {
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
   CustomerId,
-  CustomerNotFoundError,
   ExistingSubscriptionError,
   MissingParametersError,
   NotFoundPlanByIdError,
@@ -15,6 +14,7 @@ import {
   PaymentService,
   PromoCodeIsNotValidError,
   UserAlreadyExistsError,
+  CustomerNotFoundError,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription, UserType } from './core/users/User';
@@ -122,7 +122,7 @@ export default function (
           });
         }
         try {
-          const { id } = await paymentService.createCustomerForProduct(
+          const { id } = await paymentService.createOrGetCustomer(
             {
               name,
               email,
@@ -155,14 +155,19 @@ export default function (
       },
     );
 
-    fastify.post<{ Body: { name: string; email: string } }>(
+    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer',
       {
         schema: {
           body: {
             type: 'object',
             required: ['email', 'name'],
-            properties: { name: { type: 'string' }, email: { type: 'string' } },
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string' },
+              country: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
           },
         },
         config: {
@@ -173,7 +178,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { name, email } = req.body;
+        const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
           return res.status(404).send({
@@ -182,10 +187,14 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createCustomerForProduct({
-            name,
-            email,
-          });
+          const { id } = await paymentService.createOrGetCustomer(
+            {
+              name,
+              email,
+            },
+            country,
+            companyVatId,
+          );
 
           const token = jwt.sign(
             {
@@ -199,6 +208,10 @@ export default function (
             token,
           });
         } catch (err) {
+          const error = err as Error;
+
+          req.log.error(`[ERROR CREATING CUSTOMER]: ${error.stack ?? error.message}`);
+
           return res.status(500).send({
             message: 'Internal Server Error',
           });
@@ -257,7 +270,14 @@ export default function (
     });
 
     fastify.post<{
-      Body: { customerId: string; priceId: string; currency: string; token: string; promoCodeId?: string };
+      Body: {
+        customerId: string;
+        priceId: string;
+        currency: string;
+        token: string;
+        quantity?: number;
+        promoCodeId?: string;
+      };
     }>(
       '/create-subscription',
       {
@@ -281,15 +301,18 @@ export default function (
               promoCodeId: {
                 type: 'string',
               },
+              quantity: {
+                type: 'number',
+              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, quantity: seatsForBusinessSubscription } = req.body;
 
         if (!customerId || !priceId) {
-          throw new MissingParametersError([`customerId: ${customerId}`, `priceId: ${priceId}`]);
+          throw new MissingParametersError(['customerId', 'priceId']);
         }
 
         try {
@@ -306,7 +329,13 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(customerId, priceId, currency, promoCodeId);
+          const subscriptionSetUp = await paymentService.createSubscription({
+            customerId,
+            priceId,
+            seatsForBusinessSubscription: seatsForBusinessSubscription ?? 1,
+            currency,
+            promoCodeId,
+          });
 
           return res.send(subscriptionSetUp);
         } catch (err) {
@@ -326,6 +355,8 @@ export default function (
               message: error.message,
             });
           }
+
+          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',
@@ -376,6 +407,10 @@ export default function (
       async (req, res) => {
         const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
 
+        if (!customerId || !priceId) {
+          throw new MissingParametersError(['customerId', 'priceId']);
+        }
+
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
             customerId: string;
@@ -390,14 +425,13 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription(
+          const subscriptionSetUp = await paymentService.createSubscription({
             customerId,
             priceId,
             currency,
-            undefined, // Promo code ID, which we don't need for obj storage
             companyName,
             companyVatId,
-          );
+          });
 
           return res.send(subscriptionSetUp);
         } catch (err) {
@@ -601,7 +635,6 @@ export default function (
       };
       schema: {
         querystring: {
-          type: 'object';
           properties: {
             customerId: { type: 'string' };
             planId: { type: 'string' };
@@ -916,11 +949,11 @@ export default function (
         return rep.status(200).send(promoCodeObject);
       } catch (error) {
         const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+        if (err instanceof NotFoundPromoCodeByNameError) {
           return rep.status(404).send(err.message);
         }
 
-        if (err instanceof MissingParametersError) {
+        if (err instanceof MissingParametersError || err instanceof PromoCodeIsNotValidError) {
           return rep.status(400).send(err.message);
         }
 
