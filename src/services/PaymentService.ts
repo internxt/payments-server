@@ -148,7 +148,7 @@ export class PaymentService {
         }
       }
     } catch (err) {
-      const errCode = (err as any).raw.code;
+      const errCode = (err as any)?.raw?.code;
       if (errCode === 'tax_id_invalid') {
         throw new InvalidTaxIdError();
       }
