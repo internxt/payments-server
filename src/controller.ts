@@ -15,6 +15,7 @@ import {
   PromoCodeIsNotValidError,
   UserAlreadyExistsError,
   CustomerNotFoundError,
+  InvalidTaxIdError,
 } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User, UserSubscription, UserType } from './core/users/User';
@@ -212,6 +213,12 @@ export default function (
 
           req.log.error(`[ERROR CREATING CUSTOMER]: ${error.stack ?? error.message}`);
 
+          if (error instanceof InvalidTaxIdError) {
+            return res.status(400).send({
+              message: error.message,
+            });
+          }
+
           return res.status(500).send({
             message: 'Internal Server Error',
           });
@@ -355,8 +362,6 @@ export default function (
               message: error.message,
             });
           }
-
-          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',

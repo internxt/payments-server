@@ -134,30 +134,5 @@ export default async function handleSubscriptionUpdated(
     if (isSubscriptionCanceled) {
       return usersService.destroyWorkspace(uuid);
     }
-
-    // const customer = await paymentService.getCustomer(customerId);
-    // if (customer.deleted) {
-    //   log.error(`Customer object could not be retrieved in subscription updated handler with id ${customer.id}`);
-    //   return;
-    // }
-    // const { maxSpaceBytes: priceMaxSpaceBytes } = subscription.items.data[0].price.metadata as PriceMetadata;
-    // const amountOfSeats = subscription.items.data[0]!.quantity!;
-
-    // return usersService.updateWorkspaceStorage(uuid, parseInt(priceMaxSpaceBytes), amountOfSeats);
   }
-
-  // const bytesSpace = isSubscriptionCanceled
-  //   ? FREE_PLAN_BYTES_SPACE
-  //   : parseInt((subscription.items.data[0].price.metadata as unknown as PriceMetadata).maxSpaceBytes);
-
-  // const planId = isSubscriptionCanceled ? FREE_INDIVIDUAL_TIER : productId;
-  // try {
-  //   await updateUserTier(uuid, planId, config);
-  // } catch (err) {
-  //   log.error(`Error while updating user tier: uuid: ${uuid} `);
-  //   log.error(err);
-  //   throw err;
-  // }
-
-  // return storageService.changeStorage(uuid, bytesSpace);
 }
