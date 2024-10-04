@@ -138,6 +138,25 @@ export class PaymentService {
     return customer;
   }
 
+  private async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
+    try {
+      if (country && companyVatId) {
+        const taxIds = this.getVatIdFromCountry(country);
+
+        if (taxIds.length > 0) {
+          await this.attachTaxIdToCustomer(customerId, companyVatId, taxIds[0]);
+        }
+      }
+    } catch (err) {
+      const errCode = (err as any).raw.code;
+      if (errCode === 'tax_id_invalid') {
+        throw new InvalidTaxIdError();
+      }
+
+      throw err;
+    }
+  }
+
   async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
@@ -149,26 +168,14 @@ export class PaymentService {
     const userExists = !!customer.length;
 
     if (userExists) {
-      if (country && companyVatId) {
-        const taxIds = this.getVatIdFromCountry(country);
-
-        if (taxIds.length > 0) {
-          await this.attachTaxIdToCustomer(customer[0].id, companyVatId, taxIds[0]);
-        }
-      }
+      await this.getVatIdAndAttachTaxIdToCustomer(customer[0].id, country, companyVatId);
 
       return customer[0];
     }
 
     const newCustomer = await this.createCustomer(payload);
 
-    if (country && companyVatId) {
-      const taxIds = this.getVatIdFromCountry(country);
-
-      if (taxIds.length > 0) {
-        await this.attachTaxIdToCustomer(newCustomer.id, companyVatId, taxIds[0]);
-      }
-    }
+    await this.getVatIdAndAttachTaxIdToCustomer(newCustomer.id, country, companyVatId);
 
     return newCustomer;
   }
@@ -1266,9 +1273,13 @@ export class PaymentService {
   }
 
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
-    const methods = paymentMethodId ? [{
-      id: paymentMethodId
-    }] : await this.getCustomerPaymentMethods(customerId);
+    const methods = paymentMethodId
+      ? [
+          {
+            id: paymentMethodId,
+          },
+        ]
+      : await this.getCustomerPaymentMethods(customerId);
 
     if (methods.length === 0) {
       throw new Error(`No payment methods found for customer ${customerId}`);
@@ -1279,12 +1290,10 @@ export class PaymentService {
 
     const { data: charges } = await this.provider.charges.list({
       customer: customerId,
-      limit: 100
+      limit: 100,
     });
-    const oneTimeChargesWithThatPaymentMethod = charges.filter((c) => 
-      c.paid && 
-      c.metadata.type === 'object-storage' &&
-      c.payment_method === firstMethod.id
+    const oneTimeChargesWithThatPaymentMethod = charges.filter(
+      (c) => c.paid && c.metadata.type === 'object-storage' && c.payment_method === firstMethod.id,
     );
     const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
 
@@ -1502,5 +1511,13 @@ export class UserAlreadyExistsError extends Error {
     super(`User with email ${email} already exists.`);
 
     Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
+  }
+}
+
+export class InvalidTaxIdError extends Error {
+  constructor() {
+    super('The provided Tax ID is invalid');
+
+    Object.setPrototypeOf(this, InvalidTaxIdError.prototype);
   }
 }

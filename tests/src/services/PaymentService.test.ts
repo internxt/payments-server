@@ -63,6 +63,7 @@ describe('Payments Service tests', () => {
     paymentService = new PaymentService(
       new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
       productsRepository,
+      usersRepository,
     );
     storageService = new StorageService(envVariablesConfig, axios);
     usersService = new UsersService(
