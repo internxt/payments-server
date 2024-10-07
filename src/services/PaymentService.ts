@@ -1206,7 +1206,9 @@ export class PaymentService {
 
     const individualActiveSubscription = activeSubscriptions.find((subscription) => {
       const isNotBusiness = subscription.product?.metadata?.type !== 'business';
-      return isNotBusiness;
+      const isNotObjectStorage = subscription.product?.metadata?.type !== 'object-storage';
+
+      return isNotBusiness && isNotObjectStorage;
     });
     if (!individualActiveSubscription) {
       throw new NotFoundSubscriptionError('There is no individual subscription to update');
