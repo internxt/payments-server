@@ -277,7 +277,7 @@ export class PaymentService {
       },
       payment_behavior: 'default_incomplete',
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: ['card', 'paypal', 'sepa_debit'],
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
@@ -319,7 +319,7 @@ export class PaymentService {
       customer: customerId,
       currency: currencyValue,
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: ['card', 'paypal', 'sepa_debit'],
       },
     });
 
