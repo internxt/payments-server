@@ -409,7 +409,6 @@ export class PaymentService {
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
     const res = await this.provider.subscriptions.list({
       customer: customerId,
-      status: 'active',
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
@@ -424,7 +423,11 @@ export class PaymentService {
       return subscription;
     });
 
-    return transformedData;
+    const activeOrTrialingSubscriptions = transformedData.filter(
+      (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
+    );
+
+    return activeOrTrialingSubscriptions;
   }
 
   /**
