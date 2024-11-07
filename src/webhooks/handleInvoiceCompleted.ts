@@ -80,8 +80,11 @@ export default async function handleInvoiceCompleted(
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
+  const isObjStoragePlan = productType === UserType.ObjectStorage;
 
-  await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
+  if (isObjStoragePlan) {
+    await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
+  }
 
   if (!price) {
     log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
@@ -151,9 +154,7 @@ export default async function handleInvoiceCompleted(
   }
 
   try {
-    const customerByUuid = await usersService.findUserByUuid(user.uuid);
-
-    await usersService.updateUser(customerByUuid.customerId, {
+    await usersService.updateUser(customer.id, {
       lifetime: isLifetimePlan,
     });
   } catch {
