@@ -807,7 +807,7 @@ export default function (
           return subscriptionInCache;
         }
 
-        if (user.lifetime) {
+        if (user.lifetime && userType === UserType.Individual) {
           response = { type: 'lifetime' };
         } else {
           response = await paymentService.getUserSubscription(user.customerId, userType);
