@@ -794,6 +794,8 @@ export default function (
         const user: User = await assertUser(req, rep);
         const userType = (req.query.userType as UserType) || UserType.Individual;
 
+        const isLifetimeUser = user.lifetime && userType === UserType.Individual;
+
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
           subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
@@ -807,7 +809,7 @@ export default function (
           return subscriptionInCache;
         }
 
-        if (user.lifetime && userType === UserType.Individual) {
+        if (isLifetimeUser) {
           response = { type: 'lifetime' };
         } else {
           response = await paymentService.getUserSubscription(user.customerId, userType);
