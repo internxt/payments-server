@@ -102,10 +102,14 @@ export default async function handleInvoiceCompleted(
 
   try {
     const userActiveSubscription = await paymentService.getActiveSubscriptions(customer.id);
-    const hasActiveSubscription = userActiveSubscription.length > 0;
+    const hasIndividualActiveSubscription = userActiveSubscription.find(
+      (sub) =>
+        sub.product?.metadata.type !== UserType.Business && sub.product?.metadata.type !== UserType.ObjectStorage,
+    );
+    const shouldCancelCurrentActiveSubscription = isLifetimePlan && hasIndividualActiveSubscription;
 
-    if (isLifetimePlan && hasActiveSubscription) {
-      await paymentService.cancelSubscription(userActiveSubscription[0].id);
+    if (shouldCancelCurrentActiveSubscription) {
+      await paymentService.cancelSubscription(hasIndividualActiveSubscription.id);
     }
   } catch (error) {
     log.error(
@@ -154,8 +158,10 @@ export default async function handleInvoiceCompleted(
   }
 
   try {
+    const { lifetime } = await usersService.findUserByCustomerID(customer.id);
+    const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
     await usersService.updateUser(customer.id, {
-      lifetime: isLifetimePlan,
+      lifetime: isLifetimeCurrentSub,
     });
   } catch {
     await usersService.insertUser({
