@@ -519,7 +519,7 @@ export class PaymentService {
 
     const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
       cancel_at_period_end: false,
-      proration_behavior: 'none',
+      proration_behavior: additionalOptions?.proration_behavior ?? 'none',
       items: [
         {
           id: businessActiveSubscription.items.data[0].id,

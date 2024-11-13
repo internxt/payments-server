@@ -4,9 +4,26 @@ import { InvalidSeatNumberError, PaymentService } from '../services/payment.serv
 import { UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import { UserType } from '../core/users/User';
+import fastifyJwt from '@fastify/jwt';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rateLimit = require('fastify-rate-limit');
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
+    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
+    fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: '1 minute',
+    });
+    fastify.addHook('onRequest', async (request, reply) => {
+      try {
+        await request.jwtVerify();
+      } catch (err) {
+        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+        reply.status(401).send();
+      }
+    });
+
     fastify.patch<{ Body: { workspaceUpdatedSeats: number } }>('/subscription', async (req, res) => {
       const { workspaceUpdatedSeats } = req.body;
       const user = await assertUser(req, res, usersService);
@@ -40,6 +57,9 @@ export default function (paymentService: PaymentService, usersService: UsersServ
           customerId: user.customerId,
           priceId: currentSubscription?.price.id as string,
           seats: workspaceUpdatedSeats,
+          additionalOptions: {
+            proration_behavior: 'create_prorations',
+          },
         });
 
         await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);

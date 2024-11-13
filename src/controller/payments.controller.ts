@@ -27,8 +27,27 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
+import fastifyJwt from '@fastify/jwt';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rateLimit = require('fastify-rate-limit');
+
+type AllowedMethods = 'GET' | 'POST';
 
 export const allowedCurrency = ['eur', 'usd'];
+
+const ALLOWED_DOMAINS: {
+  [key: string]: AllowedMethods[];
+} = {
+  '/prices': ['GET'],
+  '/is-unique-code-available': ['GET'],
+  '/plan-by-id': ['GET'],
+  '/promo-code-by-name': ['GET'],
+  '/promo-code-info': ['GET'],
+  '/object-storage-plan-by-id': ['GET'],
+  '/create-customer-for-object-storage': ['POST'],
+  '/payment-intent-for-object-storage': ['GET'],
+  '/create-subscription-for-object-storage': ['POST'],
+};
 
 export default function (
   paymentService: PaymentService,
@@ -38,6 +57,29 @@ export default function (
   licenseCodesService: LicenseCodesService,
 ) {
   return async function (fastify: FastifyInstance) {
+    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
+    fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: '1 minute',
+    });
+    fastify.addHook('onRequest', async (request, reply) => {
+      try {
+        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        if (
+          config.method &&
+          config.url &&
+          ALLOWED_DOMAINS[config.url] &&
+          ALLOWED_DOMAINS[config.url].includes(config.method)
+        ) {
+          return;
+        }
+        await request.jwtVerify();
+      } catch (err) {
+        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+        reply.status(401).send();
+      }
+    });
+
     fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer-for-object-storage',
       {

@@ -1,7 +1,7 @@
 import fastifyCors from '@fastify/cors';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
-import { type AppConfig } from './config';
+import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
 import controllerMigration from './controller-migration';
@@ -12,15 +12,12 @@ import { UsersService } from './services/users.service';
 import webhook from './webhooks';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
-import fastifyJwt from '@fastify/jwt';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const rateLimit = require('fastify-rate-limit');
 
 type AllowedMethods = 'GET' | 'POST';
 
-const allowedRoutes: {
-  [key: string]: AllowedMethods[];
-} = {
+const allowedRoutes: { [key: string]: AllowedMethods[] } = {
   '/prices': ['GET'],
   '/is-unique-code-available': ['GET'],
   '/plan-by-id': ['GET'],
@@ -54,38 +51,8 @@ export async function buildApp(
     },
   });
 
-  fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-  fastify.register(rateLimit, {
-    max: 1000,
-    timeWindow: '1 minute',
-  });
-
-  fastify.addHook('onRequest', async (request, reply) => {
-    try {
-      const config: { url?: string; method?: string } = request.context.config;
-      const allowedRoutes: Record<string, string[]> = {};
-
-      if (
-        config.method &&
-        config.url &&
-        allowedRoutes[config.url] &&
-        allowedRoutes[config.url].includes(config.method)
-      ) {
-        return;
-      }
-      await request.jwtVerify();
-    } catch (err) {
-      request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-      reply.status(401).send();
-    }
-  });
-
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
-
-  fastify.register(businessController(paymentService, usersService, config), {
-    prefix: '/business',
-  });
-
+  fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
@@ -107,5 +74,6 @@ export async function buildApp(
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     preflightContinue: false,
   });
+
   return fastify;
 }
