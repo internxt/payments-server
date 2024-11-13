@@ -12,22 +12,6 @@ import { UsersService } from './services/users.service';
 import webhook from './webhooks';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
-
-type AllowedMethods = 'GET' | 'POST';
-
-const allowedRoutes: { [key: string]: AllowedMethods[] } = {
-  '/prices': ['GET'],
-  '/is-unique-code-available': ['GET'],
-  '/plan-by-id': ['GET'],
-  '/promo-code-by-name': ['GET'],
-  '/promo-code-info': ['GET'],
-  '/object-storage-plan-by-id': ['GET'],
-  '/create-customer-for-object-storage': ['POST'],
-  '/payment-intent-for-object-storage': ['GET'],
-  '/create-subscription-for-object-storage': ['POST'],
-};
 
 export async function buildApp(
   paymentService: PaymentService,
