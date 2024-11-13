@@ -3,15 +3,15 @@ import { MongoClient } from 'mongodb';
 import Stripe from 'stripe';
 import { FastifyInstance } from 'fastify';
 
-import { StorageService } from './services/StorageService';
-import { UsersService } from './services/UsersService';
-import { PaymentService } from './services/PaymentService';
+import { StorageService } from './services/storage.service';
+import { UsersService } from './services/users.service';
+import { PaymentService } from './services/payment.service';
 import envVariablesConfig from './config';
 import { UsersRepository } from './core/users/UsersRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
-import CacheService from './services/CacheService';
+import CacheService from './services/cache.service';
 import { buildApp } from './app';
-import { LicenseCodesService } from './services/LicenseCodesService';
+import { LicenseCodesService } from './services/licenseCodes.service';
 import { LicenseCodesRepository } from './core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from './core/users/MongoDBLicenseCodesRepository';
 import {
@@ -24,7 +24,7 @@ import { UsersCouponsRepository } from './core/coupons/UsersCouponsRepository';
 import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCouponsRepository';
 import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
-import { ObjectStorageService } from './services/ObjectStorageService';
+import { ObjectStorageService } from './services/objectStorage.service';
 
 const start = async (): Promise<FastifyInstance> => {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();

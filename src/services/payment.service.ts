@@ -211,6 +211,17 @@ export class PaymentService {
     }
   }
 
+  async getBusinessSubscriptionSeats(priceId: string) {
+    const price = await this.provider.prices.retrieve(priceId);
+    const minimumSeats = price.metadata.minimumSeats ?? 1;
+    const maximumSeats = price.metadata.maximumSeats ?? 1;
+
+    return {
+      minimumSeats,
+      maximumSeats,
+    };
+  }
+
   async createSubscription({
     customerId,
     priceId,
@@ -478,10 +489,12 @@ export class PaymentService {
     customerId,
     priceId,
     additionalOptions,
+    seats,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
+    seats?: number;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
   }) {
     const businessActiveSubscription = await this.findBusinessActiveSubscription(customerId);
@@ -511,7 +524,7 @@ export class PaymentService {
         {
           id: businessActiveSubscription.items.data[0].id,
           price: priceId,
-          quantity: currentItem.quantity,
+          quantity: seats ?? currentItem.quantity,
         },
       ],
       ...additionalOptions,

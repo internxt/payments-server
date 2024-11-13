@@ -1,7 +1,7 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { type AppConfig } from './config';
-import { UserNotFoundError, UsersService } from './services/UsersService';
+import { type AppConfig } from '../config';
+import { UsersService } from '../services/users.service';
 import {
   CouponCodeError,
   IncompatibleSubscriptionTypesError,
@@ -16,37 +16,19 @@ import {
   UserAlreadyExistsError,
   CustomerNotFoundError,
   InvalidTaxIdError,
-} from './services/PaymentService';
-import fastifyJwt from '@fastify/jwt';
-import { User, UserSubscription, UserType } from './core/users/User';
-import CacheService from './services/CacheService';
+} from '../services/payment.service';
+import { User, UserSubscription, UserType } from '../core/users/User';
+import CacheService from '../services/cache.service';
 import Stripe from 'stripe';
 import {
   InvalidLicenseCodeError,
   LicenseCodeAlreadyAppliedError,
   LicenseCodesService,
-} from './services/LicenseCodesService';
-import { Coupon } from './core/coupons/Coupon';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
-
-type AllowedMethods = 'GET' | 'POST';
+} from '../services/licenseCodes.service';
+import { Coupon } from '../core/coupons/Coupon';
+import { assertUser } from '../utils/assertUser';
 
 export const allowedCurrency = ['eur', 'usd'];
-
-const allowedRoutes: {
-  [key: string]: AllowedMethods[];
-} = {
-  '/prices': ['GET'],
-  '/is-unique-code-available': ['GET'],
-  '/plan-by-id': ['GET'],
-  '/promo-code-by-name': ['GET'],
-  '/promo-code-info': ['GET'],
-  '/object-storage-plan-by-id': ['GET'],
-  '/create-customer-for-object-storage': ['POST'],
-  '/payment-intent-for-object-storage': ['GET'],
-  '/create-subscription-for-object-storage': ['POST'],
-};
 
 export default function (
   paymentService: PaymentService,
@@ -55,43 +37,7 @@ export default function (
   cacheService: CacheService,
   licenseCodesService: LicenseCodesService,
 ) {
-  async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
-    const { uuid } = req.user.payload;
-    try {
-      return await usersService.findUserByUuid(uuid);
-    } catch (err) {
-      if (err instanceof UserNotFoundError) {
-        req.log.info(`User with uuid ${uuid} was not found`);
-        return rep.status(404).send({ message: 'User not found' });
-      }
-      throw err;
-    }
-  }
-
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        const config: { url?: string; method?: AllowedMethods } = request.context.config;
-        if (
-          config.method &&
-          config.url &&
-          allowedRoutes[config.url] &&
-          allowedRoutes[config.url].includes(config.method)
-        ) {
-          return;
-        }
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
-
     fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer-for-object-storage',
       {
@@ -461,7 +407,7 @@ export default function (
     );
 
     fastify.get('/users/exists', async (req, rep) => {
-      await assertUser(req, rep);
+      await assertUser(req, rep, usersService);
 
       return rep.status(200).send();
     });
@@ -483,7 +429,7 @@ export default function (
       async (req, rep) => {
         const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
 
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
 
         const invoices = await paymentService.getInvoicesFromUser(
           user.customerId,
@@ -524,7 +470,7 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
         if (req.query.userType === UserType.Business) {
           await usersService.cancelUserB2BSuscriptions(user.customerId);
         } else {
@@ -549,7 +495,7 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
         const { address, phoneNumber } = req.body;
         await paymentService.updateCustomerBillingInfo(user.customerId, {
           address: {
@@ -581,7 +527,7 @@ export default function (
         const { price_id: priceId, couponCode } = req.body;
         const userType = (req.body.userType as UserType) || UserType.Individual;
 
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
         try {
           const userUpdated = await paymentService.updateSubscriptionPrice(
             {
@@ -620,7 +566,7 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
         const userType = (req.query.userType as UserType) || UserType.Individual;
         const metadata: Stripe.MetadataParam = { userType };
         const { client_secret: clientSecret } = await paymentService.getSetupIntent(user.customerId, metadata);
@@ -770,7 +716,7 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep);
+        const user = await assertUser(req, rep, usersService);
         const userType = (req.query.userType as UserType) || UserType.Individual;
         return paymentService.getDefaultPaymentMethod(user.customerId, userType);
       },
@@ -791,7 +737,7 @@ export default function (
       async (req, rep) => {
         let response: UserSubscription;
 
-        const user: User = await assertUser(req, rep);
+        const user: User = await assertUser(req, rep, usersService);
         const userType = (req.query.userType as UserType) || UserType.Individual;
 
         const isLifetimeUser = user.lifetime && userType === UserType.Individual;
