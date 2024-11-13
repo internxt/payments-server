@@ -35,7 +35,7 @@ type AllowedMethods = 'GET' | 'POST';
 
 export const allowedCurrency = ['eur', 'usd'];
 
-const ALLOWED_DOMAINS: {
+const ALLOWED_PATHS: {
   [key: string]: AllowedMethods[];
 } = {
   '/prices': ['GET'],
@@ -68,8 +68,8 @@ export default function (
         if (
           config.method &&
           config.url &&
-          ALLOWED_DOMAINS[config.url] &&
-          ALLOWED_DOMAINS[config.url].includes(config.method)
+          ALLOWED_PATHS[config.url] &&
+          ALLOWED_PATHS[config.url].includes(config.method)
         ) {
           return;
         }

@@ -1470,7 +1470,13 @@ export class PaymentService {
   }
 }
 
-class NotFoundSubscriptionError extends Error {}
+export class NotFoundSubscriptionError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, NotFoundSubscriptionError.prototype);
+  }
+}
 export class CouponCodeError extends Error {
   constructor(message: string) {
     super(message);

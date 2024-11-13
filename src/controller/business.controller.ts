@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { InvalidSeatNumberError, PaymentService } from '../services/payment.service';
+import {
+  IncompatibleSubscriptionTypesError,
+  InvalidSeatNumberError,
+  NotFoundSubscriptionError,
+  PaymentService,
+} from '../services/payment.service';
 import { UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import { UserType } from '../core/users/User';
@@ -24,50 +29,82 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       }
     });
 
-    fastify.patch<{ Body: { workspaceUpdatedSeats: number } }>('/subscription', async (req, res) => {
-      const { workspaceUpdatedSeats } = req.body;
-      const user = await assertUser(req, res, usersService);
-      try {
-        const activeSubscriptions = await paymentService.getActiveSubscriptions(user.customerId);
-        const businessActiveSubscription = activeSubscriptions.find(
-          (subscription) => subscription.product?.metadata.type === UserType.Business,
-        );
-        const currentSubscription = businessActiveSubscription?.items.data[0];
-        const maxSpaceBytes = currentSubscription?.price.metadata.maxSpaceBytes as string;
-
-        const { minimumSeats, maximumSeats } = await paymentService.getBusinessSubscriptionSeats(
-          businessActiveSubscription?.product?.default_price as string,
-        );
-
-        if (minimumSeats && maximumSeats) {
-          if (workspaceUpdatedSeats > parseInt(maximumSeats)) {
-            throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
-          }
-
-          if (workspaceUpdatedSeats < parseInt(minimumSeats)) {
-            throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
-          }
-
-          if (workspaceUpdatedSeats === currentSubscription?.quantity) {
-            throw new InvalidSeatNumberError('The same seats are used');
-          }
-        }
-
-        const updatedSub = await paymentService.updateBusinessSub({
-          customerId: user.customerId,
-          priceId: currentSubscription?.price.id as string,
-          seats: workspaceUpdatedSeats,
-          additionalOptions: {
-            proration_behavior: 'create_prorations',
+    fastify.patch<{ Body: { workspaceUpdatedSeats: number } }>(
+      '/subscription',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              workspaceUpdatedSeats: { type: 'number' },
+            },
+            required: ['workspaceUpdatedSeats'],
           },
-        });
+        },
+      },
+      async (req, res) => {
+        const { workspaceUpdatedSeats } = req.body;
+        const user = await assertUser(req, res, usersService);
+        try {
+          const activeSubscriptions = await paymentService.getActiveSubscriptions(user.customerId);
+          if (activeSubscriptions.length === 0) {
+            throw new NotFoundSubscriptionError('Subscriptions not found');
+          }
 
-        await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
+          const businessActiveSubscription = activeSubscriptions.find(
+            (subscription) => subscription.product?.metadata.type === UserType.Business,
+          );
+          const currentSubscription = businessActiveSubscription?.items.data[0];
+          const maxSpaceBytes = currentSubscription?.price.metadata.maxSpaceBytes as string;
 
-        return updatedSub;
-      } catch (error) {
-        //
-      }
-    });
+          const { minimumSeats, maximumSeats } = await paymentService.getBusinessSubscriptionSeats(
+            businessActiveSubscription?.product?.default_price as string,
+          );
+
+          if (minimumSeats && maximumSeats) {
+            if (workspaceUpdatedSeats > parseInt(maximumSeats)) {
+              throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+            }
+
+            if (workspaceUpdatedSeats < parseInt(minimumSeats)) {
+              throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
+            }
+
+            if (workspaceUpdatedSeats === currentSubscription?.quantity) {
+              throw new InvalidSeatNumberError('The same seats are used');
+            }
+          }
+
+          const updatedSub = await paymentService.updateBusinessSub({
+            customerId: user.customerId,
+            priceId: currentSubscription?.price.id as string,
+            seats: workspaceUpdatedSeats,
+            additionalOptions: {
+              proration_behavior: 'create_prorations',
+            },
+          });
+
+          await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
+
+          return updatedSub;
+        } catch (err) {
+          const error = err as Error;
+          req.log.error(`[WORKSPACES/ERROR]: Error trying to update seats: ${error.stack ?? error.message}`);
+          if (
+            error instanceof InvalidSeatNumberError ||
+            error instanceof IncompatibleSubscriptionTypesError ||
+            error instanceof NotFoundSubscriptionError
+          ) {
+            return res.status(400).send({
+              message: error.message,
+            });
+          }
+
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
   };
 }
