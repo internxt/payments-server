@@ -1,4 +1,4 @@
-import { PaymentService } from '../services/PaymentService';
+import { PaymentService } from '../services/payment.service';
 
 export default async function handleSubscriptionCanceled(
   paymentService: PaymentService,

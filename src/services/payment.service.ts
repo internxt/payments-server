@@ -211,6 +211,17 @@ export class PaymentService {
     }
   }
 
+  async getBusinessSubscriptionSeats(priceId: string) {
+    const price = await this.provider.prices.retrieve(priceId);
+    const minimumSeats = price.metadata.minimumSeats ?? 1;
+    const maximumSeats = price.metadata.maximumSeats ?? 1;
+
+    return {
+      minimumSeats,
+      maximumSeats,
+    };
+  }
+
   async createSubscription({
     customerId,
     priceId,
@@ -478,10 +489,12 @@ export class PaymentService {
     customerId,
     priceId,
     additionalOptions,
+    seats,
   }: {
     customerId: CustomerId;
     priceId: PriceId;
     couponCode?: string;
+    seats?: number;
     additionalOptions?: Partial<Stripe.SubscriptionUpdateParams>;
   }) {
     const businessActiveSubscription = await this.findBusinessActiveSubscription(customerId);
@@ -506,12 +519,12 @@ export class PaymentService {
 
     const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
       cancel_at_period_end: false,
-      proration_behavior: 'none',
+      proration_behavior: additionalOptions?.proration_behavior ?? 'none',
       items: [
         {
           id: businessActiveSubscription.items.data[0].id,
           price: priceId,
-          quantity: currentItem.quantity,
+          quantity: seats ?? currentItem.quantity,
         },
       ],
       ...additionalOptions,
@@ -1457,7 +1470,13 @@ export class PaymentService {
   }
 }
 
-class NotFoundSubscriptionError extends Error {}
+export class NotFoundSubscriptionError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, NotFoundSubscriptionError.prototype);
+  }
+}
 export class CouponCodeError extends Error {
   constructor(message: string) {
     super(message);

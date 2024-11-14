@@ -1,12 +1,12 @@
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
-import CacheService from '../services/CacheService';
-import { PaymentService } from '../services/PaymentService';
-import { StorageService } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import CacheService from '../services/cache.service';
+import { PaymentService } from '../services/payment.service';
+import { StorageService } from '../services/storage.service';
+import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
-import { ObjectStorageService } from '../services/ObjectStorageService';
+import { ObjectStorageService } from '../services/objectStorage.service';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';

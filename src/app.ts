@@ -1,16 +1,17 @@
 import fastifyCors from '@fastify/cors';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
-import { type AppConfig } from './config';
-import controller from './controller';
+import { AppConfig } from './config';
+import controller from './controller/payments.controller';
+import businessController from './controller/business.controller';
 import controllerMigration from './controller-migration';
-import CacheService from './services/CacheService';
-import { PaymentService } from './services/PaymentService';
-import { StorageService } from './services/StorageService';
-import { UsersService } from './services/UsersService';
+import CacheService from './services/cache.service';
+import { PaymentService } from './services/payment.service';
+import { StorageService } from './services/storage.service';
+import { UsersService } from './services/users.service';
 import webhook from './webhooks';
-import { LicenseCodesService } from './services/LicenseCodesService';
-import { ObjectStorageService } from './services/ObjectStorageService';
+import { LicenseCodesService } from './services/licenseCodes.service';
+import { ObjectStorageService } from './services/objectStorage.service';
 
 export async function buildApp(
   paymentService: PaymentService,
@@ -33,12 +34,13 @@ export async function buildApp(
           : false,
     },
   });
-  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
 
+  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
+  fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
-    webhook(stripe, storageService, usersService, paymentService, config, cacheService, objectStorageService)
+    webhook(stripe, storageService, usersService, paymentService, config, cacheService, objectStorageService),
   );
 
   fastify.register(fastifyCors, {
@@ -56,5 +58,6 @@ export async function buildApp(
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     preflightContinue: false,
   });
+
   return fastify;
 }

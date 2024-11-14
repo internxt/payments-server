@@ -1,8 +1,8 @@
 import { FastifyLoggerInstance } from 'fastify';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
-import CacheService from '../services/CacheService';
-import { StorageService, updateUserTier } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import CacheService from '../services/cache.service';
+import { StorageService, updateUserTier } from '../services/storage.service';
+import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 
 export default async function handleLifetimeRefunded(
@@ -25,12 +25,10 @@ export default async function handleLifetimeRefunded(
   try {
     await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
   } catch (err) {
-    log.error(
-      `Error while updating user tier: uuid: ${uuid} `,
-    );
+    log.error(`Error while updating user tier: uuid: ${uuid} `);
     log.error(err);
     throw err;
   }
-  
+
   return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
 }
