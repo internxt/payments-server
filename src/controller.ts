@@ -27,6 +27,7 @@ import {
   LicenseCodesService,
 } from './services/LicenseCodesService';
 import { Coupon } from './core/coupons/Coupon';
+import fastifyLimit from '@fastify/rate-limit';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -68,7 +69,7 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(import('@fastify/rate-limit'), {
+    fastify.register(fastifyLimit, {
       max: 1000,
       timeWindow: '1 minute',
     });

@@ -4,7 +4,7 @@ import { UserNotFoundError, UsersService } from './services/UsersService';
 import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+import fastifyLimit from '@fastify/rate-limit';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
@@ -22,7 +22,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(import('@fastify/rate-limit'), {
+    fastify.register(fastifyLimit, {
       max: 30, // Set according to stripe limits.
       timeWindow: '1 second',
     });
