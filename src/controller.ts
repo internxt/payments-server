@@ -27,8 +27,6 @@ import {
   LicenseCodesService,
 } from './services/LicenseCodesService';
 import { Coupon } from './core/coupons/Coupon';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -70,13 +68,16 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
+    fastify.register(import('@fastify/rate-limit'), {
       max: 1000,
       timeWindow: '1 minute',
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        const config: { url?: string; method?: AllowedMethods } = {
+          url: request.url,
+          method: request.method as AllowedMethods,
+        };
         if (
           config.method &&
           config.url &&

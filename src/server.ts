@@ -67,9 +67,12 @@ const start = async (): Promise<FastifyInstance> => {
   );
 
   try {
-    const PORT = envVariablesConfig.SERVER_PORT;
+    const PORT = Number(envVariablesConfig.SERVER_PORT) ?? 8003;
 
-    await fastify.listen(PORT, '0.0.0.0');
+    await fastify.listen({
+      port: PORT,
+      host: '0.0.0.0',
+    });
     return fastify;
   } catch (err) {
     fastify.log.error(err);

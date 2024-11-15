@@ -5,13 +5,8 @@ import { PaymentService } from './services/PaymentService';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
 
-export default function (
-  paymentService: PaymentService,
-  usersService: UsersService,
-  config: AppConfig,
-) {
+export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
     const { uuid } = req.user.payload;
     try {
@@ -27,7 +22,7 @@ export default function (
 
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
+    fastify.register(import('@fastify/rate-limit'), {
       max: 30, // Set according to stripe limits.
       timeWindow: '1 second',
     });
@@ -41,7 +36,7 @@ export default function (
     });
 
     fastify.get('/get-user-subscription', async (req, rep) => {
-      let response: { planId: string, type: string, uuid: string };
+      let response: { planId: string; type: string; uuid: string };
 
       const user: User = await assertUser(req, rep);
 
@@ -49,17 +44,18 @@ export default function (
         const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit: 100 });
 
         if (invoices.length > 0) {
-          const oneTimePurchases = invoices.filter(
-            invoice => invoice.paid && !invoice.subscription && invoice?.lines?.data[0]?.price?.type === 'one_time'
-          ).map(invoice => ({ price: invoice.lines.data[0].price, planId: invoice.lines.data[0].price?.product }));
+          const oneTimePurchases = invoices
+            .filter(
+              (invoice) => invoice.paid && !invoice.subscription && invoice?.lines?.data[0]?.price?.type === 'one_time',
+            )
+            .map((invoice) => ({ price: invoice.lines.data[0].price, planId: invoice.lines.data[0].price?.product }));
           response = {
             planId: oneTimePurchases[0].planId as string,
             type: 'lifetime',
-            uuid: user.uuid
+            uuid: user.uuid,
           };
         } else {
-          const planId = 
-            await paymentService.getPlanIdFromLastPayment(user.customerId, { limit: 100 });
+          const planId = await paymentService.getPlanIdFromLastPayment(user.customerId, { limit: 100 });
 
           if (!planId) {
             throw new Error('Unable to find planId');
@@ -67,20 +63,19 @@ export default function (
           response = {
             planId: planId,
             type: 'lifetime',
-            uuid: user.uuid
+            uuid: user.uuid,
           };
         }
       } else {
-        const subscription = await paymentService.getUserSubscription(user.customerId) as any;
+        const subscription = (await paymentService.getUserSubscription(user.customerId)) as any;
         response = {
           planId: subscription.planId,
           type: subscription.type,
-          uuid: user.uuid
+          uuid: user.uuid,
         };
       }
 
       return response;
     });
-
   };
 }
