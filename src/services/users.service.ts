@@ -195,7 +195,7 @@ export class UsersService {
       },
     };
 
-    await this.axios.put(
+    return this.axios.put(
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`,
       {
         ownerId,

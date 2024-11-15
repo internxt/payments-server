@@ -445,6 +445,12 @@ export class PaymentService {
     return activeOrTrialingSubscriptions;
   }
 
+  async getSubscriptionById(subscriptionId: string) {
+    return this.provider.subscriptions.retrieve(subscriptionId, {
+      expand: ['plan.product'],
+    });
+  }
+
   /**
    * Function to update the subscription that contains the basic params
    *
