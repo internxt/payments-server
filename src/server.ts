@@ -67,7 +67,11 @@ const start = async (): Promise<FastifyInstance> => {
   );
 
   try {
-    const PORT = Number(envVariablesConfig.SERVER_PORT) ?? 8003;
+    const PORT = Number(envVariablesConfig.SERVER_PORT);
+
+    if (!PORT) {
+      throw new Error('ENV VARIABLE SERVER_PORT IS NOT DEFINED');
+    }
 
     await fastify.listen({
       port: PORT,
