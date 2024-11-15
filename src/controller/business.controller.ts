@@ -70,7 +70,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             }
 
             if (workspaceUpdatedSeats === productItem?.quantity) {
-              throw new InvalidSeatNumberError('The same seats are used');
+              throw new InvalidSeatNumberError('The workspace already has these seats');
             }
           }
 
