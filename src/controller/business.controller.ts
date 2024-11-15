@@ -38,7 +38,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
               subscriptionId: { type: 'string' },
               workspaceUpdatedSeats: { type: 'number' },
             },
-            required: ['workspaceUpdatedSeats'],
+            required: ['subscriptionId', 'workspaceUpdatedSeats'],
           },
         },
       },
