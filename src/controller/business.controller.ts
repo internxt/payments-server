@@ -85,7 +85,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
 
           await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
 
-          return updatedSub;
+          return res.status(200).send(updatedSub);
         } catch (err) {
           const error = err as Error;
           req.log.error(`[WORKSPACES/ERROR]: Error trying to update seats: ${error.stack ?? error.message}`);
