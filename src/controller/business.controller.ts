@@ -29,13 +29,14 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       }
     });
 
-    fastify.patch<{ Body: { workspaceUpdatedSeats: number } }>(
+    fastify.patch<{ Body: { subscriptionId: string; workspaceUpdatedSeats: number } }>(
       '/subscription',
       {
         schema: {
           body: {
             type: 'object',
             properties: {
+              subscriptionId: { type: 'string' },
               workspaceUpdatedSeats: { type: 'number' },
             },
             required: ['workspaceUpdatedSeats'],
@@ -43,7 +44,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
         },
       },
       async (req, res) => {
-        const { workspaceUpdatedSeats } = req.body;
+        const { subscriptionId, workspaceUpdatedSeats } = req.body;
         const user = await assertUser(req, res, usersService);
         try {
           const activeSubscriptions = await paymentService.getActiveSubscriptions(user.customerId);
@@ -52,7 +53,8 @@ export default function (paymentService: PaymentService, usersService: UsersServ
           }
 
           const businessActiveSubscription = activeSubscriptions.find(
-            (subscription) => subscription.product?.metadata.type === UserType.Business,
+            (subscription) =>
+              subscription.product?.metadata.type === UserType.Business && subscription.id === subscriptionId,
           );
           const currentSubscription = businessActiveSubscription?.items.data[0];
           const maxSpaceBytes = currentSubscription?.price.metadata.maxSpaceBytes as string;

@@ -112,6 +112,10 @@ export interface PlanSubscription {
   renewalPeriod: RenewalPeriod;
   storageLimit: number;
   amountOfSeats: number;
+  seats?: {
+    minimumSeats: number;
+    maximumSeats: number;
+  };
 }
 
 export interface PromotionCode {
@@ -833,6 +837,10 @@ export class PaymentService {
       renewalPeriod: this.getRenewalPeriod(subscription.plan.intervalCount, subscription.plan.interval),
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
+      seats: {
+        minimumSeats: Number(item.price.metadata.minimumSeats) ?? 3,
+        maximumSeats: Number(item.price.metadata.maximumSeats) ?? 10,
+      },
     };
 
     const { price } = subscription.items.data[0];
