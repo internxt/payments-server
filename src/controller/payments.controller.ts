@@ -64,7 +64,10 @@ export default function (
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        const config: { url?: string; method?: AllowedMethods } = {
+          url: request.url.split('?')[0],
+          method: request.method as AllowedMethods,
+        };
         if (
           config.method &&
           config.url &&

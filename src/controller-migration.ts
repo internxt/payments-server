@@ -1,11 +1,11 @@
 import { FastifyInstance } from 'fastify';
+import fastifyLimit from '@fastify/rate-limit';
 import { type AppConfig } from './config';
 import { UsersService } from './services/users.service';
 import { PaymentService } from './services/payment.service';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
 import { assertUser } from './utils/assertUser';
-import fastifyLimit from '@fastify/rate-limit';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
