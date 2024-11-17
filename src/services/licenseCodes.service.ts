@@ -1,9 +1,9 @@
 import { LicenseCode } from '../core/users/LicenseCode';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { User } from '../core/users/User';
-import { PaymentService } from './PaymentService';
-import { StorageService } from './StorageService';
-import { UsersService } from './UsersService';
+import { PaymentService } from './payment.service';
+import { StorageService } from './storage.service';
+import { UsersService } from './users.service';
 
 export class InvalidLicenseCodeError extends Error {
   constructor() {

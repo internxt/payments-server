@@ -1,17 +1,17 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
-import { StorageService } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
+import { StorageService } from '../services/storage.service';
+import { UsersService } from '../services/users.service';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
-import { PaymentService } from '../services/PaymentService';
+import { PaymentService } from '../services/payment.service';
 import handleInvoiceCompleted from './handleInvoiceCompleted';
-import CacheService from '../services/CacheService';
+import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
-import { ObjectStorageService } from '../services/ObjectStorageService';
+import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 
@@ -100,12 +100,7 @@ export default function (
             });
           }
 
-          await handlePaymentIntentSucceeded(
-            eventData,
-            paymentService,
-            objectStorageService,
-            fastify.log
-          );
+          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
           break;
         }
 

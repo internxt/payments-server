@@ -1,8 +1,8 @@
-import Stripe from "stripe";
-import { FastifyLoggerInstance } from "fastify";
+import Stripe from 'stripe';
+import { FastifyLoggerInstance } from 'fastify';
 
-import { PaymentService } from "../services/PaymentService";
-import { ObjectStorageService } from "../services/ObjectStorageService";
+import { PaymentService } from '../services/payment.service';
+import { ObjectStorageService } from '../services/objectStorage.service';
 
 function isCustomer(customer: Stripe.Customer | Stripe.DeletedCustomer): customer is Stripe.Customer {
   return !customer.deleted;
@@ -24,17 +24,17 @@ export default async function handlePaymentIntentSucceeded(
 
   if (!isCustomer(customer)) {
     throw new Error(`Customer ${paymentIntent.customer} has been deleted`);
-  } 
+  }
 
   if (!customer.email) {
     throw new Error(`Customer ${paymentIntent.customer} has no email`);
-  } 
+  }
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 
   await objectStorageService.initObjectStorageUser({
     email: customer.email,
-    customerId: customer.id
+    customerId: customer.id,
   });
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) has been initialized!`);

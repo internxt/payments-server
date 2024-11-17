@@ -1,13 +1,13 @@
 import { UserType } from './../core/users/User';
 import { FastifyLoggerInstance } from 'fastify';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
-import CacheService from '../services/CacheService';
-import { StorageService, updateUserTier } from '../services/StorageService';
-import { UsersService } from '../services/UsersService';
-import { PaymentService } from '../services/PaymentService';
+import CacheService from '../services/cache.service';
+import { StorageService, updateUserTier } from '../services/storage.service';
+import { UsersService } from '../services/users.service';
+import { PaymentService } from '../services/payment.service';
 import { AppConfig } from '../config';
 import Stripe from 'stripe';
-import { ObjectStorageService } from '../services/ObjectStorageService';
+import { ObjectStorageService } from '../services/objectStorage.service';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -21,19 +21,21 @@ async function handleObjectStorageSubscriptionCancelled(
   logger: FastifyLoggerInstance,
 ): Promise<void> {
   const activeSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
-  const objectStorageActiveSubscriptions = activeSubscriptions.filter((s) => s.product?.metadata.type === 'object-storage');
+  const objectStorageActiveSubscriptions = activeSubscriptions.filter(
+    (s) => s.product?.metadata.type === 'object-storage',
+  );
 
   if (objectStorageActiveSubscriptions.length > 0) {
     logger.info(
-      `Preventing removal of an object storage customer ${customer.id} with sub ${subscription.id} due to the existence of another active subscription`
+      `Preventing removal of an object storage customer ${customer.id} with sub ${subscription.id} due to the existence of another active subscription`,
     );
     return;
-  } 
- 
+  }
+
   logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
   await objectStorageService.deleteAccount({
-    customerId: customer.id
+    customerId: customer.id,
   });
 
   logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
@@ -55,17 +57,16 @@ export default async function handleSubscriptionCanceled(
 
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(
-      await paymentService.getCustomer(customerId) as Stripe.Customer,
+      (await paymentService.getCustomer(customerId)) as Stripe.Customer,
       subscription,
       objectStorageService,
       paymentService,
-      log, 
-    )
+      log,
+    );
     return;
   }
-  
-  const { uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
 
+  const { uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 

@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { PaymentService } from '../services/PaymentService';
+import { PaymentService } from '../services/payment.service';
 import { UserType } from '../core/users/User';
 
 export default async function handleSetupIntentSucceded(
@@ -9,7 +9,7 @@ export default async function handleSetupIntentSucceded(
   const customerId = setupIntent.customer as string;
   const paymentMethodId = setupIntent.payment_method as string;
   const setupIntentMetadata = setupIntent.metadata as Stripe.Metadata;
-  
+
   const userType = setupIntentMetadata?.userType as UserType;
 
   if ([UserType.Individual, UserType.Business].includes(userType)) {

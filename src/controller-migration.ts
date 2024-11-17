@@ -1,29 +1,17 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { type AppConfig } from './config';
-import { UserNotFoundError, UsersService } from './services/UsersService';
-import { PaymentService } from './services/PaymentService';
+import { UsersService } from './services/users.service';
+import { PaymentService } from './services/payment.service';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
+import { assertUser } from './utils/assertUser';
 import fastifyLimit from '@fastify/rate-limit';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
-  async function assertUser(req: FastifyRequest, rep: FastifyReply): Promise<User> {
-    const { uuid } = req.user.payload;
-    try {
-      return await usersService.findUserByUuid(uuid);
-    } catch (err) {
-      if (err instanceof UserNotFoundError) {
-        req.log.info(`User with uuid ${uuid} was not found`);
-        return rep.status(404).send({ message: 'User not found' });
-      }
-      throw err;
-    }
-  }
-
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
-      max: 30, // Set according to stripe limits.
+      max: 30,
       timeWindow: '1 second',
     });
     fastify.addHook('onRequest', async (request, reply) => {
@@ -38,7 +26,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
     fastify.get('/get-user-subscription', async (req, rep) => {
       let response: { planId: string; type: string; uuid: string };
 
-      const user: User = await assertUser(req, rep);
+      const user: User = await assertUser(req, rep, usersService);
 
       if (user.lifetime) {
         const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit: 100 });

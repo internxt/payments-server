@@ -1,10 +1,10 @@
 import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
-import CacheService from '../services/CacheService';
-import { PaymentService, PriceMetadata } from '../services/PaymentService';
-import { createOrUpdateUser, updateUserTier } from '../services/StorageService';
-import { CouponNotBeingTrackedError, UsersService } from '../services/UsersService';
+import CacheService from '../services/cache.service';
+import { PaymentService, PriceMetadata } from '../services/payment.service';
+import { createOrUpdateUser, updateUserTier } from '../services/storage.service';
+import { CouponNotBeingTrackedError, UsersService } from '../services/users.service';
 import { UserType } from '../core/users/User';
 
 export default async function handleCheckoutSessionCompleted(
