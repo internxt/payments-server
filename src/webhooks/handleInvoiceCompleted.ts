@@ -210,7 +210,7 @@ export default async function handleInvoiceCompleted(
       const error = err as Error;
       const statusCode = (err as any)?.response.status;
 
-      if (!statusCode || statusCode !== 400) {
+      if (!statusCode || statusCode !== 404) {
         log.error(`[ERROR UPDATING WORKSPACE]: ${error.stack ?? error.message}`);
         throw err;
       }
