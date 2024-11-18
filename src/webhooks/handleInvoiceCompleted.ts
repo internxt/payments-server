@@ -192,12 +192,6 @@ export default async function handleInvoiceCompleted(
     }
   }
 
-  try {
-    await cacheService.clearSubscription(customer.id);
-  } catch (err) {
-    log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
-  }
-
   if (isBusinessPlan) {
     const amountOfSeats = items.data[0].quantity;
     if (!amountOfSeats) return;
@@ -233,5 +227,11 @@ export default async function handleInvoiceCompleted(
         phoneNumber,
       });
     }
+  }
+
+  try {
+    await cacheService.clearSubscription(customer.id);
+  } catch (err) {
+    log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
 }
