@@ -1,17 +1,16 @@
 import { FastifyInstance } from 'fastify';
+import fastifyLimit from '@fastify/rate-limit';
 import { type AppConfig } from './config';
 import { UsersService } from './services/users.service';
 import { PaymentService } from './services/payment.service';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
 import { assertUser } from './utils/assertUser';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
+    fastify.register(fastifyLimit, {
       max: 30,
       timeWindow: '1 second',
     });

@@ -1,14 +1,20 @@
 name: Build & Publish Stable Preview
 on:
   push:
-    branches: ["master"]
+    branches: ['master']
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
         with:
+          node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc

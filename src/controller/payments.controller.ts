@@ -1,4 +1,7 @@
+import Stripe from 'stripe';
 import { FastifyInstance } from 'fastify';
+import fastifyJwt from '@fastify/jwt';
+import fastifyLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
@@ -19,7 +22,6 @@ import {
 } from '../services/payment.service';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
-import Stripe from 'stripe';
 import {
   InvalidLicenseCodeError,
   LicenseCodeAlreadyAppliedError,
@@ -27,9 +29,6 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
-import fastifyJwt from '@fastify/jwt';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -58,13 +57,16 @@ export default function (
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
+    fastify.register(fastifyLimit, {
       max: 1000,
       timeWindow: '1 minute',
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
-        const config: { url?: string; method?: AllowedMethods } = request.context.config;
+        const config: { url?: string; method?: AllowedMethods } = {
+          url: request.url.split('?')[0],
+          method: request.method as AllowedMethods,
+        };
         if (
           config.method &&
           config.url &&

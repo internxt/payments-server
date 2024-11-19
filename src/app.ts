@@ -13,6 +13,20 @@ import webhook from './webhooks';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 
+const envToLogger = {
+  development: {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname',
+      },
+    },
+  },
+  production: true,
+  test: false,
+};
+
 export async function buildApp(
   paymentService: PaymentService,
   storageService: StorageService,
@@ -24,15 +38,7 @@ export async function buildApp(
   config: AppConfig,
 ): Promise<FastifyInstance> {
   const fastify = Fastify({
-    logger: {
-      prettyPrint:
-        config.NODE_ENV === 'development'
-          ? {
-              translateTime: 'HH:MM:ss Z',
-              ignore: 'pid,hostname',
-            }
-          : false,
-    },
+    logger: envToLogger[config.NODE_ENV] ?? true,
   });
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
