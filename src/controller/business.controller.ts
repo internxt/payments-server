@@ -10,13 +10,12 @@ import {
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('fastify-rate-limit');
+import fastifyLimit from '@fastify/rate-limit';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(rateLimit, {
+    fastify.register(fastifyLimit, {
       max: 1000,
       timeWindow: '1 minute',
     });
