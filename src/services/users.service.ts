@@ -196,7 +196,7 @@ export class UsersService {
     };
 
     return this.axios.post(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage/precheck`,
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage/upgrade-check`,
       {
         ownerId,
         maxSpaceBytes: maxSpaceBytes * seats,
