@@ -74,16 +74,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             }
           }
 
-          const canWorkspaceBeUpdated = await usersService.checkWorkspaceStorageUpdate(
-            user.uuid,
-            Number(maxSpaceBytes),
-            workspaceUpdatedSeats,
-          );
-
-          if (!canWorkspaceBeUpdated)
-            throw new UpdateWorkspaceError(
-              `The workspace for the user with customerId ${user.customerId} cannot be updated`,
-            );
+          await usersService.checkWorkspaceStorageUpdate(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
 
           const updatedSub = await paymentService.updateBusinessSub({
             customerId: user.customerId,
