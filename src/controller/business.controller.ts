@@ -74,7 +74,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             }
           }
 
-          await usersService.checkWorkspaceStorageUpdate(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
+          await usersService.isWorkspaceUpgradeAllowed(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
 
           const updatedSub = await paymentService.updateBusinessSub({
             customerId: user.customerId,

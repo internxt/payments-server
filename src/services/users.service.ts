@@ -186,7 +186,7 @@ export class UsersService {
     );
   }
 
-  async checkWorkspaceStorageUpdate(ownerId: string, maxSpaceBytes: number, seats: number): Promise<boolean> {
+  async isWorkspaceUpgradeAllowed(ownerId: string, maxSpaceBytes: number, seats: number): Promise<boolean> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {
       headers: {
