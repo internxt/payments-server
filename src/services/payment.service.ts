@@ -1577,3 +1577,11 @@ export class InvalidTaxIdError extends Error {
     Object.setPrototypeOf(this, InvalidTaxIdError.prototype);
   }
 }
+
+export class UpdateWorkspaceError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, UpdateWorkspaceError.prototype);
+  }
+}

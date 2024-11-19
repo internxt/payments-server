@@ -5,6 +5,7 @@ import {
   InvalidSeatNumberError,
   NotFoundSubscriptionError,
   PaymentService,
+  UpdateWorkspaceError,
 } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
@@ -74,6 +75,17 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             }
           }
 
+          const canWorkspaceBeUpdated = await usersService.checkWorkspaceStorageUpdate(
+            user.uuid,
+            Number(maxSpaceBytes),
+            workspaceUpdatedSeats,
+          );
+
+          if (!canWorkspaceBeUpdated)
+            throw new UpdateWorkspaceError(
+              `The workspace for the user with customerId ${user.customerId} cannot be updated`,
+            );
+
           const updatedSub = await paymentService.updateBusinessSub({
             customerId: user.customerId,
             priceId: productItem?.price.id as string,
@@ -93,6 +105,7 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             error instanceof InvalidSeatNumberError ||
             error instanceof IncompatibleSubscriptionTypesError ||
             error instanceof NotFoundSubscriptionError ||
+            error instanceof UpdateWorkspaceError ||
             error instanceof UserNotFoundError
           ) {
             return res.status(400).send({
