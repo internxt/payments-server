@@ -17,18 +17,15 @@ const initializeServerAndDatabase = async () => {
   });
   const uri = mongoServer.getUri();
   mongoClient = await new MongoClient(uri).connect();
-  app = await start(mongoClient);
+  app = await start(uri);
   await preloadData(mongoClient);
 };
 
-const closeServerAndDatabase = () => {
+const closeServerAndDatabase = async () => {
   try {
-    if (app) {
-      app.close(async () => {
-        await mongoClient.close();
-        await mongoServer.stop();
-      });
-    }
+    await app.close();
+    await mongoClient.close();
+    await mongoServer.stop();
   } catch (error) {
     console.error('Error during server and database shutdown:', error);
   }

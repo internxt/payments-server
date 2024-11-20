@@ -9,12 +9,9 @@
     "dev": "nodemon src/index.ts",
     "start": "node .",
     "build": "tsc",
-    "test": "jest --detectOpenHandles",
+    "test": "jest --verbose",
     "test:cov": "jest --coverage --forceExit",
     "cli": "nodemon src/cli/load-license-codes.ts"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   },
   "devDependencies": {
     "@internxt/eslint-config-internxt": "^1.0.9",
@@ -47,5 +44,8 @@
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^6.10.0",
     "stripe": "^15.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
