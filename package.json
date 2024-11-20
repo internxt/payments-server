@@ -13,7 +13,7 @@
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@internxt/eslint-config-internxt": "^1.0.9",
