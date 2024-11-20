@@ -11,28 +11,28 @@ let mongoClient: MongoClient;
 let app: FastifyInstance;
 
 const initializeServerAndDatabase = async () => {
+  process.env.NODE_ENV = 'test';
   mongoServer = await MongoMemoryServer.create({
     instance: { dbName: 'payments', port: 3000 },
   });
   const uri = mongoServer.getUri();
   mongoClient = await new MongoClient(uri).connect();
-  await preloadData(mongoClient);
   app = await start(mongoClient);
+  await preloadData(mongoClient);
 };
 
 const closeServerAndDatabase = async () => {
   try {
-    if (mongoClient) {
-      mongoClient.close();
-    }
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
+    // if (mongoClient) {
+    // }
+    // if (mongoServer) {
+    // }
     if (app) {
-      await app.close();
+      await app.close(async () => {
+        await mongoClient.close();
+        await mongoServer.stop();
+      });
     }
-
-    await app.close();
   } catch (error) {
     console.error('Error during server and database shutdown:', error);
   }
