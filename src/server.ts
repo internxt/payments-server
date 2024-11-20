@@ -26,8 +26,8 @@ import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
 
-const start = async (): Promise<FastifyInstance> => {
-  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
+const start = async (startServer = true, testEnvironmentMongoClient?: MongoClient): Promise<FastifyInstance> => {
+  const mongoClient = testEnvironmentMongoClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
   const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
@@ -65,23 +65,25 @@ const start = async (): Promise<FastifyInstance> => {
     stripe,
     envVariablesConfig,
   );
+  if (startServer) {
+    try {
+      const PORT = Number(envVariablesConfig.SERVER_PORT);
 
-  try {
-    const PORT = Number(envVariablesConfig.SERVER_PORT);
+      if (!PORT) {
+        throw new Error('ENV VARIABLE SERVER_PORT IS NOT DEFINED');
+      }
 
-    if (!PORT) {
-      throw new Error('ENV VARIABLE SERVER_PORT IS NOT DEFINED');
+      await fastify.listen({
+        port: PORT,
+        host: '0.0.0.0',
+      });
+      return fastify;
+    } catch (err) {
+      fastify.log.error(err);
+      process.exit(1);
     }
-
-    await fastify.listen({
-      port: PORT,
-      host: '0.0.0.0',
-    });
-    return fastify;
-  } catch (err) {
-    fastify.log.error(err);
-    process.exit(1);
   }
+  return fastify;
 };
 
 export default start;

@@ -945,63 +945,57 @@ export class PaymentService {
     let businessSeats;
     const currencyValue = currency ?? 'eur';
 
-    try {
-      const prices = await this.getPricesRaw(currencyValue);
+    const prices = await this.getPricesRaw(currencyValue);
 
-      const price = prices.find((price) => price.id === priceId);
+    const price = prices.find((price) => price.id === priceId);
 
-      if (!price) {
-        throw new NotFoundPlanByIdError(priceId);
-      }
+    if (!price) {
+      throw new NotFoundPlanByIdError(priceId);
+    }
 
-      const { id, currency, metadata, type, recurring, product: productId } = price;
+    const { id, currency: productCurrency, metadata, type, recurring, product: productId } = price;
 
-      const isBusinessPrice = !!metadata.type && metadata.type === 'business';
+    const isBusinessPrice = !!metadata.type && metadata.type === 'business';
 
-      if (isBusinessPrice) {
-        businessSeats = {
-          minimumSeats: Number(metadata.minimumSeats),
-          maximumSeats: Number(metadata.maximumSeats),
+    if (isBusinessPrice) {
+      businessSeats = {
+        minimumSeats: Number(metadata.minimumSeats),
+        maximumSeats: Number(metadata.maximumSeats),
+      };
+    }
+
+    const selectedPlan: RequestedPlan['selectedPlan'] = {
+      id: id,
+      currency: currencyValue,
+      amount: price.currency_options![currencyValue].unit_amount as number,
+      bytes: parseInt(metadata?.maxSpaceBytes),
+      interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
+      decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
+      type: isBusinessPrice ? UserType.Business : UserType.Individual,
+      ...businessSeats,
+    };
+
+    if (recurring?.interval === 'month') {
+      const upsell = await this.getUpsellProduct(productId as string, productCurrency);
+
+      if (upsell?.active) {
+        upsellPlan = {
+          id: upsell.id,
+          currency: currencyValue,
+          amount: upsell.currency_options![currencyValue].unit_amount as number,
+          bytes: parseInt(upsell.metadata?.maxSpaceBytes),
+          interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
+          decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number) / 100,
+          type: isBusinessPrice ? UserType.Business : UserType.Individual,
+          ...businessSeats,
         };
       }
-
-      const selectedPlan: RequestedPlan['selectedPlan'] = {
-        id: id,
-        currency: currencyValue,
-        amount: price.currency_options![currencyValue].unit_amount as number,
-        bytes: parseInt(metadata?.maxSpaceBytes),
-        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
-        decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
-        type: isBusinessPrice ? UserType.Business : UserType.Individual,
-        ...businessSeats,
-      };
-
-      if (recurring?.interval === 'month') {
-        const upsell = await this.getUpsellProduct(productId as string, currency);
-
-        if (upsell?.active) {
-          upsellPlan = {
-            id: upsell.id,
-            currency: currencyValue,
-            amount: upsell.currency_options![currencyValue].unit_amount as number,
-            bytes: parseInt(upsell.metadata?.maxSpaceBytes),
-            interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
-            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number) / 100,
-            type: isBusinessPrice ? UserType.Business : UserType.Individual,
-            ...businessSeats,
-          };
-        }
-      }
-
-      return {
-        selectedPlan,
-        upsellPlan,
-      };
-    } catch (err) {
-      const error = err as Error;
-      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
-      throw new Error('Interval Server Error');
     }
+
+    return {
+      selectedPlan,
+      upsellPlan,
+    };
   }
 
   private getPaymentMethodTypes(

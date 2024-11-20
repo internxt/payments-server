@@ -914,8 +914,8 @@ export default function (
         return rep.status(200).send(planObject);
       } catch (error) {
         const err = error as Error;
-        if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send(err.message);
+        if (error instanceof NotFoundPlanByIdError) {
+          return rep.status(404).send({ message: error.message });
         }
 
         req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);

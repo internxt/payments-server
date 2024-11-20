@@ -2,14 +2,15 @@ import axios from 'axios';
 import { randomUUID } from 'crypto';
 import Stripe from 'stripe';
 
-import { PaymentService } from '../../../src/services/PaymentService';
-import { StorageService } from '../../../src/services/StorageService';
-import { UsersService } from '../../../src/services/UsersService';
+import { PaymentService } from '../../../src/services/payment.service';
+import { StorageService } from '../../../src/services/storage.service';
+import { UsersService } from '../../../src/services/users.service';
 import config from '../../../src/config';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
+import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -18,14 +19,20 @@ let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
+let productsRepository: ProductsRepository;
 
 beforeEach(() => {
-  paymentService = new PaymentService(new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }));
   usersRepository = {} as UsersRepository;
   displayBillingRepository = {} as DisplayBillingRepository;
   couponsRepository = {} as CouponsRepository;
   usersCouponsRepository = {} as UsersCouponsRepository;
   storageService = new StorageService(config, axios);
+  productsRepository = {} as ProductsRepository;
+  paymentService = new PaymentService(
+    new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
+    productsRepository,
+    usersRepository,
+  );
 
   usersService = new UsersService(
     usersRepository,
@@ -33,6 +40,8 @@ beforeEach(() => {
     displayBillingRepository,
     couponsRepository,
     usersCouponsRepository,
+    config,
+    axios,
   );
 });
 
