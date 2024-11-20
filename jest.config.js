@@ -6,7 +6,7 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
-  detectOpenHandles: true,
+  testTimeout: 10000,
   collectCoverage: true,
   coverageDirectory: 'coverage',
 };

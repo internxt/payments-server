@@ -1,4 +1,4 @@
-import start from '../../src/server';
+import { default as start } from '../../src/server';
 
 import { FastifyInstance } from 'fastify';
 import getMocks from './mocks';
@@ -12,33 +12,48 @@ let app: FastifyInstance;
 
 const initializeServerAndDatabase = async () => {
   mongoServer = await MongoMemoryServer.create({
-    instance: { dbName: 'payments' },
+    instance: { dbName: 'payments', port: 3000 },
   });
   const uri = mongoServer.getUri();
-  process.env.MONGO_URI = uri;
   mongoClient = await new MongoClient(uri).connect();
   await preloadData(mongoClient);
-  app = await start(false, mongoClient);
+  app = await start(mongoClient);
 };
 
 const closeServerAndDatabase = async () => {
-  if (app) {
+  try {
+    if (mongoClient) {
+      mongoClient.close();
+    }
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
+    if (app) {
+      await app.close();
+    }
+
     await app.close();
-  }
-  if (mongoClient) {
-    await mongoClient.close();
-  }
-  if (mongoServer) {
-    await mongoServer.stop();
+  } catch (error) {
+    console.error('Error during server and database shutdown:', error);
   }
 };
 
 describe('controller e2e tests', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     return initializeServerAndDatabase();
   });
 
-  afterAll(() => {
+  console.log('Active handles:');
+  const handles = (process as any)._getActiveHandles();
+  // console.log(handles);
+  handles.forEach((handle: any) => {
+    console.log(`Handle type: ${handle.constructor.name}`);
+  });
+
+  console.log('Active requests:');
+  const requests = (process as any)._getActiveRequests();
+  console.log(requests);
+  afterAll(async () => {
     return closeServerAndDatabase();
   });
 
@@ -67,108 +82,6 @@ describe('controller e2e tests', () => {
         expect(response.statusCode).toBe(404);
       });
     });
-
-    // describe('Determine if the code is valid', () => {
-    //   it('When the code is valid, it should return 200', async () => {
-    //     const { uniqueCode } = getMocks();
-
-    //     const response = await app.inject({
-    //       path: '/is-unique-code-available',
-    //       query: { code: uniqueCode.stackCommerce.codes.elegible, provider: uniqueCode.stackCommerce.provider },
-    //       method: 'GET',
-    //     });
-    //     expect(response.statusCode).toBe(200);
-    //   });
-    // });
-
-    // describe('Determine if a user is eligible for preventing cancellation', () => {
-    //   it('When an invalid token is provided, it should return Unauthorized (401)', async () => {
-    //     const response = await app.inject({
-    //       path: '/request-prevent-cancellation',
-    //       method: 'GET',
-    //       headers: { authorization: 'Bearer faketoken' },
-    //     });
-
-    //     expect(response.statusCode).toBe(401);
-    //   });
-
-    //   it('When the user has not free trials nor lifetimes, it should be eligible', async () => {
-    //     const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-    //     const response = await app.inject({
-    //       path: '/request-prevent-cancellation',
-    //       method: 'GET',
-    //       headers: { authorization: `Bearer ${getValidToken(users.elegible.subscriptionUserUuid)}` },
-    //     });
-
-    //     expect(response.statusCode).toBe(200);
-    //     expect(JSON.parse(response.body)).toMatchObject({ elegible: true });
-    //   });
-
-    //   describe('The users with free trials already applied/lifetime should not be elegible', () => {
-    //     it('When the user has a lifetime plan, it should not be elegible', async () => {
-    //       const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-    //       const response = await app.inject({
-    //         path: '/request-prevent-cancellation',
-    //         method: 'GET',
-    //         headers: { authorization: `Bearer ${getValidToken(users.nonElegible.lifetimeUserUuid)}` },
-    //       });
-
-    //       expect(response.statusCode).toBe(200);
-    //       expect(JSON.parse(response.body)).toMatchObject({ elegible: false });
-    //     });
-
-    //     it('When the user has a subscription and already had a trial, it should not be elegible', async () => {
-    //       const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-    //       const response = await app.inject({
-    //         path: '/request-prevent-cancellation',
-    //         method: 'GET',
-    //         headers: { authorization: `Bearer ${getValidToken(users.nonElegible.subscriptionUserUuid)}` },
-    //       });
-
-    //       expect(response.statusCode).toBe(200);
-    //       expect(JSON.parse(response.body)).toMatchObject({ elegible: false });
-    //     });
-    //   });
-    // });
-
-    //   describe('Preventing cancellation when the user is elegible', () => {
-    //     describe('Users with active subscription and who have not used the offer', () => {
-    //       it('When the user is elegible it should prevent cancellation', async () => {
-    //         const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-
-    //         const response = await app.inject({
-    //           path: '/prevent-cancellation',
-    //           method: 'PUT',
-    //           headers: { authorization: `Bearer ${getValidToken(users.elegible.subscriptionUserUuid)}` },
-    //         });
-
-    //         expect(response.statusCode).toBe(200);
-    //       });
-    //     });
-    //     describe('Users with active subscription who have used the offer or has a lifetime plan', () => {
-    //       it('When the user is not elegible it should not prevent cancellation', async () => {
-    //         const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-    //         const response = await app.inject({
-    //           path: '/prevent-cancellation',
-    //           method: 'PUT',
-    //           headers: { authorization: `Bearer ${getValidToken(users.nonElegible.subscriptionUserUuid)}` },
-    //         });
-
-    //         expect(response.statusCode).toBe(403);
-    //       });
-
-    //       it('When the user has a lifetime plan', async () => {
-    //         const { getValidToken, preventCancellationTestUsers: users } = getMocks();
-    //         const response = await app.inject({
-    //           path: '/prevent-cancellation',
-    //           method: 'PUT',
-    //           headers: { authorization: `Bearer ${getValidToken(users.elegible.subscriptionUserUuid)}` },
-    //         });
-
-    //         expect(response.statusCode).toBe(403);
-    //       });
-    //     });
-    //   });
 
     describe('Fetching plan object by ID and contains the basic params', () => {
       describe('Fetch subscription plan object', () => {

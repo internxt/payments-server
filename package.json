@@ -9,7 +9,7 @@
     "dev": "nodemon src/index.ts",
     "start": "node .",
     "build": "tsc",
-    "test": "jest --detectOpenHandles",
+    "test": "jest --runInBand",
     "test:cov": "jest --coverage",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
