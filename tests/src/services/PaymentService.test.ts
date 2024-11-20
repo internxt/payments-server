@@ -88,7 +88,7 @@ describe('Payments Service tests', () => {
 
       const promotionCode = await paymentService.getPromotionCodeByName('priceId', promotionCodeName);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(promotionCodeName);
+      expect(customerCreatedSpy).toHaveBeenCalledWith('priceId', promotionCodeName);
       expect(promotionCode).toEqual(mockPromotionCodeResponse);
     });
   });
@@ -105,11 +105,11 @@ describe('Payments Service tests', () => {
         promoCodeId: requestPayload.promotion_code,
       });
 
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith(
-        requestPayload.customerId,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
+      expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
+        customerId: requestPayload.customerId,
+        priceId: requestPayload.priceId,
+        promoCodeId: requestPayload.promotion_code,
+      });
       expect(subscription).toEqual(mockCreateSubscriptionResponse);
     });
   });

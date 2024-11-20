@@ -9,8 +9,8 @@
     "dev": "nodemon src/index.ts",
     "start": "node .",
     "build": "tsc",
-    "test": "jest --runInBand",
-    "test:cov": "jest --coverage",
+    "test": "jest --detectOpenHandles",
+    "test:cov": "jest --coverage --forceExit",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "engines": {

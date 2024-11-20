@@ -89,8 +89,9 @@ describe('UsersService tests', () => {
       jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
       await usersService.cancelUserIndividualSubscriptions(customerId);
+      console.log({ individualSubscriptions });
 
-      expect(cancelSubscriptionSpy).toHaveBeenCalledTimes(individualSubscriptions.length);
+      expect(cancelSubscriptionSpy).toHaveBeenCalledTimes(subscriptions.length);
 
       individualSubscriptions.forEach((s, index) => {
         expect(cancelSubscriptionSpy).toHaveBeenNthCalledWith(index + 1, s.id);

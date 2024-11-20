@@ -21,14 +21,10 @@ const initializeServerAndDatabase = async () => {
   await preloadData(mongoClient);
 };
 
-const closeServerAndDatabase = async () => {
+const closeServerAndDatabase = () => {
   try {
-    // if (mongoClient) {
-    // }
-    // if (mongoServer) {
-    // }
     if (app) {
-      await app.close(async () => {
+      app.close(async () => {
         await mongoClient.close();
         await mongoServer.stop();
       });
@@ -43,18 +39,9 @@ describe('controller e2e tests', () => {
     return initializeServerAndDatabase();
   });
 
-  console.log('Active handles:');
-  const handles = (process as any)._getActiveHandles();
-  // console.log(handles);
-  handles.forEach((handle: any) => {
-    console.log(`Handle type: ${handle.constructor.name}`);
-  });
-
-  console.log('Active requests:');
-  const requests = (process as any)._getActiveRequests();
-  console.log(requests);
-  afterAll(async () => {
-    return closeServerAndDatabase();
+  afterAll((cb) => {
+    closeServerAndDatabase();
+    cb();
   });
 
   describe('Check if the unique code provided by the user is valid', () => {
