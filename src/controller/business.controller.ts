@@ -11,6 +11,7 @@ import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
+import Stripe from 'stripe';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
@@ -28,22 +29,23 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       }
     });
 
-    fastify.patch<{ Body: { subscriptionId: string; workspaceUpdatedSeats: number } }>(
+    fastify.patch<{ Body: { workspaceId: string; subscriptionId: string; workspaceUpdatedSeats: number } }>(
       '/subscription',
       {
         schema: {
           body: {
             type: 'object',
             properties: {
+              workspaceId: { type: 'string' },
               subscriptionId: { type: 'string' },
               workspaceUpdatedSeats: { type: 'number' },
             },
-            required: ['subscriptionId', 'workspaceUpdatedSeats'],
+            required: ['workspaceId', 'subscriptionId', 'workspaceUpdatedSeats'],
           },
         },
       },
-      async (req, res) => {
-        const { subscriptionId, workspaceUpdatedSeats } = req.body;
+      async (req, res): Promise<Stripe.Subscription> => {
+        const { workspaceId, subscriptionId, workspaceUpdatedSeats } = req.body;
         const user = await assertUser(req, res, usersService);
 
         if (!user) throw new UserNotFoundError('User does not exist');
@@ -74,7 +76,12 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             }
           }
 
-          await usersService.isWorkspaceUpgradeAllowed(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
+          await usersService.isWorkspaceUpgradeAllowed(
+            user.uuid,
+            workspaceId,
+            Number(maxSpaceBytes),
+            workspaceUpdatedSeats,
+          );
 
           const updatedSub = await paymentService.updateBusinessSub({
             customerId: user.customerId,

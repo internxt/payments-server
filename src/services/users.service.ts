@@ -186,7 +186,12 @@ export class UsersService {
     );
   }
 
-  async isWorkspaceUpgradeAllowed(ownerId: string, maxSpaceBytes: number, seats: number): Promise<boolean> {
+  async isWorkspaceUpgradeAllowed(
+    ownerId: string,
+    workspaceId: string,
+    maxSpaceBytes: number,
+    seats: number,
+  ): Promise<boolean> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -196,7 +201,7 @@ export class UsersService {
     };
 
     return this.axios.post(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage/upgrade-check`,
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/${workspaceId}/storage/upgrade-check`,
       {
         ownerId,
         maxSpaceBytes: maxSpaceBytes * seats,
