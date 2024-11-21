@@ -13,11 +13,11 @@ let app: FastifyInstance;
 const initializeServerAndDatabase = async () => {
   process.env.NODE_ENV = 'test';
   mongoServer = await MongoMemoryServer.create({
-    instance: { dbName: 'payments', port: 3000 },
+    instance: { dbName: 'payments' },
   });
   const uri = mongoServer.getUri();
   mongoClient = await new MongoClient(uri).connect();
-  app = await start(uri);
+  app = await start(mongoClient);
   await preloadData(mongoClient);
 };
 
@@ -32,12 +32,11 @@ const closeServerAndDatabase = async () => {
 };
 
 beforeAll(async () => {
-  return initializeServerAndDatabase();
+  await initializeServerAndDatabase();
 });
 
-afterAll((cb) => {
-  closeServerAndDatabase();
-  cb();
+afterAll(async () => {
+  await closeServerAndDatabase();
 });
 
 describe('controller e2e tests', () => {

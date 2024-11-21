@@ -26,8 +26,8 @@ import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
 
-const start = async (mongoUri?: string): Promise<FastifyInstance> => {
-  const mongoClient = await new MongoClient(mongoUri as string).connect();
+const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
+  const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
   const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
@@ -66,6 +66,10 @@ const start = async (mongoUri?: string): Promise<FastifyInstance> => {
     envVariablesConfig,
   );
 
+  fastify.addHook('onClose', async () => {
+    await cacheService['redis'].quit();
+  });
+
   try {
     const PORT = Number(envVariablesConfig.SERVER_PORT);
 
@@ -74,8 +78,8 @@ const start = async (mongoUri?: string): Promise<FastifyInstance> => {
     }
 
     await fastify.listen({
-      port: PORT,
       host: '0.0.0.0',
+      port: PORT,
     });
     return fastify;
   } catch (err) {
