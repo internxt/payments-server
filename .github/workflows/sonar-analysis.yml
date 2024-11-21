@@ -1,14 +1,13 @@
-name: SonarCloud analysis
+name: SonarCloud code analysis
 on:
   push:
     branches:
       - master
   pull_request:
     types: [opened, synchronize, reopened]
-
 jobs:
-  test:
-    name: Run Tests
+  sonarcloud:
+    name: SonarCloud
     runs-on: ubuntu-latest
     environment: test
     strategy:
@@ -17,72 +16,33 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Set up Node.js ${{ matrix.node_version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node_version }}
           registry-url: 'https://npm.pkg.github.com'
+      - run: echo REACT_APP_NODE_ENV=test >> ./.env
+      - run: echo SERVER_PORT=${{ secrets.SERVER_PORT }} >> ./.env
+      - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
+      - run: echo JWT_SECRET=${{ secrets.JWT_SECRET }} >> ./.env
 
-      - name: Set environment variables for tests
-        run: |
-          echo NODE_ENV=test >> .env
-          echo SERVER_PORT=${{ secrets.SERVER_PORT }} >> .env
-          echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> .env
-
-      - name: Configure npm registry
-        run: |
-          echo "registry=https://registry.yarnpkg.com/" > .npmrc
-          echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
-          echo //npm.pkg.github.com/:_authToken=${{ secrets.PERSONAL_ACCESS_TOKEN }} >> .npmrc
-          echo "always-auth=true" >> .npmrc
+      - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
+      - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
+      # You cannot read packages from other private repos with GITHUB_TOKEN
+      # You have to use a PAT instead https://github.com/actions/setup-node/issues/49
+      - run: echo //npm.pkg.github.com/:_authToken=${{ secrets.PERSONAL_ACCESS_TOKEN }} >> .npmrc
+      - run: echo "always-auth=true" >> .npmrc
 
       - name: Install dependencies
         run: yarn
 
-      - name: Run tests and generate coverage
+      - name: Test and coverage
         run: yarn test:cov
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: coverage
-
-  sonarcloud:
-    name: SonarCloud Analysis
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js 20.x
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20.x
-          registry-url: 'https://npm.pkg.github.com'
-
-      - name: Configure npm registry
-        run: |
-          echo "registry=https://registry.yarnpkg.com/" > .npmrc
-          echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
-          echo //npm.pkg.github.com/:_authToken=${{ secrets.PERSONAL_ACCESS_TOKEN }} >> .npmrc
-          echo "always-auth=true" >> .npmrc
-
-      - name: Download coverage report
-        uses: actions/download-artifact@v3
-        with:
-          name: coverage-report
-          path: coverage
-
-      - name: Install dependencies
-        run: yarn
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
