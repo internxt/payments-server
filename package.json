@@ -10,7 +10,7 @@
     "start": "node .",
     "build": "tsc",
     "test": "jest --verbose",
-    "test:cov": "jest --coverage --forceExit",
+    "test:cov": "jest --coverage",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "engines": {
