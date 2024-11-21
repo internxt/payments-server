@@ -62,25 +62,6 @@ export class UsersService {
     return userFound;
   }
 
-  async cancelUserTeamsSubscriptions(uuid: User['uuid'], teamsUserUuid: User['uuid']) {
-    const user = await this.findUserByUuid(uuid);
-    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(user.customerId);
-
-    if (activeSubscriptions.length === 0) {
-      throw new Error('Subscriptions not found');
-    }
-
-    const subscriptionsToCancel = activeSubscriptions.filter((subscription) => {
-      const isTeams = parseInt(subscription.items.data[0].price.metadata.is_teams);
-
-      return isTeams === 1;
-    }) as Stripe.Subscription[];
-
-    for (const subscriptionToCancel of subscriptionsToCancel) {
-      await this.paymentService.cancelSubscription(subscriptionToCancel.id);
-    }
-  }
-
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
@@ -97,7 +78,7 @@ export class UsersService {
     }
   }
 
-  async cancelUserB2BSuscriptions(customerId: User['customerId']): Promise<void> {
+  async cancelUserB2BSubscriptions(customerId: User['customerId']): Promise<void> {
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
     if (activeSubscriptions.length === 0) {
@@ -119,7 +100,7 @@ export class UsersService {
     return billing;
   }
 
-  insertUser(user: Omit<User, 'id'>) {
+  insertUser(user: Omit<User, 'id'>): Promise<void> {
     return this.usersRepository.insertUser(user);
   }
 
@@ -237,4 +218,10 @@ export class UsersService {
   }
 }
 
-export class UserNotFoundError extends Error {}
+export class UserNotFoundError extends Error {
+  constructor() {
+    super('User not found');
+
+    Object.setPrototypeOf(this, UserNotFoundError.prototype);
+  }
+}

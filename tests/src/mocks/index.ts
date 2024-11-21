@@ -45,6 +45,7 @@ export default function getMocks() {
   function getValidToken(userUuid: string): string {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
   }
+
   return {
     getValidToken,
     preventCancellationTestUsers,

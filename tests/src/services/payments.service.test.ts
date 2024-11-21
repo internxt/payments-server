@@ -61,7 +61,6 @@ describe('Payments Service tests', () => {
       productsRepository,
       usersRepository,
     );
-
     usersRepository = testFactory.getUsersRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
     couponsRepository = testFactory.getCouponsRepositoryForTest();

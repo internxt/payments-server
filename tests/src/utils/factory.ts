@@ -9,7 +9,7 @@ const getUsersRepositoryForTest = (): UsersRepository => {
     findUserByCustomerId: jest.fn(),
     findUserByUuid: jest.fn(),
     insertUser: jest.fn(),
-    updateUser: jest.fn(),
+    updateUser: jest.fn().mockResolvedValue(true),
   };
 
   return usersRepositoryMock;
