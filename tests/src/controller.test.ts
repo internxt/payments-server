@@ -23,9 +23,17 @@ const initializeServerAndDatabase = async () => {
 
 const closeServerAndDatabase = async () => {
   try {
-    await app.close();
-    await mongoClient.close();
-    await mongoServer.stop();
+    if (app) {
+      await app.close();
+    }
+
+    if (mongoClient) {
+      await mongoClient.close();
+    }
+
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
   } catch (error) {
     console.error('Error during server and database shutdown:', error);
   }
