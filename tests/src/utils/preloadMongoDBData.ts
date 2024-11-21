@@ -7,25 +7,25 @@ export const preloadData = async (client: MongoClient) => {
 
   await db.collection('license_codes').insertMany([
     {
-      priceId: mocks.testPlansId.lifetime.exists,
+      priceId: mocks.prices.lifetime.exists,
       provider: mocks.uniqueCode.techCult.provider,
       code: mocks.uniqueCode.techCult.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.testPlansId.lifetime.exists,
+      priceId: mocks.prices.lifetime.exists,
       provider: mocks.uniqueCode.techCult.provider,
       code: mocks.uniqueCode.techCult.codes.nonElegible,
       redeemed: true,
     },
     {
-      priceId: mocks.testPlansId.lifetime.exists,
+      priceId: mocks.prices.lifetime.exists,
       provider: mocks.uniqueCode.stackCommerce.provider,
       code: mocks.uniqueCode.stackCommerce.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.testPlansId.lifetime.exists,
+      priceId: mocks.prices.lifetime.exists,
       provider: mocks.uniqueCode.stackCommerce.provider,
       code: mocks.uniqueCode.stackCommerce.codes.nonElegible,
       redeemed: true,

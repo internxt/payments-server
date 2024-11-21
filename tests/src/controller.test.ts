@@ -68,7 +68,7 @@ describe('controller e2e tests', () => {
   describe('Fetching plan object by ID and contains the basic params', () => {
     describe('Fetch subscription plan object', () => {
       it('When the planId is valid', async () => {
-        const { testPlansId } = getMocks();
+        const { prices } = getMocks();
         const expectedKeys = {
           selectedPlan: {
             id: expect.anything(),
@@ -89,7 +89,7 @@ describe('controller e2e tests', () => {
         };
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${testPlansId.subscription.exists}`,
+          path: `/plan-by-id?planId=${prices.subscription.exists}`,
           method: 'GET',
         });
         const responseBody = JSON.parse(response.body);
@@ -99,10 +99,10 @@ describe('controller e2e tests', () => {
       });
 
       it('When the planId is not valid', async () => {
-        const { testPlansId } = getMocks();
+        const { prices } = getMocks();
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${testPlansId.subscription.doesNotExist}`,
+          path: `/plan-by-id?planId=${prices.subscription.doesNotExist}`,
           method: 'GET',
         });
 
@@ -112,7 +112,7 @@ describe('controller e2e tests', () => {
 
     describe('Fetch Lifetime plan object', () => {
       it('When the planId is valid', async () => {
-        const { testPlansId } = getMocks();
+        const { prices } = getMocks();
 
         const expectedKeys = {
           selectedPlan: {
@@ -126,7 +126,7 @@ describe('controller e2e tests', () => {
         };
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${testPlansId.lifetime.exists}`,
+          path: `/plan-by-id?planId=${prices.lifetime.exists}`,
           method: 'GET',
         });
 
@@ -137,10 +137,10 @@ describe('controller e2e tests', () => {
       });
 
       it('When the planId is not valid', async () => {
-        const { testPlansId } = getMocks();
+        const { prices } = getMocks();
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${testPlansId.lifetime.doesNotExist}`,
+          path: `/plan-by-id?planId=${prices.lifetime.doesNotExist}`,
           method: 'GET',
         });
 
