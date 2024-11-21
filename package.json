@@ -13,6 +13,9 @@
     "test:cov": "jest --coverage --forceExit",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@internxt/eslint-config-internxt": "^1.0.9",
     "@internxt/prettier-config": "^1.0.2",

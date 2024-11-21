@@ -1,6 +1,6 @@
+import Stripe from 'stripe';
 import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
-import Stripe from 'stripe';
 import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
