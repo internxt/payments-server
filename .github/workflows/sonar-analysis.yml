@@ -26,7 +26,7 @@ jobs:
       - run: echo REACT_APP_NODE_ENV=test >> ./.env
       - run: echo SERVER_PORT=${{ secrets.SERVER_PORT }} >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
-      - run: echo JWT_SECRET=${{ secrets.JWT_SECRET }} >> ./.env
+      - run: echo JWT_SECRET=JWT_SECRET >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
