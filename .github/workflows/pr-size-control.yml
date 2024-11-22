@@ -1,31 +1,14 @@
-name: labeler
-
-on: [pull_request]
-
+name: PR Size Checker
+on: pull_request
 jobs:
-  labeler:
-    permissions:
-      pull-requests: write
-      contents: read
-      issues: write
+  check_pr_size:
+    name: Check PR size doesn't break set limit
     runs-on: ubuntu-latest
-    name: Label the PR size
     steps:
-      - uses: codelytv/pr-size-labeler@v1
+      # checkout your code with your git history
+      - uses: actions/checkout@v2
         with:
-          xs_label: 'size/xs'
-          xs_max_size: '10'
-          s_label: 'size/s'
-          s_max_size: '100'
-          m_label: 'size/m'
-          m_max_size: '200'
-          l_label: 'size/l'
-          l_max_size: '500'
-          xl_label: 'size/xl'
-          fail_if_xl: 'false'
-          message_if_xl: >
-            This PR exceeds the recommended size of 1000 lines.
-            Please make sure you are NOT addressing multiple issues with one PR.
-            Note this PR might be rejected due to its size.
-          github_api_url: 'https://api.github.com'
-          files_to_ignore: ''
+          fetch-depth: 0
+      - uses: maidsafe/pr_size_checker@v2
+        with:
+          max_lines_changed: 500
