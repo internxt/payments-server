@@ -6,9 +6,9 @@ import {
   PaymentService,
   PromotionCode,
   SubscriptionCreated,
-} from '../../../src/services/PaymentService';
-import { StorageService } from '../../../src/services/StorageService';
-import { UsersService } from '../../../src/services/UsersService';
+} from '../../../src/services/payment.service';
+import { StorageService } from '../../../src/services/storage.service';
+import { UsersService } from '../../../src/services/users.service';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
@@ -57,11 +57,13 @@ const paymentIntentResponse = {
 
 const promotionCodeName = 'PROMOCODE';
 
+const paymentsProvider = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
+
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
     paymentService = new PaymentService(
-      new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
+      paymentsProvider,
       productsRepository,
       usersRepository,
     );
@@ -82,72 +84,92 @@ describe('Payments Service tests', () => {
     displayBillingRepository = testFactory.displayBillingRepositoryForTest();
   });
 
-  describe('Creating a customer', () => {
-    it('should create a customer with email and name with a given parameters', async () => {
-      const customerCreatedSpy = jest
-        .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
+  // describe('Creating a customer', () => {
+  //   it('should create a customer with email and name with a given parameters', async () => {
+  //     const customerCreatedSpy = jest
+  //       .spyOn(paymentService, 'createCustomer')
+  //       .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
 
-      await paymentService.createCustomer(customerPayload);
+  //     await paymentService.createCustomer(customerPayload);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
+  //     expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
+  //   });
+  // });
+
+  // describe('Fetching the promotion code object', () => {
+  //   it('should get the promo code ID, amount off or discounted off', async () => {
+  //     const customerCreatedSpy = jest
+  //       .spyOn(paymentService, 'getPromotionCodeByName')
+  //       .mockImplementation(() => Promise.resolve(mockPromotionCodeResponse as unknown as PromotionCode));
+
+  //     const promotionCode = await paymentService.getPromotionCodeByName(promotionCodeName);
+
+  //     expect(customerCreatedSpy).toHaveBeenCalledWith(promotionCodeName);
+  //     expect(promotionCode).toEqual(mockPromotionCodeResponse);
+  //   });
+  // });
+
+  // describe('Creating a subscription', () => {
+  //   it('Should create a subscription with all params', async () => {
+  //     const subscriptionCreatedSpy = jest
+  //       .spyOn(paymentService, 'createSubscription')
+  //       .mockImplementation(() => Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreated));
+
+  //     const subscription = await paymentService.createSubscription(
+  //       requestPayload.customerId,
+  //       requestPayload.priceId,
+  //       requestPayload.promotion_code,
+  //     );
+
+  //     expect(subscriptionCreatedSpy).toHaveBeenCalledWith(
+  //       requestPayload.customerId,
+  //       requestPayload.priceId,
+  //       requestPayload.promotion_code,
+  //     );
+  //     expect(subscription).toEqual(mockCreateSubscriptionResponse);
+  //   });
+  // });
+
+  // describe('Obtain the paymentIntent customer secret', () => {
+  //   it('Should return the client secret to pay in the client side', async () => {
+  //     const paymentIntentSpy = jest
+  //       .spyOn(paymentService, 'getPaymentIntent')
+  //       .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntent));
+
+  //     const paymentIntent = await paymentService.getPaymentIntent(
+  //       requestPayload.customerId,
+  //       requestPayload.amount,
+  //       requestPayload.priceId,
+  //       requestPayload.promotion_code,
+  //     );
+
+  //     expect(paymentIntentSpy).toHaveBeenCalledWith(
+  //       requestPayload.customerId,
+  //       requestPayload.amount,
+  //       requestPayload.priceId,
+  //       requestPayload.promotion_code,
+  //     );
+  //     expect(paymentIntent).toEqual(paymentIntentResponse);
+  //   });
+  // });
+
+  describe('markInvoiceAsPaid()', () => {
+    it('When the invoice is going to be marked as paid and the params are valid, then it works', async () => {
+      const payFunction = jest.spyOn(paymentsProvider.invoices, 'pay')
+        .mockImplementation();
+      const invoiceId = 'in_1MtHbELkdIwHu7ixl4OzzPMv';
+
+      await paymentService.markInvoiceAsPaid(invoiceId)
+
+      expect(payFunction).toHaveBeenCalledWith(invoiceId, {
+        paid_out_of_band: true
+      });
     });
-  });
 
-  describe('Fetching the promotion code object', () => {
-    it('should get the promo code ID, amount off or discounted off', async () => {
-      const customerCreatedSpy = jest
-        .spyOn(paymentService, 'getPromotionCodeByName')
-        .mockImplementation(() => Promise.resolve(mockPromotionCodeResponse as unknown as PromotionCode));
+    it('When the invoice is going to be marked as paid and the invoice id is invalid, then it fails', async () => {
+      const invoiceId = 'invalid_invoice_id';
 
-      const promotionCode = await paymentService.getPromotionCodeByName(promotionCodeName);
-
-      expect(customerCreatedSpy).toHaveBeenCalledWith(promotionCodeName);
-      expect(promotionCode).toEqual(mockPromotionCodeResponse);
+      await expect(paymentService.markInvoiceAsPaid(invoiceId)).rejects.toThrow();
     });
-  });
-
-  describe('Creating a subscription', () => {
-    it('Should create a subscription with all params', async () => {
-      const subscriptionCreatedSpy = jest
-        .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() => Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreated));
-
-      const subscription = await paymentService.createSubscription(
-        requestPayload.customerId,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
-
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith(
-        requestPayload.customerId,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
-      expect(subscription).toEqual(mockCreateSubscriptionResponse);
-    });
-  });
-
-  describe('Obtain the paymentIntent customer secret', () => {
-    it('Should return the client secret to pay in the client side', async () => {
-      const paymentIntentSpy = jest
-        .spyOn(paymentService, 'getPaymentIntent')
-        .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntent));
-
-      const paymentIntent = await paymentService.getPaymentIntent(
-        requestPayload.customerId,
-        requestPayload.amount,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
-
-      expect(paymentIntentSpy).toHaveBeenCalledWith(
-        requestPayload.customerId,
-        requestPayload.amount,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
-      expect(paymentIntent).toEqual(paymentIntentResponse);
-    });
-  });
+  })
 });

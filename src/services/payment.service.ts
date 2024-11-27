@@ -1231,6 +1231,23 @@ export class PaymentService {
     };
   }
 
+  private validateInvoiceId(invoiceId: Invoice['id']): boolean {
+    const regex = /^in_[a-zA-Z0-9]+$/;
+    return regex.test(invoiceId);
+  }
+
+  async markInvoiceAsPaid(invoiceId: Invoice['id']): Promise<void> {
+    const validInvoiceId = this.validateInvoiceId(invoiceId);
+
+    if (!validInvoiceId) {
+      throw new Error(`Invalid invoice id ${invoiceId}`);
+    }
+
+    await this.provider.invoices.pay(invoiceId, {
+      paid_out_of_band: true,
+    })
+  }
+
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
