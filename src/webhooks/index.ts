@@ -14,6 +14,7 @@ import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
+import { connect } from './providers/bit2me/webhook';
 
 export default function (
   stripe: Stripe,
@@ -165,5 +166,7 @@ export default function (
 
       return rep.status(204).send();
     });
+
+    connect(fastify, paymentService);
   };
 }
