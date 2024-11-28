@@ -58,6 +58,7 @@ describe('Payments Service tests', () => {
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     displayBillingRepository = testFactory.displayBillingRepositoryForTest();
   });
+
   describe('Creating a customer', () => {
     it('should create a customer with email and name with a given parameters', async () => {
       const customerCreatedSpy = jest
@@ -67,6 +68,7 @@ describe('Payments Service tests', () => {
       expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
     });
   });
+
   describe('Fetching the promotion code object', () => {
     it('should get the promo code ID, amount off or discounted off', async () => {
       const customerCreatedSpy = jest
@@ -79,6 +81,7 @@ describe('Payments Service tests', () => {
       expect(promotionCode).toEqual(mockPromotionCodeResponse);
     });
   });
+
   describe('Creating a subscription', () => {
     it('Should create a subscription with all params', async () => {
       const subscriptionCreatedSpy = jest
