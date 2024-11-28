@@ -7,44 +7,18 @@ import {
   SubscriptionCreated,
 } from '../../../src/services/payment.service';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
+import getMocks from '../mocks';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
 
 let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-const customerPayload = {
-  email: 'test@example.com',
-  name: 'Test User',
-};
-const requestPayload = {
-  customerId: 'cId',
-  amount: 100,
-  priceId: 'price_id',
-  promotion_code: 'promo_code',
-};
-const mockCustomer = { id: 'cus_12345', email: 'test@example.com', name: 'Test User' };
-const mockPromotionCodeResponse = {
-  id: 'promo_id',
-  amountOff: null,
-  discountOff: 75,
-};
-const mockCreateSubscriptionResponse = {
-  type: 'payment',
-  clientSecret: 'client_secret',
-};
-const paymentIntentResponse = {
-  clientSecret: 'client_secret',
-};
-const promotionCodeName = 'PROMOCODE';
+
+const mocks = getMocks();
+
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
@@ -53,19 +27,17 @@ describe('Payments Service tests', () => {
       productsRepository,
       usersRepository,
     );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    displayBillingRepository = testFactory.displayBillingRepositoryForTest();
   });
 
   describe('Creating a customer', () => {
     it('should create a customer with email and name with a given parameters', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
-      await paymentService.createCustomer(customerPayload);
-      expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
+        .mockImplementation(() => Promise.resolve(mocks.mockedUser as unknown as Stripe.Customer));
+
+      await paymentService.createCustomer(mocks.mockedCustomerPayload);
+
+      expect(customerCreatedSpy).toHaveBeenCalledWith(mocks.mockedCustomerPayload);
     });
   });
 
@@ -73,12 +45,12 @@ describe('Payments Service tests', () => {
     it('should get the promo code ID, amount off or discounted off', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'getPromotionCodeByName')
-        .mockImplementation(() => Promise.resolve(mockPromotionCodeResponse as unknown as PromotionCode));
+        .mockImplementation(() => Promise.resolve(mocks.mockPromotionCodeResponse as unknown as PromotionCode));
 
-      const promotionCode = await paymentService.getPromotionCodeByName('priceId', promotionCodeName);
+      const promotionCode = await paymentService.getPromotionCodeByName('priceId', mocks.couponName.valid);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith('priceId', promotionCodeName);
-      expect(promotionCode).toEqual(mockPromotionCodeResponse);
+      expect(customerCreatedSpy).toHaveBeenCalledWith('priceId', mocks.couponName.valid);
+      expect(promotionCode).toEqual(mocks.mockPromotionCodeResponse);
     });
   });
 
@@ -86,20 +58,22 @@ describe('Payments Service tests', () => {
     it('Should create a subscription with all params', async () => {
       const subscriptionCreatedSpy = jest
         .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() => Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreated));
+        .mockImplementation(() =>
+          Promise.resolve(mocks.mockCreateSubscriptionResponse as unknown as SubscriptionCreated),
+        );
 
       const subscription = await paymentService.createSubscription({
-        customerId: requestPayload.customerId,
-        priceId: requestPayload.priceId,
-        promoCodeId: requestPayload.promotion_code,
+        customerId: mocks.createdSubscriptionPayload.customerId,
+        priceId: mocks.createdSubscriptionPayload.priceId,
+        promoCodeId: mocks.createdSubscriptionPayload.promotion_code,
       });
 
       expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
-        customerId: requestPayload.customerId,
-        priceId: requestPayload.priceId,
-        promoCodeId: requestPayload.promotion_code,
+        customerId: mocks.createdSubscriptionPayload.customerId,
+        priceId: mocks.createdSubscriptionPayload.priceId,
+        promoCodeId: mocks.createdSubscriptionPayload.promotion_code,
       });
-      expect(subscription).toEqual(mockCreateSubscriptionResponse);
+      expect(subscription).toEqual(mocks.mockCreateSubscriptionResponse);
     });
   });
 
@@ -107,21 +81,21 @@ describe('Payments Service tests', () => {
     it('Should return the client secret to pay in the client side', async () => {
       const paymentIntentSpy = jest
         .spyOn(paymentService, 'createPaymentIntent')
-        .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntent));
+        .mockImplementation(() => Promise.resolve(mocks.paymentIntentResponse as unknown as PaymentIntent));
 
       const paymentIntent = await paymentService.createPaymentIntent(
-        requestPayload.customerId,
-        requestPayload.amount,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
+        mocks.createdSubscriptionPayload.customerId,
+        mocks.createdSubscriptionPayload.amount,
+        mocks.createdSubscriptionPayload.priceId,
+        mocks.createdSubscriptionPayload.promotion_code,
       );
       expect(paymentIntentSpy).toHaveBeenCalledWith(
-        requestPayload.customerId,
-        requestPayload.amount,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
+        mocks.createdSubscriptionPayload.customerId,
+        mocks.createdSubscriptionPayload.amount,
+        mocks.createdSubscriptionPayload.priceId,
+        mocks.createdSubscriptionPayload.promotion_code,
       );
-      expect(paymentIntent).toEqual(paymentIntentResponse);
+      expect(paymentIntent).toEqual(mocks.paymentIntentResponse);
     });
   });
 });
