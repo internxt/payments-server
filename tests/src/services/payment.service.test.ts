@@ -1,5 +1,4 @@
 import Stripe from 'stripe';
-
 import {
   PaymentIntent,
   PaymentService,
@@ -14,7 +13,6 @@ import getMocks from '../mocks';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
-
 let usersRepository: UsersRepository;
 
 const mocks = getMocks();
