@@ -53,7 +53,7 @@ export default function getMocks() {
   const mockedUser: User = {
     id: randomUUID(),
     uuid: randomUUID(),
-    customerId: randomUUID(),
+    customerId: `cus_${randomUUID()}`,
     lifetime: false,
   };
 
