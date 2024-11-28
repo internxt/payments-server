@@ -173,7 +173,7 @@ describe('controller e2e tests', () => {
         });
 
         it('When the planId is not valid', async () => {
-          const { testPlansId } = getMocks();
+          const { testPlansId } = await getMocks();
 
           const response = await app.inject({
             path: `/plan-by-id?planId=${testPlansId.subscription.doesNotExist}`,
@@ -186,7 +186,7 @@ describe('controller e2e tests', () => {
 
       describe('Fetch Lifetime plan object', () => {
         it('When the planId is valid', async () => {
-          const { testPlansId } = getMocks();
+          const { testPlansId } = await getMocks();
 
           const expectedKeys = {
             planId: expect.anything(),
