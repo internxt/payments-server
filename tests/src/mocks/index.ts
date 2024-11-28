@@ -45,7 +45,8 @@ export default function getMocks() {
   };
 
   const mockPromotionCodeResponse = {
-    id: 'promo_id',
+    codeId: 'promo_id',
+    promoCodeName: 'PROMO_NAME',
     amountOff: null,
     discountOff: 75,
   };

@@ -30,7 +30,7 @@ describe('Payments Service tests', () => {
   });
 
   describe('Creating a customer', () => {
-    it('should create a customer with email and name with a given parameters', async () => {
+    it('When trying to create a customer with the correct params, then the customer is created successfully', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
         .mockImplementation(() => Promise.resolve(mocks.mockedUser as unknown as Stripe.Customer));
@@ -42,20 +42,23 @@ describe('Payments Service tests', () => {
   });
 
   describe('Fetching the promotion code object', () => {
-    it('should get the promo code ID, amount off or discounted off', async () => {
+    it('When requesting the Promotion Code with the correct params, then returns the promoCodeId, name, amount off and/or discount off', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'getPromotionCodeByName')
         .mockImplementation(() => Promise.resolve(mocks.mockPromotionCodeResponse as unknown as PromotionCode));
 
-      const promotionCode = await paymentService.getPromotionCodeByName('priceId', mocks.couponName.valid);
+      const promotionCode = await paymentService.getPromotionCodeByName(
+        mocks.prices.subscription.exists,
+        mocks.couponName.valid,
+      );
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith('priceId', mocks.couponName.valid);
+      expect(customerCreatedSpy).toHaveBeenCalledWith(mocks.prices.subscription.exists, mocks.couponName.valid);
       expect(promotionCode).toEqual(mocks.mockPromotionCodeResponse);
     });
   });
 
   describe('Creating a subscription', () => {
-    it('Should create a subscription with all params', async () => {
+    it('When trying to create a subscription with the correct params, then it is successfully created', async () => {
       const subscriptionCreatedSpy = jest
         .spyOn(paymentService, 'createSubscription')
         .mockImplementation(() =>
@@ -78,7 +81,7 @@ describe('Payments Service tests', () => {
   });
 
   describe('Obtain the paymentIntent customer secret', () => {
-    it('Should return the client secret to pay in the client side', async () => {
+    it('When fetching the Payment Intent customer with the correct payload, then returns the client secret to pay in the client side', async () => {
       const paymentIntentSpy = jest
         .spyOn(paymentService, 'createPaymentIntent')
         .mockImplementation(() => Promise.resolve(mocks.paymentIntentResponse as unknown as PaymentIntent));
