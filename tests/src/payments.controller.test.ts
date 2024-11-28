@@ -47,9 +47,9 @@ afterAll(async () => {
   await closeServerAndDatabase();
 });
 
-describe('controller e2e tests', () => {
+describe('Payment controller e2e tests', () => {
   describe('Check if the unique code provided by the user is valid', () => {
-    it('When the code is already used, it should return 404', async () => {
+    it('When the code is already used, then it returns 404 status code', async () => {
       const { uniqueCode } = getMocks();
       const response = await app.inject({
         path: '/is-unique-code-available',
@@ -60,7 +60,7 @@ describe('controller e2e tests', () => {
     });
 
     // eslint-disable-next-line quotes
-    it("When the code doesn't exist, it should return 404", async () => {
+    it("When the code doesn't exist, then it returns 404 status code", async () => {
       const { uniqueCode } = getMocks();
 
       const response = await app.inject({
@@ -75,7 +75,7 @@ describe('controller e2e tests', () => {
 
   describe('Fetching plan object by ID and contains the basic params', () => {
     describe('Fetch subscription plan object', () => {
-      it('When the planId is valid, then the endpoint returns the correct object', async () => {
+      it('When the subscription priceId is valid, then the endpoint returns the correct object', async () => {
         const { prices } = getMocks();
         const expectedKeys = {
           selectedPlan: {
@@ -106,7 +106,7 @@ describe('controller e2e tests', () => {
         expect(responseBody).toMatchObject(expectedKeys);
       });
 
-      it('When the planId is not valid', async () => {
+      it('When the subscription priceId is not valid, then it returns 404 status code', async () => {
         const { prices } = getMocks();
 
         const response = await app.inject({
@@ -119,7 +119,7 @@ describe('controller e2e tests', () => {
     });
 
     describe('Fetch Lifetime plan object', () => {
-      it('When the planId is valid, returns the lifetime price object', async () => {
+      it('When the lifetime priceId is valid, then it returns the lifetime price object', async () => {
         const { prices } = getMocks();
 
         const expectedKeys = {
@@ -144,7 +144,7 @@ describe('controller e2e tests', () => {
         expect(responseBody).toMatchObject(expectedKeys);
       });
 
-      it('When the planId is not valid, then returns 404 status code', async () => {
+      it('When the lifetime priceId is not valid, then returns 404 status code', async () => {
         const { prices } = getMocks();
 
         const response = await app.inject({
