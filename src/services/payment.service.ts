@@ -31,7 +31,7 @@ type HasUserAppliedCouponResponse = {
   reason?: Reason;
 };
 
-interface ExtendedSubscription extends Subscription {
+export interface ExtendedSubscription extends Subscription {
   product?: Stripe.Product;
 }
 

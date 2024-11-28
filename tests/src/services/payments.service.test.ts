@@ -21,38 +21,30 @@ let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
-
 const customerPayload = {
   email: 'test@example.com',
   name: 'Test User',
 };
-
 const requestPayload = {
   customerId: 'cId',
   amount: 100,
   priceId: 'price_id',
   promotion_code: 'promo_code',
 };
-
 const mockCustomer = { id: 'cus_12345', email: 'test@example.com', name: 'Test User' };
-
 const mockPromotionCodeResponse = {
   id: 'promo_id',
   amountOff: null,
   discountOff: 75,
 };
-
 const mockCreateSubscriptionResponse = {
   type: 'payment',
   clientSecret: 'client_secret',
 };
-
 const paymentIntentResponse = {
   clientSecret: 'client_secret',
 };
-
 const promotionCodeName = 'PROMOCODE';
-
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
@@ -66,19 +58,15 @@ describe('Payments Service tests', () => {
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     displayBillingRepository = testFactory.displayBillingRepositoryForTest();
   });
-
   describe('Creating a customer', () => {
     it('should create a customer with email and name with a given parameters', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
         .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
-
       await paymentService.createCustomer(customerPayload);
-
       expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
     });
   });
-
   describe('Fetching the promotion code object', () => {
     it('should get the promo code ID, amount off or discounted off', async () => {
       const customerCreatedSpy = jest
@@ -91,7 +79,6 @@ describe('Payments Service tests', () => {
       expect(promotionCode).toEqual(mockPromotionCodeResponse);
     });
   });
-
   describe('Creating a subscription', () => {
     it('Should create a subscription with all params', async () => {
       const subscriptionCreatedSpy = jest
@@ -125,7 +112,6 @@ describe('Payments Service tests', () => {
         requestPayload.priceId,
         requestPayload.promotion_code,
       );
-
       expect(paymentIntentSpy).toHaveBeenCalledWith(
         requestPayload.customerId,
         requestPayload.amount,

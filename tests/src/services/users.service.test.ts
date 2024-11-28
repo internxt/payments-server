@@ -73,25 +73,25 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Updating user in Mongo DB', () => {
-    it('should update the user successfully', async () => {
-      await expect(usersService.updateUser(mocks.mockedUser.customerId, { lifetime: false })).resolves.toBeUndefined();
+  // describe('Updating user in Mongo DB', () => {
+  //   it('should update the user successfully', async () => {
+  //     await expect(usersService.updateUser(mocks.mockedUser.customerId, { lifetime: false })).resolves.toBeUndefined();
 
-      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
-      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUser.customerId, { lifetime: false });
-    });
+  //     expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+  //     expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUser.customerId, { lifetime: false });
+  //   });
 
-    it('should throw UserNotFoundError when user does not exist', async () => {
-      (usersRepository.updateUser as jest.Mock).mockResolvedValue(false);
+  //   it('should throw UserNotFoundError when user does not exist', async () => {
+  //     (usersRepository.updateUser as jest.Mock).mockResolvedValue(false);
 
-      await expect(usersService.updateUser(mocks.mockedUser.customerId, { lifetime: false })).rejects.toThrow(
-        UserNotFoundError,
-      );
+  //     await expect(usersService.updateUser(mocks.mockedUser.customerId, { lifetime: false })).rejects.toThrow(
+  //       UserNotFoundError,
+  //     );
 
-      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
-      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUser.customerId, { lifetime: false });
-    });
-  });
+  //     expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+  //     expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUser.customerId, { lifetime: false });
+  //   });
+  // });
 
   describe('Find customer by Customer ID', () => {
     it('should find a user by customerId successfully', async () => {

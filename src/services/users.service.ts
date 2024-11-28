@@ -97,7 +97,7 @@ export class UsersService {
     }
   }
 
-  async cancelUserB2BSuscriptions(customerId: User['customerId']): Promise<void> {
+  async cancelUserB2BSubscriptions(customerId: User['customerId']): Promise<void> {
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
     if (activeSubscriptions.length === 0) {
