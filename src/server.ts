@@ -26,8 +26,8 @@ import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
 
-const start = async (): Promise<FastifyInstance> => {
-  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
+const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
+  const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
   const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
@@ -65,6 +65,10 @@ const start = async (): Promise<FastifyInstance> => {
     stripe,
     envVariablesConfig,
   );
+
+  fastify.addHook('onClose', async () => {
+    await cacheService['redis'].quit();
+  });
 
   try {
     const PORT = Number(envVariablesConfig.SERVER_PORT);
