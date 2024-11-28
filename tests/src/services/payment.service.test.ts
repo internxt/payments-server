@@ -1,4 +1,3 @@
-import axios from 'axios';
 import Stripe from 'stripe';
 
 import {
@@ -6,9 +5,7 @@ import {
   PaymentService,
   PromotionCode,
   SubscriptionCreated,
-} from '../../../src/services/PaymentService';
-import { StorageService } from '../../../src/services/StorageService';
-import { UsersService } from '../../../src/services/UsersService';
+} from '../../../src/services/payment.service';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
@@ -19,44 +16,35 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
+
 let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
-
 const customerPayload = {
   email: 'test@example.com',
   name: 'Test User',
 };
-
 const requestPayload = {
   customerId: 'cId',
   amount: 100,
   priceId: 'price_id',
   promotion_code: 'promo_code',
 };
-
 const mockCustomer = { id: 'cus_12345', email: 'test@example.com', name: 'Test User' };
-
 const mockPromotionCodeResponse = {
   id: 'promo_id',
   amountOff: null,
   discountOff: 75,
 };
-
 const mockCreateSubscriptionResponse = {
   type: 'payment',
   clientSecret: 'client_secret',
 };
-
 const paymentIntentResponse = {
   clientSecret: 'client_secret',
 };
-
 const promotionCodeName = 'PROMOCODE';
-
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
@@ -65,17 +53,6 @@ describe('Payments Service tests', () => {
       productsRepository,
       usersRepository,
     );
-    storageService = new StorageService(envVariablesConfig, axios);
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      envVariablesConfig,
-      axios,
-    );
-
     usersRepository = testFactory.getUsersRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
     couponsRepository = testFactory.getCouponsRepositoryForTest();
@@ -87,9 +64,7 @@ describe('Payments Service tests', () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
         .mockImplementation(() => Promise.resolve(mockCustomer as unknown as Stripe.Customer));
-
       await paymentService.createCustomer(customerPayload);
-
       expect(customerCreatedSpy).toHaveBeenCalledWith(customerPayload);
     });
   });
@@ -100,9 +75,9 @@ describe('Payments Service tests', () => {
         .spyOn(paymentService, 'getPromotionCodeByName')
         .mockImplementation(() => Promise.resolve(mockPromotionCodeResponse as unknown as PromotionCode));
 
-      const promotionCode = await paymentService.getPromotionCodeByName(promotionCodeName);
+      const promotionCode = await paymentService.getPromotionCodeByName('priceId', promotionCodeName);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(promotionCodeName);
+      expect(customerCreatedSpy).toHaveBeenCalledWith('priceId', promotionCodeName);
       expect(promotionCode).toEqual(mockPromotionCodeResponse);
     });
   });
@@ -113,17 +88,17 @@ describe('Payments Service tests', () => {
         .spyOn(paymentService, 'createSubscription')
         .mockImplementation(() => Promise.resolve(mockCreateSubscriptionResponse as unknown as SubscriptionCreated));
 
-      const subscription = await paymentService.createSubscription(
-        requestPayload.customerId,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
+      const subscription = await paymentService.createSubscription({
+        customerId: requestPayload.customerId,
+        priceId: requestPayload.priceId,
+        promoCodeId: requestPayload.promotion_code,
+      });
 
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith(
-        requestPayload.customerId,
-        requestPayload.priceId,
-        requestPayload.promotion_code,
-      );
+      expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
+        customerId: requestPayload.customerId,
+        priceId: requestPayload.priceId,
+        promoCodeId: requestPayload.promotion_code,
+      });
       expect(subscription).toEqual(mockCreateSubscriptionResponse);
     });
   });
@@ -131,16 +106,15 @@ describe('Payments Service tests', () => {
   describe('Obtain the paymentIntent customer secret', () => {
     it('Should return the client secret to pay in the client side', async () => {
       const paymentIntentSpy = jest
-        .spyOn(paymentService, 'getPaymentIntent')
+        .spyOn(paymentService, 'createPaymentIntent')
         .mockImplementation(() => Promise.resolve(paymentIntentResponse as unknown as PaymentIntent));
 
-      const paymentIntent = await paymentService.getPaymentIntent(
+      const paymentIntent = await paymentService.createPaymentIntent(
         requestPayload.customerId,
         requestPayload.amount,
         requestPayload.priceId,
         requestPayload.promotion_code,
       );
-
       expect(paymentIntentSpy).toHaveBeenCalledWith(
         requestPayload.customerId,
         requestPayload.amount,
