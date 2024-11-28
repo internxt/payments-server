@@ -16,37 +16,34 @@ const mandatoryVariables = [
   'DRIVE_NEW_GATEWAY_SECRET',
   'STRIPE_OBJECT_STORAGE_PRICE_ID',
   'OBJECT_STORAGE_GATEWAY_SECRET',
-  'OBJECT_STORAGE_URL'
+  'OBJECT_STORAGE_URL',
 ] as const;
 
-
-
 type BaseConfig = {
-  [name in typeof mandatoryVariables[number]]: string;
-}
+  [name in (typeof mandatoryVariables)[number]]: string;
+};
 
 interface DevConfig extends BaseConfig {
   NODE_ENV: 'development';
-  REDIS_HOST?: string
+  REDIS_HOST?: string;
 }
 
-
-const mandatoryVariablesOnlyInProd = ['REDIS_HOST','REDIS_PASSWORD'] as const;
+const mandatoryVariablesOnlyInProd = ['REDIS_HOST', 'REDIS_PASSWORD'] as const;
 
 type ProdConfig = BaseConfig & {
   NODE_ENV: 'production';
 } & {
-  [name in typeof mandatoryVariablesOnlyInProd[number]]: string;
+  [name in (typeof mandatoryVariablesOnlyInProd)[number]]: string;
 };
+
+const mandatoryVariablesOnlyInTest = ['NODE_ENV', 'SERVER_PORT', 'STRIPE_SECRET_KEY', 'JWT_SECRET'] as const;
 
 export type AppConfig = DevConfig | ProdConfig;
 
-const variablesToCheck = [
-  ...mandatoryVariables,
-  ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : []),
-];
-
-
+const variablesToCheck =
+  process.env.NODE_ENV === 'test'
+    ? mandatoryVariablesOnlyInTest
+    : [...mandatoryVariables, ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : [])];
 
 const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
 
