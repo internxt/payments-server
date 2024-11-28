@@ -172,7 +172,7 @@ describe('UsersService tests', () => {
 
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
-      await usersService.cancelUserB2BSubscriptions(mocks.mockedUser.customerId);
+      await usersService.cancelUserB2BSuscriptions(mocks.mockedUser.customerId);
       await storageService.changeStorage(mocks.mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
 
       const b2bSubscriptions = mocks.mockActiveSubscriptions.filter((sub) => sub.product?.metadata.type === 'business');

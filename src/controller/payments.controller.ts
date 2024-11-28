@@ -516,7 +516,7 @@ export default function (
       async (req, rep) => {
         const user = await assertUser(req, rep, usersService);
         if (req.query.userType === UserType.Business) {
-          await usersService.cancelUserB2BSubscriptions(user.customerId);
+          await usersService.cancelUserB2BSuscriptions(user.customerId);
         } else {
           await usersService.cancelUserIndividualSubscriptions(user.customerId);
         }
