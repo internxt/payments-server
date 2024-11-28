@@ -1,7 +1,5 @@
 import 'dotenv/config';
 
-const isTestEnv = process.env.NODE_ENV === 'test';
-
 const mandatoryVariables = [
   'NODE_ENV',
   'SERVER_PORT',
@@ -38,16 +36,18 @@ type ProdConfig = BaseConfig & {
   [name in (typeof mandatoryVariablesOnlyInProd)[number]]: string;
 };
 
+const mandatoryVariablesOnlyInTest = ['NODE_ENV', 'SERVER_PORT', 'STRIPE_SECRET_KEY', 'JWT_SECRET'] as const;
+
 export type AppConfig = DevConfig | ProdConfig;
 
-const variablesToCheck = [
-  ...mandatoryVariables,
-  ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : []),
-];
+const variablesToCheck =
+  process.env.NODE_ENV === 'test'
+    ? mandatoryVariablesOnlyInTest
+    : [...mandatoryVariables, ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : [])];
 
 const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
 
-if (!isTestEnv && undefinedMandatoryVariables.length) {
+if (undefinedMandatoryVariables.length) {
   throw new Error(`Some mandatory variables are undefined: ${undefinedMandatoryVariables.join(' - ')}.`);
 }
 
