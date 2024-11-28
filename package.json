@@ -10,7 +10,7 @@
     "start": "node .",
     "build": "tsc",
     "test": "jest",
-    "test:coverage": "jest --coverage users.service.test.ts",
+    "test:cov": "jest --coverage users.service.test.ts",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "engines": {
