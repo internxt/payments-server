@@ -27,6 +27,9 @@ jobs:
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
       - run: echo JWT_SECRET=JWT_SECRET >> ./.env
+      - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
+      - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
+      - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
