@@ -33,7 +33,7 @@ type HasUserAppliedCouponResponse = {
   reason?: Reason;
 };
 
-interface ExtendedSubscription extends Subscription {
+export interface ExtendedSubscription extends Subscription {
   product?: Stripe.Product;
 }
 
@@ -1011,7 +1011,8 @@ export class PaymentService {
       };
     } catch (err) {
       const error = err as Error;
-      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
+      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price'))
+        throw new NotFoundPlanByIdError(priceId);
       throw new Error('Interval Server Error');
     }
   }
