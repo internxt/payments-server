@@ -2,7 +2,7 @@ import { Axios, AxiosError, AxiosRequestConfig } from "axios";
 import { AppConfig } from "../config";
 import { createHmac } from "crypto";
 
-interface Currency {
+export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
   name: string; // The full name of the currency (e.g., "Bitcoin", "Euro")
   type: "crypto" | "fiat"; // The type of currency: "crypto" or "fiat"

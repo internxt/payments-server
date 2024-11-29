@@ -10,7 +10,7 @@ import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -101,4 +101,41 @@ describe('Payments Service tests', () => {
       expect(paymentIntent).toEqual(mocks.paymentIntentResponse);
     });
   });
+
+  describe('getCryptoCurrencies()', () => {
+    it('When listing the currencies, then only return the crypto ones', async () => {
+      const expected: Currency[] = [
+        {
+          currencyId: 'BTC',
+          name: 'Bitcoin',
+          type: 'crypto',
+          receiveType: true,
+          networks: [{
+            platformId: 'bitcoin',
+            name: 'bitcoin'
+          }],
+          imageUrl: 'https://some-image.jpg'
+        },
+      ]
+      jest.spyOn(bit2MeService, 'getCurrencies').mockReturnValue(
+        Promise.resolve(
+          [
+            expected[0],
+            {
+              currencyId: 'EUR',
+              name: 'Euro',
+              type: 'fiat',
+              receiveType: true,
+              networks: [],
+              imageUrl: 'https://some-image.jpg',
+            }
+          ]
+        )
+      );
+      
+      const received = await paymentService.getCryptoCurrencies();
+
+      expect(received).toStrictEqual(expected);
+    });
+  })
 });
