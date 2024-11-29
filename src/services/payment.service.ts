@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
-import { AllowedCurrencies, Bit2MeService } from './bit2me.service';
+import { Bit2MeService } from './bit2me.service';
 import jwt from 'jsonwebtoken';
 import config from '../config';
 
