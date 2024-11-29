@@ -1,29 +1,31 @@
 import Stripe from 'stripe';
+import axios from 'axios';
 import {
   PaymentIntent,
   PaymentService,
   PromotionCode,
   SubscriptionCreated,
 } from '../../../src/services/payment.service';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
-let usersRepository: UsersRepository;
+let bit2MeService: Bit2MeService;
 
 const mocks = getMocks();
 
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
+    bit2MeService = new Bit2MeService(envVariablesConfig, axios);
     paymentService = new PaymentService(
       new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
       productsRepository,
-      usersRepository,
+      bit2MeService
     );
   });
 

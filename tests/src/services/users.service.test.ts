@@ -13,6 +13,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import testFactory from '../utils/factory';
 import getMocks from '../mocks';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -22,6 +23,7 @@ let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
+let bit2MeService: Bit2MeService;
 
 beforeEach(() => {
   usersRepository = testFactory.getUsersRepositoryForTest();
@@ -30,10 +32,11 @@ beforeEach(() => {
   usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
   storageService = new StorageService(config, axios);
   productsRepository = testFactory.getProductsRepositoryForTest();
+  bit2MeService = new Bit2MeService(config, axios);
   paymentService = new PaymentService(
     new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
     productsRepository,
-    usersRepository,
+    bit2MeService,
   );
 
   usersService = new UsersService(
