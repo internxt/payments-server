@@ -190,11 +190,11 @@ describe('UsersService tests', () => {
     it('when the coupon is not tracked, then the an CouponNotBeingTrackedError is thrown', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
 
-      await expect(usersService.storeCouponUsedByUser(mocks.mockedUser, mocks.invalidCoupon)).rejects.toThrow(
+      await expect(usersService.storeCouponUsedByUser(mocks.mockedUser, mocks.couponName.invalid)).rejects.toThrow(
         CouponNotBeingTrackedError,
       );
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.invalidCoupon);
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.couponName.invalid);
       expect(usersCouponsRepository.create).not.toHaveBeenCalled();
     });
   });
@@ -231,9 +231,9 @@ describe('UsersService tests', () => {
     it('When the coupon is not tracked, then returns false', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
 
-      const result = await usersService.isCouponBeingUsedByUser(mocks.mockedUser, mocks.invalidCoupon);
+      const result = await usersService.isCouponBeingUsedByUser(mocks.mockedUser, mocks.couponName.invalid);
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.invalidCoupon);
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.couponName.invalid);
       expect(usersCouponsRepository.findByUserAndCoupon).not.toHaveBeenCalled();
       expect(result).toBe(false);
     });
