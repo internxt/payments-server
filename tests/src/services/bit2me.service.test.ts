@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
@@ -36,6 +36,40 @@ describe('Bit2Me Service tests', () => {
       const received = await bit2MeService.getCurrencies();
 
       expect(received).toStrictEqual(currencies);
+    });
+
+    it('When Bit2Me answers with an error, then the error is extracted and formatted', async () => {
+      const error = new AxiosError('Message');
+      const data = {
+        statusCode: 400,
+        message: ['some message']
+      };
+      error.response = {
+        ...error.response,
+        status: 400,
+        statusText: 'Bad Request',
+        data
+      } as AxiosResponse<unknown, any>;
+
+      jest
+        .spyOn(axios, 'request')
+        .mockRejectedValue(error);
+
+      await expect(bit2MeService.getCurrencies()).rejects.toThrow(
+        new Error(
+          `Status ${data.statusCode} received -> ${data.message.join(',')}`
+        )
+      )
+    });
+
+    it('When an external error happens, then the error is propagated', async () => {
+      const error = new Error('Message');
+
+      jest
+        .spyOn(axios, 'request')
+        .mockRejectedValue(error);
+
+      await expect(bit2MeService.getCurrencies()).rejects.toThrow(error);
     });
   });
 });

@@ -61,13 +61,15 @@ export class Bit2MeService {
     try {
       const { data } = await this.axios.request<Currency[]>(params);
       return data;
-    } catch (error: unknown | AxiosError) {
-      if (error instanceof AxiosError && error.response) {
-        console.error('Error fetching currencies:', error.response.data);
+    } catch (err: unknown | Error | AxiosError<Bit2MeAPIError>) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        const data = response?.data as Bit2MeAPIError;
+
+        throw new Error(`Status ${data.statusCode} received -> ${data.message.join(',')}`);
       } else {
-        console.error('Unexpected error:', error);
+        throw err;
       }
-      throw new Error('Failed to fetch currencies');
     }
   }
 
