@@ -1258,5 +1258,7 @@ export default function (
         }
       },
     );
+
+    fastify.get('/currencies', () => paymentService.getCryptoCurrencies());
   };
 }
