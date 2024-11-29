@@ -11,6 +11,16 @@ export interface Currency {
   imageUrl: string; // The URL to the currency's icon
 }
 
+interface Bit2MeAPIError {
+  // Contains all the errors
+  message: string[];
+  // HTTP Error
+  error: string[];
+  // HTTP Status code
+  statusCode: number;
+}
+
+
 export class Bit2MeService {
   constructor(
     private readonly config: AppConfig,
