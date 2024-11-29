@@ -15,6 +15,7 @@ import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
 let bit2MeService: Bit2MeService;
+let stripe: Stripe;
 
 const mocks = getMocks();
 
@@ -22,8 +23,9 @@ describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
     bit2MeService = new Bit2MeService(envVariablesConfig, axios);
+    stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
     paymentService = new PaymentService(
-      new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
+      stripe,
       productsRepository,
       bit2MeService
     );
@@ -137,5 +139,24 @@ describe('Payments Service tests', () => {
 
       expect(received).toStrictEqual(expected);
     });
+  });
+
+  describe('markInvoiceAsPaid()', () => {
+    it('When the invoice id is invalid, then it throws an error', async () => {
+      await expect(paymentService.markInvoiceAsPaid('invalid-invoice-id')).rejects.toThrow();
+    });
+
+    it('When the invoice id is valid, then it marks it as paid', async () => {
+      const invoiceId = 'in_eir9242';
+      const paySpy = jest.spyOn(stripe.invoices, 'pay').mockImplementation(
+        () => Promise.resolve(null as unknown as Stripe.Response<Stripe.Invoice>)
+      );
+
+      await paymentService.markInvoiceAsPaid(invoiceId);
+
+      expect(paySpy).toHaveBeenCalledWith(invoiceId, {
+        paid_out_of_band: true,
+      });
+    })
   })
 });
