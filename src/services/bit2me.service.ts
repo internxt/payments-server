@@ -33,6 +33,50 @@ interface Bit2MeAPIError {
   statusCode: number;
 }
 
+interface RawInvoiceResponse {
+  invoiceId: string;
+  createdAt: string;
+  updatedAt: string;
+  expiredAt: string;
+  paidAt: null;
+  foreignId: string;
+  priceAmount: string;
+  priceCurrency: string;
+  status: string;
+  customerEmail: string;
+  receiveCurrencyName: string;
+  title: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  underpaidAmount: string;
+  overpaidAmount: string;
+  paymentAddress: string;
+  paymentRequestUri: string;
+  payAmount: number;
+  payCurrency: string;
+  merchant: {
+    merchantId: string;
+    name: string;
+  },
+  url: string;
+}
+
+type ParsedInvoiceResponse = Omit<RawInvoiceResponse, 'createdAt' | 'updatedAt' | 'expiredAt' | 'priceAmount' | 'underpaidAmount' | 'overpaidAmount'> & {
+  createdAt: Date;
+  updatedAt: Date;
+  expiredAt: Date;
+  priceAmount: number;
+  underpaidAmount: number;
+  overpaidAmount: number;
+};
+
+type RawCreateInvoiceResponse = Omit<RawInvoiceResponse, 'expiredAt' | 'underpaidAmount' | 'overpaidAmount'>;
+type ParsedCreatedInvoiceResponse = Omit<RawCreateInvoiceResponse, 'createdAt' | 'updatedAt' | 'priceAmount'> & {
+  createdAt: Date;
+  updatedAt: Date;
+  priceAmount: number;
+};
 
 export class Bit2MeService {
   constructor(
