@@ -173,6 +173,43 @@ export class Bit2MeService {
       }
     }
   }
+  
+  /**
+   * Activates an invoice for payment processing.
+   * 
+   * @param {string} invoiceId - The unique ID of the invoice to activate.
+   * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
+   * @throws {Error} If the API call fails or the invoice ID is invalid.
+   */
+  async checkoutInvoice(
+    invoiceId: string,
+    currencyId: AllowedCurrencies,
+  ): Promise<ParsedInvoiceResponse> {
+    const payload = {
+      currencyId,
+      networkId: "networkId",
+    }
+    const params: AxiosRequestConfig = {
+      method: 'PUT',
+      url: `${this.apiKey}/v3/commerce/invoices/${invoiceId}/checkout`,
+      headers: this.getAPIHeaders(payload),
+      data: payload,
+    }
+  
+    const { data } = await this.axios.request<RawInvoiceResponse>(params);
+  
+    const response: ParsedInvoiceResponse = {
+      ...data,
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+      expiredAt: new Date(data.expiredAt),
+      priceAmount: parseFloat(data.priceAmount),
+      underpaidAmount: parseFloat(data.underpaidAmount),
+      overpaidAmount: parseFloat(data.overpaidAmount),
+    };
+  
+    return response;
+  }
 
   /**
    * Retrieves a list of all supported currencies in the Bit2Me system.
