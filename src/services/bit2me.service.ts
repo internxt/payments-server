@@ -11,6 +11,19 @@ export interface Currency {
   imageUrl: string; // The URL to the currency's icon
 }
 
+export enum AllowedCurrencies {
+  Bitcoin = 'BTC',
+  Ethereum = 'ETH',
+  Litecoin = 'LTC',
+  BitcoinCash = 'BCH',
+  Ripple = 'XRP',
+  Tether = 'USDT',
+  USDC = 'USDC',
+  Tron = 'TRX',
+  Cardano = 'ADA',
+  BinanceCoin = 'BNB',
+}
+
 interface Bit2MeAPIError {
   // Contains all the errors
   message: string[];
@@ -46,6 +59,10 @@ export class Bit2MeService {
     }
   }
 
+  isAllowedCurrency(value: string): value is AllowedCurrencies {
+    return Object.values(AllowedCurrencies).includes(value as AllowedCurrencies);
+  }
+  
 
   /**
    * Retrieves a list of all supported currencies in the Bit2Me system.
