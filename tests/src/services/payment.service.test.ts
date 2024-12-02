@@ -1,29 +1,33 @@
 import Stripe from 'stripe';
+import axios from 'axios';
 import {
   PaymentIntent,
   PaymentService,
   PromotionCode,
   SubscriptionCreated,
 } from '../../../src/services/payment.service';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
+import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
-let usersRepository: UsersRepository;
+let bit2MeService: Bit2MeService;
+let stripe: Stripe;
 
 const mocks = getMocks();
 
 describe('Payments Service tests', () => {
   beforeEach(() => {
     productsRepository = testFactory.getProductsRepositoryForTest();
+    bit2MeService = new Bit2MeService(envVariablesConfig, axios);
+    stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
     paymentService = new PaymentService(
-      new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
+      stripe,
       productsRepository,
-      usersRepository,
+      bit2MeService
     );
   });
 
@@ -99,4 +103,60 @@ describe('Payments Service tests', () => {
       expect(paymentIntent).toEqual(mocks.paymentIntentResponse);
     });
   });
+
+  describe('getCryptoCurrencies()', () => {
+    it('When listing the currencies, then only return the crypto ones', async () => {
+      const expected: Currency[] = [
+        {
+          currencyId: 'BTC',
+          name: 'Bitcoin',
+          type: 'crypto',
+          receiveType: true,
+          networks: [{
+            platformId: 'bitcoin',
+            name: 'bitcoin'
+          }],
+          imageUrl: 'https://some-image.jpg'
+        },
+      ]
+      jest.spyOn(bit2MeService, 'getCurrencies').mockReturnValue(
+        Promise.resolve(
+          [
+            expected[0],
+            {
+              currencyId: 'EUR',
+              name: 'Euro',
+              type: 'fiat',
+              receiveType: true,
+              networks: [],
+              imageUrl: 'https://some-image.jpg',
+            }
+          ]
+        )
+      );
+      
+      const received = await paymentService.getCryptoCurrencies();
+
+      expect(received).toStrictEqual(expected);
+    });
+  });
+
+  describe('markInvoiceAsPaid()', () => {
+    it('When the invoice id is invalid, then it throws an error', async () => {
+      await expect(paymentService.markInvoiceAsPaid('invalid-invoice-id')).rejects.toThrow();
+    });
+
+    it('When the invoice id is valid, then it marks it as paid', async () => {
+      const invoiceId = 'in_eir9242';
+      const paySpy = jest.spyOn(stripe.invoices, 'pay').mockImplementation(
+        () => Promise.resolve(null as unknown as Stripe.Response<Stripe.Invoice>)
+      );
+
+      await paymentService.markInvoiceAsPaid(invoiceId);
+
+      expect(paySpy).toHaveBeenCalledWith(invoiceId, {
+        paid_out_of_band: true,
+      });
+    })
+  })
 });

@@ -25,6 +25,7 @@ import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCoupon
 import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
+import { Bit2MeService } from './services/bit2me.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -36,7 +37,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
 
   const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
-  const paymentService = new PaymentService(stripe, productsRepository, usersRepository);
+  const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
+  const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(
     usersRepository,

@@ -3,7 +3,9 @@ import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
-import { UsersRepository } from '../core/users/UsersRepository';
+import { Bit2MeService } from './bit2me.service';
+import jwt from 'jsonwebtoken';
+import config from '../config';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -126,15 +128,11 @@ export interface PromotionCode {
 }
 
 export class PaymentService {
-  private readonly provider: Stripe;
-  private readonly productsRepository: ProductsRepository;
-  private readonly usersRepository: UsersRepository;
-
-  constructor(provider: Stripe, productsRepository: ProductsRepository, usersRepository: UsersRepository) {
-    this.provider = provider;
-    this.productsRepository = productsRepository;
-    this.usersRepository = usersRepository;
-  }
+  constructor(
+    private readonly provider: Stripe,
+    private readonly productsRepository: ProductsRepository,
+    private readonly bit2MeService: Bit2MeService,
+  ) {}
 
   async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
     const customer = await this.provider.customers.create(payload);
@@ -1232,6 +1230,23 @@ export class PaymentService {
     };
   }
 
+  private validateInvoiceId(invoiceId: Invoice['id']): boolean {
+    const regex = /^in_[a-zA-Z0-9]+$/;
+    return regex.test(invoiceId);
+  }
+
+  async markInvoiceAsPaid(invoiceId: Invoice['id']): Promise<void> {
+    const validInvoiceId = this.validateInvoiceId(invoiceId);
+
+    if (!validInvoiceId) {
+      throw new Error(`Invalid invoice id ${invoiceId}`);
+    }
+
+    await this.provider.invoices.pay(invoiceId, {
+      paid_out_of_band: true,
+    })
+  }
+
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
     const activeSubscriptions = await this.getActiveSubscriptions(customerId);
 
@@ -1482,6 +1497,12 @@ export class PaymentService {
     });
 
     return res.data;
+  }
+
+  async getCryptoCurrencies()  {
+    const currencies = await this.bit2MeService.getCurrencies();
+
+    return currencies.filter(c => c.type === 'crypto');
   }
 }
 
