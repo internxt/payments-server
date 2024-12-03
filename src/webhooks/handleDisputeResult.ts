@@ -28,23 +28,23 @@ export async function handleDisputeResult({
   log,
   config,
 }: HandleDisputeResultProps) {
-  const isDisputeLost = charge.status === 'lost';
+  if (charge.status !== 'lost') {
+    return;
+  }
+
   const chargeId = charge.charge as string;
-
   try {
-    if (isDisputeLost) {
-      const { customer, invoice } = await stripe.charges.retrieve(chargeId);
-      const customerId = typeof customer === 'string' ? customer : (customer?.id as string);
-      const invoiceId = typeof invoice === 'string' ? invoice : (invoice?.id as string);
+    const { customer, invoice } = await stripe.charges.retrieve(chargeId);
+    const customerId = typeof customer === 'string' ? customer : (customer?.id as string);
+    const invoiceId = typeof invoice === 'string' ? invoice : (invoice?.id as string);
 
-      const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
-      const { lifetime } = await usersService.findUserByCustomerID(customerId);
+    const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
+    const { lifetime } = await usersService.findUserByCustomerID(customerId);
 
-      if (lifetime) {
-        await handleLifetimeRefunded(storageService, usersService, customerId, cacheService, log, config);
-      } else {
-        await paymentService.cancelSubscription(subscriptionId as string);
-      }
+    if (lifetime) {
+      await handleLifetimeRefunded(storageService, usersService, customerId, cacheService, log, config);
+    } else {
+      await paymentService.cancelSubscription(subscriptionId as string);
     }
   } catch (error) {
     throw error;
