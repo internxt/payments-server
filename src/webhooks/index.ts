@@ -13,7 +13,7 @@ import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
-import { handleDisputeLost } from './handleDisputeLost';
+import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 
 export default function (
@@ -166,7 +166,7 @@ export default function (
 
         case 'charge.dispute.closed':
           const charge = event.data.object;
-          await handleDisputeLost({
+          await handleDisputeResult({
             charge,
             stripe,
             paymentService,

@@ -7,7 +7,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
 import { FastifyBaseLogger } from 'fastify';
 
-interface HandleDisputeLostProps {
+interface HandleDisputeResultProps {
   charge: Stripe.Dispute;
   stripe: Stripe;
   paymentService: PaymentService;
@@ -18,7 +18,7 @@ interface HandleDisputeLostProps {
   config: AppConfig;
 }
 
-export async function handleDisputeLost({
+export async function handleDisputeResult({
   charge,
   stripe,
   paymentService,
@@ -27,7 +27,7 @@ export async function handleDisputeLost({
   cacheService,
   log,
   config,
-}: HandleDisputeLostProps) {
+}: HandleDisputeResultProps) {
   const isDisputeLost = charge.status === 'lost';
   const chargeId = charge.charge as string;
 
