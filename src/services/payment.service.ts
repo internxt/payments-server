@@ -334,7 +334,7 @@ export class PaymentService {
     customerId: CustomerId,
     amount: number,
     priceId: string,
-    currency?: AllowedCurrencies | 'eur',
+    currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
   ): Promise<PaymentIntent> {
     let couponId;
