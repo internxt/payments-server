@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
 
@@ -22,7 +22,7 @@ export default async function handleInvoicePaymentFailed(
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  logger: FastifyLoggerInstance,
+  logger: FastifyBaseLogger,
 ): Promise<void> {
   if (!invoice.customer) {
     throw new Error('No customer found for this payment');

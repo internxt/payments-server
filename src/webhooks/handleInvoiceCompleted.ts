@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/cache.service';
@@ -56,7 +56,7 @@ export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   usersService: UsersService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   cacheService: CacheService,
   config: AppConfig,
   objectStorageService: ObjectStorageService,

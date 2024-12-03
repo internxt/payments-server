@@ -1,4 +1,4 @@
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/cache.service';
@@ -12,7 +12,7 @@ export default async function handleCheckoutSessionCompleted(
   stripe: Stripe,
   usersService: UsersService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   cacheService: CacheService,
   config: AppConfig,
 ): Promise<void> {
