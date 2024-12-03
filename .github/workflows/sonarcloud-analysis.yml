@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: ${{ matrix.node_version }}
           registry-url: 'https://npm.pkg.github.com'
-      - run: echo REACT_APP_NODE_ENV=test >> ./.env
+      - run: echo NODE_ENV=test >> ./.env
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
       - run: echo JWT_SECRET=JWT_SECRET >> ./.env
