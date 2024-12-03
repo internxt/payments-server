@@ -399,8 +399,8 @@ export class PaymentService {
           config.JWT_SECRET,
         ),
         foreignId: finalizedInvoice.id,
-        cancelUrl: 'https://internxt.com/cancel',
-        successUrl: 'https://internxt.com/success',
+        cancelUrl: 'https://drive.internxt.com/cancel',
+        successUrl: 'https://drive.internxt.com/success',
         purchaserEmail: (customer as Customer).email || 'hello@internxt.com',
       });
 
