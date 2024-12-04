@@ -17,21 +17,6 @@ import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded');
-
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let cacheService: CacheService;
-
-const mocks = getMocks();
-let stripe: Stripe;
-
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   __esModule: true,
   default: jest.fn(),
@@ -58,33 +43,27 @@ jest.mock('../../../src/services/cache.service', () => {
   };
 });
 
-beforeEach(() => {
-  stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  displayBillingRepository = {} as DisplayBillingRepository;
-  couponsRepository = testFactory.getCouponsRepositoryForTest();
-  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-  productsRepository = testFactory.getProductsRepositoryForTest();
+const {
+  mockCharge,
+  mockInvoice,
+  mockedUserWithLifetime,
+  mockedUserWithoutLifetime,
+  mockDispute,
+  mockLogger,
+  voidPromise,
+} = getMocks();
 
-  cacheService = new CacheService(config);
-  storageService = new StorageService(config, axios);
-  bit2MeService = new Bit2MeService(config, axios);
-  paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
-
-  usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    config,
-    axios,
-  );
-
-  jest.clearAllMocks();
-});
-
-const voidPromise = () => Promise.resolve();
+let paymentService: PaymentService;
+let storageService: StorageService;
+let usersService: UsersService;
+let usersRepository: UsersRepository;
+let displayBillingRepository: DisplayBillingRepository;
+let couponsRepository: CouponsRepository;
+let usersCouponsRepository: UsersCouponsRepository;
+let productsRepository: ProductsRepository;
+let bit2MeService: Bit2MeService;
+let cacheService: CacheService;
+let stripe: Stripe;
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
@@ -115,8 +94,6 @@ describe('handleDisputeResult()', () => {
 
   describe('Dispute Status is Lost', () => {
     it('When the status is lost and the user has a subscription, then the subscription is cancelled and the storage is downgraded', async () => {
-      const { mockCharge, mockInvoice, mockedUserWithoutLifetime, mockDispute, mockLogger } = mocks;
-
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
       (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoice);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithoutLifetime);
@@ -140,8 +117,6 @@ describe('handleDisputeResult()', () => {
     });
 
     it('When the status is lost and the user has a lifetime, then the lifetime param is changed to false and the storage is downgraded', async () => {
-      const { mockCharge, mockInvoice, mockedUserWithLifetime, mockDispute, mockLogger } = mocks;
-
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
       (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoice);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithLifetime);
@@ -176,7 +151,6 @@ describe('handleDisputeResult()', () => {
 
   describe('Dispute Status is Not Lost', () => {
     it('When the status is different to lost, then nothing is changed', async () => {
-      const { mockDispute, mockCharge, mockInvoice, mockedUserWithLifetime, mockLogger } = mocks;
       mockDispute.status = 'needs_response';
 
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
