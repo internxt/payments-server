@@ -1,4 +1,4 @@
-import { FastifyBaseLogger } from 'fastify';
+import { FastifyLoggerInstance } from 'fastify';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
 import { StorageService, updateUserTier } from '../services/storage.service';
@@ -10,7 +10,7 @@ export default async function handleLifetimeRefunded(
   usersService: UsersService,
   customerId: string,
   cacheService: CacheService,
-  log: FastifyBaseLogger,
+  log: FastifyLoggerInstance,
   config: AppConfig,
 ): Promise<void> {
   const { uuid } = await usersService.findUserByCustomerID(customerId);
