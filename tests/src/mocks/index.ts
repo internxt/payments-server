@@ -2,6 +2,10 @@ import jwt from 'jsonwebtoken';
 import envVarsConfig from '../../../src/config';
 import { randomUUID } from 'crypto';
 import { User } from '../../../src/core/users/User';
+import { Chance } from 'chance';
+import { FastifyBaseLogger } from 'fastify';
+
+const randomDataGenerator = new Chance();
 
 export default function getMocks() {
   const uniqueCode = {
@@ -45,139 +49,138 @@ export default function getMocks() {
   };
 
   const mockPromotionCodeResponse = {
-    codeId: 'promo_id',
-    promoCodeName: 'PROMO_NAME',
+    codeId: randomDataGenerator.natural({ min: 1 }),
+    promoCodeName: randomDataGenerator.string({ length: 10 }),
     amountOff: null,
     discountOff: 75,
   };
   const mockCreateSubscriptionResponse = {
     type: 'payment',
-    clientSecret: 'client_secret',
+    clientSecret: randomDataGenerator.string({ length: 20 }),
   };
   const paymentIntentResponse = {
-    clientSecret: 'client_secret',
+    clientSecret: randomDataGenerator.string({ length: 20 }),
   };
 
   const mockedCoupon = {
     id: randomUUID(),
     provider: 'stripe',
-    code: 'c0UP0n',
+    code: randomDataGenerator.string({ length: 5 }),
   };
 
   const couponName = {
-    invalid: 'INVALID_COUPON',
-    valid: 'PROMOCODE',
+    invalid: randomDataGenerator.string({ length: 5 }),
+    valid: randomDataGenerator.string({ length: 5 }),
   };
 
-  const mockedUser: User = {
+  const mockedUserWithoutLifetime: User = {
     id: randomUUID(),
     uuid: randomUUID(),
     customerId: `cus_${randomUUID()}`,
     lifetime: false,
   };
 
+  const mockedUserWithLifetime: User = {
+    id: randomUUID(),
+    uuid: randomUUID(),
+    customerId: `cus_${randomUUID()}`,
+    lifetime: true,
+  };
+
   const mockedCustomerPayload = {
-    email: 'test@example.com',
-    name: 'Test User',
+    email: randomDataGenerator.email(),
+    name: randomDataGenerator.string({ length: 7 }),
   };
 
   const createdSubscriptionPayload = {
     customerId: 'cId',
-    amount: 100,
-    priceId: 'price_id',
-    promotion_code: 'promo_code',
+    amount: randomDataGenerator.natural({ min: 1 }),
+    priceId: `price_${randomDataGenerator.string({ length: 7 })}`,
+    promotion_code: randomDataGenerator.string({ length: 10 }),
   };
 
   const mockActiveSubscriptions = [
     {
-      id: 'sub_1ExampleBusiness',
+      id: randomDataGenerator.guid(),
       object: 'subscription',
-      customer: 'cus_123456789',
+      customer: randomDataGenerator.guid(),
       status: 'active',
       items: {
         object: 'list',
         data: [
           {
-            id: 'si_12345',
+            id: randomDataGenerator.guid(),
             object: 'subscription_item',
             price: {
-              id: 'price_1ExampleBusiness',
+              id: randomDataGenerator.guid(),
               object: 'price',
               currency: 'usd',
-              unit_amount: 5000,
+              unit_amount: randomDataGenerator.integer({ min: 1000, max: 10000 }),
               recurring: {
                 interval: 'month',
                 interval_count: 1,
               },
               product: {
-                id: 'prod_1ExampleBusiness',
+                id: randomDataGenerator.guid(),
                 object: 'product',
                 active: true,
                 metadata: {
-                  type: 'business',
+                  type: randomDataGenerator.pickone(['business', 'individual']),
                 },
-                name: 'Business Product',
+                name: randomDataGenerator.sentence({ words: 3 }),
               },
             },
-            quantity: 5, // Business subscription with 5 seats
+            quantity: randomDataGenerator.integer({ min: 1, max: 10 }), // Business subscription with variable seats
           },
         ],
       },
       product: {
-        id: 'prod_1ExampleBusiness',
+        id: randomDataGenerator.guid(),
         object: 'product',
         active: true,
         metadata: {
-          type: 'business',
+          type: randomDataGenerator.pickone(['business', 'individual']),
         },
-        name: 'Business Product',
-      },
-      current_period_end: Math.floor(Date.now() / 1000) + 2592000, // 30 days from now
-      current_period_start: Math.floor(Date.now() / 1000), // Now
-    },
-    {
-      id: 'sub_1ExampleEmpty',
-      object: 'subscription',
-      customer: 'cus_987654321',
-      status: 'active',
-      items: {
-        object: 'list',
-        data: [
-          {
-            id: 'si_67890',
-            object: 'subscription_item',
-            price: {
-              id: 'price_1ExampleEmpty',
-              object: 'price',
-              currency: 'usd',
-              unit_amount: 1000,
-              recurring: {
-                interval: 'month',
-                interval_count: 1,
-              },
-              product: {
-                id: 'prod_1ExampleEmpty',
-                object: 'product',
-                active: true,
-                metadata: {}, // Empty metadata
-                name: 'Empty Metadata Product',
-              },
-            },
-            quantity: 1, // Default quantity for individual
-          },
-        ],
-      },
-      product: {
-        id: 'prod_1ExampleEmpty',
-        object: 'product',
-        active: true,
-        metadata: {}, // Empty metadata
-        name: 'Empty Metadata Product',
+        name: randomDataGenerator.sentence({ words: 3 }),
       },
       current_period_end: Math.floor(Date.now() / 1000) + 2592000, // 30 days from now
       current_period_start: Math.floor(Date.now() / 1000), // Now
     },
   ];
+
+  const mockCharge = {
+    id: `ch_${randomUUID()}`,
+    customer: `cus_${randomUUID()}`,
+    invoice: `in_${randomUUID()}`,
+    amount: randomDataGenerator.integer({ min: 500, max: 5000 }),
+    currency: 'usd',
+    status: 'succeeded',
+  };
+
+  const mockDispute = {
+    id: `dp_${randomUUID()}`,
+    status: 'lost',
+    charge: mockCharge.id,
+    amount: mockCharge.amount,
+    currency: mockCharge.currency,
+  };
+
+  const mockInvoice = {
+    id: `in_${randomUUID()}`,
+    subscription: `sub_${randomUUID()}`,
+  };
+
+  const mockLogger: jest.Mocked<FastifyBaseLogger> = {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+    trace: jest.fn(),
+    level: 'info',
+    silent: jest.fn(),
+    child: jest.fn(),
+  };
 
   function getValidToken(userUuid: string): string {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
@@ -188,7 +191,8 @@ export default function getMocks() {
     preventCancellationTestUsers,
     uniqueCode,
     mockedCoupon,
-    mockedUser,
+    mockedUserWithoutLifetime,
+    mockedUserWithLifetime,
     mockActiveSubscriptions,
     couponName,
     mockedCustomerPayload,
@@ -196,6 +200,10 @@ export default function getMocks() {
     paymentIntentResponse,
     mockCreateSubscriptionResponse,
     mockPromotionCodeResponse,
+    mockDispute,
+    mockCharge,
+    mockInvoice,
+    mockLogger,
     validToken:
       // eslint-disable-next-line max-len
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7InV1aWQiOiJiODQyODk3YS01MDg2LTQxODMtYWZiMS1mYTAwNGVlMzljNjYiLCJlbWFpbCI6InByZXBheW1lbnRzbGF1bmNoQGlueHQuY29tIiwibmFtZSI6ImhlbGxvIiwibGFzdG5hbWUiOiJoZWxsbyIsInVzZXJuYW1lIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJzaGFyZWRXb3Jrc3BhY2UiOnRydWUsIm5ldHdvcmtDcmVkZW50aWFscyI6eyJ1c2VyIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJwYXNzIjoiJDJhJDA4JFRRSmppNS9wUHpWUlp0UWNxOW9hd3VsdEFUYUlMTjdlUHNjWHg2Vy95WDhzNGJyM1FtOWJtIn19LCJpYXQiOjE2NTUxMDQwOTZ9.s3791sv4gmWgt5Ni1a8DnRw_5JyJ8g9Ff0bpIlqo6LM',

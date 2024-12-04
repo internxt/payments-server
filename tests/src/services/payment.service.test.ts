@@ -24,18 +24,14 @@ describe('Payments Service tests', () => {
     productsRepository = testFactory.getProductsRepositoryForTest();
     bit2MeService = new Bit2MeService(envVariablesConfig, axios);
     stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
-    paymentService = new PaymentService(
-      stripe,
-      productsRepository,
-      bit2MeService
-    );
+    paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
   });
 
   describe('Creating a customer', () => {
     it('When trying to create a customer with the correct params, then the customer is created successfully', async () => {
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mocks.mockedUser as unknown as Stripe.Customer));
+        .mockImplementation(() => Promise.resolve(mocks.mockedUserWithoutLifetime as unknown as Stripe.Customer));
 
       await paymentService.createCustomer(mocks.mockedCustomerPayload);
 
@@ -112,29 +108,29 @@ describe('Payments Service tests', () => {
           name: 'Bitcoin',
           type: 'crypto',
           receiveType: true,
-          networks: [{
-            platformId: 'bitcoin',
-            name: 'bitcoin'
-          }],
-          imageUrl: 'https://some-image.jpg'
-        },
-      ]
-      jest.spyOn(bit2MeService, 'getCurrencies').mockReturnValue(
-        Promise.resolve(
-          [
-            expected[0],
+          networks: [
             {
-              currencyId: 'EUR',
-              name: 'Euro',
-              type: 'fiat',
-              receiveType: true,
-              networks: [],
-              imageUrl: 'https://some-image.jpg',
-            }
-          ]
-        )
+              platformId: 'bitcoin',
+              name: 'bitcoin',
+            },
+          ],
+          imageUrl: 'https://some-image.jpg',
+        },
+      ];
+      jest.spyOn(bit2MeService, 'getCurrencies').mockReturnValue(
+        Promise.resolve([
+          expected[0],
+          {
+            currencyId: 'EUR',
+            name: 'Euro',
+            type: 'fiat',
+            receiveType: true,
+            networks: [],
+            imageUrl: 'https://some-image.jpg',
+          },
+        ]),
       );
-      
+
       const received = await paymentService.getCryptoCurrencies();
 
       expect(received).toStrictEqual(expected);
@@ -148,15 +144,15 @@ describe('Payments Service tests', () => {
 
     it('When the invoice id is valid, then it marks it as paid', async () => {
       const invoiceId = 'in_eir9242';
-      const paySpy = jest.spyOn(stripe.invoices, 'pay').mockImplementation(
-        () => Promise.resolve(null as unknown as Stripe.Response<Stripe.Invoice>)
-      );
+      const paySpy = jest
+        .spyOn(stripe.invoices, 'pay')
+        .mockImplementation(() => Promise.resolve(null as unknown as Stripe.Response<Stripe.Invoice>));
 
       await paymentService.markInvoiceAsPaid(invoiceId);
 
       expect(paySpy).toHaveBeenCalledWith(invoiceId, {
         paid_out_of_band: true,
       });
-    })
-  })
+    });
+  });
 });
