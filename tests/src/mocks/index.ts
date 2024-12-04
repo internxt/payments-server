@@ -2,6 +2,10 @@ import jwt from 'jsonwebtoken';
 import envVarsConfig from '../../../src/config';
 import { randomUUID } from 'crypto';
 import { User } from '../../../src/core/users/User';
+import { FastifyBaseLogger } from 'fastify';
+import { Chance } from 'chance';
+
+const randomDataGenerator = new Chance();
 
 export default function getMocks() {
   const uniqueCode = {
@@ -69,7 +73,14 @@ export default function getMocks() {
     valid: 'PROMOCODE',
   };
 
-  const mockedUser: User = {
+  const mockedUserWithLifetime: User = {
+    id: randomUUID(),
+    uuid: randomUUID(),
+    customerId: `cus_${randomUUID()}`,
+    lifetime: true,
+  };
+
+  const mockedUserWithoutLifetime: User = {
     id: randomUUID(),
     uuid: randomUUID(),
     customerId: `cus_${randomUUID()}`,
@@ -179,18 +190,58 @@ export default function getMocks() {
     },
   ];
 
+  const mockCharge = {
+    id: `ch_${randomUUID()}`,
+    customer: `cus_${randomUUID()}`,
+    invoice: `in_${randomUUID()}`,
+    amount: randomDataGenerator.integer({ min: 500, max: 5000 }),
+    currency: 'usd',
+    status: 'succeeded',
+  };
+
+  const mockDispute = {
+    id: `dp_${randomUUID()}`,
+    status: 'lost',
+    charge: mockCharge.id,
+    amount: mockCharge.amount,
+    currency: mockCharge.currency,
+  };
+
+  const mockInvoice = {
+    id: `in_${randomUUID()}`,
+    subscription: `sub_${randomUUID()}`,
+  };
+
+  const mockLogger: jest.Mocked<FastifyBaseLogger> = {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+    trace: jest.fn(),
+    level: 'info',
+    silent: jest.fn(),
+    child: jest.fn(),
+  };
+
   function getValidToken(userUuid: string): string {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
   }
 
+  const voidPromise = () => Promise.resolve();
+
   return {
-    getValidToken,
     preventCancellationTestUsers,
     uniqueCode,
     mockedCoupon,
-    mockedUser,
+    mockedUserWithLifetime,
+    mockedUserWithoutLifetime,
     mockActiveSubscriptions,
     couponName,
+    mockCharge,
+    mockDispute,
+    mockInvoice,
+    mockLogger,
     mockedCustomerPayload,
     createdSubscriptionPayload,
     paymentIntentResponse,
@@ -200,5 +251,7 @@ export default function getMocks() {
       // eslint-disable-next-line max-len
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwYXlsb2FkIjp7InV1aWQiOiJiODQyODk3YS01MDg2LTQxODMtYWZiMS1mYTAwNGVlMzljNjYiLCJlbWFpbCI6InByZXBheW1lbnRzbGF1bmNoQGlueHQuY29tIiwibmFtZSI6ImhlbGxvIiwibGFzdG5hbWUiOiJoZWxsbyIsInVzZXJuYW1lIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJzaGFyZWRXb3Jrc3BhY2UiOnRydWUsIm5ldHdvcmtDcmVkZW50aWFscyI6eyJ1c2VyIjoicHJlcGF5bWVudHNsYXVuY2hAaW54dC5jb20iLCJwYXNzIjoiJDJhJDA4JFRRSmppNS9wUHpWUlp0UWNxOW9hd3VsdEFUYUlMTjdlUHNjWHg2Vy95WDhzNGJyM1FtOWJtIn19LCJpYXQiOjE2NTUxMDQwOTZ9.s3791sv4gmWgt5Ni1a8DnRw_5JyJ8g9Ff0bpIlqo6LM',
     prices,
+    getValidToken,
+    voidPromise,
   };
 }

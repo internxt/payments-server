@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
 import { UserType } from '../core/users/User';
 
-export default async function handleSetupIntentSucceded(
+export default async function handleSetupIntentSucceeded(
   setupIntent: Stripe.SetupIntent,
   paymentService: PaymentService,
 ): Promise<void> {

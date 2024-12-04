@@ -1,5 +1,5 @@
 import { UserType } from './../core/users/User';
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
 import { StorageService, updateUserTier } from '../services/storage.service';
@@ -48,7 +48,7 @@ export default async function handleSubscriptionCanceled(
   subscription: Stripe.Subscription,
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   config: AppConfig,
 ): Promise<void> {
   const customerId = subscription.customer as string;

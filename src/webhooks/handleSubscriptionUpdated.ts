@@ -1,4 +1,4 @@
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
@@ -73,7 +73,7 @@ export default async function handleSubscriptionUpdated(
   cacheService: CacheService,
   paymentService: PaymentService,
   objectStorageService: ObjectStorageService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   config: AppConfig,
 ): Promise<void> {
   let uuid = '';

@@ -9,11 +9,12 @@ import { PaymentService } from '../services/payment.service';
 import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
-import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
+import { handleDisputeResult } from './handleDisputeResult';
+import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 
 export default function (
   stripe: Stripe,
@@ -129,7 +130,7 @@ export default function (
           break;
 
         case 'setup_intent.succeeded':
-          await handleSetupIntentSucceded(event.data.object as Stripe.SetupIntent, paymentService);
+          await handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent, paymentService);
           break;
 
         case 'checkout.session.async_payment_succeeded':
@@ -161,6 +162,20 @@ export default function (
               );
             }
           }
+          break;
+
+        case 'charge.dispute.closed':
+          const charge = event.data.object;
+          await handleDisputeResult({
+            charge,
+            stripe,
+            paymentService,
+            usersService,
+            storageService,
+            cacheService,
+            log: fastify.log,
+            config,
+          });
           break;
 
         default:
