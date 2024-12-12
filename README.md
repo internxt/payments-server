@@ -28,7 +28,7 @@
 - Redirect webhooks to your local server: `stripe listen --forward-to localhost:8003/webhook`
 - Start the project: `yarn run dev`
 
-#### Good to know
+#### Nice to know
 
 - If you go to `localhost:8082` you'll see a GUI to inspect the mongodb instance
 - Install prettier & eslint vscode extensions for a better dev experience.
