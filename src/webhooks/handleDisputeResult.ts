@@ -40,10 +40,14 @@ export async function handleDisputeResult({
 
     const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
     const { lifetime } = await usersService.findUserByCustomerID(customerId);
+    const activeSubscription = await stripe.subscriptions.retrieve(subscriptionId as string);
 
     if (lifetime) {
       await handleLifetimeRefunded(storageService, usersService, customerId, cacheService, log, config);
     } else {
+      if (!activeSubscription || activeSubscription.status !== 'active') {
+        return;
+      }
       await paymentService.cancelSubscription(subscriptionId as string);
     }
   } catch (error) {
