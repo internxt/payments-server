@@ -347,6 +347,11 @@
     ajv-formats "^3.0.1"
     fast-uri "^3.0.0"
 
+"@fastify/busboy@^3.0.0":
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/@fastify/busboy/-/busboy-3.1.0.tgz#a18543f8ed7eb27d6b1071ddd8468dd3816ace70"
+  integrity sha512-yHmUtGwEbW6HsKpPqT140/L6GpHtquHogRLgtanJFep3UAfDkE0fQfC49U+F9irCAoJVlv3M7VSp4rrtO4LnfA==
+
 "@fastify/cors@^10.0.1":
   version "10.0.1"
   resolved "https://registry.yarnpkg.com/@fastify/cors/-/cors-10.0.1.tgz#c208fa5f672db31a8383400349e9852762903d64"
@@ -354,6 +359,11 @@
   dependencies:
     fastify-plugin "^5.0.0"
     mnemonist "0.39.8"
+
+"@fastify/deepmerge@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@fastify/deepmerge/-/deepmerge-2.0.0.tgz#794e98a4eefd6e1edde852e924e25f47b0fed7d8"
+  integrity sha512-fsaybTGDyQ5KpPsplQqb9yKdCf2x/pbNpMNk8Tvp3rRz7lVcupKysH4b2ELMN2P4Hak1+UqTYdTj/u4FNV2p0g==
 
 "@fastify/error@^4.0.0":
   version "4.0.0"
@@ -384,6 +394,17 @@
   integrity sha512-fERDVz7topgNjtXsJTTW1JKLy0rhuLRcquYqNR9rF7OcVpCa2OVW49ZPDIhaRRCaUuvVxI+N416xUoF76HNSXA==
   dependencies:
     fast-deep-equal "^3.1.3"
+
+"@fastify/multipart@^9.0.1":
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/@fastify/multipart/-/multipart-9.0.1.tgz#2d003776c6ee8f787ceb8a4bb77a4256727b3f34"
+  integrity sha512-vt2gOCw/O4EwpN4KlLVJxth4iQlDf7T5ggw2Db2C+UbO2WJBG7y0jEBvu/HT6JIW/lBYaqrrUy9MmTpCKgXEpw==
+  dependencies:
+    "@fastify/busboy" "^3.0.0"
+    "@fastify/deepmerge" "^2.0.0"
+    "@fastify/error" "^4.0.0"
+    fastify-plugin "^5.0.0"
+    secure-json-parse "^3.0.0"
 
 "@fastify/rate-limit@^10.1.1":
   version "10.1.1"
@@ -3616,6 +3637,11 @@ secure-json-parse@^2.4.0, secure-json-parse@^2.7.0:
   version "2.7.0"
   resolved "https://registry.yarnpkg.com/secure-json-parse/-/secure-json-parse-2.7.0.tgz#5a5f9cd6ae47df23dba3151edd06855d47e09862"
   integrity sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==
+
+secure-json-parse@^3.0.0:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/secure-json-parse/-/secure-json-parse-3.0.1.tgz#78987844ea1f0cfe9c5f9f723cdf031f542e7b5f"
+  integrity sha512-9QR7G96th4QJ2+dJwvZB+JoXyt8PN+DbEjOr6kL2/JU4KH8Eb2sFdU+gt8EDdzWDWoWH0uocDdfCoFzdVSixUA==
 
 semver@^6.0.0, semver@^6.3.0, semver@^6.3.1:
   version "6.3.1"

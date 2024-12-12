@@ -1,9 +1,11 @@
 import Stripe from 'stripe';
 import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
+import multipart from '@fastify/multipart';
 import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
+import IRController from './controller/IR.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -41,8 +43,11 @@ export async function buildApp(
     logger: envToLogger[config.NODE_ENV] ?? true,
   });
 
+  fastify.register(multipart);
+
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
+  fastify.register(IRController(stripe), { prefix: '/impact' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
