@@ -19,7 +19,6 @@ export async function processOrderId(
         expand: ['latest_charge'],
       });
       const refunded = paymentIntent.status === 'succeeded' && (paymentIntent.latest_charge as Stripe.Charge).refunded;
-      console.log('PAYMENT INTENT', paymentIntent);
       return {
         orderId,
         type: 'payment_intent',
