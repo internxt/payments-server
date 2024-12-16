@@ -66,7 +66,6 @@ export async function processUploadedFile(
     return results;
   } catch (error) {
     log.error(`Error processing uploaded file: ${(error as Error).message}`);
-    console.log(error);
     if (error instanceof CustomError) {
       throw error;
     }
