@@ -5,13 +5,7 @@ import { BadRequestError, CustomError, InternalServerError } from '../custom-err
 
 interface OrderCheckResult {
   orderId: string;
-  type: 'payment_intent' | 'error';
-  refunded?: boolean | null;
-}
-
-interface OrderCheckResult {
-  orderId: string;
-  type: 'payment_intent' | 'error';
+  type: 'payment_intent' | 'subscription';
   refunded?: boolean | null;
 }
 
@@ -22,7 +16,7 @@ export async function processOrderId(
 ): Promise<OrderCheckResult> {
   try {
     if (!orderId.startsWith('pi_')) {
-      throw new BadRequestError(`Invalid order ID format: ${orderId}`);
+      return { orderId, type: 'subscription', refunded: null };
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(orderId, {
@@ -53,11 +47,9 @@ export async function processUploadedFile(
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
 
-    // Validar estructura del archivo
     const keys = Object.keys(jsonData[0] || {});
-    if (keys.length > 1 || keys[0].toLocaleLowerCase() !== 'order-id') {
-      log.error('Invalid XLSX structure');
-      throw new BadRequestError('The file must have exactly one column with the header "order-id".');
+    if (keys.length > 1 || !keys || keys[0]?.toLocaleLowerCase() !== 'order-id') {
+      throw new BadRequestError('The file must have exactly one column with the header "order-id"');
     }
 
     const results: OrderCheckResult[] = [];
@@ -74,6 +66,7 @@ export async function processUploadedFile(
     return results;
   } catch (error) {
     log.error(`Error processing uploaded file: ${(error as Error).message}`);
+    console.log(error);
     if (error instanceof CustomError) {
       throw error;
     }

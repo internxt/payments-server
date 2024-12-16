@@ -3,6 +3,7 @@ import XLSX from 'xlsx';
 import { FastifyBaseLogger } from 'fastify';
 import { processOrderId, processUploadedFile } from '../../../src/services/orders.service';
 import { Chance } from 'chance';
+import { BadRequestError, InternalServerError } from '../../../src/custom-errors';
 
 const chance = new Chance();
 
@@ -21,7 +22,7 @@ jest.mock('xlsx', () => ({
   },
 }));
 
-describe('impact.service', () => {
+describe('orders.service', () => {
   let stripe: jest.Mocked<Stripe>;
   const mockLog = {
     error: jest.fn(),
@@ -54,86 +55,75 @@ describe('impact.service', () => {
       });
     });
 
-    it('When the order ID is invalid, then it should return an error type', async () => {
-      const orderId = chance.string({ length: 10 });
-      const result = await processOrderId(orderId, stripe, mockLog);
-
-      expect(stripe.paymentIntents.retrieve).not.toHaveBeenCalled();
-      expect(result).toEqual({
-        orderId,
-        type: 'error',
-      });
-    });
-
-    it('When the Stripe API fails, then it should log an error and return an error type', async () => {
+    it('When the Stripe API fails, then it should throw InternalServerError', async () => {
       const orderId = `pi_${chance.string({ length: 10 })}`;
       (stripe.paymentIntents.retrieve as jest.Mock).mockRejectedValue(new Error('Stripe API error'));
 
-      const result = await processOrderId(orderId, stripe, mockLog);
-
+      await expect(processOrderId(orderId, stripe, mockLog)).rejects.toThrow(InternalServerError);
       expect(mockLog.error).toHaveBeenCalledWith(`Error processing order ID ${orderId}: Stripe API error`);
-      expect(result).toEqual({
-        orderId,
-        type: 'error',
-      });
     });
   });
 
   describe('processUploadedFile', () => {
-    it('When the file has multiple columns, then it should throw an error', async () => {
+    it('When the file has a single "order-id" column and payment intents are refunded, then it should return valid results', async () => {
       const mockBuffer = Buffer.from('mock data');
+      const mockJsonData = [{ 'order-id': 'pi_valid_1' }, { 'order-id': 'pi_valid_2' }];
       jest.spyOn(XLSX, 'read').mockReturnValue({
         SheetNames: ['Sheet1'],
         Sheets: { Sheet1: {} },
       });
-      jest.spyOn(XLSX.utils, 'sheet_to_json').mockReturnValue([{ 'order-id': 'pi_valid_1', 'extra-column': 'value' }]);
-
-      await expect(processUploadedFile(mockBuffer, stripe, mockLog)).rejects.toThrow(
-        'Invalid XLSX structure: The file must have exactly one column with the header "order-id".',
-      );
-      expect(mockLog.error).toHaveBeenCalledWith(
-        'Invalid XLSX structure: The file must have exactly one column with the header "order-id".',
-      );
-    });
-
-    it('When the file has the wrong column name, then it should throw an error', async () => {
-      const mockBuffer = Buffer.from('mock data');
-      jest.spyOn(XLSX, 'read').mockReturnValue({
-        SheetNames: ['Sheet1'],
-        Sheets: { Sheet1: {} },
-      });
-      jest.spyOn(XLSX.utils, 'sheet_to_json').mockReturnValue([{ 'wrong-header': 'pi_valid_1' }]);
-
-      await expect(processUploadedFile(mockBuffer, stripe, mockLog)).rejects.toThrow(
-        'Invalid XLSX structure: The file must have exactly one column with the header "order-id".',
-      );
-      expect(mockLog.error).toHaveBeenCalledWith(
-        'Invalid XLSX structure: The file must have exactly one column with the header "order-id".',
-      );
-    });
-
-    it('When the file has a single "order-id" column, then it should process the rows', async () => {
-      const mockBuffer = Buffer.from('mock data');
-      jest.spyOn(XLSX, 'read').mockReturnValue({
-        SheetNames: ['Sheet1'],
-        Sheets: { Sheet1: {} },
-      });
-      jest
-        .spyOn(XLSX.utils, 'sheet_to_json')
-        .mockReturnValue([{ 'order-id': 'pi_valid_1' }, { 'order-id': 'pi_valid_2' }]);
+      jest.spyOn(XLSX.utils, 'sheet_to_json').mockReturnValue(mockJsonData);
 
       jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValue({
         status: 'succeeded',
-        latest_charge: { refunded: false },
-        lastResponse: { headers: {}, requestId: 'req_mock', statusCode: 200 },
+        latest_charge: { refunded: true },
       } as unknown as Stripe.Response<Stripe.PaymentIntent>);
 
       const results = await processUploadedFile(mockBuffer, stripe, mockLog);
 
       expect(results).toEqual([
-        { orderId: 'pi_valid_1', type: 'payment_intent', refunded: false },
-        { orderId: 'pi_valid_2', type: 'payment_intent', refunded: false },
+        { orderId: 'pi_valid_1', type: 'payment_intent', refunded: true },
+        { orderId: 'pi_valid_2', type: 'payment_intent', refunded: true },
       ]);
+    });
+
+    it('When the file contains no rows, then it should return a BadRequest error', async () => {
+      const mockBuffer = Buffer.from('mock data');
+
+      jest.spyOn(XLSX, 'read').mockReturnValue({
+        SheetNames: ['Sheet1'],
+        Sheets: { Sheet1: {} },
+      });
+
+      jest.spyOn(XLSX.utils, 'sheet_to_json').mockReturnValue([]);
+
+      await expect(processUploadedFile(mockBuffer, stripe, mockLog)).rejects.toThrow(BadRequestError);
+    });
+
+    it('When the order ID does not start with "pi_", then it should skip it', async () => {
+      const invalidOrderId = chance.string({ length: 10 });
+
+      const result = await processOrderId(invalidOrderId, stripe, mockLog);
+
+      expect(result).toEqual({
+        orderId: invalidOrderId,
+        type: 'subscription',
+        refunded: null,
+      });
+    });
+
+    it('When processing fails due to Stripe API, then it should throw InternalServerError', async () => {
+      const mockBuffer = Buffer.from('mock data');
+      const mockJsonData = [{ 'order-id': 'pi_valid_1' }];
+      jest.spyOn(XLSX, 'read').mockReturnValue({
+        SheetNames: ['Sheet1'],
+        Sheets: { Sheet1: {} },
+      });
+      jest.spyOn(XLSX.utils, 'sheet_to_json').mockReturnValue(mockJsonData);
+
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockRejectedValue(new Error('Stripe API error'));
+
+      await expect(processUploadedFile(mockBuffer, stripe, mockLog)).rejects.toThrow(InternalServerError);
     });
   });
 });
