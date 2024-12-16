@@ -1,6 +1,13 @@
 import Stripe from 'stripe';
 import XLSX from 'xlsx';
 import { FastifyBaseLogger, FastifyInstance } from 'fastify';
+import { BadRequestError, CustomError, InternalServerError } from '../custom-errors';
+
+interface OrderCheckResult {
+  orderId: string;
+  type: 'payment_intent' | 'error';
+  refunded?: boolean | null;
+}
 
 interface OrderCheckResult {
   orderId: string;
@@ -14,21 +21,24 @@ export async function processOrderId(
   log: FastifyInstance['log'],
 ): Promise<OrderCheckResult> {
   try {
-    if (orderId.startsWith('pi_')) {
-      const paymentIntent = await stripe.paymentIntents.retrieve(orderId, {
-        expand: ['latest_charge'],
-      });
-      const refunded = paymentIntent.status === 'succeeded' && (paymentIntent.latest_charge as Stripe.Charge).refunded;
-      return {
-        orderId,
-        type: 'payment_intent',
-        refunded,
-      };
+    if (!orderId.startsWith('pi_')) {
+      throw new BadRequestError(`Invalid order ID format: ${orderId}`);
     }
-    return { orderId, type: 'error' };
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(orderId, {
+      expand: ['latest_charge'],
+    });
+
+    const refunded = paymentIntent.status === 'succeeded' && (paymentIntent.latest_charge as Stripe.Charge).refunded;
+
+    return {
+      orderId,
+      type: 'payment_intent',
+      refunded,
+    };
   } catch (error) {
     log.error(`Error processing order ID ${orderId}: ${(error as Error).message}`);
-    return { orderId, type: 'error' };
+    throw new InternalServerError(`Failed to process order ID ${orderId}`);
   }
 }
 
@@ -43,10 +53,11 @@ export async function processUploadedFile(
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet);
 
+    // Validar estructura del archivo
     const keys = Object.keys(jsonData[0] || {});
-    if (keys.length > 1 || keys[0] !== 'order-id') {
-      log.error('Invalid XLSX structure: The file must have exactly one column with the header "order-id".');
-      throw new Error('Invalid XLSX structure: The file must have exactly one column with the header "order-id".');
+    if (keys.length > 1 || keys[0].toLocaleLowerCase() !== 'order-id') {
+      log.error('Invalid XLSX structure');
+      throw new BadRequestError('The file must have exactly one column with the header "order-id".');
     }
 
     const results: OrderCheckResult[] = [];
@@ -54,13 +65,18 @@ export async function processUploadedFile(
     for (const row of jsonData) {
       for (const orderId of Object.values(row)) {
         const result = await processOrderId(orderId, stripe, log);
-        results.push(result);
+        if (result.type === 'payment_intent' && result.refunded) {
+          results.push(result);
+        }
       }
     }
 
     return results;
   } catch (error) {
     log.error(`Error processing uploaded file: ${(error as Error).message}`);
-    throw error;
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new InternalServerError('Failed to process uploaded file.');
   }
 }

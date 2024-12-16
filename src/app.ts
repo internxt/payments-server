@@ -5,7 +5,7 @@ import multipart from '@fastify/multipart';
 import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
-import IRController from './controller/orders.controller';
+import gatewayController from './controller/gateway.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -47,7 +47,7 @@ export async function buildApp(
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
-  fastify.register(IRController(stripe), { prefix: '/orders' });
+  fastify.register(gatewayController(stripe, config), { prefix: '/gateway' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
