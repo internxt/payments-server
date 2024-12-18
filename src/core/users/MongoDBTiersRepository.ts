@@ -15,6 +15,7 @@ export interface DriveFeatures {
     enabled: boolean;
     minimumSeats: number;
     maximumSeats: number;
+    maxSpaceBytesPerSeat: number;
   }
 };
 
