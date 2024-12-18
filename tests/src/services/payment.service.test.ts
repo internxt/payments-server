@@ -11,6 +11,7 @@ import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
 import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
+import { UserType } from '../../../src/core/users/User';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -153,6 +154,106 @@ describe('Payments Service tests', () => {
       expect(paySpy).toHaveBeenCalledWith(invoiceId, {
         paid_out_of_band: true,
       });
+    });
+  });
+
+  describe('getDefaultPaymentMethod()', () => {
+    const mockProvider = {
+      paymentMethods: {
+        list: jest.fn(),
+      },
+      customers: {
+        retrieve: jest.fn(),
+      },
+    };
+
+    const mockGetActiveSubscriptions = jest.fn();
+
+    const customerId = 'test-customer-id';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('when user is lifetime individual, then returns the payment method', async () => {
+      const mockPaymentMethods = [{ id: 'pm_1' }];
+      mockProvider.paymentMethods.list.mockResolvedValue({ data: mockPaymentMethods });
+
+      const result = await paymentService.getDefaultPaymentMethod.call(
+        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
+        customerId,
+        true,
+        UserType.Individual,
+      );
+
+      expect(mockProvider.paymentMethods.list).toHaveBeenCalledWith({ customer: customerId });
+      expect(result).toEqual(mockPaymentMethods[0]);
+    });
+
+    it('when no payment methods exist for lifetime individual user, then returns null', async () => {
+      mockProvider.paymentMethods.list.mockResolvedValue({ data: [] });
+
+      const result = await paymentService.getDefaultPaymentMethod.call(
+        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
+        customerId,
+        true,
+        UserType.Individual,
+      );
+
+      expect(mockProvider.paymentMethods.list).toHaveBeenCalledWith({ customer: customerId });
+      expect(result).toBeNull();
+    });
+
+    it('when subscriptions exist with default payment method, then returns the default payment method', async () => {
+      const mockSubscriptions = [
+        {
+          default_payment_method: { id: 'pm_default' },
+        },
+      ];
+      mockGetActiveSubscriptions.mockResolvedValue(mockSubscriptions);
+
+      const result = await paymentService.getDefaultPaymentMethod.call(
+        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
+        customerId,
+        false,
+        UserType.Individual,
+      );
+
+      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
+      expect(result).toEqual(mockSubscriptions[0].default_payment_method);
+    });
+
+    it('when no active subscriptions exist, then returns null', async () => {
+      mockGetActiveSubscriptions.mockResolvedValue([]);
+
+      const result = await paymentService.getDefaultPaymentMethod.call(
+        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
+        customerId,
+        false,
+        UserType.Individual,
+      );
+
+      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
+      expect(result).toBeNull();
+    });
+
+    it('when no default payment method exists in subscriptions, then returns the default source', async () => {
+      const mockSubscriptions = [
+        {
+          default_source: { id: 'source_default' },
+        },
+      ];
+      mockGetActiveSubscriptions.mockResolvedValue(mockSubscriptions);
+
+      const result = await paymentService.getDefaultPaymentMethod.call(
+        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
+        customerId,
+        false,
+        UserType.Individual,
+      );
+
+      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
+      expect(result).toEqual(mockSubscriptions[0].default_source);
     });
   });
 });
