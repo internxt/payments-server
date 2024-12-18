@@ -61,7 +61,7 @@ export interface TiersRepository {
   findByProductId(productId: Tier['productId']): Promise<Tier | null>;
 }
 
-export class MongoDBDisplayBillingRepository implements DisplayBillingRepository {
+export class MongoDBTiersRepository implements TiersRepository {
   private readonly collection: Collection<Tier>;
 
   constructor(mongo: MongoClient) {
