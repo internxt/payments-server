@@ -8,7 +8,7 @@ interface BackupsFeatures {
   enabled: boolean;
 };
 
-interface DriveFeatures {
+export interface DriveFeatures {
   enabled: boolean;
   maxSpaceBytes: number;
   workspaces: {
@@ -33,7 +33,7 @@ interface VpnFeatures {
   locationsAvailable: number;
 };
 
-enum Service {
+export enum Service {
   Drive = 'drive',
   Backups = 'backups',
   Antivirus = 'antivirus',
