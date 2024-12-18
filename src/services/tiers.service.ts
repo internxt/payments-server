@@ -20,6 +20,10 @@ export class TiersService {
   
     for (const service of Object.keys(tier.featuresPerService)) {
       const s = service as Service;
+
+      if (!tier.featuresPerService[s].enabled) {
+        continue;
+      }
   
       switch (s) {
         case Service.Drive:
@@ -42,7 +46,7 @@ export class TiersService {
     }
   }
 
-  private async applyDriveFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyDriveFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
@@ -75,7 +79,8 @@ export class TiersService {
     }
   }
 
-  private async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
     // TODO: API call to the VPN server.
+    const features = tier.featuresPerService[Service.Vpn];
   }
 }
