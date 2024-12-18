@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { User } from '../../../src/core/users/User';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
+import { Tier } from '../../../src/core/users/MongoDBTiersRepository';
 
 const randomDataGenerator = new Chance();
 
@@ -228,6 +229,68 @@ export default function getMocks() {
     return jwt.sign({ payload: { uuid: userUuid } }, envVarsConfig.JWT_SECRET);
   }
 
+  function newTier(params?: Partial<Tier>): Tier {
+    return {
+      billingType: 'subscription',
+      label: 'test-label',
+      productId: randomDataGenerator.string({
+        length: 15
+      }),
+      featuresPerService: {
+        mail: {
+          enabled: false,
+          addressesPerUser: randomDataGenerator.integer({
+            min: 0,
+            max: 5,
+          }),
+        },
+        meet: {
+          enabled: false,
+          paxPerCall: randomDataGenerator.integer({
+            min: 0,
+            max: 5
+          }),
+        },
+        vpn: {
+          enabled: false,
+          locationsAvailable: randomDataGenerator.integer({
+            min: 0,
+            max: 5
+          })
+        },
+        antivirus: {
+          enabled: false,
+        },
+        backups: {
+          enabled: false,
+        }, 
+        drive: {
+          enabled: false,
+          maxSpaceBytes: randomDataGenerator.integer({
+            max: 5 * 1024 * 1024 * 1024,
+            min: 1024 * 1024 * 1024
+          }),
+          workspaces: {
+            enabled: false,
+            maximumSeats: randomDataGenerator.integer({
+              max: 100,
+              min: 10
+            }),
+            minimumSeats: randomDataGenerator.integer({
+              min: 3,
+              max: 3
+            }),
+            maxSpaceBytesPerSeat: randomDataGenerator.integer({
+              max: 5 * 1024 * 1024 * 1024,
+              min: 1024 * 1024 * 1024
+            })
+          }
+        }
+      },
+      ...params
+    }
+  }
+
   const voidPromise = () => Promise.resolve();
 
   return {
@@ -253,5 +316,6 @@ export default function getMocks() {
     prices,
     getValidToken,
     voidPromise,
+    newTier,
   };
 }
