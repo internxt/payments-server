@@ -760,9 +760,9 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep, usersService);
+        const { customerId, lifetime } = await assertUser(req, rep, usersService);
         const userType = (req.query.userType as UserType) || UserType.Individual;
-        return paymentService.getDefaultPaymentMethod(user.customerId, userType);
+        return paymentService.getDefaultPaymentMethod(customerId, lifetime, userType);
       },
     );
 
