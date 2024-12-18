@@ -9,7 +9,7 @@ import { UsersService } from '../../../src/services/users.service';
 import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { PaymentService } from '../../../src/services/payment.service';
-import { StorageService } from '../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -64,7 +64,7 @@ describe('TiersService tests', () => {
   });
 
   describe('applyTier()', () => {
-    it('When applying the tier, it should fail if the tier is not found', async () => {
+    it('When applying the tier, then fails if the tier is not found', async () => {
       const user = mocks.mockedUserWithLifetime;
       const productId = 'productId';
 
@@ -79,7 +79,7 @@ describe('TiersService tests', () => {
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
     });
 
-    it('When applying the tier, it should skip not enabled features', async () => {
+    it('When applying the tier, then skips disabled features', async () => {
       const user = mocks.mockedUserWithLifetime;
       const tier = mocks.newTier();
       const { productId } = tier;
@@ -101,7 +101,7 @@ describe('TiersService tests', () => {
       expect(applyVpnFeatures).not.toHaveBeenCalled();
     });
 
-    it('When applying the tier, it should apply enabled features', async () => {
+    it('When applying the tier, then applies enabled features', async () => {
       const user = mocks.mockedUserWithLifetime;
       const tier = mocks.newTier();
       const userWithEmail = { ...user, email: 'fake email' };
@@ -118,6 +118,67 @@ describe('TiersService tests', () => {
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, tier);
+    });
+  });
+
+  describe('applyDriveFeatures()', () => {
+    it('When workspaces is enabled, then it is applied exclusively', async () => {
+      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
+      const tier = mocks.newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const updateWorkspaceStorage = jest.spyOn(usersService, 'updateWorkspaceStorage')
+        .mockImplementation(() => Promise.resolve());
+      
+      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser)
+        .mockImplementation(() => Promise.resolve() as any);
+
+      await tiersService.applyDriveFeatures(
+        userWithEmail,
+        tier,
+      );
+
+      expect(updateWorkspaceStorage).toHaveBeenCalledWith(
+        userWithEmail.uuid,
+        tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+        0
+      );
+
+      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
+    });
+  
+    it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
+      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
+      const tier = mocks.newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const updateWorkspaceError = new Error('Workspace does not exist');
+      jest.spyOn(usersService, 'updateWorkspaceStorage')
+        .mockImplementation(() => Promise.reject(updateWorkspaceError));
+      const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace')
+        .mockImplementation(() => Promise.resolve());
+      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser)
+        .mockImplementation(() => Promise.resolve() as any);
+
+      await tiersService.applyDriveFeatures(
+        userWithEmail,
+        tier,
+      );
+
+      expect(initializeWorkspace).toHaveBeenCalledWith(
+        userWithEmail.uuid, 
+        {
+          newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+          seats: 0,
+          address: '',
+          phoneNumber: '',
+        }
+      );
+      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
   });
 });
