@@ -4,8 +4,6 @@ import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
-import jwt from 'jsonwebtoken';
-import config from '../config';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -757,8 +755,19 @@ export class PaymentService {
    */
   async getDefaultPaymentMethod(
     customerId: CustomerId,
+    isLifetime?: boolean,
     userType: UserType = UserType.Individual,
   ): Promise<PaymentMethod | CustomerSource | null> {
+    if (isLifetime && userType === UserType.Individual) {
+      const { data: userPaymentMethod } = await this.provider.paymentMethods.list({
+        customer: customerId,
+      });
+
+      if (userPaymentMethod.length === 0) return null;
+
+      return userPaymentMethod[0];
+    }
+
     let subscriptions = await this.getActiveSubscriptions(customerId);
     if (subscriptions.length === 0) return null;
 
@@ -1244,7 +1253,7 @@ export class PaymentService {
 
     await this.provider.invoices.pay(invoiceId, {
       paid_out_of_band: true,
-    })
+    });
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
@@ -1499,10 +1508,10 @@ export class PaymentService {
     return res.data;
   }
 
-  async getCryptoCurrencies()  {
+  async getCryptoCurrencies() {
     const currencies = await this.bit2MeService.getCurrencies();
 
-    return currencies.filter(c => c.type === 'crypto');
+    return currencies.filter((c) => c.type === 'crypto');
   }
 }
 
