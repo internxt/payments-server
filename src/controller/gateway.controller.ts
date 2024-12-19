@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { processUploadedFile } from '../services/orders.service';
-import { BadRequestError, CustomError } from '../custom-errors';
+import { BadRequestError, CustomError, InternalServerError } from '../custom-errors';
 import fastifyJwt from '@fastify/jwt';
 import { AppConfig } from '../config';
 
@@ -43,7 +43,7 @@ export default function (stripe: Stripe, config: AppConfig) {
 
         return res.send(results);
       } catch (error) {
-        if (error instanceof CustomError) {
+        if (error instanceof CustomError || error instanceof BadRequestError || error instanceof InternalServerError) {
           return res.status(error.statusCode).send({ error: error.message });
         }
         fastify.log.error(`Error processing file: ${(error as Error).message}`);
