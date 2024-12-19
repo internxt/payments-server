@@ -41,11 +41,11 @@ const closeServerAndDatabase = async () => {
 
 beforeAll(async () => {
   await initializeServerAndDatabase();
-});
+}, 20000);
 
 afterAll(async () => {
   await closeServerAndDatabase();
-});
+}, 10000);
 
 describe('Payment controller e2e tests', () => {
   describe('Check if the unique code provided by the user is valid', () => {
