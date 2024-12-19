@@ -9,7 +9,7 @@ const XLSX_MIMETYPE = 'application/vnd.openxmlformats-officedocument.spreadsheet
 
 export default function (stripe: Stripe, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
-    const publicKey = Buffer.from(config.DRIVE_GATEWAY_PUBLIC_SECRET as string, 'base64').toString('utf8');
+    const publicKey = Buffer.from(config.DRIVE_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf8');
 
     fastify.register(fastifyJwt, {
       secret: {
