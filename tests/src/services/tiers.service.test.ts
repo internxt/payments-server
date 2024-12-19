@@ -112,17 +112,21 @@ describe('TiersService tests', () => {
       const userWithEmail = { ...user, email: 'fake email' };
       const { productId } = tier;
       tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Vpn].enabled = true;
 
       const findTierByProductId = jest
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(tier));
       const applyDriveFeatures = jest.spyOn(tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures')
+        .mockImplementation(() => Promise.resolve());
 
       await tiersService.applyTier(userWithEmail, productId);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, tier);
+      expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
   });
 
@@ -206,6 +210,25 @@ describe('TiersService tests', () => {
         tier.productId,
         config
       );
+    });
+  });
+
+  describe('applyVpnFeatures()', () => {
+    it('When it is called, then it does not throw', async () => {
+      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
+      const tier = mocks.newTier();
+
+      tier.featuresPerService[Service.Vpn].enabled = true;
+
+      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyVpnFeatures(
+        userWithEmail,
+        tier,
+      );
+
+      expect(applyVpnFeatures).not.toThrow();
     });
   });
 });
