@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import getMocks from '../mocks';
-import { TiersService } from '../../../src/services/tiers.service';
+import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import { UsersService } from '../../../src/services/users.service';
 import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
@@ -79,7 +79,7 @@ describe('TiersService tests', () => {
 
       await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId))
         .rejects
-        .toThrow(new Error(`Tier for product ${productId} not found`));
+        .toThrow(new TierNotFoundError(productId));
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
     });

@@ -4,6 +4,14 @@ import { UsersService } from "./users.service";
 import { createOrUpdateUser, updateUserTier } from './storage.service';
 import { AppConfig } from "../config";
 
+export class TierNotFoundError extends Error {
+  constructor(productId: Tier['productId']) {
+    super(`Tier for product ${productId} not found`);
+
+    Object.setPrototypeOf(this, TierNotFoundError.prototype);
+  }
+}
+
 export class TiersService {
   constructor(
     private readonly usersService: UsersService,
@@ -15,7 +23,7 @@ export class TiersService {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
-      throw new Error(`Tier for product ${productId} not found`);
+      throw new TierNotFoundError(productId);
     }
   
     for (const service of Object.keys(tier.featuresPerService)) {
