@@ -9,7 +9,7 @@ import { UsersService } from '../../../src/services/users.service';
 import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { PaymentService } from '../../../src/services/payment.service';
-import { createOrUpdateUser, StorageService } from '../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -29,6 +29,11 @@ let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 const mocks = getMocks();
+
+jest.spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
+  .mockImplementation(() => Promise.resolve() as any);
+jest.spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
+  .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
   beforeEach(() => {
@@ -161,8 +166,6 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.reject(updateWorkspaceError));
       const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace')
         .mockImplementation(() => Promise.resolve());
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser)
-        .mockImplementation(() => Promise.resolve() as any);
 
       await tiersService.applyDriveFeatures(
         userWithEmail,
@@ -178,7 +181,31 @@ describe('TiersService tests', () => {
           phoneNumber: '',
         }
       );
-      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
+      expect(createOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('When workspaces is not enabled, then individual is initialized', async () => {
+      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
+      const tier = mocks.newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = false;
+
+      await tiersService.applyDriveFeatures(
+        userWithEmail,
+        tier,
+      );
+
+      expect(createOrUpdateUser).toHaveBeenCalledWith(
+        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(), 
+        userWithEmail.email,
+        config
+      );
+      expect(updateUserTier).toHaveBeenCalledWith(
+        userWithEmail.uuid,
+        tier.productId,
+        config
+      );
     });
   });
 });
