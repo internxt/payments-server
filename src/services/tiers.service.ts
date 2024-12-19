@@ -71,12 +71,8 @@ export class TiersService {
   
     const maxSpaceBytes = features.maxSpaceBytes;
   
-    try {
-      await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email as string, this.config);
-      await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
-    } catch (err) {
-      throw err;
-    }
+    await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email as string, this.config);
+    await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
   async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
