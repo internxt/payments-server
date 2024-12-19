@@ -41,7 +41,6 @@ export async function buildApp(
 ): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: envToLogger[config.NODE_ENV] ?? true,
-    pluginTimeout: 10000,
   });
 
   fastify.register(multipart);
