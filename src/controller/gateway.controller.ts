@@ -46,8 +46,12 @@ export default function (stripe: Stripe, config: AppConfig) {
         }
 
         file.file.on('limit', () => {
-          req.log.error(`[LIMIT REACHED]`);
-          return res.status(400).send('Payload too large');
+          req.log.error(`FILE LIMIT REACHED: ${file.filename}`);
+          return res.status(400).send({ error: 'Payload too large' });
+        });
+
+        file.file.on('close', () => {
+          return;
         });
 
         const fileBuffer = await file.toBuffer();
@@ -62,7 +66,7 @@ export default function (stripe: Stripe, config: AppConfig) {
       } catch (error) {
         if (error instanceof CustomError || error instanceof BadRequestError) {
           req.log.error(`[ERROR WHILE PROCESSING FILE]: ${error.message}`);
-          return res.status(error.statusCode).send(error.message);
+          return res.status(error.statusCode).send({ error: error.message });
         }
 
         req.log.error(`Error processing file: ${(error as Error).message}`);
