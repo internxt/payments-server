@@ -32,10 +32,25 @@ export async function processOrderId(
     };
   } catch (error) {
     log.error(`Error processing order ID ${orderId}: ${(error as Error).message}`);
-    throw new InternalServerError(`Failed to process order ID ${orderId}`);
+    throw new InternalServerError(`Failed to process order ID ${orderId}. Error message: ${(error as Error).message}`);
   }
 }
 
+/**
+ * Processes an uploaded Excel file to validate and retrieve refund information for Stripe orders.
+ *
+ * This function reads an Excel file from the provided `fileBuffer`, extracts the data from the first worksheet,
+ * and validates that the file contains exactly one column with the header "order-id". It then processes each
+ * order ID using the `processOrderId` function to check if the associated payment intent is refunded.
+ *
+ * @param {Buffer} fileBuffer - The binary content of the uploaded file.
+ * @param {Stripe} stripe - An instance of the Stripe SDK for API calls.
+ * @param {FastifyBaseLogger} log - The Fastify logger for logging errors and other information.
+ * @returns {Promise<OrderCheckResult[]>} A promise that resolves to an array of `OrderCheckResult` objects,
+ * each containing information about refunded payment intents.
+ * @throws {BadRequestError} If the file does not have exactly one column with the header "order-id".
+ * @throws {InternalServerError} If the file processing fails or an unexpected error occurs.
+ */
 export async function processUploadedFile(
   fileBuffer: Buffer,
   stripe: Stripe,
