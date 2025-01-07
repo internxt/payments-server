@@ -456,7 +456,9 @@ export default function (
       return rep.status(200).send();
     });
 
-    fastify.get<{ Querystring: { limit: number; starting_after?: string; subscription?: string } }>(
+    fastify.get<{
+      Querystring: { limit: number; starting_after?: string; userType?: UserType; subscription?: string };
+    }>(
       '/invoices',
       {
         schema: {
@@ -465,15 +467,22 @@ export default function (
             properties: {
               limit: { type: 'number', default: 10 },
               starting_after: { type: 'string' },
+              userType: { type: 'string', default: UserType.Individual },
               subscription: { type: 'string' },
             },
           },
         },
       },
       async (req, rep) => {
-        const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
+        const { limit, starting_after: startingAfter, userType, subscription: subscriptionId } = req.query;
 
         const user = await assertUser(req, rep, usersService);
+
+        const invoiceType = (invoice: Stripe.Invoice) => {
+          return userType === UserType.Business
+            ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
+            : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+        };
 
         const invoices = await paymentService.getInvoicesFromUser(
           user.customerId,
@@ -484,7 +493,11 @@ export default function (
         const invoicesMapped = invoices
           .filter(
             (invoice) =>
-              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes,
+              invoice.created &&
+              invoice.invoice_pdf &&
+              invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
+              invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+              invoiceType(invoice),
           )
           .map((invoice) => {
             return {
