@@ -478,7 +478,7 @@ export default function (
 
         const user = await assertUser(req, rep, usersService);
 
-        const userInvoices = paymentService.getDriveInvoices(
+        const userInvoices = await paymentService.getDriveInvoices(
           user.customerId,
           {
             limit,
