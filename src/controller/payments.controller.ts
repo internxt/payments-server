@@ -478,40 +478,17 @@ export default function (
 
         const user = await assertUser(req, rep, usersService);
 
-        const invoiceType = (invoice: Stripe.Invoice) => {
-          return userType === UserType.Business
-            ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
-            : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
-        };
-
-        const invoices = await paymentService.getInvoicesFromUser(
+        const userInvoices = paymentService.getDriveInvoices(
           user.customerId,
-          { limit, startingAfter },
+          {
+            limit,
+            startingAfter,
+          },
+          userType,
           subscriptionId,
         );
 
-        const invoicesMapped = invoices
-          .filter((invoice) =>
-            invoice.created &&
-            invoice.invoice_pdf &&
-            invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
-            invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
-            subscriptionId
-              ? true
-              : invoiceType(invoice),
-          )
-          .map((invoice) => {
-            return {
-              id: invoice.id,
-              created: invoice.created,
-              pdf: invoice.invoice_pdf,
-              bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
-              total: invoice.total,
-              currency: invoice.currency,
-            };
-          });
-
-        return rep.send(invoicesMapped);
+        return rep.send(userInvoices);
       },
     );
 
