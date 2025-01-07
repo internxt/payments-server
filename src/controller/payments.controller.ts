@@ -491,13 +491,14 @@ export default function (
         );
 
         const invoicesMapped = invoices
-          .filter(
-            (invoice) =>
-              invoice.created &&
-              invoice.invoice_pdf &&
-              invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
-              invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
-              invoiceType(invoice),
+          .filter((invoice) =>
+            invoice.created &&
+            invoice.invoice_pdf &&
+            invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
+            invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+            subscriptionId
+              ? true
+              : invoiceType(invoice),
           )
           .map((invoice) => {
             return {
