@@ -258,53 +258,15 @@ describe('Payments Service tests', () => {
   });
 
   describe('getDriveInvoices()', () => {
-    const mockCustomerId = 'test-customer-id';
+    const mockCustomerId = mocks.mockedUserWithoutLifetime.customerId;
     const mockPagination = { limit: 10, startingAfter: 'inv_123' };
-    const mockSubscriptionId = 'sub_123';
+    const mockSubscriptionId = mocks.mockActiveSubscriptions[0].id;
 
-    const mockInvoices = [
-      {
-        id: 'inv_1',
-        created: 1640995200,
-        invoice_pdf: 'https://example.com/inv_1.pdf',
-        lines: {
-          data: [
-            {
-              price: {
-                metadata: {
-                  maxSpaceBytes: '1073741824',
-                  type: 'individual',
-                },
-              },
-            },
-          ],
-        },
-        total: 1000,
-        currency: 'usd',
-      },
-      {
-        id: 'inv_2',
-        created: 1640995300,
-        invoice_pdf: 'https://example.com/inv_2.pdf',
-        lines: {
-          data: [
-            {
-              price: {
-                metadata: {
-                  maxSpaceBytes: '2147483648',
-                  type: 'business',
-                },
-              },
-            },
-          ],
-        },
-        total: 2000,
-        currency: 'usd',
-      },
-    ];
+    const { mockInvoices } = mocks;
 
     beforeEach(() => {
       jest.clearAllMocks();
+      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockInvoices as unknown as Stripe.Invoice[]);
     });
 
     it('When userType is Individual, then returns filtered invoices with individual type', async () => {
@@ -315,7 +277,7 @@ describe('Payments Service tests', () => {
       expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(mockCustomerId, mockPagination, undefined);
       expect(result).toEqual([
         {
-          id: 'inv_1',
+          id: mockInvoices[0].id,
           created: mockInvoices[0].created,
           pdf: mockInvoices[0].invoice_pdf,
           bytesInPlan: mockInvoices[0].lines.data[0].price.metadata.maxSpaceBytes,
@@ -333,7 +295,7 @@ describe('Payments Service tests', () => {
       expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(mockCustomerId, mockPagination, undefined);
       expect(result).toEqual([
         {
-          id: 'inv_2',
+          id: mockInvoices[1].id,
           created: mockInvoices[1].created,
           pdf: mockInvoices[1].invoice_pdf,
           bytesInPlan: mockInvoices[1].lines.data[0].price.metadata.maxSpaceBytes,

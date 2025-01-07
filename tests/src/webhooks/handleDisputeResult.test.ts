@@ -45,7 +45,7 @@ jest.mock('../../../src/services/cache.service', () => {
 
 const {
   mockCharge,
-  mockInvoice,
+  mockInvoices,
   mockedUserWithLifetime,
   mockedUserWithoutLifetime,
   mockDispute,
@@ -95,7 +95,7 @@ describe('handleDisputeResult()', () => {
   describe('Dispute Status is Lost', () => {
     it('When the status is lost and the user has a subscription, then the subscription is cancelled and the storage is downgraded', async () => {
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoice);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices[0]);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithoutLifetime);
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
@@ -113,12 +113,12 @@ describe('handleDisputeResult()', () => {
       expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockCharge.id);
       expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockCharge.invoice);
       expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockCharge.customer);
-      expect(paymentService.cancelSubscription).toHaveBeenCalledWith(mockInvoice.subscription);
+      expect(paymentService.cancelSubscription).toHaveBeenCalledWith(mockInvoices[0].subscription);
     });
 
     it('When the status is lost and the user has a lifetime, then the lifetime param is changed to false and the storage is downgraded', async () => {
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoice);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithLifetime);
       (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
       jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
@@ -154,7 +154,7 @@ describe('handleDisputeResult()', () => {
       mockDispute.status = 'needs_response';
 
       (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoice);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithLifetime);
       (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
