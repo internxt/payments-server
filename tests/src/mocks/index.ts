@@ -208,10 +208,48 @@ export default function getMocks() {
     currency: mockCharge.currency,
   };
 
-  const mockInvoice = {
-    id: `in_${randomUUID()}`,
-    subscription: `sub_${randomUUID()}`,
-  };
+  const mockInvoices = [
+    {
+      id: `in_${randomUUID()}`,
+      created: 1640995200,
+      invoice_pdf: 'https://example.com/inv_1.pdf',
+      lines: {
+        data: [
+          {
+            price: {
+              metadata: {
+                maxSpaceBytes: '1073741824',
+                type: 'individual',
+              },
+            },
+          },
+        ],
+      },
+      total: 1000,
+      currency: 'usd',
+      subscription: `sub_${randomUUID()}`,
+    },
+    {
+      id: `in_${randomUUID()}`,
+      created: 1640995300,
+      invoice_pdf: 'https://example.com/inv_2.pdf',
+      lines: {
+        data: [
+          {
+            price: {
+              metadata: {
+                maxSpaceBytes: '2147483648',
+                type: 'business',
+              },
+            },
+          },
+        ],
+      },
+      total: 2000,
+      currency: 'usd',
+      subscription: `sub_${randomUUID()}`,
+    },
+  ];
 
   const mockLogger: jest.Mocked<FastifyBaseLogger> = {
     info: jest.fn(),
@@ -234,7 +272,7 @@ export default function getMocks() {
       billingType: 'subscription',
       label: 'test-label',
       productId: randomDataGenerator.string({
-        length: 15
+        length: 15,
       }),
       featuresPerService: {
         mail: {
@@ -248,47 +286,47 @@ export default function getMocks() {
           enabled: false,
           paxPerCall: randomDataGenerator.integer({
             min: 0,
-            max: 5
+            max: 5,
           }),
         },
         vpn: {
           enabled: false,
           locationsAvailable: randomDataGenerator.integer({
             min: 0,
-            max: 5
-          })
+            max: 5,
+          }),
         },
         antivirus: {
           enabled: false,
         },
         backups: {
           enabled: false,
-        }, 
+        },
         drive: {
           enabled: false,
           maxSpaceBytes: randomDataGenerator.integer({
             max: 5 * 1024 * 1024 * 1024,
-            min: 1024 * 1024 * 1024
+            min: 1024 * 1024 * 1024,
           }),
           workspaces: {
             enabled: false,
             maximumSeats: randomDataGenerator.integer({
               max: 100,
-              min: 10
+              min: 10,
             }),
             minimumSeats: randomDataGenerator.integer({
               min: 3,
-              max: 3
+              max: 3,
             }),
             maxSpaceBytesPerSeat: randomDataGenerator.integer({
               max: 5 * 1024 * 1024 * 1024,
-              min: 1024 * 1024 * 1024
-            })
-          }
-        }
+              min: 1024 * 1024 * 1024,
+            }),
+          },
+        },
       },
-      ...params
-    }
+      ...params,
+    };
   }
 
   const voidPromise = () => Promise.resolve();
@@ -303,7 +341,7 @@ export default function getMocks() {
     couponName,
     mockCharge,
     mockDispute,
-    mockInvoice,
+    mockInvoices,
     mockLogger,
     mockedCustomerPayload,
     createdSubscriptionPayload,

@@ -703,6 +703,46 @@ export class PaymentService {
     return res.data;
   }
 
+  private invoiceType(invoice: Stripe.Invoice, userType: UserType) {
+    return userType === UserType.Business
+      ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
+      : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+  }
+
+  async getDriveInvoices(
+    customerId: CustomerId,
+    pagination: { limit?: number; startingAfter?: string },
+    userType: UserType = UserType.Individual,
+    subscriptionId?: SubscriptionId,
+  ) {
+    const { limit, startingAfter } = pagination;
+
+    const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId);
+
+    const invoicesMapped = invoices
+      .filter((invoice) =>
+        invoice.created &&
+        invoice.invoice_pdf &&
+        invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
+        invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+        subscriptionId
+          ? true
+          : this.invoiceType(invoice, userType),
+      )
+      .map((invoice) => {
+        return {
+          id: invoice.id,
+          created: invoice.created,
+          pdf: invoice.invoice_pdf,
+          bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+          total: invoice.total,
+          currency: invoice.currency,
+        };
+      });
+
+    return invoicesMapped;
+  }
+
   async isUserElegibleForTrial(user: User, reason: Reason): Promise<HasUserAppliedCouponResponse> {
     const { lifetime, customerId } = user;
 

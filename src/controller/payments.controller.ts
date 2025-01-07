@@ -456,7 +456,9 @@ export default function (
       return rep.status(200).send();
     });
 
-    fastify.get<{ Querystring: { limit: number; starting_after?: string; subscription?: string } }>(
+    fastify.get<{
+      Querystring: { limit: number; starting_after?: string; userType?: UserType; subscription?: string };
+    }>(
       '/invoices',
       {
         schema: {
@@ -465,39 +467,28 @@ export default function (
             properties: {
               limit: { type: 'number', default: 10 },
               starting_after: { type: 'string' },
+              userType: { type: 'string', default: UserType.Individual },
               subscription: { type: 'string' },
             },
           },
         },
       },
       async (req, rep) => {
-        const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
+        const { limit, starting_after: startingAfter, userType, subscription: subscriptionId } = req.query;
 
         const user = await assertUser(req, rep, usersService);
 
-        const invoices = await paymentService.getInvoicesFromUser(
+        const userInvoices = await paymentService.getDriveInvoices(
           user.customerId,
-          { limit, startingAfter },
+          {
+            limit,
+            startingAfter,
+          },
+          userType,
           subscriptionId,
         );
 
-        const invoicesMapped = invoices
-          .filter(
-            (invoice) =>
-              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes,
-          )
-          .map((invoice) => {
-            return {
-              id: invoice.id,
-              created: invoice.created,
-              pdf: invoice.invoice_pdf,
-              bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
-              total: invoice.total,
-              currency: invoice.currency,
-            };
-          });
-
-        return rep.send(invoicesMapped);
+        return rep.send(userInvoices);
       },
     );
 
