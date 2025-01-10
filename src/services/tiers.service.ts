@@ -1,8 +1,8 @@
-import { Service, Tier, TiersRepository } from "../core/users/MongoDBTiersRepository";
-import { User } from "../core/users/User";
-import { UsersService } from "./users.service";
+import { Service, Tier, TiersRepository } from '../core/users/MongoDBTiersRepository';
+import { User } from '../core/users/User';
+import { UsersService } from './users.service';
 import { createOrUpdateUser, updateUserTier } from './storage.service';
-import { AppConfig } from "../config";
+import { AppConfig } from '../config';
 
 export class TierNotFoundError extends Error {
   constructor(productId: Tier['productId']) {
@@ -16,8 +16,18 @@ export class TiersService {
   constructor(
     private readonly usersService: UsersService,
     private readonly tiersRepository: TiersRepository,
-    private readonly config: AppConfig
+    private readonly config: AppConfig,
   ) {}
+
+  async getTierProductsByProductsId(productId: string): Promise<Tier | Error> {
+    const tier = await this.tiersRepository.findByProductId(productId);
+
+    if (!tier) {
+      throw new TierNotFoundError(productId);
+    }
+
+    return tier;
+  }
 
   async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
     const tier = await this.tiersRepository.findByProductId(productId);
@@ -25,20 +35,17 @@ export class TiersService {
     if (!tier) {
       throw new TierNotFoundError(productId);
     }
-  
+
     for (const service of Object.keys(tier.featuresPerService)) {
       const s = service as Service;
 
       if (!tier.featuresPerService[s].enabled) {
         continue;
       }
-  
+
       switch (s) {
         case Service.Drive:
-          await this.applyDriveFeatures(
-            userWithEmail,
-            tier,
-          );
+          await this.applyDriveFeatures(userWithEmail, tier);
           break;
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
@@ -62,7 +69,7 @@ export class TiersService {
       const amountOfSeats = 0;
       const address = '';
       const phoneNumber = '';
-  
+
       try {
         await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), amountOfSeats);
       } catch (err) {
@@ -73,12 +80,12 @@ export class TiersService {
           phoneNumber,
         });
       }
-      
+
       return;
-    } 
-  
+    }
+
     const maxSpaceBytes = features.maxSpaceBytes;
-  
+
     await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email as string, this.config);
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
