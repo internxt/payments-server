@@ -3,6 +3,7 @@ import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { createOrUpdateUser, updateUserTier } from './storage.service';
 import { AppConfig } from '../config';
+import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 
 export class TierNotFoundError extends Error {
   constructor(productId: Tier['productId']) {
@@ -12,9 +13,12 @@ export class TierNotFoundError extends Error {
   }
 }
 
+export const ALLOWED_SUBSCRIPTIONS = ['prod_123', 'prod_456'];
+
 export class TiersService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
     private readonly config: AppConfig,
   ) {}
@@ -27,6 +31,36 @@ export class TiersService {
     }
 
     return tier;
+  }
+
+  // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
+  async getAntivirusTier(
+    customerId: CustomerId,
+    isLifetime: boolean,
+  ): Promise<{ featuresPerService: { antivirus: boolean } }> {
+    const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
+    const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
+
+    if (!activeUserSubscription && !isLifetime) {
+      throw new NotFoundSubscriptionError('User has no active subscriptions');
+    }
+
+    if (
+      isLifetime ||
+      (activeUserSubscription?.product?.id && ALLOWED_SUBSCRIPTIONS.includes(activeUserSubscription?.product?.id))
+    ) {
+      return {
+        featuresPerService: {
+          antivirus: true,
+        },
+      };
+    }
+
+    return {
+      featuresPerService: {
+        antivirus: false,
+      },
+    };
   }
 
   async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
