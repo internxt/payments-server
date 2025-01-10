@@ -4,12 +4,17 @@ import Stripe from 'stripe';
 import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import getMocks from '../mocks';
-import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
+import { ALLOWED_SUBSCRIPTIONS, TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import { UsersService } from '../../../src/services/users.service';
 import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { PaymentService } from '../../../src/services/payment.service';
-import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
+import {
+  CustomerId,
+  ExtendedSubscription,
+  NotFoundSubscriptionError,
+  PaymentService,
+} from '../../../src/services/payment.service';
+import { createOrUpdateUser, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -20,7 +25,6 @@ let tiersService: TiersService;
 let paymentsService: PaymentService;
 let tiersRepository: TiersRepository;
 let paymentService: PaymentService;
-let storageService: StorageService;
 let usersService: UsersService;
 let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
@@ -30,9 +34,11 @@ let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 const mocks = getMocks();
 
-jest.spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
+jest
+  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
   .mockImplementation(() => Promise.resolve() as any);
-jest.spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
+jest
+  .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
@@ -48,7 +54,6 @@ describe('TiersService tests', () => {
     displayBillingRepository = {} as DisplayBillingRepository;
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    storageService = new StorageService(config, axios);
     productsRepository = testFactory.getProductsRepositoryForTest();
     bit2MeService = new Bit2MeService(config, axios);
     paymentService = new PaymentService(
@@ -65,7 +70,51 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, tiersRepository, config);
+    tiersService = new TiersService(usersService, paymentService, tiersRepository, config);
+  });
+
+  describe('getAntivirusTier()', () => {
+    it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
+      const customerId: CustomerId = 'customer123';
+      const activeSubscription = { status: 'active', product: { id: ALLOWED_SUBSCRIPTIONS[0] } };
+
+      jest
+        .spyOn(paymentService, 'getActiveSubscriptions')
+        .mockResolvedValue([activeSubscription as unknown as ExtendedSubscription]);
+
+      const antivirusTier = await tiersService.getAntivirusTier(customerId, false);
+
+      expect(antivirusTier).toEqual({
+        featuresPerService: {
+          antivirus: true,
+        },
+      });
+    });
+
+    it('When the user has a lifetime, then returns antivirus enabled', async () => {
+      const customerId: CustomerId = 'customer123';
+      const isLifetime = true;
+
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+
+      const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
+
+      expect(antivirusTier).toEqual({
+        featuresPerService: {
+          antivirus: true,
+        },
+      });
+    });
+
+    it('When the user has no active subscription and is not lifetime, then throws NotFoundSubscriptionError', async () => {
+      const customerId: CustomerId = 'customer123';
+
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+
+      await expect(tiersService.getAntivirusTier(customerId, false)).rejects.toThrow(
+        new NotFoundSubscriptionError('User has no active subscriptions'),
+      );
+    });
   });
 
   describe('applyTier()', () => {
@@ -77,9 +126,9 @@ describe('TiersService tests', () => {
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(null));
 
-      await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId))
-        .rejects
-        .toThrow(new TierNotFoundError(productId));
+      await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId)).rejects.toThrow(
+        new TierNotFoundError(productId),
+      );
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
     });
@@ -94,10 +143,10 @@ describe('TiersService tests', () => {
       const findTierByProductId = jest
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(tier));
-      const applyDriveFeatures = jest.spyOn(tiersService, 'applyDriveFeatures')
+      const applyDriveFeatures = jest
+        .spyOn(tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures')
-        .mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
       await tiersService.applyTier({ ...user, email: 'fake email' }, productId);
 
@@ -117,10 +166,10 @@ describe('TiersService tests', () => {
       const findTierByProductId = jest
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(tier));
-      const applyDriveFeatures = jest.spyOn(tiersService, 'applyDriveFeatures')
+      const applyDriveFeatures = jest
+        .spyOn(tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures')
-        .mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
       await tiersService.applyTier(userWithEmail, productId);
 
@@ -138,26 +187,23 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      const updateWorkspaceStorage = jest.spyOn(usersService, 'updateWorkspaceStorage')
+      const updateWorkspaceStorage = jest
+        .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
-      
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser)
-        .mockImplementation(() => Promise.resolve() as any);
 
-      await tiersService.applyDriveFeatures(
-        userWithEmail,
-        tier,
-      );
+      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
+
+      await tiersService.applyDriveFeatures(userWithEmail, tier);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        0
+        0,
       );
 
       expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
-  
+
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
       const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
       const tier = mocks.newTier();
@@ -166,25 +212,19 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
       const updateWorkspaceError = new Error('Workspace does not exist');
-      jest.spyOn(usersService, 'updateWorkspaceStorage')
-        .mockImplementation(() => Promise.reject(updateWorkspaceError));
-      const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace')
+      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(updateWorkspaceError));
+      const initializeWorkspace = jest
+        .spyOn(usersService, 'initializeWorkspace')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyDriveFeatures(
-        userWithEmail,
-        tier,
-      );
+      await tiersService.applyDriveFeatures(userWithEmail, tier);
 
-      expect(initializeWorkspace).toHaveBeenCalledWith(
-        userWithEmail.uuid, 
-        {
-          newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-          seats: 0,
-          address: '',
-          phoneNumber: '',
-        }
-      );
+      expect(initializeWorkspace).toHaveBeenCalledWith(userWithEmail.uuid, {
+        newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+        seats: 0,
+        address: '',
+        phoneNumber: '',
+      });
       expect(createOrUpdateUser).not.toHaveBeenCalled();
     });
 
@@ -195,21 +235,14 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
-      await tiersService.applyDriveFeatures(
-        userWithEmail,
-        tier,
-      );
+      await tiersService.applyDriveFeatures(userWithEmail, tier);
 
       expect(createOrUpdateUser).toHaveBeenCalledWith(
-        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(), 
+        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),
         userWithEmail.email,
-        config
+        config,
       );
-      expect(updateUserTier).toHaveBeenCalledWith(
-        userWithEmail.uuid,
-        tier.productId,
-        config
-      );
+      expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });
   });
 
@@ -220,13 +253,9 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures')
-        .mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyVpnFeatures(
-        userWithEmail,
-        tier,
-      );
+      await tiersService.applyVpnFeatures(userWithEmail, tier);
 
       expect(applyVpnFeatures).not.toThrow();
     });
