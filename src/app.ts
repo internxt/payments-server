@@ -4,6 +4,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
+import productsController from './controller/products.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -12,6 +13,7 @@ import { UsersService } from './services/users.service';
 import webhook from './webhooks';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
+import { TiersService } from './services/tiers.service';
 
 const envToLogger = {
   development: {
@@ -32,6 +34,7 @@ export async function buildApp(
   storageService: StorageService,
   usersService: UsersService,
   cacheService: CacheService,
+  tiersService: TiersService,
   licenseCodesService: LicenseCodesService,
   objectStorageService: ObjectStorageService,
   stripe: Stripe,
@@ -43,6 +46,7 @@ export async function buildApp(
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
+  fastify.register(productsController(tiersService, usersService, config), { prefix: '/products' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
