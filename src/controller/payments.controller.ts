@@ -180,7 +180,6 @@ export default function (
 
         try {
           const { customerId } = await usersService.findUserByUuid(uuid);
-          console.log(customerId);
           const token = jwt.sign(
             {
               customerId,
@@ -193,7 +192,6 @@ export default function (
           });
         } catch (error) {
           const castedError = error as Error;
-          console.log(`ERROR : ${castedError}`);
           if (!(error instanceof UserNotFoundError)) {
             req.log.error(`[ERROR GETTING CUSTOMER BY UUID IN CREATE-CUSTOMER]: ${castedError.message}`);
             return res.status(500).send({
