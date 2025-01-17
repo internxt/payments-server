@@ -14,6 +14,11 @@ export default function getMocks() {
     uuid: '223b88d7-f5a0-4592-a76c-22758c074757',
     lifetime: false,
   };
+  const newUser = {
+    customerId: 'cus_123',
+    uuid: randomUUID(),
+    lifetime: false,
+  };
   const uniqueCode = {
     techCult: {
       codes: {
@@ -338,6 +343,7 @@ export default function getMocks() {
 
   return {
     user,
+    newUser,
     preventCancellationTestUsers,
     uniqueCode,
     mockedCoupon,
