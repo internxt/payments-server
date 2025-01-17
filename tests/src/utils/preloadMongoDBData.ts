@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 import getMocks from '../mocks';
+import { UserType } from '../../../src/core/users/User';
 
 export const preloadData = async (client: MongoClient) => {
   const mocks = getMocks();
