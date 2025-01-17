@@ -219,7 +219,7 @@ describe('Payment controller e2e tests', () => {
     const createdToken = getValidToken(user.uuid);
     const authToken = `Bearer ${createdToken}`;
 
-    it('When the email is missing in the request body, then it returns a 404 status code', async () => {
+    it('When the email is missing in the request body, then it returns a 400 status code', async () => {
       const response = await app.inject({
         path: `/create-customer`,
         method: 'POST',
