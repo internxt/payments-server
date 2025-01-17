@@ -158,7 +158,7 @@ export default async function handleInvoiceCompleted(
   }
 
   try {
-    const { lifetime } = await usersService.findUserByCustomerID(customer.id);
+    const { lifetime } = await usersService.findUserByUuid(user.uuid);
     const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
     await usersService.updateUser(customer.id, {
       lifetime: isLifetimeCurrentSub,

@@ -155,5 +155,25 @@ describe('Payment controller e2e tests', () => {
         expect(response.statusCode).toBe(404);
       });
     });
+
+    describe('POST /create-customer', () => {
+      it('When the email is missing in the request body, then it returns a 404 status code', () => {});
+
+      describe('UUID related', () => {
+        it('When uuid is present and the user exists, then it returns the customerId', async () => {});
+        it('When uuid is present but findUserByUuid throws a generic error, then it returns a 500 status code', async () => {});
+        it('When uuid is present but findUserByUuid throws a UserNotFoundError, then it does not crash', async () => {});
+      });
+
+      describe('createOrGetCustomer', () => {
+        it('When uuid is not present and the customer is created successfully, then it returns a customerId and token', async () => {});
+        it('When createOrGetCustomer throws an InvalidTaxIdError, then it returns a 400 status code', async () => {});
+        it('When createOrGetCustomer throws a generic error, then it returns a 500 status code', async () => {});
+      });
+
+      describe('JWT related', () => {
+        it('When jwt.sign throws an error, then it returns a 500 status', async () => {});
+      });
+    });
   });
 });

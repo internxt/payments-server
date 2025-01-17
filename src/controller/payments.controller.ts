@@ -4,7 +4,7 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
-import { UsersService } from '../services/users.service';
+import { UserNotFoundError, UsersService } from '../services/users.service';
 import {
   CouponCodeError,
   IncompatibleSubscriptionTypesError,
@@ -169,12 +169,28 @@ export default function (
         },
       },
       async (req, res) => {
+        const { uuid } = req.user.payload;
         const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
           return res.status(404).send({
             message: 'Email should be provided',
           });
+        }
+
+        if (uuid) {
+          try {
+            const { customerId } = await usersService.findUserByUuid(uuid);
+            return customerId;
+          } catch (error) {
+            const castedError = error as Error;
+            if (!(error instanceof UserNotFoundError)) {
+              req.log.error(`[ERROR GETTING CUSTOMER BY UUID IN CREATE-CUSTOMER]: ${castedError.message}`);
+              return res.status(500).send({
+                message: 'Internal Server Error',
+              });
+            }
+          }
         }
 
         try {
