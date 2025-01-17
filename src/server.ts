@@ -29,7 +29,13 @@ import { Bit2MeService } from './services/bit2me.service';
 import { TiersService } from './services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
 
-const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
+const start = async (
+  mongoTestClient?: MongoClient,
+  mocksServices?: {
+    usersService: UsersService;
+    paymentsService: PaymentService;
+  },
+): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
   const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
@@ -41,17 +47,20 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
 
   const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
-  const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+  const paymentService =
+    mocksServices?.paymentsService ?? new PaymentService(stripe, productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);
-  const usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    envVariablesConfig,
-    axios,
-  );
+  const usersService =
+    mocksServices?.usersService ??
+    new UsersService(
+      usersRepository,
+      paymentService,
+      displayBillingRepository,
+      couponsRepository,
+      usersCouponsRepository,
+      envVariablesConfig,
+      axios,
+    );
   const cacheService = new CacheService(envVariablesConfig);
   const licenseCodesService = new LicenseCodesService(
     paymentService,

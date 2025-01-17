@@ -1,7 +1,5 @@
 import { MongoClient } from 'mongodb';
 import getMocks from '../mocks';
-import { randomUUID } from 'crypto';
-import { UserType } from '../../../src/core/users/User';
 
 export const preloadData = async (client: MongoClient) => {
   const mocks = getMocks();
@@ -35,12 +33,15 @@ export const preloadData = async (client: MongoClient) => {
   ]);
 
   await db.collection('users').insertMany([
-    { uuid: randomUUID(), customerId: `cus_${randomUUID()}`, lifetime: false },
-    { uuid: randomUUID(), customerId: `cus_${randomUUID()}`, lifetime: true },
+    {
+      customer_id: mocks.user.customerId,
+      uuid: mocks.user.uuid,
+      lifetime: mocks.user.lifetime,
+    },
   ]);
 
-  await db.collection('products').insertMany([
-    { userType: UserType.Business, customerId: `prod_QSIkFOC1iCrHAd` },
-    { userType: UserType.Business, paymentGatewayId: `prod_QSIpZDVYVLVil1` },
-  ]);
+  // await db.collection('products').insertMany([
+  //   { userType: UserType.Business, customerId: `prod_QSIkFOC1iCrHAd` },
+  //   { userType: UserType.Business, paymentGatewayId: `prod_QSIpZDVYVLVil1` },
+  // ]);
 };

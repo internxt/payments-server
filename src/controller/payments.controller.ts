@@ -173,28 +173,37 @@ export default function (
         const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
-          return res.status(404).send({
+          return res.status(400).send({
             message: 'Email should be provided',
           });
         }
 
-        if (uuid) {
-          try {
-            const { customerId } = await usersService.findUserByUuid(uuid);
-            return customerId;
-          } catch (error) {
-            const castedError = error as Error;
-            if (!(error instanceof UserNotFoundError)) {
-              req.log.error(`[ERROR GETTING CUSTOMER BY UUID IN CREATE-CUSTOMER]: ${castedError.message}`);
-              return res.status(500).send({
-                message: 'Internal Server Error',
-              });
-            }
+        try {
+          const { customerId } = await usersService.findUserByUuid(uuid);
+          console.log(customerId);
+          const token = jwt.sign(
+            {
+              customerId,
+            },
+            config.JWT_SECRET,
+          );
+          return res.send({
+            customerId: customerId,
+            token,
+          });
+        } catch (error) {
+          const castedError = error as Error;
+          console.log(`ERROR : ${castedError}`);
+          if (!(error instanceof UserNotFoundError)) {
+            req.log.error(`[ERROR GETTING CUSTOMER BY UUID IN CREATE-CUSTOMER]: ${castedError.message}`);
+            return res.status(500).send({
+              message: 'Internal Server Error',
+            });
           }
         }
 
         try {
-          const { id } = await paymentService.createOrGetCustomer(
+          const { id: customerId } = await paymentService.createOrGetCustomer(
             {
               name,
               email,
@@ -205,13 +214,13 @@ export default function (
 
           const token = jwt.sign(
             {
-              customerId: id,
+              customerId,
             },
             config.JWT_SECRET,
           );
 
           return res.send({
-            customerId: id,
+            customerId: customerId,
             token,
           });
         } catch (err) {
