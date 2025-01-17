@@ -16,7 +16,7 @@ import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 
-jest.mock('../../../src/webhooks/handleLifetimeRefunded');
+// jest.mock('../../../src/webhooks/handleLifetimeRefunded');
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   __esModule: true,
   default: jest.fn(),

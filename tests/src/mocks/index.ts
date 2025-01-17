@@ -9,6 +9,16 @@ import { Tier } from '../../../src/core/users/MongoDBTiersRepository';
 const randomDataGenerator = new Chance();
 
 export default function getMocks() {
+  const user = {
+    customerId: 'cus_RbPFdWW7LCxL2c',
+    uuid: '223b88d7-f5a0-4592-a76c-22758c074757',
+    lifetime: false,
+  };
+  const newUser = {
+    customerId: 'cus_123',
+    uuid: randomUUID(),
+    lifetime: false,
+  };
   const uniqueCode = {
     techCult: {
       codes: {
@@ -332,6 +342,8 @@ export default function getMocks() {
   const voidPromise = () => Promise.resolve();
 
   return {
+    user,
+    newUser,
     preventCancellationTestUsers,
     uniqueCode,
     mockedCoupon,
