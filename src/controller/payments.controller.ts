@@ -201,7 +201,7 @@ export default function (
         }
 
         try {
-          const { id: customerId } = await paymentService.createOrGetCustomer(
+          const { id } = await paymentService.createOrGetCustomer(
             {
               name,
               email,
@@ -212,13 +212,13 @@ export default function (
 
           const token = jwt.sign(
             {
-              customerId,
+              customerId: id,
             },
             config.JWT_SECRET,
           );
 
           return res.send({
-            customerId: customerId,
+            customerId: id,
             token,
           });
         } catch (err) {
