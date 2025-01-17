@@ -164,7 +164,6 @@ export default async function handleInvoiceCompleted(
       lifetime: isLifetimeCurrentSub,
     });
   } catch {
-    console.log('USER', user);
     await usersService.insertUser({
       customerId: customer.id,
       uuid: user.uuid,
