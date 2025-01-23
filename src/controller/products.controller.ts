@@ -23,16 +23,16 @@ export default function (tiersService: TiersService, usersService: UsersService,
       }
     });
 
-    fastify.get('/', {}, async (req, res): Promise<{ featuresPerService: { antivirus: boolean } } | Error> => {
-      const user = await assertUser(req, res, usersService);
-
-      if (!user) throw new UserNotFoundError('User does not exist');
-
-      const { customerId, lifetime } = user;
-
-      const isLifetimeUser = lifetime ?? false;
-
+    fastify.get('/', async (req, res): Promise<{ featuresPerService: { antivirus: boolean } } | Error> => {
       try {
+        const user = await assertUser(req, res, usersService);
+
+        if (!user) throw new UserNotFoundError('User does not exist');
+
+        const { customerId, lifetime } = user;
+
+        const isLifetimeUser = lifetime ?? false;
+
         const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetimeUser);
 
         return res.status(200).send(antivirusTier);
