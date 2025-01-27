@@ -13,7 +13,7 @@ export class TierNotFoundError extends Error {
   }
 }
 
-export const ALLOWED_SUBSCRIPTIONS = ['prod_123', 'prod_456'];
+export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = ['prod_RY24Z7Axqaz1tG', 'prod_RY27zjzWZWuzEO', 'prod_RY29StsWXwy8Wu'];
 
 export class TiersService {
   constructor(
@@ -47,7 +47,8 @@ export class TiersService {
 
     if (
       isLifetime ||
-      (activeUserSubscription?.product?.id && ALLOWED_SUBSCRIPTIONS.includes(activeUserSubscription?.product?.id))
+      (activeUserSubscription?.product?.id &&
+        ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(activeUserSubscription?.product?.id))
     ) {
       return {
         featuresPerService: {
