@@ -4,7 +4,11 @@ import Stripe from 'stripe';
 import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import getMocks from '../mocks';
-import { ALLOWED_SUBSCRIPTIONS, TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
+import {
+  ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
+  TierNotFoundError,
+  TiersService,
+} from '../../../src/services/tiers.service';
 import { UsersService } from '../../../src/services/users.service';
 import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
@@ -76,7 +80,7 @@ describe('TiersService tests', () => {
   describe('getAntivirusTier()', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
       const customerId: CustomerId = 'customer123';
-      const activeSubscription = { status: 'active', product: { id: ALLOWED_SUBSCRIPTIONS[0] } };
+      const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
       jest
         .spyOn(paymentService, 'getActiveSubscriptions')
