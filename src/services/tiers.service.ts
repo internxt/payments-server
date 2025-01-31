@@ -39,7 +39,7 @@ export class TiersService {
     isLifetime: boolean,
   ): Promise<{ featuresPerService: { antivirus: boolean } }> {
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
-    const activeUserSubscription = userSubscriptions.find((sub) => sub.status === 'active');
+    const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
 
     if (!activeUserSubscription && !isLifetime) {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
