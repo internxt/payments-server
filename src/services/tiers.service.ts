@@ -34,21 +34,17 @@ export class TiersService {
   }
 
   // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
-  async getAntivirusTier(
-    customerId: CustomerId,
-    isLifetime: boolean,
-  ): Promise<{ featuresPerService: { antivirus: boolean } }> {
+  async getAntivirusTier(customerId: CustomerId): Promise<{ featuresPerService: { antivirus: boolean } }> {
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
     const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
 
-    if (!activeUserSubscription && !isLifetime) {
+    if (!activeUserSubscription) {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
     }
 
     if (
-      isLifetime ||
-      (activeUserSubscription?.product?.id &&
-        ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(activeUserSubscription?.product?.id))
+      activeUserSubscription?.product?.id &&
+      ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(activeUserSubscription?.product?.id)
     ) {
       return {
         featuresPerService: {
