@@ -48,7 +48,9 @@ export class TiersService {
     let lifetimeProductId: string | null = null;
 
     if (isLifetime) {
-      const activeLifetime = await this.paymentService.getInvoicesFromUser(customerId, {});
+      const activeLifetime = (await this.paymentService.getInvoicesFromUser(customerId, {})).filter(
+        (invoice) => invoice.status === 'paid',
+      );
       const firstInvoice = activeLifetime?.[0];
       const firstLine = firstInvoice?.lines?.data?.[0];
 
