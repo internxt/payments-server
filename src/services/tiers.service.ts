@@ -34,28 +34,38 @@ export class TiersService {
   }
 
   // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
-  async getAntivirusTier(customerId: CustomerId): Promise<{ featuresPerService: { antivirus: boolean } }> {
+  async getAntivirusTier(
+    customerId: CustomerId,
+    isLifetime: boolean,
+  ): Promise<{ featuresPerService: { antivirus: boolean } }> {
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
-    const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
+    const activeUserSubscription = userSubscriptions.find((sub) => sub.status === 'active');
 
-    if (!activeUserSubscription) {
+    if (!activeUserSubscription && !isLifetime) {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
     }
 
-    if (
-      activeUserSubscription?.product?.id &&
-      ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(activeUserSubscription?.product?.id)
-    ) {
-      return {
-        featuresPerService: {
-          antivirus: true,
-        },
-      };
+    let lifetimeProductId: string | null = null;
+
+    if (isLifetime) {
+      const activeLifetime = await this.paymentService.getInvoicesFromUser(customerId, {});
+      const firstInvoice = activeLifetime?.[0];
+      const firstLine = firstInvoice?.lines?.data?.[0];
+
+      if (firstLine?.price?.product) {
+        lifetimeProductId = firstLine.price.product as string;
+      }
     }
+
+    const hasAntivirusAccess = !!(
+      (activeUserSubscription?.product?.id &&
+        ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(activeUserSubscription.product.id)) ||
+      (isLifetime && lifetimeProductId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(lifetimeProductId))
+    );
 
     return {
       featuresPerService: {
-        antivirus: false,
+        antivirus: hasAntivirusAccess,
       },
     };
   }

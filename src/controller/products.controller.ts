@@ -29,9 +29,11 @@ export default function (tiersService: TiersService, usersService: UsersService,
 
         if (!user) throw new UserNotFoundError('User does not exist');
 
-        const { customerId } = user;
+        const { customerId, lifetime } = user;
 
-        const antivirusTier = await tiersService.getAntivirusTier(customerId);
+        const isLifetimeUser = lifetime ?? false;
+
+        const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetimeUser);
 
         return res.status(200).send(antivirusTier);
       } catch (error) {
