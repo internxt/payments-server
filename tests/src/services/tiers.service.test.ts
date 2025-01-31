@@ -86,7 +86,7 @@ describe('TiersService tests', () => {
         .spyOn(paymentService, 'getActiveSubscriptions')
         .mockResolvedValue([activeSubscription as unknown as ExtendedSubscription]);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, false);
+      const antivirusTier = await tiersService.getAntivirusTier(customerId);
 
       expect(antivirusTier).toEqual({
         featuresPerService: {
@@ -97,11 +97,10 @@ describe('TiersService tests', () => {
 
     it('When the user has a lifetime, then returns antivirus enabled', async () => {
       const customerId: CustomerId = 'customer123';
-      const isLifetime = true;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
+      const antivirusTier = await tiersService.getAntivirusTier(customerId);
 
       expect(antivirusTier).toEqual({
         featuresPerService: {
@@ -115,7 +114,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
-      await expect(tiersService.getAntivirusTier(customerId, false)).rejects.toThrow(
+      await expect(tiersService.getAntivirusTier(customerId)).rejects.toThrow(
         new NotFoundSubscriptionError('User has no active subscriptions'),
       );
     });
