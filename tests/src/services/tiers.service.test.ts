@@ -116,7 +116,7 @@ describe('TiersService tests', () => {
       jest
         .spyOn(paymentService, 'getInvoicesFromUser')
         .mockResolvedValue([
-          { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] } },
+          { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
         ] as any);
 
       const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
