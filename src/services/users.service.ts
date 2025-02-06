@@ -9,6 +9,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { type AppConfig } from '../config';
+import { VpnFeatures } from '../core/users/MongoDBTiersRepository';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -259,6 +260,27 @@ export class UsersService {
     };
 
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
+  }
+
+  async addUserTierToVPNDatabase(userUuid: User['uuid'], tier: VpnFeatures['featureId']) {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    //TODO: Update the endpoint to the correct one
+    return this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/vpn/users`,
+      {
+        userUuid,
+        tier,
+      },
+      requestConfig,
+    );
   }
 }
 
