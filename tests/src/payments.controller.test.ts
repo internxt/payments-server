@@ -45,10 +45,7 @@ const initializeServerAndDatabase = async () => {
   const uri = mongoServer.getUri();
   mongoClient = await new MongoClient(uri).connect();
 
-  app = await start(mongoClient, {
-    paymentsService: paymentService,
-    usersService,
-  });
+  app = await start(mongoClient);
   await preloadData(mongoClient);
 };
 
@@ -232,7 +229,7 @@ describe('Payment controller e2e tests', () => {
     });
 
     it('When the user exists by UUID, then it returns the customerId and a token', async () => {
-      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(Promise.resolve(user as unknown as User));
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(Promise.resolve(user as unknown as User));
 
       const response = await app.inject({
         path: `/create-customer`,
@@ -253,7 +250,7 @@ describe('Payment controller e2e tests', () => {
 
     it('When findUserByUuid throws a generic error, then it returns a 500 status code', async () => {
       const unknownError = new Error('Unknown error');
-      jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(unknownError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(unknownError);
 
       const response = await app.inject({
         path: `/create-customer`,
@@ -270,9 +267,9 @@ describe('Payment controller e2e tests', () => {
 
     it('When findUserByUuid throws a UserNotFoundError, then it does not crash', async () => {
       const userNotFoundError = new UserNotFoundError('User not found');
-      jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(userNotFoundError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
       const createOrGetCustomerSpy = jest
-        .spyOn(paymentService, 'createOrGetCustomer')
+        .spyOn(PaymentService.prototype, 'createOrGetCustomer')
         .mockResolvedValue({ id: user.customerId } as unknown as Stripe.Customer);
 
       await app.inject({
@@ -290,9 +287,9 @@ describe('Payment controller e2e tests', () => {
 
     it('When the user does not exist in our DB the customer is created successfully, then it returns a customerId and token', async () => {
       const userNotFoundError = new UserNotFoundError('User not found');
-      jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(userNotFoundError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
       const createOrGetCustomerSpy = jest
-        .spyOn(paymentService, 'createOrGetCustomer')
+        .spyOn(PaymentService.prototype, 'createOrGetCustomer')
         .mockResolvedValue({ id: user.customerId } as unknown as Stripe.Customer);
 
       const response = await app.inject({
@@ -315,8 +312,8 @@ describe('Payment controller e2e tests', () => {
     it('When createOrGetCustomer throws an InvalidTaxIdError, then it returns a 400 status code', async () => {
       const userNotFoundError = new UserNotFoundError();
       const invalidTaxIdError = new InvalidTaxIdError();
-      jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(userNotFoundError);
-      jest.spyOn(paymentService, 'createOrGetCustomer').mockRejectedValue(invalidTaxIdError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(invalidTaxIdError);
 
       const response = await app.inject({
         path: `/create-customer`,
@@ -333,8 +330,8 @@ describe('Payment controller e2e tests', () => {
     it('When createOrGetCustomer throws a generic error, then it returns a 500 status code', async () => {
       const userNotFoundError = new UserNotFoundError();
       const unknownError = new Error('Unknown error');
-      jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(userNotFoundError);
-      jest.spyOn(paymentService, 'createOrGetCustomer').mockRejectedValue(unknownError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(unknownError);
 
       const response = await app.inject({
         path: `/create-customer`,
