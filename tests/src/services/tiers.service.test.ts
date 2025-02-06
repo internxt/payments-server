@@ -304,17 +304,35 @@ describe('TiersService tests', () => {
   });
 
   describe('applyVpnFeatures()', () => {
-    it('When it is called, then it does not throw', async () => {
+    it('When VPN is enabled, then it adds the user tier to the VPN database', async () => {
       const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
       const tier = mocks.newTier();
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
+      const addUserTierToVPNDatabase = jest
+        .spyOn(usersService, 'addUserTierToVPNDatabase')
+        .mockImplementation(() => Promise.resolve());
 
       await tiersService.applyVpnFeatures(userWithEmail, tier);
 
-      expect(applyVpnFeatures).not.toThrow();
+      expect(addUserTierToVPNDatabase).toHaveBeenCalledWith(
+        userWithEmail.uuid,
+        tier.featuresPerService[Service.Vpn].featureId,
+      );
+    });
+
+    it('When VPN is disabled, then it does not call addUserTierToVPNDatabase', async () => {
+      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
+      const tier = mocks.newTier();
+
+      const addUserTierToVPNDatabase = jest
+        .spyOn(usersService, 'addUserTierToVPNDatabase')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyVpnFeatures(userWithEmail, tier);
+
+      expect(addUserTierToVPNDatabase).not.toHaveBeenCalled();
     });
   });
 });
