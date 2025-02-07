@@ -78,7 +78,7 @@ describe('TiersService tests', () => {
 
   describe('getAntivirusTier()', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
       const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
       jest
@@ -93,7 +93,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has an active subscription but is not eligible for antivirus, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
       const activeSubscription = { status: 'active', product: { id: 'some_other_product' } };
 
       jest
@@ -108,7 +108,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has no active subscription but has a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
       const isLifetime = true;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
@@ -126,7 +126,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has no active subscription and is not lifetime, then throws NotFoundSubscriptionError', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
@@ -136,7 +136,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user is lifetime but the product is not in the allowed list, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
       const isLifetime = true;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
@@ -152,7 +152,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has both an active subscription and a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = mockedUserWithLifetime().customerId;
       const isLifetime = true;
       const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
