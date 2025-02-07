@@ -13,7 +13,7 @@ export class TierNotFoundError extends Error {
   }
 }
 
-export const ALLOWED_SUBSCRIPTIONS = ['prod_123', 'prod_456'];
+export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = ['prod_RY24Z7Axqaz1tG', 'prod_RY27zjzWZWuzEO', 'prod_RY29StsWXwy8Wu'];
 
 export class TiersService {
   constructor(
@@ -38,6 +38,7 @@ export class TiersService {
     customerId: CustomerId,
     isLifetime: boolean,
   ): Promise<{ featuresPerService: { antivirus: boolean } }> {
+    let productId;
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
     const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
 
@@ -45,20 +46,27 @@ export class TiersService {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
     }
 
-    if (
-      isLifetime ||
-      (activeUserSubscription?.product?.id && ALLOWED_SUBSCRIPTIONS.includes(activeUserSubscription?.product?.id))
-    ) {
-      return {
-        featuresPerService: {
-          antivirus: true,
-        },
-      };
+    if (activeUserSubscription?.product?.id) {
+      productId = activeUserSubscription?.product?.id;
     }
+
+    if (isLifetime) {
+      const activeLifetime = (await this.paymentService.getInvoicesFromUser(customerId, {})).filter(
+        (invoice) => invoice.status === 'paid',
+      );
+      const firstInvoice = activeLifetime?.[0];
+      const firstLine = firstInvoice?.lines?.data?.[0];
+
+      if (firstLine?.price?.product) {
+        productId = firstLine.price.product as string;
+      }
+    }
+
+    const hasAntivirusAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
 
     return {
       featuresPerService: {
-        antivirus: false,
+        antivirus: hasAntivirusAccess,
       },
     };
   }
