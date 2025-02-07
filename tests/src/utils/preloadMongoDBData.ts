@@ -1,43 +1,45 @@
 import { MongoClient } from 'mongodb';
-import getMocks from '../mocks';
 import { UserType } from '../../../src/core/users/User';
+import { prices, uniqueCode, user } from '../mocks';
 
 export const preloadData = async (client: MongoClient) => {
-  const mocks = getMocks();
+  const mockedUser = user();
+  const mockedPrices = prices();
+  const mockedUniqueCode = uniqueCode();
   const db = client.db('payments');
 
   await db.collection('license_codes').insertMany([
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.techCult.provider,
-      code: mocks.uniqueCode.techCult.codes.elegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCode.techCult.provider,
+      code: mockedUniqueCode.techCult.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.techCult.provider,
-      code: mocks.uniqueCode.techCult.codes.nonElegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCode.techCult.provider,
+      code: mockedUniqueCode.techCult.codes.nonElegible,
       redeemed: true,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.stackCommerce.provider,
-      code: mocks.uniqueCode.stackCommerce.codes.elegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCode.stackCommerce.provider,
+      code: mockedUniqueCode.stackCommerce.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.stackCommerce.provider,
-      code: mocks.uniqueCode.stackCommerce.codes.nonElegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCode.stackCommerce.provider,
+      code: mockedUniqueCode.stackCommerce.codes.nonElegible,
       redeemed: true,
     },
   ]);
 
   await db.collection('users').insertMany([
     {
-      customer_id: mocks.user.customerId,
-      uuid: mocks.user.uuid,
-      lifetime: mocks.user.lifetime,
+      customer_id: mockedUser.customerId,
+      uuid: mockedUser.uuid,
+      lifetime: mockedUser.lifetime,
     },
   ]);
 
