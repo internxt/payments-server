@@ -3,6 +3,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
 import Stripe from 'stripe';
 import axios from 'axios';
+import * as jwt from 'jsonwebtoken';
 
 import { default as start } from '../../src/server';
 
@@ -15,11 +16,16 @@ import { CouponsRepository } from '../../src/core/coupons/CouponsRepository';
 import { DisplayBillingRepository } from '../../src/core/users/MongoDBDisplayBillingRepository';
 import { UsersRepository } from '../../src/core/users/UsersRepository';
 import { StorageService } from '../../src/services/storage.service';
-import { InvalidTaxIdError, PaymentService } from '../../src/services/payment.service';
+import {
+  InvalidTaxIdError,
+  PaymentService,
+  PromoCodeIsNotValidError,
+  SubscriptionCreated,
+} from '../../src/services/payment.service';
 import testFactory from './utils/factory';
 import config from '../../src/config';
 import { User } from '../../src/core/users/User';
-import { getValidToken, prices, uniqueCode, user } from './mocks';
+import { driveInvoices, getValidToken, mockCreateSubscriptionResponse, prices, uniqueCode, user } from './mocks';
 
 let mongoServer: MongoMemoryServer;
 let mongoClient: MongoClient;
@@ -96,7 +102,7 @@ afterAll(async () => {
 });
 
 describe('Payment controller e2e tests', () => {
-  describe('Check if the unique code provided by the user is valid', () => {
+  describe('GET /is-unique-code-available', () => {
     it('When the code is already used, then it returns 404 status code', async () => {
       const response = await app.inject({
         path: '/is-unique-code-available',
@@ -118,7 +124,7 @@ describe('Payment controller e2e tests', () => {
     });
   });
 
-  describe('Fetching plan object by ID and contains the basic params', () => {
+  describe('GET /plan-by-id', () => {
     describe('Fetch subscription plan object', () => {
       it('When the subscription priceId is valid, then the endpoint returns the correct object', async () => {
         const expectedKeys = {
@@ -334,5 +340,150 @@ describe('Payment controller e2e tests', () => {
 
       expect(response.statusCode).toBe(500);
     });
+  });
+
+  describe('POST /create-subscription', () => {
+    const createdToken = getValidToken(user().uuid);
+    const authToken = `Bearer ${createdToken}`;
+
+    it('When customerId o priceId are missing, then returns 400 status code', async () => {
+      const response = await app.inject({
+        path: `/create-subscription`,
+        method: 'POST',
+        headers: { authorization: authToken },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('When all parameters are valid, then returns 200 with the created subscription data', async () => {
+      const mockedUser = user();
+      const mockedSubCreated = mockCreateSubscriptionResponse() as SubscriptionCreated;
+      const token = jwt.sign(
+        {
+          customerId: mockedUser.customerId,
+        },
+        config.JWT_SECRET,
+        {
+          expiresIn: '1h',
+        },
+      );
+
+      const createSubSpy = jest
+        .spyOn(PaymentService.prototype, 'createSubscription')
+        .mockResolvedValue(mockedSubCreated);
+
+      const response = await app.inject({
+        path: `/create-subscription`,
+        method: 'POST',
+        headers: { authorization: authToken },
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          token,
+        },
+      });
+
+      const responseBody = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(createSubSpy).toHaveBeenCalledTimes(1);
+      expect(responseBody).toEqual(mockedSubCreated);
+    });
+
+    it('When paymentService.createSubscription throws PromoCodeIsNotValidError, then returns 422', async () => {
+      const mockedUser = user();
+      const mockError = new PromoCodeIsNotValidError('Error in coupon code');
+      const token = jwt.sign(
+        {
+          customerId: mockedUser.customerId,
+        },
+        config.JWT_SECRET,
+        {
+          expiresIn: '1h',
+        },
+      );
+
+      jest.spyOn(PaymentService.prototype, 'createSubscription').mockRejectedValue(mockError);
+
+      const response = await app.inject({
+        path: `/create-subscription`,
+        method: 'POST',
+        headers: { authorization: authToken },
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          token,
+        },
+      });
+
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('When paymentService.createSubscription throws an unknown error, then returns 500', async () => {
+      const mockedUser = user();
+      const mockedUnknownError = new Error('Unknown error');
+      const token = jwt.sign(
+        {
+          customerId: mockedUser.customerId,
+        },
+        config.JWT_SECRET,
+        {
+          expiresIn: '1h',
+        },
+      );
+
+      jest.spyOn(PaymentService.prototype, 'createSubscription').mockRejectedValue(mockedUnknownError);
+
+      const response = await app.inject({
+        path: `/create-subscription`,
+        method: 'POST',
+        headers: { authorization: authToken },
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          token,
+        },
+      });
+
+      expect(response.statusCode).toBe(500);
+    });
+  });
+
+  describe('GET /invoices', () => {
+    it('When limit is specified, then returns the specified number of invoices', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+
+      jest.spyOn(PaymentService.prototype, 'getDriveInvoices').mockResolvedValue(mockedDriveInvoices as any);
+    });
+    it('When starting_after is provided, then returns invoices paginated correctly', async () => {});
+    it('When userType is provided, then returns invoices filtered by that user type', async () => {});
+    it('When subscription query param is provided, then returns invoices filtered by that subscription ID', async () => {});
+    it('When everything is valid, then returns 200 with the list of matching invoices', async () => {});
+  });
+
+  describe('DELETE /subscriptions', () => {
+    it('When userType is business, then usersService.cancelUserB2BSubscriptions is called and returns 204', async () => {});
+    it('When userType is individual, then usersService.cancelUserIndividualSubscriptions is called and returns 204', async () => {});
+    it('When userType is not provided, then defaults to individual and returns 204', async () => {});
+  });
+
+  describe('PATCH /billing', () => {
+    it('When both address and phoneNumber are missing, then proceeds without error', async () => {});
+    it('When paymentService.updateCustomerBillingInfo fails, then returns 500', async () => {});
+    it('When everything is valid, then returns 204 and updates the billing info', async () => {});
+  });
+
+  describe('PUT /subscriptions', () => {
+    it('When price_id is missing, then returns 400', async () => {});
+    it('When userType is invalid, then returns 400', async () => {});
+    it('When paymentService.updateSubscriptionPrice throws InvalidSeatNumberError or IncompatibleSubscriptionTypesError, then returns 400', async () => {});
+    it('When paymentService.updateSubscriptionPrice is successful, then returns 200', async () => {});
+  });
+
+  describe('GET /setup-intent', () => {
+    it('When a specific userType is provided, then sets metadata in Stripe', async () => {});
+    it('When everything is valid, then returns 200', async () => {});
   });
 });

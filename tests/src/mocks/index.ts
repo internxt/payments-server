@@ -65,6 +65,8 @@ export function mockCreateSubscriptionResponse() {
   return {
     type: 'payment',
     clientSecret: 'client_secret',
+    subscriptionId: randomDataGenerator.string({ length: 10 }),
+    paymentIntentId: randomDataGenerator.string({ length: 10 }),
   };
 }
 
@@ -257,6 +259,17 @@ export function mockLogger(): jest.Mocked<FastifyBaseLogger> {
     level: 'info',
     silent: jest.fn(),
     child: jest.fn(),
+  };
+}
+
+export function driveInvoices() {
+  return {
+    id: `in_${randomUUID()}`,
+    created: 1640995300,
+    pdf: 'https://example.com/inv_1.pdf',
+    bytesInPlan: 2147483648,
+    total: 1000,
+    currency: 'EUR',
   };
 }
 
