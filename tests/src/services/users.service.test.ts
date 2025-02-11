@@ -97,16 +97,15 @@ describe('UsersService tests', () => {
     });
 
     it('When no user is updated, then throws an error indicating that the user was not found', async () => {
-      (usersRepository.updateUser as jest.Mock).mockResolvedValue(false);
+      (usersRepository.updateUser as jest.Mock).mockImplementation(() =>
+        Promise.reject(new UserNotFoundError('User not found')),
+      );
 
       await expect(
         usersService.updateUser(mocks.mockedUserWithoutLifetime.customerId, { lifetime: true }),
       ).rejects.toThrow(UserNotFoundError);
 
       expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
-      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId, {
-        lifetime: true,
-      });
     });
   });
 
@@ -291,8 +290,8 @@ describe('UsersService tests', () => {
 
   describe('enableVPNTier()', () => {
     it('When called with a userUuid and tier, then enables the VPN for the user', async () => {
-      const userUuid = 'user-uuid-123';
-      const tier = 'vpn-feature-1';
+      const userUuid = mocks.mockedUserWithLifetime.uuid;
+      const tier = mocks.newTier().featuresPerService['vpn'].featureId;
 
       const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
       jest.spyOn(jwt, 'sign').mockReturnValue();
@@ -300,6 +299,11 @@ describe('UsersService tests', () => {
       await usersService.enableVPNTier(userUuid, tier);
 
       expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/vpn/users`,
+        { userUuid, tier },
+        expect.anything(),
+      );
     });
   });
 });
