@@ -77,7 +77,7 @@ describe('TiersService tests', () => {
     tiersService = new TiersService(usersService, paymentService, tiersRepository, config);
   });
 
-  describe('getAntivirusTier()', () => {
+  describe('Antivirus access based on user tier', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
       const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
       const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
@@ -174,7 +174,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyTier()', () => {
+  describe('Apply the Tier the user paid for', () => {
     it('When applying the tier, then fails if the tier is not found', async () => {
       const user = mocks.mockedUserWithLifetime;
       const productId = 'productId';
@@ -236,7 +236,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyDriveFeatures()', () => {
+  describe('Apply Drive features according the paid plan', () => {
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
       const tier = mocks.newTier();
@@ -303,7 +303,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyVpnFeatures()', () => {
+  describe('VPN access based on user tier', () => {
     it("When VPN is enabled, then a request to enable user's tier on the VPN service is sent", async () => {
       const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
       const tier = mocks.newTier();
