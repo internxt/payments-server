@@ -236,7 +236,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('Apply Drive features according the paid plan', () => {
+  describe('Apply Drive features according the user tier plan', () => {
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
       const tier = mocks.newTier();
