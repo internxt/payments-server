@@ -24,7 +24,7 @@ import {
 } from '../../src/services/payment.service';
 import testFactory from './utils/factory';
 import config from '../../src/config';
-import { User } from '../../src/core/users/User';
+import { User, UserType } from '../../src/core/users/User';
 import { driveInvoices, getValidToken, mockCreateSubscriptionResponse, prices, uniqueCode, user } from './mocks';
 
 let mongoServer: MongoMemoryServer;
@@ -451,39 +451,153 @@ describe('Payment controller e2e tests', () => {
   });
 
   describe('GET /invoices', () => {
+    const createdToken = getValidToken(user().uuid);
+    const authToken = `Bearer ${createdToken}`;
+
+    beforeEach(() => {
+      jest.restoreAllMocks();
+    });
+
     it('When limit is specified, then returns the specified number of invoices', async () => {
       const mockedUser = user();
       const mockedDriveInvoices = driveInvoices();
+      const getDriveInvoicesSpy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
 
-      jest.spyOn(PaymentService.prototype, 'getDriveInvoices').mockResolvedValue(mockedDriveInvoices as any);
+      const limit = 5;
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices?limit=${limit}`,
+        headers: { authorization: authToken },
+      });
+
+      expect(getDriveInvoicesSpy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        { limit, startingAfter: undefined },
+        UserType.Individual,
+        undefined,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
     });
-    it('When starting_after is provided, then returns invoices paginated correctly', async () => {});
-    it('When userType is provided, then returns invoices filtered by that user type', async () => {});
-    it('When subscription query param is provided, then returns invoices filtered by that subscription ID', async () => {});
-    it('When everything is valid, then returns 200 with the list of matching invoices', async () => {});
-  });
 
-  describe('DELETE /subscriptions', () => {
-    it('When userType is business, then usersService.cancelUserB2BSubscriptions is called and returns 204', async () => {});
-    it('When userType is individual, then usersService.cancelUserIndividualSubscriptions is called and returns 204', async () => {});
-    it('When userType is not provided, then defaults to individual and returns 204', async () => {});
-  });
+    it('When starting_after is provided, then returns invoices paginated correctly', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+      const spy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
 
-  describe('PATCH /billing', () => {
-    it('When both address and phoneNumber are missing, then proceeds without error', async () => {});
-    it('When paymentService.updateCustomerBillingInfo fails, then returns 500', async () => {});
-    it('When everything is valid, then returns 204 and updates the billing info', async () => {});
-  });
+      const startingAfter = 'invoice_456';
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices?starting_after=${startingAfter}`,
+        headers: { authorization: authToken },
+      });
 
-  describe('PUT /subscriptions', () => {
-    it('When price_id is missing, then returns 400', async () => {});
-    it('When userType is invalid, then returns 400', async () => {});
-    it('When paymentService.updateSubscriptionPrice throws InvalidSeatNumberError or IncompatibleSubscriptionTypesError, then returns 400', async () => {});
-    it('When paymentService.updateSubscriptionPrice is successful, then returns 200', async () => {});
-  });
+      expect(spy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        { limit: 10, startingAfter },
+        UserType.Individual,
+        undefined,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
+    });
 
-  describe('GET /setup-intent', () => {
-    it('When a specific userType is provided, then sets metadata in Stripe', async () => {});
-    it('When everything is valid, then returns 200', async () => {});
+    it('When userType is provided, then returns invoices filtered by that user type', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+      const spy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
+
+      const userType = UserType.Business;
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices?userType=${userType}`,
+        headers: { authorization: authToken },
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        { limit: 10, startingAfter: undefined },
+        userType,
+        undefined,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
+    });
+
+    it('When subscription query param is provided, then returns invoices filtered by that subscription ID', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+      const spy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
+
+      const subscriptionId = 'sub_789';
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices?subscription=${subscriptionId}`,
+        headers: { authorization: authToken },
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        { limit: 10, startingAfter: undefined },
+        UserType.Individual,
+        subscriptionId,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
+    });
+
+    it('When everything is valid, then returns 200 with the list of matching invoices', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+      const spy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
+
+      const limit = 5;
+      const startingAfter = new Date().toISOString();
+      const userType = UserType.Business;
+      const subscriptionId = 'sub_789';
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices?limit=${limit}&starting_after=${startingAfter}&userType=${userType}&subscription=${subscriptionId}`,
+        headers: { authorization: authToken },
+      });
+
+      expect(spy).toHaveBeenCalledWith(mockedUser.customerId, { limit, startingAfter }, userType, subscriptionId);
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
+    });
+
+    it('When no param is provided, then returns the individual invoices', async () => {
+      const mockedUser = user();
+      const mockedDriveInvoices = driveInvoices();
+      const spy = jest
+        .spyOn(PaymentService.prototype, 'getDriveInvoices')
+        .mockResolvedValue(mockedDriveInvoices as any);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/invoices`,
+        headers: { authorization: authToken },
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        { limit: 10, startingAfter: undefined },
+        UserType.Individual,
+        undefined,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(mockedDriveInvoices);
+    });
   });
 });
