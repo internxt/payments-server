@@ -14,6 +14,7 @@ import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import testFactory from '../utils/factory';
 import getMocks from '../mocks';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
+import jwt from 'jsonwebtoken';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -24,6 +25,11 @@ let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
+
+jest.mock('jsonwebtoken', () => ({
+  ...jest.requireActual('jsonwebtoken'),
+  sign: jest.fn(),
+}));
 
 beforeEach(() => {
   usersRepository = testFactory.getUsersRepositoryForTest();
@@ -59,7 +65,7 @@ describe('UsersService tests', () => {
     jest.restoreAllMocks();
   });
 
-  describe('Insert User in Mongo DB', () => {
+  describe('insertUser()', () => {
     it('When trying to add a user with the correct params, the user is inserted successfully', async () => {
       await usersService.insertUser({
         customerId: mocks.mockedUserWithoutLifetime.customerId,
@@ -76,8 +82,36 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Find customer by Customer ID', () => {
-    it('When looking for a customer by its ID with the correct params, then the customer is found', async () => {
+  describe('updateUser()', () => {
+    it('When the user is updated successfully, then resolves', async () => {
+      (usersRepository.updateUser as jest.Mock).mockResolvedValue(true);
+
+      await expect(
+        usersService.updateUser(mocks.mockedUserWithoutLifetime.customerId, { lifetime: true }),
+      ).resolves.toBeUndefined();
+
+      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId, {
+        lifetime: true,
+      });
+    });
+
+    it('When no user is updated, then throws an error indicating that the user was not found', async () => {
+      (usersRepository.updateUser as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        usersService.updateUser(mocks.mockedUserWithoutLifetime.customerId, { lifetime: true }),
+      ).rejects.toThrow(UserNotFoundError);
+
+      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId, {
+        lifetime: true,
+      });
+    });
+  });
+
+  describe('findUserByCustomerID()', () => {
+    it('When looking for a customer by its customer ID and exists, then the user is returned', async () => {
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mocks.mockedUserWithoutLifetime);
 
       const result = await usersService.findUserByCustomerID(mocks.mockedUserWithoutLifetime.customerId);
@@ -87,7 +121,7 @@ describe('UsersService tests', () => {
       expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId);
     });
 
-    it('when no user is found by customerId, then an UserNotFoundError is thrown', async () => {
+    it('when no user is found by customerId, then throws an error indicating that the user was not found', async () => {
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(null);
 
       await expect(usersService.findUserByCustomerID(mocks.mockedUserWithoutLifetime.customerId)).rejects.toThrow(
@@ -99,8 +133,8 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Find customer by User UUId', () => {
-    it('When looking for a customer by UUID with the correct params, then the customer is found', async () => {
+  describe('findUserByUuid()', () => {
+    it('When looking for a customer by UUID and exists, then the customer is returned', async () => {
       (usersRepository.findUserByUuid as jest.Mock).mockResolvedValue(mocks.mockedUserWithoutLifetime);
 
       const result = await usersService.findUserByUuid(mocks.mockedUserWithoutLifetime.uuid);
@@ -110,7 +144,7 @@ describe('UsersService tests', () => {
       expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.uuid);
     });
 
-    it('when no user is found by UUID then should throw UserNotFoundError', async () => {
+    it('when no user is found by UUID, then throws an error indicating that the user was not found', async () => {
       (usersRepository.findUserByUuid as jest.Mock).mockResolvedValue(null);
 
       await expect(usersService.findUserByUuid(mocks.mockedUserWithoutLifetime.uuid)).rejects.toThrow(
@@ -123,7 +157,7 @@ describe('UsersService tests', () => {
   });
 
   describe('Cancelling user subscription', () => {
-    describe('Cancel the user individual subscription', () => {
+    describe('cancelUserIndividualSubscriptions()', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plan is cancelled and the storage is restored', async () => {
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
@@ -150,7 +184,7 @@ describe('UsersService tests', () => {
       });
     });
 
-    describe('Cancel the user B2B subscription', () => {
+    describe('cancelUserB2BSuscriptions()', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plans are cancelled', async () => {
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
@@ -181,7 +215,7 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Storing coupon user by user', () => {
+  describe('storeCouponUsedByUser()', () => {
     it('When the coupon is tracked, then the coupon is stored correctly', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
 
@@ -206,7 +240,7 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('isCouponBeingUsedByUser', () => {
+  describe('isCouponBeingUsedByUser()', () => {
     it('When the coupon is tracked and used by the user, then returns true', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
       (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue({ id: 'entry1' });
@@ -252,6 +286,20 @@ describe('UsersService tests', () => {
       expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.couponName.invalid);
       expect(usersCouponsRepository.findByUserAndCoupon).not.toHaveBeenCalled();
       expect(result).toBe(false);
+    });
+  });
+
+  describe('enableVPNTier()', () => {
+    it('When called with a userUuid and tier, then enables the VPN for the user', async () => {
+      const userUuid = 'user-uuid-123';
+      const tier = 'vpn-feature-1';
+
+      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
+      jest.spyOn(jwt, 'sign').mockReturnValue();
+
+      await usersService.enableVPNTier(userUuid, tier);
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

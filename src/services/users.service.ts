@@ -63,25 +63,6 @@ export class UsersService {
     return userFound;
   }
 
-  async cancelUserTeamsSubscriptions(uuid: User['uuid'], teamsUserUuid: User['uuid']) {
-    const user = await this.findUserByUuid(uuid);
-    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(user.customerId);
-
-    if (activeSubscriptions.length === 0) {
-      throw new Error('Subscriptions not found');
-    }
-
-    const subscriptionsToCancel = activeSubscriptions.filter((subscription) => {
-      const isTeams = parseInt(subscription.items.data[0].price.metadata.is_teams);
-
-      return isTeams === 1;
-    }) as Stripe.Subscription[];
-
-    for (const subscriptionToCancel of subscriptionsToCancel) {
-      await this.paymentService.cancelSubscription(subscriptionToCancel.id);
-    }
-  }
-
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
@@ -262,7 +243,7 @@ export class UsersService {
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
   }
 
-  async addUserTierToVPNDatabase(userUuid: User['uuid'], tier: VpnFeatures['featureId']): Promise<void> {
+  async enableVPNTier(userUuid: User['uuid'], tier: VpnFeatures['featureId']): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
 
     const requestConfig: AxiosRequestConfig = {

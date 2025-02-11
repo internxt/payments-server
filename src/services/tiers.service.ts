@@ -137,7 +137,7 @@ export class TiersService {
     const { enabled, featureId } = tier.featuresPerService[Service.Vpn];
 
     if (enabled) {
-      await this.usersService.addUserTierToVPNDatabase(uuid, featureId);
+      await this.usersService.enableVPNTier(uuid, featureId);
     }
   }
 }
