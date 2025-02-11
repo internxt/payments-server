@@ -96,7 +96,7 @@ describe('UsersService tests', () => {
       });
     });
 
-    it('When no user is updated, then throws an error indicating that the user was not found', async () => {
+    it('When no user is updated or user is not found, then throws an error indicating that the user was not found', async () => {
       (usersRepository.updateUser as jest.Mock).mockImplementation(() =>
         Promise.reject(new UserNotFoundError('User not found')),
       );
