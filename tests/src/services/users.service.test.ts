@@ -214,7 +214,7 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Storing coupon user by user', () => {
+  describe('Track coupons used by users', () => {
     it('When the coupon is tracked, then the coupon is stored correctly', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
 
@@ -239,7 +239,7 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Check if the user used a coupon code', () => {
+  describe('Verify if the user used a tracked coupon code', () => {
     it('When the coupon is tracked and used by the user, then returns true', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
       (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue({ id: 'entry1' });
