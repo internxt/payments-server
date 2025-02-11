@@ -120,7 +120,7 @@ describe('UsersService tests', () => {
       expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId);
     });
 
-    it('when no user is found by customerId, then throws an error indicating that the user was not found', async () => {
+    it('When a user is not found, then an error indicating so is thrown', async () => {
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(null);
 
       await expect(usersService.findUserByCustomerID(mocks.mockedUserWithoutLifetime.customerId)).rejects.toThrow(
@@ -226,8 +226,7 @@ describe('UsersService tests', () => {
         user: mocks.mockedUserWithoutLifetime.id,
       });
     });
-
-    it('when the coupon is not tracked, then the an CouponNotBeingTrackedError is thrown', async () => {
+    it('when the coupon is not tracked, then an error indicating so is thrown', async () => {
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
 
       await expect(
