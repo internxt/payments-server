@@ -4,7 +4,7 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
-import { UserNotFoundError, UsersService } from '../services/users.service';
+import { UsersService } from '../services/users.service';
 import {
   CouponCodeError,
   IncompatibleSubscriptionTypesError,
@@ -169,7 +169,6 @@ export default function (
         },
       },
       async (req, res) => {
-        const { uuid } = req.user.payload;
         const { name, email, country, companyVatId } = req.body;
 
         if (!email) {
@@ -179,29 +178,7 @@ export default function (
         }
 
         try {
-          const { customerId } = await usersService.findUserByUuid(uuid);
-          const token = jwt.sign(
-            {
-              customerId,
-            },
-            config.JWT_SECRET,
-          );
-          return res.send({
-            customerId: customerId,
-            token,
-          });
-        } catch (error) {
-          const castedError = error as Error;
-          if (!(error instanceof UserNotFoundError)) {
-            req.log.error(`[ERROR GETTING CUSTOMER BY UUID IN CREATE-CUSTOMER]: ${castedError.message}`);
-            return res.status(500).send({
-              message: 'Internal Server Error',
-            });
-          }
-        }
-
-        try {
-          const { id: customerId } = await paymentService.createOrGetCustomer(
+          const { id } = await paymentService.createOrGetCustomer(
             {
               name,
               email,
@@ -212,13 +189,13 @@ export default function (
 
           const token = jwt.sign(
             {
-              customerId,
+              customerId: id,
             },
             config.JWT_SECRET,
           );
 
           return res.send({
-            customerId,
+            customerId: id,
             token,
           });
         } catch (err) {
