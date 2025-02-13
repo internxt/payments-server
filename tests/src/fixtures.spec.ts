@@ -134,7 +134,7 @@ describe('Test fixtures', () => {
   });
 
   describe("Subscription's fixture", () => {
-    describe('Subscription response', () => {
+    describe('Created Subscription response', () => {
       it('When generating a subscription response, then it should have a default clientSecret', () => {
         const response = mockCreateSubscriptionResponse();
 
@@ -143,9 +143,9 @@ describe('Test fixtures', () => {
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const response = mockCreateSubscriptionResponse({ clientSecret: 'custom_secret' });
+        const response = mockCreateSubscriptionResponse({ type: 'setup' });
 
-        expect(response.clientSecret).toBe('custom_secret');
+        expect(response.type).toBe('setup');
       });
     });
 
