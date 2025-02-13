@@ -25,7 +25,7 @@ export const getValidToken = (userUuid: string): string => {
 
 export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
   return {
-    id: 'cus_NffrFeUfNV2Hib',
+    id: `cus_${randomDataGenerator.string({ length: 12 })}`,
     object: 'customer',
     address: null,
     balance: 0,
@@ -35,7 +35,7 @@ export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.C
     delinquent: false,
     description: null,
     discount: null,
-    email: 'example@inxt.com',
+    email: 'example@internxt.com',
     invoice_prefix: '0759376C',
     invoice_settings: {
       custom_fields: null,
@@ -45,7 +45,7 @@ export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.C
     },
     livemode: false,
     metadata: {},
-    name: 'Jenny Rosen',
+    name: 'My internxt',
     next_invoice_sequence: 1,
     phone: null,
     preferred_locales: [],
@@ -87,9 +87,9 @@ export const mockCreateSubscriptionResponse = (params?: Partial<SubscriptionCrea
   };
 };
 
-export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
+export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
   return {
-    id: 'sub_1MowQVLkdIwHu7ixeRlqHVzs',
+    id: `sub_${randomDataGenerator.string({ length: 14 })}`,
     object: 'subscription',
     billing_cycle_anchor_config: {
       day_of_month: 1,
@@ -108,7 +108,7 @@ export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscript
       enabled: false,
       liability: null,
     },
-    billing_cycle_anchor: 1679609767,
+    billing_cycle_anchor: randomDataGenerator.natural({ length: 10 }),
     billing_thresholds: null,
     cancel_at: null,
     cancel_at_period_end: false,
@@ -119,11 +119,11 @@ export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscript
       reason: null,
     },
     collection_method: 'charge_automatically',
-    created: 1679609767,
+    created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
-    current_period_end: 1682288167,
-    current_period_start: 1679609767,
-    customer: 'cus_Na6dX7aXxi11N4',
+    current_period_end: randomDataGenerator.natural({ length: 10 }),
+    current_period_start: randomDataGenerator.natural({ length: 10 }),
+    customer: `cus_${randomDataGenerator.string({ length: 12 })}`,
     days_until_due: null,
     default_payment_method: null,
     default_source: null,
@@ -136,46 +136,46 @@ export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscript
       object: 'list',
       data: [
         {
-          id: 'si_Na6dzxczY5fwHx',
+          id: `si_${randomDataGenerator.string({ length: 12 })}`,
           object: 'subscription_item',
           billing_thresholds: null,
-          created: 1679609768,
+          created: randomDataGenerator.natural({ length: 10 }),
           metadata: {},
           discounts: null as any,
           plan: {
-            id: 'price_1MowQULkdIwHu7ixraBm864M',
+            id: `price_${randomDataGenerator.string({ length: 20 })}`,
             object: 'plan',
             active: true,
             aggregate_usage: null,
             amount: 1000,
             amount_decimal: '1000',
             billing_scheme: 'per_unit',
-            created: 1679609766,
+            created: randomDataGenerator.natural({ length: 10 }),
             currency: 'usd',
             interval: 'month',
             interval_count: 1,
             livemode: false,
             metadata: {},
             nickname: null,
-            product: 'prod_Na6dGcTsmU0I4R',
+            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
             tiers_mode: null,
             transform_usage: null,
             trial_period_days: null,
             usage_type: 'licensed',
           },
           price: {
-            id: 'price_1MowQULkdIwHu7ixraBm864M',
+            id: `price_${randomDataGenerator.string({ length: 12 })}`,
             object: 'price',
             active: true,
             billing_scheme: 'per_unit',
-            created: 1679609766,
+            created: randomDataGenerator.natural({ length: 10 }),
             currency: 'usd',
             custom_unit_amount: null,
             livemode: false,
             lookup_key: null,
             metadata: {},
             nickname: null,
-            product: 'prod_Na6dGcTsmU0I4R',
+            product: `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
               aggregate_usage: null,
               interval: 'month',
@@ -191,14 +191,14 @@ export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscript
             unit_amount_decimal: '1000',
           },
           quantity: 1,
-          subscription: 'sub_1MowQVLkdIwHu7ixeRlqHVzs',
+          subscription: `sub_${randomDataGenerator.string({ length: 12 })}`,
           tax_rates: [],
         },
       ],
       has_more: false,
       url: '/v1/subscription_items?subscription=sub_1MowQVLkdIwHu7ixeRlqHVzs',
     },
-    latest_invoice: 'in_1MowQWLkdIwHu7ixuzkSPfKd',
+    latest_invoice: `in_${randomDataGenerator.string({ length: 14 })}`,
     livemode: false,
     metadata: {},
     next_pending_invoice_item_invoice: null,
@@ -213,7 +213,7 @@ export const mockCreatedSubscriptionPayload = (params?: Partial<Stripe.Subscript
     pending_setup_intent: null,
     pending_update: null,
     schedule: null,
-    start_date: 1679609767,
+    start_date: randomDataGenerator.natural({ length: 10 }),
     status: 'active',
     test_clock: null,
     transfer_data: null,
@@ -233,7 +233,7 @@ export const mockActiveSubscriptions = (
   paramsArray: Partial<Stripe.Subscription>[] = [],
 ): Stripe.Subscription[] => {
   return Array.from({ length: count }, (_, index) => ({
-    ...mockCreatedSubscriptionPayload(),
+    ...createdSubscription(),
     ...paramsArray[index],
   }));
 };

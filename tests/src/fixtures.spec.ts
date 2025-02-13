@@ -1,9 +1,9 @@
 import config from '../../src/config';
 import {
+  createdSubscription,
   getUser,
   getValidToken,
   mockActiveSubscriptions,
-  mockCreatedSubscriptionPayload,
   mockCreateSubscriptionResponse,
   mockCustomerPayload,
   mockPrices,
@@ -141,14 +141,14 @@ describe('Test fixtures', () => {
 
   describe('mockCreatedSubscriptionPayload', () => {
     it('When generating a subscription, then it should have default values', () => {
-      const subscription = mockCreatedSubscriptionPayload();
+      const subscription = createdSubscription();
 
       expect(subscription.id).toBe('sub_1MowQVLkdIwHu7ixeRlqHVzs');
       expect(subscription.status).toBe('active');
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const subscription = mockCreatedSubscriptionPayload({ status: 'canceled' });
+      const subscription = createdSubscription({ status: 'canceled' });
 
       expect(subscription.status).toBe('canceled');
     });
