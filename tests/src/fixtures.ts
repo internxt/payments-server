@@ -23,7 +23,7 @@ export const getValidToken = (userUuid: string): string => {
   return jwt.sign({ payload: { uuid: userUuid } }, config.JWT_SECRET);
 };
 
-export const getCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
+export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
   return {
     id: `cus_${randomDataGenerator.string({ length: 20 })}`,
     object: 'customer',
@@ -56,7 +56,7 @@ export const getCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Cu
   };
 };
 
-export const getPromotionCode = (params: Partial<PromotionCode>): PromotionCode => {
+export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode => {
   return {
     codeId: 'promo_id',
     promoCodeName: 'PROMO_NAME',
@@ -88,6 +88,9 @@ export const getCreateSubscriptionResponse = (params?: Partial<SubscriptionCreat
 };
 
 export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
+  const customer = `cus_${randomDataGenerator.string({ length: 20 })}`;
+  const invoice = `in_${randomDataGenerator.string({ length: 14 })}`;
+
   return {
     id: `sub_${randomDataGenerator.string({ length: 14 })}`,
     object: 'subscription',
@@ -123,14 +126,63 @@ export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): S
     currency: 'usd',
     current_period_end: randomDataGenerator.natural({ length: 10 }),
     current_period_start: randomDataGenerator.natural({ length: 10 }),
-    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
+    customer: customer,
     days_until_due: null,
     default_payment_method: null,
     default_source: null,
     default_tax_rates: [],
     description: null,
     discount: null,
-    discounts: null as any,
+    discounts: [
+      {
+        id: 'jMT0WJUD',
+        checkout_session: '',
+        coupon: 'jMT0WJUD' as any,
+        customer: customer,
+        invoice,
+        invoice_item: invoice,
+        end: 0,
+        object: 'discount',
+        start: 10,
+        subscription: '',
+        subscription_item: '',
+        promotion_code: {
+          id: `promo_${randomDataGenerator.string({ length: 22 })}`,
+          object: 'promotion_code',
+          active: true,
+          code: 'PROMO_CODE',
+          coupon: {
+            id: 'jMT0WJUD',
+            object: 'coupon',
+            amount_off: null,
+            created: 1678040164,
+            currency: null,
+            duration: 'repeating',
+            duration_in_months: 3,
+            livemode: false,
+            max_redemptions: null,
+            metadata: {},
+            name: null,
+            percent_off: 25.5,
+            redeem_by: null,
+            times_redeemed: 0,
+            valid: true,
+          },
+          created: 1678040164,
+          customer: null,
+          expires_at: null,
+          livemode: false,
+          max_redemptions: null,
+          metadata: {},
+          restrictions: {
+            first_time_transaction: false,
+            minimum_amount: null,
+            minimum_amount_currency: null,
+          },
+          times_redeemed: 0,
+        },
+      },
+    ],
     ended_at: null,
     items: {
       object: 'list',

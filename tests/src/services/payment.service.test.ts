@@ -1,17 +1,20 @@
 import Stripe from 'stripe';
 import axios from 'axios';
-import {
-  PaymentIntent,
-  PaymentService,
-  PromotionCode,
-  SubscriptionCreated,
-} from '../../../src/services/payment.service';
+import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
 import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
 import { UserType } from '../../../src/core/users/User';
+import {
+  getCoupon,
+  getCreatedSubscription,
+  getCreateSubscriptionResponse,
+  getCustomer,
+  getPrices,
+  getPromotionCode,
+} from '../fixtures';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -30,52 +33,68 @@ describe('Payments Service tests', () => {
 
   describe('Creating a customer', () => {
     it('When trying to create a customer with the correct params, then the customer is created successfully', async () => {
+      const mockedCustomer = getCustomer();
+
+      const createCustomerPayload = {
+        email: mockedCustomer.email as string,
+        name: mockedCustomer.name as string,
+      };
+
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mocks.mockedUserWithoutLifetime as unknown as Stripe.Customer));
+        .mockImplementation(() => Promise.resolve(mockedCustomer));
 
-      await paymentService.createCustomer(mocks.mockedCustomerPayload);
+      await paymentService.createCustomer(createCustomerPayload);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(mocks.mockedCustomerPayload);
+      expect(customerCreatedSpy).toHaveBeenCalledWith(createCustomerPayload);
     });
   });
 
   describe('Fetching the promotion code object', () => {
     it('When requesting the Promotion Code with the correct params, then returns the promoCodeId, name, amount off and/or discount off', async () => {
+      const mockedPromoCode = getPromotionCode();
+      const mockedPrices = getPrices();
+      const mockedCoupon = getCoupon();
+
+      const existingSubscription = mockedPrices.subscription.exists;
+      const promoCode = mockedCoupon.code;
+
       const customerCreatedSpy = jest
         .spyOn(paymentService, 'getPromotionCodeByName')
-        .mockImplementation(() => Promise.resolve(mocks.mockPromotionCodeResponse as unknown as PromotionCode));
+        .mockImplementation(() => Promise.resolve(mockedPromoCode));
 
-      const promotionCode = await paymentService.getPromotionCodeByName(
-        mocks.prices.subscription.exists,
-        mocks.couponName.valid,
-      );
+      const promotionCode = await paymentService.getPromotionCodeByName(existingSubscription, promoCode);
 
-      expect(customerCreatedSpy).toHaveBeenCalledWith(mocks.prices.subscription.exists, mocks.couponName.valid);
-      expect(promotionCode).toEqual(mocks.mockPromotionCodeResponse);
+      expect(customerCreatedSpy).toHaveBeenCalledWith(existingSubscription, promoCode);
+      expect(promotionCode).toEqual(mockedPromoCode);
     });
   });
 
   describe('Creating a subscription', () => {
     it('When trying to create a subscription with the correct params, then it is successfully created', async () => {
+      const mockedSubscriptionResponse = getCreateSubscriptionResponse();
+      const mockedCreateSubscription = getCreatedSubscription();
+
       const subscriptionCreatedSpy = jest
         .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() =>
-          Promise.resolve(mocks.mockCreateSubscriptionResponse as unknown as SubscriptionCreated),
-        );
+        .mockImplementation(() => Promise.resolve(mockedSubscriptionResponse));
 
       const subscription = await paymentService.createSubscription({
-        customerId: mocks.createdSubscriptionPayload.customerId,
-        priceId: mocks.createdSubscriptionPayload.priceId,
-        promoCodeId: mocks.createdSubscriptionPayload.promotion_code,
+        customerId: mockedCreateSubscription.customer as string,
+        priceId: mockedCreateSubscription.items.data[0].price.id,
+        promoCodeId: (
+          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+        ).code,
       });
 
       expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
-        customerId: mocks.createdSubscriptionPayload.customerId,
-        priceId: mocks.createdSubscriptionPayload.priceId,
-        promoCodeId: mocks.createdSubscriptionPayload.promotion_code,
+        customerId: mockedCreateSubscription.customer as string,
+        priceId: mockedCreateSubscription.items.data[0].price.id,
+        promoCodeId: (
+          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+        ).code,
       });
-      expect(subscription).toEqual(mocks.mockCreateSubscriptionResponse);
+      expect(subscription).toEqual(mockedSubscriptionResponse);
     });
   });
 

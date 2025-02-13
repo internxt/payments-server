@@ -7,7 +7,7 @@ import {
   getCoupon,
   getCreatedSubscription,
   getCreateSubscriptionResponse,
-  getCustomerPayload,
+  getCustomer,
   getDispute,
   getInvoice,
   getInvoices,
@@ -94,7 +94,7 @@ describe('Test fixtures', () => {
 
   describe('Customers fixture', () => {
     it('When generating a customer payload, then it should have default values', () => {
-      const customer = getCustomerPayload();
+      const customer = getCustomer();
 
       expect(customer.id).toMatch(/^cus_/);
       expect(customer.email).toBe('example@internxt.com');
@@ -102,7 +102,7 @@ describe('Test fixtures', () => {
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const customer = getCustomerPayload({ email: 'custom@example.com', name: 'Custom Name' });
+      const customer = getCustomer({ email: 'custom@example.com', name: 'Custom Name' });
 
       expect(customer.email).toBe('custom@example.com');
       expect(customer.name).toBe('Custom Name');
