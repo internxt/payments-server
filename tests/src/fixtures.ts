@@ -14,7 +14,7 @@ const randomDataGenerator = new Chance();
 export const getUser = (params?: Partial<User>): User => ({
   id: randomDataGenerator.string({ length: 12 }),
   uuid: randomUUID(),
-  customerId: `cus_${randomDataGenerator.string({ length: 10 })}`,
+  customerId: `cus_${randomDataGenerator.string({ length: 20 })}`,
   lifetime: false,
   ...params,
 });
@@ -25,7 +25,7 @@ export const getValidToken = (userUuid: string): string => {
 
 export const getCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
   return {
-    id: `cus_${randomDataGenerator.string({ length: 12 })}`,
+    id: `cus_${randomDataGenerator.string({ length: 20 })}`,
     object: 'customer',
     address: null,
     balance: 0,
@@ -123,7 +123,7 @@ export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): S
     currency: 'usd',
     current_period_end: randomDataGenerator.natural({ length: 10 }),
     current_period_start: randomDataGenerator.natural({ length: 10 }),
-    customer: `cus_${randomDataGenerator.string({ length: 12 })}`,
+    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
     days_until_due: null,
     default_payment_method: null,
     default_source: null,
@@ -326,7 +326,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => 
     created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
     custom_fields: null,
-    customer: `cus_${randomDataGenerator.string({ length: 8 })}`,
+    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
     customer_address: null,
     customer_email: 'example@internxt.com',
     customer_name: 'My internxt',
@@ -451,14 +451,14 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     captured: true,
     created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
-    customer: null,
+    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
     description: null,
     disputed: false,
     failure_balance_transaction: null,
     failure_code: null,
     failure_message: null,
     fraud_details: {},
-    invoice: null,
+    invoice: `in_${randomDataGenerator.string({ length: 16 })}`,
     livemode: false,
     metadata: {},
     on_behalf_of: null,
