@@ -6,6 +6,7 @@ import {
   mockActiveSubscriptions,
   mockCreateSubscriptionResponse,
   mockCustomerPayload,
+  mockLogger,
   mockPrices,
   mockPromotionCode,
 } from './fixtures';
@@ -134,9 +135,9 @@ describe('Test fixtures', () => {
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const response = mockCreateSubscriptionResponse({ clientSecret: 'custom_secret' });
+        const response = mockCreateSubscriptionResponse({ type: 'setup' });
 
-        expect(response.clientSecret).toBe('custom_secret');
+        expect(response.type).toBe('setup');
       });
     });
 
@@ -163,6 +164,33 @@ describe('Test fixtures', () => {
         expect(subscriptions[0].id).toBe('sub_123');
         expect(subscriptions[1].id).toBe('sub_456');
       });
+    });
+  });
+
+  describe('Logger fixture', () => {
+    it('When generating a logger, then all functions should be mocked', () => {
+      const logger = mockLogger();
+
+      expect(logger.info).toBeDefined();
+      expect(typeof logger.info).toBe('function');
+
+      expect(logger.error).toBeDefined();
+      expect(typeof logger.error).toBe('function');
+
+      expect(logger.warn).toBeDefined();
+      expect(typeof logger.warn).toBe('function');
+
+      expect(logger.debug).toBeDefined();
+      expect(typeof logger.debug).toBe('function');
+
+      expect(logger.fatal).toBeDefined();
+      expect(typeof logger.fatal).toBe('function');
+
+      expect(logger.trace).toBeDefined();
+      expect(typeof logger.trace).toBe('function');
+
+      expect(logger.silent).toBeDefined();
+      expect(typeof logger.silent).toBe('function');
     });
   });
 });
