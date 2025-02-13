@@ -23,7 +23,7 @@ export const getValidToken = (userUuid: string): string => {
   return jwt.sign({ payload: { uuid: userUuid } }, config.JWT_SECRET);
 };
 
-export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
+export const getCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
   return {
     id: `cus_${randomDataGenerator.string({ length: 12 })}`,
     object: 'customer',
@@ -56,7 +56,7 @@ export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.C
   };
 };
 
-export const mockPromotionCode = (params: Partial<PromotionCode>): PromotionCode => {
+export const getPromotionCode = (params: Partial<PromotionCode>): PromotionCode => {
   return {
     codeId: 'promo_id',
     promoCodeName: 'PROMO_NAME',
@@ -66,7 +66,7 @@ export const mockPromotionCode = (params: Partial<PromotionCode>): PromotionCode
   };
 };
 
-export const mockPrices = () => {
+export const getPrices = () => {
   return {
     subscription: {
       exists: 'price_1PLMh8FAOdcgaBMQlZcGAPY4',
@@ -79,7 +79,7 @@ export const mockPrices = () => {
   };
 };
 
-export const mockCreateSubscriptionResponse = (params?: Partial<SubscriptionCreated>): SubscriptionCreated => {
+export const getCreateSubscriptionResponse = (params?: Partial<SubscriptionCreated>): SubscriptionCreated => {
   return {
     type: 'payment',
     clientSecret: `ci_${randomDataGenerator.string({ length: 8 })}`,
@@ -87,7 +87,7 @@ export const mockCreateSubscriptionResponse = (params?: Partial<SubscriptionCrea
   };
 };
 
-export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
+export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
   return {
     id: `sub_${randomDataGenerator.string({ length: 14 })}`,
     object: 'subscription',
@@ -228,17 +228,17 @@ export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stri
   };
 };
 
-export const mockActiveSubscriptions = (
+export const getActiveSubscriptions = (
   count: number = 1,
   paramsArray: Partial<Stripe.Subscription>[] = [],
 ): Stripe.Subscription[] => {
   return Array.from({ length: count }, (_, index) => ({
-    ...createdSubscription(),
+    ...getCreatedSubscription(),
     ...paramsArray[index],
   }));
 };
 
-export const mockPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
+export const getPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
   return {
     id: `pi_${randomDataGenerator.string({ length: 10 })}`,
     clientSecret: 'client_secret',
@@ -247,7 +247,7 @@ export const mockPaymentIntentResponse = (params?: Partial<PaymentIntent>): Paym
   };
 };
 
-export const mockCoupon = (params?: Partial<Coupon>): Coupon => ({
+export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
   id: randomUUID(),
   provider: 'stripe',
   code: 'c0UP0n',
@@ -280,7 +280,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
   };
 };
 
-export const mockLogger = (): jest.Mocked<FastifyBaseLogger> => {
+export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
   return {
     info: jest.fn(),
     error: jest.fn(),
@@ -294,7 +294,7 @@ export const mockLogger = (): jest.Mocked<FastifyBaseLogger> => {
   };
 };
 
-export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => {
+export const getInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => {
   return {
     id: `in_${randomDataGenerator.string({ length: 12 })}`,
     object: 'invoice',
@@ -402,9 +402,9 @@ export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice =>
   };
 };
 
-export function mockInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
+export function getInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
   return Array.from({ length: count }, (_, index) => ({
-    ...mockInvoice(),
+    ...getInvoice(),
     ...paramsArray[index],
   }));
 }
@@ -422,7 +422,7 @@ export function uniqueCode() {
   };
 }
 
-export function mockCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
+export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
   return {
     id: `ch_${randomDataGenerator.string({ length: 10 })}`,
     source: '' as any,
@@ -513,13 +513,13 @@ export function mockCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
   };
 }
 
-export function mockDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
+export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
   return {
     id: 'du_1MtJUT2eZvKYlo2CNaw2HvEv',
     object: 'dispute',
     amount: 1000,
     balance_transactions: [],
-    charge: 'ch_1AZtxr2eZvKYlo2CJDX8whov',
+    charge: `ch_${randomDataGenerator.string({ length: 16 })}`,
     created: 1680651737,
     currency: 'usd',
     evidence: {
