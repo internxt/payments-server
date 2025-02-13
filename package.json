@@ -11,6 +11,7 @@
     "build": "tsc",
     "test": "jest --detectOpenHandles",
     "test:cov": "jest --coverage",
+    "spec": "jest --testMatch='**/*.spec.ts'",
     "cli": "nodemon src/cli/load-license-codes.ts"
   },
   "engines": {

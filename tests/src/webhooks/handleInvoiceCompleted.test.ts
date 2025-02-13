@@ -15,7 +15,7 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import CacheService from '../../../src/services/cache.service';
 import handleInvoiceCompleted from '../../../src/webhooks/handleInvoiceCompleted';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
-import { getUser } from '../mocks/users';
+import { getUser } from '../fixtures';
 
 const { mockLogger } = getMocks();
 
@@ -75,7 +75,7 @@ const fakeInvoiceCompletedSession = {
 
 describe('Process when an invoice payment is completed', () => {
   beforeEach(() => {
-    user = getUser(true);
+    user = getUser({ lifetime: true });
     stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
     usersRepository = testFactory.getUsersRepositoryForTest();
     displayBillingRepository = {} as DisplayBillingRepository;
