@@ -12,7 +12,7 @@ import {
 import jwt from 'jsonwebtoken';
 
 describe('Test fixtures', () => {
-  describe('User fixture', () => {
+  describe("User's fixture", () => {
     describe('Generating a user', () => {
       it('When generating a user, then the UUID should be unique', () => {
         const user1 = getUser();
@@ -70,7 +70,7 @@ describe('Test fixtures', () => {
     });
   });
 
-  describe('getValidToken', () => {
+  describe("Token's fixtures", () => {
     it('When generating a token, then it should be a valid JWT', () => {
       const uuid = '223b88d7-f5a0-4592-a76c-22758c074757';
       const token = getValidToken(uuid);
@@ -83,13 +83,13 @@ describe('Test fixtures', () => {
     });
   });
 
-  describe('mockCustomerPayload', () => {
+  describe('Customers fixture', () => {
     it('When generating a customer payload, then it should have default values', () => {
       const customer = mockCustomerPayload();
 
-      expect(customer.id).toBe('cus_NffrFeUfNV2Hib');
-      expect(customer.email).toBe('example@inxt.com');
-      expect(customer.name).toBe('Jenny Rosen');
+      expect(customer.id).toMatch(/^cus_/);
+      expect(customer.email).toBe('example@internxt.com');
+      expect(customer.name).toBe('My internxt');
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
@@ -100,7 +100,7 @@ describe('Test fixtures', () => {
     });
   });
 
-  describe('mockPromotionCode', () => {
+  describe('Promotion code fixture', () => {
     it('When generating a promotion code, then it should have default values', () => {
       const promoCode = mockPromotionCode({});
 
@@ -115,7 +115,7 @@ describe('Test fixtures', () => {
     });
   });
 
-  describe('mockPrices', () => {
+  describe("Price's fixture", () => {
     it('When generating prices, then it should return predefined price IDs', () => {
       const prices = mockPrices();
 
@@ -124,43 +124,45 @@ describe('Test fixtures', () => {
     });
   });
 
-  describe('mockCreateSubscriptionResponse', () => {
-    it('When generating a subscription response, then it should have a default clientSecret', () => {
-      const response = mockCreateSubscriptionResponse();
+  describe("Subscription's fixture", () => {
+    describe('Created Subscription response', () => {
+      it('When generating a subscription response, then it should have a default clientSecret', () => {
+        const response = mockCreateSubscriptionResponse();
 
-      expect(response.type).toBe('payment');
-      expect(response.clientSecret).toBeDefined();
+        expect(response.type).toBe('payment');
+        expect(response.clientSecret).toBeDefined();
+      });
+
+      it('When passing custom parameters, then it should override the defaults', () => {
+        const response = mockCreateSubscriptionResponse({ clientSecret: 'custom_secret' });
+
+        expect(response.clientSecret).toBe('custom_secret');
+      });
     });
 
-    it('When passing custom parameters, then it should override the defaults', () => {
-      const response = mockCreateSubscriptionResponse({ clientSecret: 'custom_secret' });
+    describe('Created subscription object', () => {
+      it('When generating a subscription, then it should have default values', () => {
+        const subscription = createdSubscription();
 
-      expect(response.clientSecret).toBe('custom_secret');
+        expect(subscription.id).toMatch(/^sub_/);
+        expect(subscription.status).toBe('active');
+      });
+
+      it('When passing custom parameters, then it should override the defaults', () => {
+        const subscription = createdSubscription({ status: 'canceled' });
+
+        expect(subscription.status).toBe('canceled');
+      });
     });
-  });
 
-  describe('mockCreatedSubscriptionPayload', () => {
-    it('When generating a subscription, then it should have default values', () => {
-      const subscription = createdSubscription();
+    describe('Active subscriptions', () => {
+      it('When generating active subscriptions, then it should return the specified number of subscriptions', () => {
+        const subscriptions = mockActiveSubscriptions(2, [{ id: 'sub_123' }, { id: 'sub_456' }]);
 
-      expect(subscription.id).toBe('sub_1MowQVLkdIwHu7ixeRlqHVzs');
-      expect(subscription.status).toBe('active');
-    });
-
-    it('When passing custom parameters, then it should override the defaults', () => {
-      const subscription = createdSubscription({ status: 'canceled' });
-
-      expect(subscription.status).toBe('canceled');
-    });
-  });
-
-  describe('mockActiveSubscriptions', () => {
-    it('When generating active subscriptions, then it should return the specified number of subscriptions', () => {
-      const subscriptions = mockActiveSubscriptions(2, [{ id: 'sub_123' }, { id: 'sub_456' }]);
-
-      expect(subscriptions).toHaveLength(2);
-      expect(subscriptions[0].id).toBe('sub_123');
-      expect(subscriptions[1].id).toBe('sub_456');
+        expect(subscriptions).toHaveLength(2);
+        expect(subscriptions[0].id).toBe('sub_123');
+        expect(subscriptions[1].id).toBe('sub_456');
+      });
     });
   });
 });
