@@ -40,7 +40,7 @@ jest.mock('stripe', () => {
         retrieve: jest.fn(),
       },
       subscriptions: {
-        cancel: jest.fn(), // <-- ¡agrega esto!
+        cancel: jest.fn(),
       },
     })),
   };
