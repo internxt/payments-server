@@ -201,7 +201,7 @@ describe('Payment controller e2e tests', () => {
       });
     });
 
-    it('When findUserByUuid throws a generic error, then an error indicating so is thrown', async () => {
+    it('When there is an unexpected error while fetching a customer by UUID, then an error indicating so is thrown', async () => {
       const unknownError = new Error('Unknown error');
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(unknownError);
 
