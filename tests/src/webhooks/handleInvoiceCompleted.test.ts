@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { ExtendedSubscription, PaymentService } from '../../../src/services/payment.service';
+import getMocks from '../mocks';
 import testFactory from '../utils/factory';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
@@ -15,7 +16,8 @@ import CacheService from '../../../src/services/cache.service';
 import handleInvoiceCompleted from '../../../src/webhooks/handleInvoiceCompleted';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { User } from '../../../src/core/users/User';
-import { mockLogger, user } from '../mocks';
+
+const { user, newUser, mockLogger } = getMocks();
 
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -96,10 +98,7 @@ describe('handleInvoiceCompleted()', () => {
 
     objectStorageService = new ObjectStorageService(paymentService, config, axios);
 
-    const mockedUser = user();
-    jest
-      .spyOn(paymentService, 'getCustomer')
-      .mockResolvedValue({ deleted: false, customer: mockedUser.customerId } as any);
+    jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: false, customer: user.customerId } as any);
     jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue({
       data: [
         {
@@ -113,22 +112,21 @@ describe('handleInvoiceCompleted()', () => {
       ],
     } as any);
     jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([] as ExtendedSubscription[]);
-    (createOrUpdateUser as jest.Mock).mockResolvedValue(Promise.resolve({ data: { user: { ...mockedUser } } }));
+    (createOrUpdateUser as jest.Mock).mockResolvedValue(Promise.resolve({ data: { user } }));
     (updateUserTier as jest.Mock).mockResolvedValue(Promise.resolve());
 
     jest.clearAllMocks();
   });
 
   it('When user exists, then the user is updated if needed in the DB', async () => {
-    const mockedUser = user();
-    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser as User);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(user as User);
     jest.spyOn(usersRepository, 'updateUser');
 
     await handleInvoiceCompleted(
       fakeInvoiceCompletedSession,
       usersService,
       paymentService,
-      mockLogger(),
+      mockLogger,
       cacheService,
       config,
       objectStorageService,
@@ -149,7 +147,7 @@ describe('handleInvoiceCompleted()', () => {
       fakeInvoiceCompletedSession,
       usersService,
       paymentService,
-      mockLogger(),
+      mockLogger,
       cacheService,
       config,
       objectStorageService,
@@ -173,7 +171,7 @@ describe('handleInvoiceCompleted()', () => {
         fakeInvoiceCompletedSession,
         usersService,
         paymentService,
-        mockLogger(),
+        mockLogger,
         cacheService,
         config,
         objectStorageService,
@@ -185,6 +183,6 @@ describe('handleInvoiceCompleted()', () => {
     expect(paymentService.getActiveSubscriptions).toHaveBeenCalledTimes(1);
     expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
     expect(updateUserTier).toHaveBeenCalledTimes(1);
-    expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
+    expect(usersRepository.insertUser).toHaveBeenCalledTimes(1); // Verifica que se intentó insertar al usuario
   });
 });

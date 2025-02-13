@@ -6,6 +6,7 @@ import axios from 'axios';
 
 import { default as start } from '../../src/server';
 
+import getMocks from './mocks';
 import { preloadData } from './utils/preloadMongoDBData';
 import { UserNotFoundError, UsersService } from '../../src/services/users.service';
 import { Bit2MeService } from '../../src/services/bit2me.service';
@@ -19,7 +20,8 @@ import { InvalidTaxIdError, PaymentService } from '../../src/services/payment.se
 import testFactory from './utils/factory';
 import config from '../../src/config';
 import { User } from '../../src/core/users/User';
-import { getValidToken, prices, uniqueCode, user } from './mocks';
+
+const mocks = getMocks();
 
 let mongoServer: MongoMemoryServer;
 let mongoClient: MongoClient;
@@ -98,9 +100,10 @@ afterAll(async () => {
 describe('Payment controller e2e tests', () => {
   describe('Check if the unique code provided by the user is valid', () => {
     it('When the code is already used, then it returns 404 status code', async () => {
+      const { uniqueCode } = mocks;
       const response = await app.inject({
         path: '/is-unique-code-available',
-        query: { code: uniqueCode().techCult.codes.nonElegible, provider: uniqueCode().techCult.provider },
+        query: { code: uniqueCode.techCult.codes.nonElegible, provider: uniqueCode.techCult.provider },
         method: 'GET',
       });
       expect(response.statusCode).toBe(404);
@@ -108,9 +111,11 @@ describe('Payment controller e2e tests', () => {
 
     // eslint-disable-next-line quotes
     it("When the code doesn't exist, then it returns 404 status code", async () => {
+      const { uniqueCode } = mocks;
+
       const response = await app.inject({
         path: '/is-unique-code-available',
-        query: { code: uniqueCode().techCult.codes.doesntExist, provider: uniqueCode().techCult.provider },
+        query: { code: uniqueCode.techCult.codes.doesntExist, provider: uniqueCode.techCult.provider },
         method: 'GET',
       });
 
@@ -121,6 +126,7 @@ describe('Payment controller e2e tests', () => {
   describe('Fetching plan object by ID and contains the basic params', () => {
     describe('Fetch subscription plan object', () => {
       it('When the subscription priceId is valid, then the endpoint returns the correct object', async () => {
+        const { prices } = mocks;
         const expectedKeys = {
           selectedPlan: {
             id: expect.anything(),
@@ -141,7 +147,7 @@ describe('Payment controller e2e tests', () => {
         };
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${prices().subscription.exists}`,
+          path: `/plan-by-id?planId=${prices.subscription.exists}`,
           method: 'GET',
         });
         const responseBody = JSON.parse(response.body);
@@ -151,8 +157,10 @@ describe('Payment controller e2e tests', () => {
       });
 
       it('When the subscription priceId is not valid, then it returns 404 status code', async () => {
+        const { prices } = mocks;
+
         const response = await app.inject({
-          path: `/plan-by-id?planId=${prices().subscription.doesNotExist}`,
+          path: `/plan-by-id?planId=${prices.subscription.doesNotExist}`,
           method: 'GET',
         });
 
@@ -162,6 +170,8 @@ describe('Payment controller e2e tests', () => {
 
     describe('Fetch Lifetime plan object', () => {
       it('When the lifetime priceId is valid, then it returns the lifetime price object', async () => {
+        const { prices } = mocks;
+
         const expectedKeys = {
           selectedPlan: {
             id: expect.anything(),
@@ -174,7 +184,7 @@ describe('Payment controller e2e tests', () => {
         };
 
         const response = await app.inject({
-          path: `/plan-by-id?planId=${prices().lifetime.exists}`,
+          path: `/plan-by-id?planId=${prices.lifetime.exists}`,
           method: 'GET',
         });
 
@@ -185,8 +195,10 @@ describe('Payment controller e2e tests', () => {
       });
 
       it('When the lifetime priceId is not valid, then returns 404 status code', async () => {
+        const { prices } = mocks;
+
         const response = await app.inject({
-          path: `/plan-by-id?planId=${prices().lifetime.doesNotExist}`,
+          path: `/plan-by-id?planId=${prices.lifetime.doesNotExist}`,
           method: 'GET',
         });
 
@@ -200,7 +212,8 @@ describe('Payment controller e2e tests', () => {
       jest.restoreAllMocks();
     });
 
-    const createdToken = getValidToken(user().uuid);
+    const { user, getValidToken } = mocks;
+    const createdToken = getValidToken(user.uuid);
     const authToken = `Bearer ${createdToken}`;
 
     it('When the email is missing in the request body, then it returns a 400 status code', async () => {
@@ -216,9 +229,7 @@ describe('Payment controller e2e tests', () => {
     });
 
     it('When the user exists by UUID, then it returns the customerId and a token', async () => {
-      jest
-        .spyOn(UsersService.prototype, 'findUserByUuid')
-        .mockResolvedValue(Promise.resolve(user() as unknown as User));
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(Promise.resolve(user as unknown as User));
 
       const response = await app.inject({
         path: `/create-customer`,
@@ -232,7 +243,7 @@ describe('Payment controller e2e tests', () => {
 
       const responseBody = JSON.parse(response.body);
       expect(responseBody).toEqual({
-        customerId: user().customerId,
+        customerId: user.customerId,
         token: expect.any(String),
       });
     });
@@ -259,7 +270,7 @@ describe('Payment controller e2e tests', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
       const createOrGetCustomerSpy = jest
         .spyOn(PaymentService.prototype, 'createOrGetCustomer')
-        .mockResolvedValue({ id: user().customerId } as unknown as Stripe.Customer);
+        .mockResolvedValue({ id: user.customerId } as unknown as Stripe.Customer);
 
       await app.inject({
         path: `/create-customer`,
@@ -279,7 +290,7 @@ describe('Payment controller e2e tests', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
       const createOrGetCustomerSpy = jest
         .spyOn(PaymentService.prototype, 'createOrGetCustomer')
-        .mockResolvedValue({ id: user().customerId } as unknown as Stripe.Customer);
+        .mockResolvedValue({ id: user.customerId } as unknown as Stripe.Customer);
 
       const response = await app.inject({
         path: `/create-customer`,
@@ -294,7 +305,7 @@ describe('Payment controller e2e tests', () => {
       expect(createOrGetCustomerSpy).toHaveBeenCalledTimes(1);
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.body)).toEqual({
-        customerId: user().customerId,
+        customerId: user.customerId,
         token: expect.any(String),
       });
     });
