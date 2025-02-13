@@ -6,6 +6,7 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
+  coveragePathIgnorePatterns: ['/**/*.spec.ts'],
   // collectCoverage: true,
   // coverageDirectory: 'coverage',
 };
