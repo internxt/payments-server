@@ -368,6 +368,7 @@ export default function (
         token: string;
         companyName: string;
         companyVatId: string;
+        promoCodeId?: string;
       };
     }>(
       '/create-subscription-for-object-storage',
@@ -389,6 +390,9 @@ export default function (
               currency: {
                 type: 'string',
               },
+              promoCodeId: {
+                type: 'string',
+              },
               companyName: {
                 type: 'string',
               },
@@ -400,7 +404,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, companyName, companyVatId } = req.body;
 
         if (!customerId || !priceId) {
           throw new MissingParametersError(['customerId', 'priceId']);
@@ -426,6 +430,7 @@ export default function (
             currency,
             companyName,
             companyVatId,
+            promoCodeId,
           });
 
           return res.send(subscriptionSetUp);
