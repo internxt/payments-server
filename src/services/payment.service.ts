@@ -1424,6 +1424,7 @@ export class PaymentService {
       AT: ['eu_vat'],
       BG: ['bg_uic', 'eu_vat'],
       BH: ['bh_vat'],
+      BE: ['eu_vat'],
       BO: ['bo_tin'],
       BR: ['br_cnpj', 'br_cpf'],
       CA: ['ca_bn', 'ca_gst_hst', 'ca_pst_bc', 'ca_pst_mb', 'ca_pst_sk', 'ca_qst'],
