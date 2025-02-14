@@ -255,7 +255,7 @@ export class UsersService {
 
     //TODO: Update the endpoint to the correct one
     return this.axios.post(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/vpn/users`,
+      `${this.config.VPN_URL}/users`,
       {
         userUuid,
         tier,

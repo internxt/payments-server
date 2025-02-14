@@ -296,11 +296,7 @@ describe('UsersService tests', () => {
       await usersService.enableVPNTier(userUuid, tier);
 
       expect(axiosPostSpy).toHaveBeenCalledTimes(1);
-      expect(axiosPostSpy).toHaveBeenCalledWith(
-        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/vpn/users`,
-        { userUuid, tier },
-        expect.anything(),
-      );
+      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/users`, { userUuid, tier }, expect.anything());
     });
   });
 });
