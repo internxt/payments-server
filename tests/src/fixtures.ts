@@ -88,7 +88,10 @@ export const getCreateSubscriptionResponse = (params?: Partial<SubscriptionCreat
   };
 };
 
-export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
+export const getCreatedSubscription = (
+  params?: Partial<Stripe.Subscription>,
+  userType?: UserType,
+): Stripe.Subscription => {
   const customer = `cus_${randomDataGenerator.string({ length: 20 })}`;
   const invoice = `in_${randomDataGenerator.string({ length: 14 })}`;
 
@@ -266,7 +269,26 @@ export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): S
             livemode: false,
             metadata: {},
             nickname: null,
-            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
+            product: {
+              active: true,
+              created: randomDataGenerator.natural({ length: 10 }),
+              description: '',
+              id: `prod_${randomDataGenerator.string({ length: 12 })}`,
+              images: [],
+              livemode: false,
+              marketing_features: [],
+              metadata: {
+                type: `${userType}`,
+              },
+              name: '',
+              object: 'product',
+              package_dimensions: null,
+              shippable: false,
+              tax_code: '',
+              type: 'service',
+              updated: randomDataGenerator.natural({ length: 10 }),
+              url: '',
+            },
             tiers_mode: null,
             transform_usage: null,
             trial_period_days: null,
