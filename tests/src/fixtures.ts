@@ -3,11 +3,12 @@ import { randomUUID } from 'crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { User } from '../../src/core/users/User';
+import { User, UserType } from '../../src/core/users/User';
 import { Tier } from '../../src/core/users/MongoDBTiersRepository';
 import Stripe from 'stripe';
 import { PaymentIntent, PromotionCode, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
+import { Currency } from '../../src/services/bit2me.service';
 
 const randomDataGenerator = new Chance();
 
@@ -126,10 +127,66 @@ export const getCreatedSubscription = (params?: Partial<Stripe.Subscription>): S
     currency: 'usd',
     current_period_end: randomDataGenerator.natural({ length: 10 }),
     current_period_start: randomDataGenerator.natural({ length: 10 }),
-    customer: customer,
+    customer,
     days_until_due: null,
-    default_payment_method: null,
-    default_source: null,
+    default_payment_method: {
+      id: `pm_${randomDataGenerator.string({ length: 14 })}`,
+      billing_details: {
+        name: 'John Doe',
+        address: randomDataGenerator.address() as any,
+        email: randomDataGenerator.email(),
+        phone: randomDataGenerator.phone(),
+      },
+      created: randomDataGenerator.natural({ length: 10 }),
+      customer,
+      livemode: false,
+      metadata: {},
+      object: 'payment_method',
+      type: 'card',
+    },
+    default_source: {
+      id: `src_${randomDataGenerator.string({ length: 16 })}`,
+      object: 'source',
+      ach_credit_transfer: {
+        account_number: 'test_eb829353ed79',
+        bank_name: 'TEST BANK',
+        fingerprint: 'kBQsBk9KtfCgjEYK',
+        refund_account_holder_name: null,
+        refund_account_holder_type: null,
+        refund_routing_number: null,
+        routing_number: '110000000',
+        swift_code: 'TSTEZ122',
+      },
+      amount: null,
+      client_secret: 'src_client_secret_ZaOIRUD8a9uGmQobLxGvqKSr',
+      created: 1683144457,
+      currency: 'usd',
+      flow: 'receiver',
+      livemode: false,
+      metadata: {},
+      owner: {
+        address: null,
+        email: 'jenny.rosen@example.com',
+        name: null,
+        phone: null,
+        verified_address: null,
+        verified_email: null,
+        verified_name: null,
+        verified_phone: null,
+      },
+      receiver: {
+        address: '110000000-test_eb829353ed79',
+        amount_charged: 0,
+        amount_received: 0,
+        amount_returned: 0,
+        refund_attributes_method: 'email',
+        refund_attributes_status: 'missing',
+      },
+      statement_descriptor: null,
+      status: 'pending',
+      type: 'ach_credit_transfer',
+      usage: 'reusable',
+    },
     default_tax_rates: [],
     description: null,
     discount: null,
@@ -346,9 +403,9 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
   };
 };
 
-export const getInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => {
+export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType): Stripe.Invoice => {
   return {
-    id: `in_${randomDataGenerator.string({ length: 12 })}`,
+    id: 'in_eir9242',
     object: 'invoice',
     effective_at: 0,
     rendering: null,
@@ -405,7 +462,88 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => 
     latest_revision: null,
     lines: {
       object: 'list',
-      data: [],
+      data: [
+        {
+          id: 'il_tmp_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          object: 'line_item',
+          invoice: '',
+          amount: 1000,
+          amount_excluding_tax: 1000,
+          currency: 'usd',
+          description: 'My First Invoice Item (created for API docs)',
+          discount_amounts: [],
+          discountable: true,
+          discounts: [],
+          invoice_item: 'ii_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          livemode: false,
+          metadata: {},
+          period: {
+            end: 1696975413,
+            start: 1696975413,
+          },
+          plan: {
+            id: `price_${randomDataGenerator.string({ length: 20 })}`,
+            object: 'plan',
+            active: true,
+            aggregate_usage: null,
+            amount: 1000,
+            amount_decimal: '1000',
+            billing_scheme: 'per_unit',
+            created: randomDataGenerator.natural({ length: 10 }),
+            currency: 'usd',
+            interval: 'month',
+            interval_count: 1,
+            livemode: false,
+            metadata: {},
+            nickname: null,
+            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
+            tiers_mode: null,
+            transform_usage: null,
+            trial_period_days: null,
+            usage_type: 'licensed',
+          },
+          price: {
+            id: `price_${randomDataGenerator.string({ length: 12 })}`,
+            object: 'price',
+            active: true,
+            billing_scheme: 'per_unit',
+            created: randomDataGenerator.natural({ length: 10 }),
+            currency: 'usd',
+            custom_unit_amount: null,
+            livemode: false,
+            lookup_key: null,
+            metadata: {
+              maxSpaceBytes: `${randomDataGenerator.natural({ length: 8 })}`,
+              type: userType as string,
+            },
+            nickname: null,
+            product: `prod_${randomDataGenerator.string({ length: 12 })}`,
+            recurring: {
+              aggregate_usage: null,
+              interval: 'month',
+              interval_count: 1,
+              trial_period_days: null,
+              usage_type: 'licensed',
+            },
+            tax_behavior: 'unspecified',
+            tiers_mode: null,
+            transform_quantity: null,
+            type: 'recurring',
+            unit_amount: 1000,
+            unit_amount_decimal: '1000',
+          },
+          proration: false,
+          proration_details: {
+            credited_items: null,
+          },
+          quantity: 1,
+          subscription: null,
+          tax_amounts: [],
+          tax_rates: [],
+          type: 'invoiceitem',
+          unit_amount_excluding_tax: '1000',
+        },
+      ],
       has_more: false,
       url: '/v1/invoices/in_1MtHbELkdIwHu7ixl4OzzPMv/lines',
     },
@@ -618,5 +756,70 @@ export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
     ...params,
   };
 }
+
+export const getCurrency = (params?: Partial<Currency>): Currency => {
+  return {
+    currencyId: 'BTC',
+    name: 'Bitcoin',
+    type: 'crypto',
+    receiveType: true,
+    networks: [
+      {
+        platformId: 'bitcoin',
+        name: 'bitcoin',
+      },
+    ],
+    imageUrl: 'https://some-image.jpg',
+    ...params,
+  };
+};
+
+export const getCurrencies = (count = 2, paramsArray: Partial<Currency>[] = []): Currency[] => {
+  return Array.from({ length: count }, (_, index) => ({
+    ...getCurrency(),
+    ...paramsArray[index],
+  }));
+};
+
+export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe.PaymentMethod => {
+  return {
+    id: 'pm_1Q0PsIJvEtkwdCNYMSaVuRz6',
+    object: 'payment_method',
+    allow_redisplay: 'unspecified',
+    billing_details: {
+      address: {
+        city: null,
+        country: null,
+        line1: null,
+        line2: null,
+        postal_code: null,
+        state: null,
+      },
+      email: null,
+      name: 'John Doe',
+      phone: null,
+    },
+    created: 1726673582,
+    customer: null,
+    livemode: false,
+    metadata: {},
+    type: 'us_bank_account',
+    us_bank_account: {
+      account_holder_type: 'individual',
+      account_type: 'checking',
+      bank_name: 'STRIPE TEST BANK',
+      financial_connections_account: null,
+      fingerprint: 'LstWJFsCK7P349Bg',
+      last4: '6789',
+      networks: {
+        preferred: 'ach',
+        supported: ['ach'],
+      },
+      routing_number: '110000000',
+      status_details: {},
+    },
+    ...params,
+  };
+};
 
 export const voidPromise = () => Promise.resolve();
