@@ -14,7 +14,6 @@ import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import testFactory from '../utils/factory';
 import getMocks from '../mocks';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import jwt from 'jsonwebtoken';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -293,7 +292,6 @@ describe('UsersService tests', () => {
       const tier = mocks.newTier().featuresPerService['vpn'].featureId;
 
       const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
-      jest.spyOn(jwt, 'sign').mockReturnValue();
 
       await usersService.enableVPNTier(userUuid, tier);
 
