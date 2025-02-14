@@ -2,11 +2,11 @@ import { Collection, MongoClient } from 'mongodb';
 
 interface AntivirusFeatures {
   enabled: boolean;
-};
+}
 
 interface BackupsFeatures {
   enabled: boolean;
-};
+}
 
 export interface DriveFeatures {
   enabled: boolean;
@@ -16,23 +16,23 @@ export interface DriveFeatures {
     minimumSeats: number;
     maximumSeats: number;
     maxSpaceBytesPerSeat: number;
-  }
-};
+  };
+}
 
 interface MeetFeatures {
   enabled: boolean;
   paxPerCall: number;
-};
+}
 
 interface MailFeatures {
   enabled: boolean;
   addressesPerUser: number;
 }
 
-interface VpnFeatures {
+export interface VpnFeatures {
   enabled: boolean;
-  locationsAvailable: number;
-};
+  featureId: string;
+}
 
 export enum Service {
   Drive = 'drive',
@@ -40,21 +40,21 @@ export enum Service {
   Antivirus = 'antivirus',
   Meet = 'meet',
   Mail = 'mail',
-  Vpn = 'vpn'
+  Vpn = 'vpn',
 }
 
 export interface Tier {
   label: string;
   productId: string;
-  billingType: "subscription" | "lifetime",
+  billingType: 'subscription' | 'lifetime';
   featuresPerService: {
-    [Service.Drive]: DriveFeatures,
-    [Service.Backups]: BackupsFeatures,
-    [Service.Antivirus]: AntivirusFeatures,
-    [Service.Meet]: MeetFeatures,
-    [Service.Mail]: MailFeatures,
-    [Service.Vpn]: VpnFeatures
-  }
+    [Service.Drive]: DriveFeatures;
+    [Service.Backups]: BackupsFeatures;
+    [Service.Antivirus]: AntivirusFeatures;
+    [Service.Meet]: MeetFeatures;
+    [Service.Mail]: MailFeatures;
+    [Service.Vpn]: VpnFeatures;
+  };
 }
 
 export interface TiersRepository {
@@ -70,7 +70,7 @@ export class MongoDBTiersRepository implements TiersRepository {
 
   async findByProductId(productId: Tier['productId']): Promise<Tier | null> {
     const tier = await this.collection.findOne({
-      productId
+      productId,
     });
 
     return tier;

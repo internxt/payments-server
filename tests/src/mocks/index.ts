@@ -291,9 +291,8 @@ export default function getMocks() {
         },
         vpn: {
           enabled: false,
-          locationsAvailable: randomDataGenerator.integer({
-            min: 0,
-            max: 5,
+          featureId: randomDataGenerator.string({
+            length: 10,
           }),
         },
         antivirus: {

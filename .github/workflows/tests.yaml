@@ -30,6 +30,7 @@ jobs:
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
+      - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc

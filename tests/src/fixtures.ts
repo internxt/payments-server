@@ -393,7 +393,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
     featuresPerService: {
       mail: { enabled: false, addressesPerUser: randomDataGenerator.integer({ min: 0, max: 5 }) },
       meet: { enabled: false, paxPerCall: randomDataGenerator.integer({ min: 0, max: 5 }) },
-      vpn: { enabled: false, locationsAvailable: randomDataGenerator.integer({ min: 0, max: 5 }) },
+      vpn: { enabled: false, featureId: randomDataGenerator.string({ length: 12 }) },
       antivirus: { enabled: false },
       backups: { enabled: false },
       drive: {

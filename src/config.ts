@@ -20,6 +20,7 @@ const mandatoryVariables = [
   'CRYPTO_PAYMENTS_PROCESSOR_API_URL',
   'CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY',
   'CRYPTO_PAYMENTS_PROCESSOR_API_KEY',
+  'VPN_URL',
 ] as const;
 
 type BaseConfig = {
