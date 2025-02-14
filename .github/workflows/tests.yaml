@@ -1,4 +1,4 @@
-name: SonarCloud code analysis
+name: Tests suite
 on:
   push:
     branches:
