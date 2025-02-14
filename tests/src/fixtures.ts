@@ -3,18 +3,19 @@ import { randomUUID } from 'crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { User } from '../../src/core/users/User';
+import { User, UserType } from '../../src/core/users/User';
 import { Tier } from '../../src/core/users/MongoDBTiersRepository';
 import Stripe from 'stripe';
 import { PaymentIntent, PromotionCode, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
+import { Currency } from '../../src/services/bit2me.service';
 
 const randomDataGenerator = new Chance();
 
 export const getUser = (params?: Partial<User>): User => ({
   id: randomDataGenerator.string({ length: 12 }),
   uuid: randomUUID(),
-  customerId: `cus_${randomDataGenerator.string({ length: 10 })}`,
+  customerId: `cus_${randomDataGenerator.string({ length: 20 })}`,
   lifetime: false,
   ...params,
 });
@@ -23,9 +24,9 @@ export const getValidToken = (userUuid: string): string => {
   return jwt.sign({ payload: { uuid: userUuid } }, config.JWT_SECRET);
 };
 
-export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
+export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
   return {
-    id: `cus_${randomDataGenerator.string({ length: 12 })}`,
+    id: `cus_${randomDataGenerator.string({ length: 20 })}`,
     object: 'customer',
     address: null,
     balance: 0,
@@ -56,7 +57,7 @@ export const mockCustomerPayload = (params?: Partial<Stripe.Customer>): Stripe.C
   };
 };
 
-export const mockPromotionCode = (params: Partial<PromotionCode>): PromotionCode => {
+export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode => {
   return {
     codeId: 'promo_id',
     promoCodeName: 'PROMO_NAME',
@@ -66,7 +67,7 @@ export const mockPromotionCode = (params: Partial<PromotionCode>): PromotionCode
   };
 };
 
-export const mockPrices = () => {
+export const getPrices = () => {
   return {
     subscription: {
       exists: 'price_1PLMh8FAOdcgaBMQlZcGAPY4',
@@ -79,7 +80,7 @@ export const mockPrices = () => {
   };
 };
 
-export const mockCreateSubscriptionResponse = (params?: Partial<SubscriptionCreated>): SubscriptionCreated => {
+export const getCreateSubscriptionResponse = (params?: Partial<SubscriptionCreated>): SubscriptionCreated => {
   return {
     type: 'payment',
     clientSecret: `ci_${randomDataGenerator.string({ length: 8 })}`,
@@ -87,7 +88,13 @@ export const mockCreateSubscriptionResponse = (params?: Partial<SubscriptionCrea
   };
 };
 
-export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stripe.Subscription => {
+export const getCreatedSubscription = (
+  params?: Partial<Stripe.Subscription>,
+  userType?: UserType,
+): Stripe.Subscription => {
+  const customer = `cus_${randomDataGenerator.string({ length: 20 })}`;
+  const invoice = `in_${randomDataGenerator.string({ length: 14 })}`;
+
   return {
     id: `sub_${randomDataGenerator.string({ length: 14 })}`,
     object: 'subscription',
@@ -123,14 +130,119 @@ export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stri
     currency: 'usd',
     current_period_end: randomDataGenerator.natural({ length: 10 }),
     current_period_start: randomDataGenerator.natural({ length: 10 }),
-    customer: `cus_${randomDataGenerator.string({ length: 12 })}`,
+    customer,
     days_until_due: null,
-    default_payment_method: null,
-    default_source: null,
+    default_payment_method: {
+      id: `pm_${randomDataGenerator.string({ length: 14 })}`,
+      billing_details: {
+        name: 'John Doe',
+        address: randomDataGenerator.address() as any,
+        email: randomDataGenerator.email(),
+        phone: randomDataGenerator.phone(),
+      },
+      created: randomDataGenerator.natural({ length: 10 }),
+      customer,
+      livemode: false,
+      metadata: {},
+      object: 'payment_method',
+      type: 'card',
+    },
+    default_source: {
+      id: `src_${randomDataGenerator.string({ length: 16 })}`,
+      object: 'source',
+      ach_credit_transfer: {
+        account_number: 'test_eb829353ed79',
+        bank_name: 'TEST BANK',
+        fingerprint: 'kBQsBk9KtfCgjEYK',
+        refund_account_holder_name: null,
+        refund_account_holder_type: null,
+        refund_routing_number: null,
+        routing_number: '110000000',
+        swift_code: 'TSTEZ122',
+      },
+      amount: null,
+      client_secret: 'src_client_secret_ZaOIRUD8a9uGmQobLxGvqKSr',
+      created: 1683144457,
+      currency: 'usd',
+      flow: 'receiver',
+      livemode: false,
+      metadata: {},
+      owner: {
+        address: null,
+        email: 'jenny.rosen@example.com',
+        name: null,
+        phone: null,
+        verified_address: null,
+        verified_email: null,
+        verified_name: null,
+        verified_phone: null,
+      },
+      receiver: {
+        address: '110000000-test_eb829353ed79',
+        amount_charged: 0,
+        amount_received: 0,
+        amount_returned: 0,
+        refund_attributes_method: 'email',
+        refund_attributes_status: 'missing',
+      },
+      statement_descriptor: null,
+      status: 'pending',
+      type: 'ach_credit_transfer',
+      usage: 'reusable',
+    },
     default_tax_rates: [],
     description: null,
     discount: null,
-    discounts: null as any,
+    discounts: [
+      {
+        id: 'jMT0WJUD',
+        checkout_session: '',
+        coupon: 'jMT0WJUD' as any,
+        customer: customer,
+        invoice,
+        invoice_item: invoice,
+        end: 0,
+        object: 'discount',
+        start: 10,
+        subscription: '',
+        subscription_item: '',
+        promotion_code: {
+          id: `promo_${randomDataGenerator.string({ length: 22 })}`,
+          object: 'promotion_code',
+          active: true,
+          code: 'PROMO_CODE',
+          coupon: {
+            id: 'jMT0WJUD',
+            object: 'coupon',
+            amount_off: null,
+            created: 1678040164,
+            currency: null,
+            duration: 'repeating',
+            duration_in_months: 3,
+            livemode: false,
+            max_redemptions: null,
+            metadata: {},
+            name: null,
+            percent_off: 25.5,
+            redeem_by: null,
+            times_redeemed: 0,
+            valid: true,
+          },
+          created: 1678040164,
+          customer: null,
+          expires_at: null,
+          livemode: false,
+          max_redemptions: null,
+          metadata: {},
+          restrictions: {
+            first_time_transaction: false,
+            minimum_amount: null,
+            minimum_amount_currency: null,
+          },
+          times_redeemed: 0,
+        },
+      },
+    ],
     ended_at: null,
     items: {
       object: 'list',
@@ -157,7 +269,26 @@ export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stri
             livemode: false,
             metadata: {},
             nickname: null,
-            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
+            product: {
+              active: true,
+              created: randomDataGenerator.natural({ length: 10 }),
+              description: '',
+              id: `prod_${randomDataGenerator.string({ length: 12 })}`,
+              images: [],
+              livemode: false,
+              marketing_features: [],
+              metadata: {
+                type: `${userType}`,
+              },
+              name: '',
+              object: 'product',
+              package_dimensions: null,
+              shippable: false,
+              tax_code: '',
+              type: 'service',
+              updated: randomDataGenerator.natural({ length: 10 }),
+              url: '',
+            },
             tiers_mode: null,
             transform_usage: null,
             trial_period_days: null,
@@ -228,17 +359,17 @@ export const createdSubscription = (params?: Partial<Stripe.Subscription>): Stri
   };
 };
 
-export const mockActiveSubscriptions = (
+export const getActiveSubscriptions = (
   count: number = 1,
   paramsArray: Partial<Stripe.Subscription>[] = [],
 ): Stripe.Subscription[] => {
   return Array.from({ length: count }, (_, index) => ({
-    ...createdSubscription(),
+    ...getCreatedSubscription(),
     ...paramsArray[index],
   }));
 };
 
-export const mockPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
+export const getPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
   return {
     id: `pi_${randomDataGenerator.string({ length: 10 })}`,
     clientSecret: 'client_secret',
@@ -247,7 +378,7 @@ export const mockPaymentIntentResponse = (params?: Partial<PaymentIntent>): Paym
   };
 };
 
-export const mockCoupon = (params?: Partial<Coupon>): Coupon => ({
+export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
   id: randomUUID(),
   provider: 'stripe',
   code: 'c0UP0n',
@@ -280,7 +411,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
   };
 };
 
-export const mockLogger = (): jest.Mocked<FastifyBaseLogger> => {
+export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
   return {
     info: jest.fn(),
     error: jest.fn(),
@@ -294,9 +425,9 @@ export const mockLogger = (): jest.Mocked<FastifyBaseLogger> => {
   };
 };
 
-export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice => {
+export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType): Stripe.Invoice => {
   return {
-    id: `in_${randomDataGenerator.string({ length: 12 })}`,
+    id: 'in_eir9242',
     object: 'invoice',
     effective_at: 0,
     rendering: null,
@@ -326,7 +457,7 @@ export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice =>
     created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
     custom_fields: null,
-    customer: `cus_${randomDataGenerator.string({ length: 8 })}`,
+    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
     customer_address: null,
     customer_email: 'example@internxt.com',
     customer_name: 'My internxt',
@@ -353,7 +484,88 @@ export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice =>
     latest_revision: null,
     lines: {
       object: 'list',
-      data: [],
+      data: [
+        {
+          id: 'il_tmp_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          object: 'line_item',
+          invoice: '',
+          amount: 1000,
+          amount_excluding_tax: 1000,
+          currency: 'usd',
+          description: 'My First Invoice Item (created for API docs)',
+          discount_amounts: [],
+          discountable: true,
+          discounts: [],
+          invoice_item: 'ii_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          livemode: false,
+          metadata: {},
+          period: {
+            end: 1696975413,
+            start: 1696975413,
+          },
+          plan: {
+            id: `price_${randomDataGenerator.string({ length: 20 })}`,
+            object: 'plan',
+            active: true,
+            aggregate_usage: null,
+            amount: 1000,
+            amount_decimal: '1000',
+            billing_scheme: 'per_unit',
+            created: randomDataGenerator.natural({ length: 10 }),
+            currency: 'usd',
+            interval: 'month',
+            interval_count: 1,
+            livemode: false,
+            metadata: {},
+            nickname: null,
+            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
+            tiers_mode: null,
+            transform_usage: null,
+            trial_period_days: null,
+            usage_type: 'licensed',
+          },
+          price: {
+            id: `price_${randomDataGenerator.string({ length: 12 })}`,
+            object: 'price',
+            active: true,
+            billing_scheme: 'per_unit',
+            created: randomDataGenerator.natural({ length: 10 }),
+            currency: 'usd',
+            custom_unit_amount: null,
+            livemode: false,
+            lookup_key: null,
+            metadata: {
+              maxSpaceBytes: `${randomDataGenerator.natural({ length: 8 })}`,
+              type: userType as string,
+            },
+            nickname: null,
+            product: `prod_${randomDataGenerator.string({ length: 12 })}`,
+            recurring: {
+              aggregate_usage: null,
+              interval: 'month',
+              interval_count: 1,
+              trial_period_days: null,
+              usage_type: 'licensed',
+            },
+            tax_behavior: 'unspecified',
+            tiers_mode: null,
+            transform_quantity: null,
+            type: 'recurring',
+            unit_amount: 1000,
+            unit_amount_decimal: '1000',
+          },
+          proration: false,
+          proration_details: {
+            credited_items: null,
+          },
+          quantity: 1,
+          subscription: null,
+          tax_amounts: [],
+          tax_rates: [],
+          type: 'invoiceitem',
+          unit_amount_excluding_tax: '1000',
+        },
+      ],
       has_more: false,
       url: '/v1/invoices/in_1MtHbELkdIwHu7ixl4OzzPMv/lines',
     },
@@ -402,14 +614,14 @@ export const mockInvoice = (params?: Partial<Stripe.Invoice>): Stripe.Invoice =>
   };
 };
 
-export function mockInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
+export function getInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
   return Array.from({ length: count }, (_, index) => ({
-    ...mockInvoice(),
+    ...getInvoice(),
     ...paramsArray[index],
   }));
 }
 
-export function uniqueCode() {
+export function getUniqueCodes() {
   return {
     techCult: {
       codes: {
@@ -419,10 +631,18 @@ export function uniqueCode() {
       },
       provider: 'TECHCULT',
     },
+    stackCommerce: {
+      codes: {
+        elegible: '5tb_redeem_code',
+        nonElegible: '2tb_code_redeem',
+        doesntExist: 'doesnt_exist',
+      },
+      provider: 'STACKCOMMERCE',
+    },
   };
 }
 
-export function mockCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
+export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
   return {
     id: `ch_${randomDataGenerator.string({ length: 10 })}`,
     source: '' as any,
@@ -451,14 +671,14 @@ export function mockCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     captured: true,
     created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
-    customer: null,
+    customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
     description: null,
     disputed: false,
     failure_balance_transaction: null,
     failure_code: null,
     failure_message: null,
     fraud_details: {},
-    invoice: null,
+    invoice: `in_${randomDataGenerator.string({ length: 16 })}`,
     livemode: false,
     metadata: {},
     on_behalf_of: null,
@@ -513,13 +733,13 @@ export function mockCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
   };
 }
 
-export function mockDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
+export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
   return {
     id: 'du_1MtJUT2eZvKYlo2CNaw2HvEv',
     object: 'dispute',
     amount: 1000,
     balance_transactions: [],
-    charge: 'ch_1AZtxr2eZvKYlo2CJDX8whov',
+    charge: `ch_${randomDataGenerator.string({ length: 16 })}`,
     created: 1680651737,
     currency: 'usd',
     evidence: {
@@ -566,5 +786,70 @@ export function mockDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
     ...params,
   };
 }
+
+export const getCurrency = (params?: Partial<Currency>): Currency => {
+  return {
+    currencyId: 'BTC',
+    name: 'Bitcoin',
+    type: 'crypto',
+    receiveType: true,
+    networks: [
+      {
+        platformId: 'bitcoin',
+        name: 'bitcoin',
+      },
+    ],
+    imageUrl: 'https://some-image.jpg',
+    ...params,
+  };
+};
+
+export const getCurrencies = (count = 2, paramsArray: Partial<Currency>[] = []): Currency[] => {
+  return Array.from({ length: count }, (_, index) => ({
+    ...getCurrency(),
+    ...paramsArray[index],
+  }));
+};
+
+export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe.PaymentMethod => {
+  return {
+    id: 'pm_1Q0PsIJvEtkwdCNYMSaVuRz6',
+    object: 'payment_method',
+    allow_redisplay: 'unspecified',
+    billing_details: {
+      address: {
+        city: null,
+        country: null,
+        line1: null,
+        line2: null,
+        postal_code: null,
+        state: null,
+      },
+      email: null,
+      name: 'John Doe',
+      phone: null,
+    },
+    created: 1726673582,
+    customer: null,
+    livemode: false,
+    metadata: {},
+    type: 'us_bank_account',
+    us_bank_account: {
+      account_holder_type: 'individual',
+      account_type: 'checking',
+      bank_name: 'STRIPE TEST BANK',
+      financial_connections_account: null,
+      fingerprint: 'LstWJFsCK7P349Bg',
+      last4: '6789',
+      networks: {
+        preferred: 'ach',
+        supported: ['ach'],
+      },
+      routing_number: '110000000',
+      status_details: {},
+    },
+    ...params,
+  };
+};
 
 export const voidPromise = () => Promise.resolve();

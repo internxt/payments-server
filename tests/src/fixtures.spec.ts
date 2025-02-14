@@ -2,21 +2,21 @@ import config from '../../src/config';
 import {
   getUser,
   getValidToken,
-  mockActiveSubscriptions,
-  mockCharge,
-  mockCoupon,
-  createdSubscription,
-  mockCreateSubscriptionResponse,
-  mockCustomerPayload,
-  mockDispute,
-  mockInvoice,
-  mockInvoices,
-  mockLogger,
-  mockPaymentIntentResponse,
-  mockPrices,
-  mockPromotionCode,
+  getActiveSubscriptions,
+  getCharge,
+  getCoupon,
+  getCreatedSubscription,
+  getCreateSubscriptionResponse,
+  getCustomer,
+  getDispute,
+  getInvoice,
+  getInvoices,
+  getLogger,
+  getPaymentIntentResponse,
+  getPrices,
+  getPromotionCode,
   newTier,
-  uniqueCode,
+  getUniqueCodes,
 } from './fixtures';
 import jwt from 'jsonwebtoken';
 
@@ -94,7 +94,7 @@ describe('Test fixtures', () => {
 
   describe('Customers fixture', () => {
     it('When generating a customer payload, then it should have default values', () => {
-      const customer = mockCustomerPayload();
+      const customer = getCustomer();
 
       expect(customer.id).toMatch(/^cus_/);
       expect(customer.email).toBe('example@internxt.com');
@@ -102,7 +102,7 @@ describe('Test fixtures', () => {
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const customer = mockCustomerPayload({ email: 'custom@example.com', name: 'Custom Name' });
+      const customer = getCustomer({ email: 'custom@example.com', name: 'Custom Name' });
 
       expect(customer.email).toBe('custom@example.com');
       expect(customer.name).toBe('Custom Name');
@@ -111,14 +111,14 @@ describe('Test fixtures', () => {
 
   describe('Promotion code fixture', () => {
     it('When generating a promotion code, then it should have default values', () => {
-      const promoCode = mockPromotionCode({});
+      const promoCode = getPromotionCode({});
 
       expect(promoCode.codeId).toBe('promo_id');
       expect(promoCode.percentOff).toBe(75);
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const promoCode = mockPromotionCode({ percentOff: 50 });
+      const promoCode = getPromotionCode({ percentOff: 50 });
 
       expect(promoCode.percentOff).toBe(50);
     });
@@ -126,7 +126,7 @@ describe('Test fixtures', () => {
 
   describe("Price's fixture", () => {
     it('When generating prices, then it should return predefined price IDs', () => {
-      const prices = mockPrices();
+      const prices = getPrices();
 
       expect(prices.subscription.exists).toBe('price_1PLMh8FAOdcgaBMQlZcGAPY4');
       expect(prices.lifetime.doesNotExist).toBe('price_1PLMVCFAOdcgaBMQxIQgdXsds');
@@ -136,14 +136,14 @@ describe('Test fixtures', () => {
   describe("Subscription's fixture", () => {
     describe('Created Subscription response', () => {
       it('When generating a subscription response, then it should have a default clientSecret', () => {
-        const response = mockCreateSubscriptionResponse();
+        const response = getCreateSubscriptionResponse();
 
         expect(response.type).toBe('payment');
         expect(response.clientSecret).toBeDefined();
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const response = mockCreateSubscriptionResponse({ type: 'setup' });
+        const response = getCreateSubscriptionResponse({ type: 'setup' });
 
         expect(response.type).toBe('setup');
       });
@@ -151,14 +151,14 @@ describe('Test fixtures', () => {
 
     describe('Created subscription object', () => {
       it('When generating a subscription, then it should have default values', () => {
-        const subscription = createdSubscription();
+        const subscription = getCreatedSubscription();
 
         expect(subscription.id).toMatch(/^sub_/);
         expect(subscription.status).toBe('active');
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const subscription = createdSubscription({ status: 'canceled' });
+        const subscription = getCreatedSubscription({ status: 'canceled' });
 
         expect(subscription.status).toBe('canceled');
       });
@@ -166,7 +166,7 @@ describe('Test fixtures', () => {
 
     describe('Active subscriptions', () => {
       it('When generating active subscriptions, then it should return the specified number of subscriptions', () => {
-        const subscriptions = mockActiveSubscriptions(2, [{ id: 'sub_123' }, { id: 'sub_456' }]);
+        const subscriptions = getActiveSubscriptions(2, [{ id: 'sub_123' }, { id: 'sub_456' }]);
 
         expect(subscriptions).toHaveLength(2);
         expect(subscriptions[0].id).toBe('sub_123');
@@ -177,13 +177,13 @@ describe('Test fixtures', () => {
 
   describe('Payment intent fixture', () => {
     it('When generating a payment intent, then it should have a client secret', () => {
-      const intent = mockPaymentIntentResponse();
+      const intent = getPaymentIntentResponse();
 
       expect(intent.clientSecret).toBe('client_secret');
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const intent = mockPaymentIntentResponse({ invoiceStatus: 'paid' });
+      const intent = getPaymentIntentResponse({ invoiceStatus: 'paid' });
 
       expect(intent.invoiceStatus).toBe('paid');
     });
@@ -191,13 +191,13 @@ describe('Test fixtures', () => {
 
   describe('Coupon fixture', () => {
     it('When generating a coupon, then it should have a default code', () => {
-      const coupon = mockCoupon();
+      const coupon = getCoupon();
 
       expect(coupon.code).toBe('c0UP0n');
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const coupon = mockCoupon({ code: 'NEWCODE' });
+      const coupon = getCoupon({ code: 'NEWCODE' });
 
       expect(coupon.code).toBe('NEWCODE');
     });
@@ -220,7 +220,7 @@ describe('Test fixtures', () => {
 
   describe('Logger fixture', () => {
     it('When generating a logger, then all functions should be mocked', () => {
-      const logger = mockLogger();
+      const logger = getLogger();
 
       expect(logger.info).toBeDefined();
       expect(typeof logger.info).toBe('function');
@@ -248,7 +248,7 @@ describe('Test fixtures', () => {
   describe('Invoice fixtures', () => {
     describe('Invoice object', () => {
       it('When generating an invoice, then it should have default values', () => {
-        const invoice = mockInvoice();
+        const invoice = getInvoice();
 
         expect(invoice).toBeDefined();
         expect(invoice.id).toMatch(/^in_/);
@@ -259,7 +259,7 @@ describe('Test fixtures', () => {
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const invoice = mockInvoice({ status: 'paid', account_country: 'CA' });
+        const invoice = getInvoice({ status: 'paid', account_country: 'CA' });
 
         expect(invoice.status).toBe('paid');
         expect(invoice.account_country).toBe('CA');
@@ -268,7 +268,7 @@ describe('Test fixtures', () => {
 
     describe('Invoices array object', () => {
       it('When generating multiple invoices, then it should return the specified number of invoices', () => {
-        const invoices = mockInvoices(3);
+        const invoices = getInvoices(3);
 
         expect(invoices).toHaveLength(3);
         invoices.forEach((invoice) => {
@@ -278,7 +278,7 @@ describe('Test fixtures', () => {
       });
 
       it('When passing custom parameters, then it should override the defaults', () => {
-        const invoices = mockInvoices(2, [
+        const invoices = getInvoices(2, [
           { id: 'in_custom1', status: 'paid' },
           { id: 'in_custom2', status: 'void' },
         ]);
@@ -294,7 +294,7 @@ describe('Test fixtures', () => {
 
   describe('Unique code fixture', () => {
     it('When generating a unique code, then it should return predefined values', () => {
-      const codes = uniqueCode();
+      const codes = getUniqueCodes();
 
       expect(codes.techCult.codes.elegible).toBe('5tb_redeem_code');
       expect(codes.techCult.codes.nonElegible).toBe('2tb_code_redeem');
@@ -305,7 +305,7 @@ describe('Test fixtures', () => {
 
   describe('Charge fixture', () => {
     it('When generating a charge, then it should have default values', () => {
-      const charge = mockCharge();
+      const charge = getCharge();
 
       expect(charge).toBeDefined();
       expect(charge.id).toMatch(/^ch_/);
@@ -316,7 +316,7 @@ describe('Test fixtures', () => {
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const charge = mockCharge({ amount: 5000, status: 'failed' });
+      const charge = getCharge({ amount: 5000, status: 'failed' });
 
       expect(charge.amount).toBe(5000);
       expect(charge.status).toBe('failed');
@@ -325,7 +325,7 @@ describe('Test fixtures', () => {
 
   describe('Dispute fixture', () => {
     it('When generating a dispute, then it should have default values', () => {
-      const dispute = mockDispute();
+      const dispute = getDispute();
 
       expect(dispute).toBeDefined();
       expect(dispute.id).toMatch(/^du_/);
@@ -336,7 +336,7 @@ describe('Test fixtures', () => {
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const dispute = mockDispute({ amount: 2000, status: 'won' });
+      const dispute = getDispute({ amount: 2000, status: 'won' });
 
       expect(dispute.amount).toBe(2000);
       expect(dispute.status).toBe('won');
