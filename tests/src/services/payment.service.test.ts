@@ -4,7 +4,6 @@ import { PaymentService } from '../../../src/services/payment.service';
 import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import getMocks from '../mocks';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { UserType } from '../../../src/core/users/User';
 import {
@@ -26,8 +25,6 @@ let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
 let bit2MeService: Bit2MeService;
 let stripe: Stripe;
-
-const mocks = getMocks();
 
 describe('Payments Service tests', () => {
   beforeEach(() => {

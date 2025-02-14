@@ -4,7 +4,7 @@ import { FastifyInstance } from 'fastify';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
 import { preloadData } from './utils/preloadMongoDBData';
-import { getPrices, uniqueCode } from './fixtures';
+import { getPrices, getUniqueCodes } from './fixtures';
 
 let mongoServer: MongoMemoryServer;
 let mongoClient: MongoClient;
@@ -50,7 +50,7 @@ afterAll(async () => {
 describe('Payment controller e2e tests', () => {
   describe('Check if the unique code provided by the user is valid', () => {
     it('When the code is already used, then it returns 404 status code', async () => {
-      const mockedUniqueCode = uniqueCode();
+      const mockedUniqueCode = getUniqueCodes();
 
       const response = await app.inject({
         path: '/is-unique-code-available',
@@ -62,7 +62,7 @@ describe('Payment controller e2e tests', () => {
 
     // eslint-disable-next-line quotes
     it("When the code doesn't exist, then it returns 404 status code", async () => {
-      const mockedUniqueCode = uniqueCode();
+      const mockedUniqueCode = getUniqueCodes();
 
       const response = await app.inject({
         path: '/is-unique-code-available',

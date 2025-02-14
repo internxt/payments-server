@@ -621,7 +621,7 @@ export function getInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = 
   }));
 }
 
-export function uniqueCode() {
+export function getUniqueCodes() {
   return {
     techCult: {
       codes: {
@@ -630,6 +630,14 @@ export function uniqueCode() {
         doesntExist: 'doesnt_exist',
       },
       provider: 'TECHCULT',
+    },
+    stackCommerce: {
+      codes: {
+        elegible: '5tb_redeem_code',
+        nonElegible: '2tb_code_redeem',
+        doesntExist: 'doesnt_exist',
+      },
+      provider: 'STACKCOMMERCE',
     },
   };
 }

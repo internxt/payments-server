@@ -1,35 +1,36 @@
 import { MongoClient } from 'mongodb';
-import getMocks from '../mocks';
 import { randomUUID } from 'crypto';
 import { UserType } from '../../../src/core/users/User';
+import { getPrices, getUniqueCodes } from '../fixtures';
 
 export const preloadData = async (client: MongoClient) => {
-  const mocks = getMocks();
   const db = client.db('payments');
+  const mockedPrices = getPrices();
+  const mockedUniqueCodes = getUniqueCodes();
 
   await db.collection('license_codes').insertMany([
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.techCult.provider,
-      code: mocks.uniqueCode.techCult.codes.elegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCodes.techCult.provider,
+      code: mockedUniqueCodes.techCult.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.techCult.provider,
-      code: mocks.uniqueCode.techCult.codes.nonElegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCodes.techCult.provider,
+      code: mockedUniqueCodes.techCult.codes.nonElegible,
       redeemed: true,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.stackCommerce.provider,
-      code: mocks.uniqueCode.stackCommerce.codes.elegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCodes.stackCommerce.provider,
+      code: mockedUniqueCodes.stackCommerce.codes.elegible,
       redeemed: false,
     },
     {
-      priceId: mocks.prices.lifetime.exists,
-      provider: mocks.uniqueCode.stackCommerce.provider,
-      code: mocks.uniqueCode.stackCommerce.codes.nonElegible,
+      priceId: mockedPrices.lifetime.exists,
+      provider: mockedUniqueCodes.stackCommerce.provider,
+      code: mockedUniqueCodes.stackCommerce.codes.nonElegible,
       redeemed: true,
     },
   ]);
