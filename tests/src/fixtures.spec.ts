@@ -16,7 +16,7 @@ import {
   getPrices,
   getPromotionCode,
   newTier,
-  uniqueCode,
+  getUniqueCodes,
 } from './fixtures';
 import jwt from 'jsonwebtoken';
 
@@ -294,7 +294,7 @@ describe('Test fixtures', () => {
 
   describe('Unique code fixture', () => {
     it('When generating a unique code, then it should return predefined values', () => {
-      const codes = uniqueCode();
+      const codes = getUniqueCodes();
 
       expect(codes.techCult.codes.elegible).toBe('5tb_redeem_code');
       expect(codes.techCult.codes.nonElegible).toBe('2tb_code_redeem');
