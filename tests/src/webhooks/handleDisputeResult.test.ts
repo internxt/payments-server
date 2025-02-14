@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { PaymentService } from '../../../src/services/payment.service';
+import getMocks from '../mocks';
 import testFactory from '../utils/factory';
 import { UsersService } from '../../../src/services/users.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
@@ -14,8 +15,6 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
-import { FastifyBaseLogger } from 'fastify';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded');
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
@@ -44,6 +43,16 @@ jest.mock('../../../src/services/cache.service', () => {
   };
 });
 
+const {
+  mockCharge,
+  mockInvoices,
+  mockedUserWithLifetime,
+  mockedUserWithoutLifetime,
+  mockDispute,
+  mockLogger,
+  voidPromise,
+} = getMocks();
+
 let paymentService: PaymentService;
 let storageService: StorageService;
 let usersService: UsersService;
@@ -55,12 +64,9 @@ let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 let cacheService: CacheService;
 let stripe: Stripe;
-let logger: jest.Mocked<FastifyBaseLogger>;
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
-    logger = getLogger();
-
     stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
     usersRepository = testFactory.getUsersRepositoryForTest();
     displayBillingRepository = {} as DisplayBillingRepository;
@@ -88,79 +94,56 @@ describe('handleDisputeResult()', () => {
 
   describe('Dispute Status is Lost', () => {
     it('When the status is lost and the user has a subscription, then the subscription is cancelled and the storage is downgraded', async () => {
-      const mockedUser = getUser();
-      const mockedInvoice = getInvoice();
-      const mockedCharge = getCharge({
-        invoice: mockedInvoice.id,
-      });
-      const mockedDispute = getDispute({
-        charge: mockedCharge.id,
-      });
-
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
+      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices[0]);
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithoutLifetime);
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        charge: mockDispute as unknown as Stripe.Dispute,
         cacheService,
         config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
+        log: mockLogger,
       });
 
-      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
-      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockedCharge.invoice);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedCharge.customer);
-      expect(paymentService.cancelSubscription).toHaveBeenCalledWith(mockedInvoice.subscription);
+      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockCharge.id);
+      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockCharge.invoice);
+      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockCharge.customer);
+      expect(paymentService.cancelSubscription).toHaveBeenCalledWith(mockInvoices[0].subscription);
     });
 
     it('When the status is lost and the user has a lifetime, then the lifetime param is changed to false and the storage is downgraded', async () => {
-      const mockedUser = getUser({
-        lifetime: true,
-      });
-      const mockedInvoice = getInvoice({
-        customer: mockedUser.customerId,
-      });
-      const mockedCharge = getCharge({
-        customer: mockedUser.customerId,
-        invoice: mockedInvoice.id,
-      });
-      const mockedDispute = getDispute({
-        charge: mockedCharge.id,
-      });
-
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
+      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices);
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithLifetime);
       (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
       jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
-      jest.spyOn(axios, 'request').mockImplementation(voidPromise);
+      jest.spyOn(axios, 'request').mockImplementation(() => Promise.resolve());
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        charge: mockDispute as unknown as Stripe.Dispute,
         cacheService,
         config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
+        log: mockLogger,
       });
 
-      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
-      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockedCharge.invoice);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedCharge.customer);
+      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockCharge.id);
+      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockCharge.invoice);
+      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockCharge.customer);
       expect(handleLifetimeRefunded).toHaveBeenCalledWith(
         storageService,
         usersService,
-        mockedCharge.customer,
+        mockCharge.customer,
         cacheService,
-        logger,
+        mockLogger,
         config,
       );
     });
@@ -168,36 +151,23 @@ describe('handleDisputeResult()', () => {
 
   describe('Dispute Status is Not Lost', () => {
     it('When the status is different to lost, then nothing is changed', async () => {
-      const mockedUser = getUser({
-        lifetime: true,
-      });
-      const mockedInvoice = getInvoice({
-        customer: mockedUser.customerId,
-      });
-      const mockedCharge = getCharge({
-        customer: mockedUser.customerId,
-        invoice: mockedInvoice.id,
-      });
-      const mockedDispute = getDispute({
-        status: 'needs_response',
-        charge: mockedCharge.id,
-      });
+      mockDispute.status = 'needs_response';
 
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
+      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockCharge);
+      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockInvoices);
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUserWithLifetime);
       (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        charge: mockDispute as unknown as Stripe.Dispute,
         cacheService,
         config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
+        log: mockLogger,
       });
 
       expect(stripe.charges.retrieve).not.toHaveBeenCalled();
