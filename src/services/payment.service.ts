@@ -211,6 +211,40 @@ export class PaymentService {
     }
   }
 
+  extractProductId(product: string | Stripe.Product | Stripe.DeletedProduct | undefined): string {
+    if (!product) {
+      throw new ProductNotFoundError('Product not found');
+    }
+    return typeof product === 'string' ? product : product.id;
+  }
+
+  async getProductIdForUser(user: User): Promise<string> {
+    const { customerId, lifetime } = user;
+
+    if (lifetime) {
+      const invoices = await this.getInvoicesFromUser(customerId, {});
+      const paidInvoice = invoices.find((invoice) => invoice.status === 'paid');
+      if (!paidInvoice) {
+        throw new InvoiceNotFoundError('No paid invoice found for this user.');
+      }
+
+      const invoiceLineItems = await this.getInvoiceLineItems(paidInvoice.id);
+      if (!invoiceLineItems[0]) {
+        throw new InvoiceNotFoundError('No line items found in the invoice.');
+      }
+
+      return this.extractProductId(invoiceLineItems[0].price?.product);
+    } else {
+      const userSubscription = await this.getSubscriptionById(customerId);
+      const [subscriptionItem] = userSubscription.items.data;
+      if (!subscriptionItem) {
+        throw new NotFoundSubscriptionError('No subscription items found for this user.');
+      }
+
+      return this.extractProductId(subscriptionItem.price?.product);
+    }
+  }
+
   async getBusinessSubscriptionSeats(priceId: string) {
     const price = await this.provider.prices.retrieve(priceId);
     const minimumSeats = price.metadata.minimumSeats ?? 1;
@@ -1249,9 +1283,10 @@ export class PaymentService {
   }
 
   async getInvoiceLineItems(invoiceId: string) {
-    return this.provider.invoices.listLineItems(invoiceId, {
+    const invoiceLineItems = await this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
+    return invoiceLineItems.data;
   }
 
   getCustomer(customerId: CustomerId) {
@@ -1553,6 +1588,22 @@ export class PaymentService {
     const currencies = await this.bit2MeService.getCurrencies();
 
     return currencies.filter((c) => c.type === 'crypto');
+  }
+}
+
+export class InvoiceNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, InvoiceNotFoundError.prototype);
+  }
+}
+
+export class ProductNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, ProductNotFoundError.prototype);
   }
 }
 
