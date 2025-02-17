@@ -2,7 +2,6 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import {
   InvoiceNotFoundError,
-  NotFoundSubscriptionError,
   PaymentIntent,
   PaymentService,
   ProductNotFoundError,
@@ -357,27 +356,27 @@ describe('Payments Service tests', () => {
   describe('Extract the product id from a given Product', () => {
     const mockedSubscription = getCreatedSubscription();
 
-    it('should return the string if product is a string', () => {
+    it('When the product is a string, then return it directly', () => {
       const productId = mockedSubscription.items.data[0].price.product;
       expect(paymentService.resolveProductId(productId)).toBe(productId);
     });
 
-    it('should return the id of the product if product is an object', () => {
+    it('When the product is an object, then return the id param', () => {
       const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
       expect(paymentService.resolveProductId(product)).toBe(product.id);
     });
 
-    it('should throw ProductNotFoundError if product is undefined', () => {
+    it('When the product is undefined, then an error indicating so is thrown', () => {
       expect(() => paymentService.resolveProductId(undefined)).toThrow(ProductNotFoundError);
     });
   });
 
   describe('Get the user subscription/lifetime product Id', () => {
     describe('when the user has a lifetime plan', () => {
-      let user: User;
+      let userWithLifetime: User;
 
       beforeEach(() => {
-        user = getUser({ lifetime: true });
+        userWithLifetime = getUser({ lifetime: true });
       });
 
       afterEach(() => {
@@ -386,7 +385,7 @@ describe('Payments Service tests', () => {
 
       it('When there are no paid invoices, then an error indicating so is thrown', async () => {
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([] as Stripe.Invoice[]);
-        await expect(paymentService.fetchUserProductId(user.customerId, user.lifetime)).rejects.toThrow(
+        await expect(paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId)).rejects.toThrow(
           InvoiceNotFoundError,
         );
       });
@@ -395,12 +394,12 @@ describe('Payments Service tests', () => {
         const mockedInvoice = getInvoice();
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
         jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([]);
-        await expect(paymentService.fetchUserProductId(user.customerId, user.lifetime)).rejects.toThrow(
+        await expect(paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId)).rejects.toThrow(
           InvoiceNotFoundError,
         );
       });
 
-      it('When tge user has a lifetime and a valid invoice, then return the product id of the lifetime plan', async () => {
+      it('When the user has a lifetime and a valid invoice, then return the product id of the lifetime plan', async () => {
         const mockedInvoice = getInvoice({ status: 'paid' });
         const mockedSubscription = getCreatedSubscription();
         const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
@@ -408,80 +407,8 @@ describe('Payments Service tests', () => {
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
         jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([lineItem]);
 
-        const result = await paymentService.fetchUserProductId(user.customerId, user.lifetime);
+        const result = await paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId);
         expect(result).toBe(product.id);
-      });
-    });
-
-    describe('when the user has an active subscription', () => {
-      let user: User;
-
-      beforeEach(() => {
-        user = getUser();
-      });
-
-      afterEach(() => {
-        jest.restoreAllMocks();
-      });
-
-      it('When the user does not have a subscription, then an error indicating so is thrown', async () => {
-        const mockedSubscription = {
-          ...getCreatedSubscription({
-            customer: user.customerId,
-            items: { data: [], has_more: false, object: 'list', url: '' },
-          }),
-          lastResponse: {
-            headers: {},
-            requestId: 'req_test',
-            statusCode: 200,
-            apiVersion: '2024-04-10',
-          },
-        };
-        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
-        await expect(paymentService.fetchUserProductId(user.customerId, user.lifetime)).rejects.toThrow(
-          NotFoundSubscriptionError,
-        );
-      });
-
-      it('When the user has a subscription but the status is not active, then an error indicating so is thrown', async () => {
-        const mockedSubscription = {
-          ...getCreatedSubscription({
-            customer: user.customerId,
-            items: { data: [], has_more: false, object: 'list', url: '' },
-            status: 'canceled',
-          }),
-          lastResponse: {
-            headers: {},
-            requestId: 'req_test',
-            statusCode: 200,
-            apiVersion: '2024-04-10',
-          },
-        };
-        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
-        await expect(paymentService.fetchUserProductId(user.customerId, user.lifetime)).rejects.toThrow(
-          NotFoundSubscriptionError,
-        );
-      });
-
-      it('When the user has an active subscription, then return the product id of the subscription', async () => {
-        const mockedSubscription = {
-          ...getCreatedSubscription({
-            customer: user.customerId,
-            status: 'active',
-          }),
-          lastResponse: {
-            headers: {},
-            requestId: 'req_test',
-            statusCode: 200,
-            apiVersion: '2024-04-10',
-          },
-        };
-        const productId = mockedSubscription.items.data[0].price.product;
-        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
-
-        const result = await paymentService.fetchUserProductId(user.customerId, user.lifetime);
-
-        expect(result).toBe(productId);
       });
     });
   });
