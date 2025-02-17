@@ -24,6 +24,7 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { newTier } from '../fixtures';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -75,6 +76,38 @@ describe('TiersService tests', () => {
       axios,
     );
     tiersService = new TiersService(usersService, paymentService, tiersRepository, config);
+  });
+
+  describe('Fetch user tier products', () => {
+    it('When the product exists, then it returns the corresponding tier', async () => {
+      const mockedTier = newTier();
+      jest.spyOn(tiersRepository, 'findByProductIdAndBillingType').mockResolvedValue(mockedTier);
+
+      const result = await tiersService.getTierProductsByProductsId(mockedTier.productId, 'subscription');
+
+      expect(result).toEqual(mockedTier);
+      expect(tiersRepository.findByProductIdAndBillingType).toHaveBeenCalledWith(mockedTier.productId, 'subscription');
+    });
+
+    it('When the product does not exist, then an error indicating so is thrown', async () => {
+      const invalidProductId = 'invalid-product-id';
+
+      jest.spyOn(tiersRepository, 'findByProductIdAndBillingType').mockResolvedValue(null);
+
+      await expect(tiersService.getTierProductsByProductsId(invalidProductId, 'subscription')).rejects.toThrow(
+        TierNotFoundError,
+      );
+      expect(tiersRepository.findByProductIdAndBillingType).toHaveBeenCalledWith(invalidProductId, 'subscription');
+    });
+
+    it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
+      const randomProductId = 'random-product-id';
+      jest.spyOn(tiersRepository, 'findByProductIdAndBillingType').mockRejectedValue(new Error('Unexpected error'));
+
+      await expect(tiersService.getTierProductsByProductsId(randomProductId, 'subscription')).rejects.toThrow(Error);
+
+      expect(tiersRepository.findByProductIdAndBillingType).toHaveBeenCalledWith(randomProductId, 'subscription');
+    });
   });
 
   describe('getAntivirusTier()', () => {
@@ -180,14 +213,14 @@ describe('TiersService tests', () => {
       const productId = 'productId';
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(tiersRepository, 'findByProductIdAndBillingType')
         .mockImplementation(() => Promise.resolve(null));
 
-      await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId)).rejects.toThrow(
+      await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId, 'subscription')).rejects.toThrow(
         new TierNotFoundError(productId),
       );
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith(productId, 'subscription');
     });
 
     it('When applying the tier, then skips disabled features', async () => {
@@ -198,16 +231,16 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Vpn].enabled = false;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(tiersRepository, 'findByProductIdAndBillingType')
         .mockImplementation(() => Promise.resolve(tier));
       const applyDriveFeatures = jest
         .spyOn(tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier({ ...user, email: 'fake email' }, productId);
+      await tiersService.applyTier({ ...user, email: 'fake email' }, productId, 'subscription');
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith(productId, 'subscription');
       expect(applyDriveFeatures).not.toHaveBeenCalled();
       expect(applyVpnFeatures).not.toHaveBeenCalled();
     });
@@ -221,16 +254,16 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Vpn].enabled = true;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(tiersRepository, 'findByProductIdAndBillingType')
         .mockImplementation(() => Promise.resolve(tier));
       const applyDriveFeatures = jest
         .spyOn(tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(userWithEmail, productId);
+      await tiersService.applyTier(userWithEmail, productId, 'subscription');
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith(productId, 'subscription');
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, tier);
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });

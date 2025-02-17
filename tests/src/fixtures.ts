@@ -3,10 +3,10 @@ import { randomUUID } from 'crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { User, UserType } from '../../src/core/users/User';
+import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import { Tier } from '../../src/core/users/MongoDBTiersRepository';
 import Stripe from 'stripe';
-import { PaymentIntent, PromotionCode, SubscriptionCreated } from '../../src/services/payment.service';
+import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
 
@@ -917,6 +917,40 @@ export const getInvoiceLineItem = (
       },
     ],
     ...objParams,
+  };
+};
+
+export const getUserSubscription = (params?: Partial<UserSubscription>): UserSubscription => {
+  const baseSubscription: UserSubscription = {
+    type: 'subscription',
+    subscriptionId: `sub_${randomDataGenerator.string({ length: 14 })}`,
+    amount: 9999,
+    currency: 'usd',
+    interval: 'month',
+    nextPayment: randomDataGenerator.date().getDate(),
+    priceId: `price_${randomDataGenerator.string({ length: 14 })}`,
+    plan: {
+      status: 'active',
+      planId: `price_${randomDataGenerator.string({ length: 14 })}`,
+      productId: `prod_${randomDataGenerator.string({ length: 14 })}`,
+      currency: 'EUR',
+      amountOfSeats: 1,
+      isLifetime: false,
+      isTeam: false,
+      monthlyPrice: 10,
+      name: 'Essential',
+      paymentInterval: 'month',
+      price: 10,
+      renewalPeriod: RenewalPeriod.Monthly,
+      simpleName: 'Essential',
+      storageLimit: randomDataGenerator.natural({ length: 10 }),
+      type: UserType.Individual,
+    },
+  };
+
+  return {
+    ...baseSubscription,
+    ...params,
   };
 };
 

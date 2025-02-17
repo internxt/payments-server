@@ -17,7 +17,7 @@ const getUsersRepositoryForTest = (): UsersRepository => {
 };
 
 const getTiersRepository = (): TiersRepository => {
-  return { findByProductId: jest.fn() } as TiersRepository;
+  return { findByProductIdAndBillingType: jest.fn() } as TiersRepository;
 };
 
 const getProductsRepositoryForTest = (): ProductsRepository => {

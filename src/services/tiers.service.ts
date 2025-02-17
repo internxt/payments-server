@@ -23,8 +23,8 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
-  async getTierProductsByProductsId(productId: string): Promise<Tier | Error> {
-    const tier = await this.tiersRepository.findByProductId(productId);
+  async getTierProductsByProductsId(productId: Tier['productId'], billingType: Tier['billingType']): Promise<Tier> {
+    const tier = await this.tiersRepository.findByProductIdAndBillingType(productId, billingType);
 
     if (!tier) {
       throw new TierNotFoundError(productId);
@@ -71,8 +71,12 @@ export class TiersService {
     };
   }
 
-  async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId(productId);
+  async applyTier(
+    userWithEmail: User & { email: string },
+    productId: Tier['productId'],
+    billingType: Tier['billingType'],
+  ): Promise<void> {
+    const tier = await this.tiersRepository.findByProductIdAndBillingType(productId, billingType);
 
     if (!tier) {
       throw new TierNotFoundError(productId);

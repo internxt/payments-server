@@ -2,11 +2,11 @@ import { Collection, MongoClient } from 'mongodb';
 
 interface AntivirusFeatures {
   enabled: boolean;
-};
+}
 
 interface BackupsFeatures {
   enabled: boolean;
-};
+}
 
 export interface DriveFeatures {
   enabled: boolean;
@@ -16,13 +16,13 @@ export interface DriveFeatures {
     minimumSeats: number;
     maximumSeats: number;
     maxSpaceBytesPerSeat: number;
-  }
-};
+  };
+}
 
 interface MeetFeatures {
   enabled: boolean;
   paxPerCall: number;
-};
+}
 
 interface MailFeatures {
   enabled: boolean;
@@ -32,7 +32,7 @@ interface MailFeatures {
 interface VpnFeatures {
   enabled: boolean;
   locationsAvailable: number;
-};
+}
 
 export enum Service {
   Drive = 'drive',
@@ -40,25 +40,25 @@ export enum Service {
   Antivirus = 'antivirus',
   Meet = 'meet',
   Mail = 'mail',
-  Vpn = 'vpn'
+  Vpn = 'vpn',
 }
 
 export interface Tier {
   label: string;
   productId: string;
-  billingType: "subscription" | "lifetime",
+  billingType: 'subscription' | 'lifetime';
   featuresPerService: {
-    [Service.Drive]: DriveFeatures,
-    [Service.Backups]: BackupsFeatures,
-    [Service.Antivirus]: AntivirusFeatures,
-    [Service.Meet]: MeetFeatures,
-    [Service.Mail]: MailFeatures,
-    [Service.Vpn]: VpnFeatures
-  }
+    [Service.Drive]: DriveFeatures;
+    [Service.Backups]: BackupsFeatures;
+    [Service.Antivirus]: AntivirusFeatures;
+    [Service.Meet]: MeetFeatures;
+    [Service.Mail]: MailFeatures;
+    [Service.Vpn]: VpnFeatures;
+  };
 }
 
 export interface TiersRepository {
-  findByProductId(productId: Tier['productId']): Promise<Tier | null>;
+  findByProductIdAndBillingType(productId: Tier['productId'], billingType: Tier['billingType']): Promise<Tier | null>;
 }
 
 export class MongoDBTiersRepository implements TiersRepository {
@@ -68,9 +68,13 @@ export class MongoDBTiersRepository implements TiersRepository {
     this.collection = mongo.db('payments').collection<Tier>('tiers');
   }
 
-  async findByProductId(productId: Tier['productId']): Promise<Tier | null> {
+  async findByProductIdAndBillingType(
+    productId: Tier['productId'],
+    billingType: Tier['billingType'],
+  ): Promise<Tier | null> {
     const tier = await this.collection.findOne({
-      productId
+      productId,
+      billingType,
     });
 
     return tier;
