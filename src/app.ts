@@ -46,7 +46,7 @@ export async function buildApp(
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
-  fastify.register(productsController(tiersService, usersService, config), { prefix: '/products' });
+  fastify.register(productsController(paymentService, tiersService, usersService, config), { prefix: '/products' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(

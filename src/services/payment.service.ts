@@ -233,9 +233,7 @@ export class PaymentService {
    * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
    * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
    */
-  async fetchUserProductId(user: User): Promise<string> {
-    const { customerId, lifetime } = user;
-
+  async fetchUserProductId(customerId: User['customerId'], lifetime: User['lifetime']): Promise<string> {
     if (lifetime) {
       const invoices = await this.getInvoicesFromUser(customerId, {});
       const paidInvoice = invoices.find((invoice) => invoice.status === 'paid');
