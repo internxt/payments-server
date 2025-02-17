@@ -218,7 +218,7 @@ export class PaymentService {
    * @returns {string} - The product identifier.
    * @throws {ProductNotFoundError} - If the product is undefined.
    */
-  extractProductId(product: string | Stripe.Product | Stripe.DeletedProduct | undefined): string {
+  resolveProductId(product: string | Stripe.Product | Stripe.DeletedProduct | undefined): string {
     if (!product) {
       throw new ProductNotFoundError('Product not found');
     }
@@ -233,7 +233,7 @@ export class PaymentService {
    * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
    * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
    */
-  async getProductIdFromUserActivePlan(user: User): Promise<string> {
+  async fetchUserProductId(user: User): Promise<string> {
     const { customerId, lifetime } = user;
 
     if (lifetime) {
@@ -248,7 +248,7 @@ export class PaymentService {
         throw new InvoiceNotFoundError('No line items found in the invoice.');
       }
 
-      return this.extractProductId(invoiceLineItems[0].price?.product);
+      return this.resolveProductId(invoiceLineItems[0].price?.product);
     } else {
       const userSubscription = await this.getSubscriptionById(customerId);
       const [subscriptionItem] = userSubscription.items.data;
@@ -256,7 +256,7 @@ export class PaymentService {
         throw new NotFoundSubscriptionError('No subscription items found for this user.');
       }
 
-      return this.extractProductId(subscriptionItem.price?.product);
+      return this.resolveProductId(subscriptionItem.price?.product);
     }
   }
 

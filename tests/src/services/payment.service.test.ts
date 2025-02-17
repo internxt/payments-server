@@ -359,16 +359,16 @@ describe('Payments Service tests', () => {
 
     it('should return the string if product is a string', () => {
       const productId = mockedSubscription.items.data[0].price.product;
-      expect(paymentService.extractProductId(productId)).toBe(productId);
+      expect(paymentService.resolveProductId(productId)).toBe(productId);
     });
 
     it('should return the id of the product if product is an object', () => {
       const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
-      expect(paymentService.extractProductId(product)).toBe(product.id);
+      expect(paymentService.resolveProductId(product)).toBe(product.id);
     });
 
     it('should throw ProductNotFoundError if product is undefined', () => {
-      expect(() => paymentService.extractProductId(undefined)).toThrow(ProductNotFoundError);
+      expect(() => paymentService.resolveProductId(undefined)).toThrow(ProductNotFoundError);
     });
   });
 
@@ -386,14 +386,14 @@ describe('Payments Service tests', () => {
 
       it('When there are no paid invoices, then an error indicating so is thrown', async () => {
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([] as Stripe.Invoice[]);
-        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(InvoiceNotFoundError);
+        await expect(paymentService.fetchUserProductId(user)).rejects.toThrow(InvoiceNotFoundError);
       });
 
       it('When the invoice does not have line items, then an error indicating so is thrown', async () => {
         const mockedInvoice = getInvoice();
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
         jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([]);
-        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(InvoiceNotFoundError);
+        await expect(paymentService.fetchUserProductId(user)).rejects.toThrow(InvoiceNotFoundError);
       });
 
       it('When tge user has a lifetime and a valid invoice, then return the product id of the lifetime plan', async () => {
@@ -404,7 +404,7 @@ describe('Payments Service tests', () => {
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
         jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([lineItem]);
 
-        const result = await paymentService.getProductIdFromUserActivePlan(user);
+        const result = await paymentService.fetchUserProductId(user);
         expect(result).toBe(product.id);
       });
     });
@@ -434,7 +434,7 @@ describe('Payments Service tests', () => {
           },
         };
         jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
-        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(NotFoundSubscriptionError);
+        await expect(paymentService.fetchUserProductId(user)).rejects.toThrow(NotFoundSubscriptionError);
       });
 
       it('When the user has a subscription but the status is not active, then an error indicating so is thrown', async () => {
@@ -452,7 +452,7 @@ describe('Payments Service tests', () => {
           },
         };
         jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
-        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(NotFoundSubscriptionError);
+        await expect(paymentService.fetchUserProductId(user)).rejects.toThrow(NotFoundSubscriptionError);
       });
 
       it('When the user has an active subscription, then return the product id of the subscription', async () => {
@@ -471,7 +471,7 @@ describe('Payments Service tests', () => {
         const productId = mockedSubscription.items.data[0].price.product;
         jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
 
-        const result = await paymentService.getProductIdFromUserActivePlan(user);
+        const result = await paymentService.fetchUserProductId(user);
 
         expect(result).toBe(productId);
       });
