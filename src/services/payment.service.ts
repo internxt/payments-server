@@ -211,6 +211,13 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Extracts the product id from the provided product.
+   *
+   * @param {string | Stripe.Product | Stripe.DeletedProduct | undefined} product - The product or its identifier.
+   * @returns {string} - The product identifier.
+   * @throws {ProductNotFoundError} - If the product is undefined.
+   */
   extractProductId(product: string | Stripe.Product | Stripe.DeletedProduct | undefined): string {
     if (!product) {
       throw new ProductNotFoundError('Product not found');
@@ -218,6 +225,14 @@ export class PaymentService {
     return typeof product === 'string' ? product : product.id;
   }
 
+  /**
+   * Gets the product id from the user's subscription or lifetime plan.
+   *
+   * @param {User} user - The user whose product id we want to extract.
+   * @returns {Promise<string>} - A promise that resolves to the product id.
+   * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
+   * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
+   */
   async getProductIdForUser(user: User): Promise<string> {
     const { customerId, lifetime } = user;
 
@@ -1282,10 +1297,17 @@ export class PaymentService {
     });
   }
 
+  /**
+   * Retrieves the invoice line items for a given invoice.
+   *
+   * @param {string} invoiceId - The invoice id.
+   * @returns {Promise<Stripe.InvoiceLineItem[]>} A promise that resolves to an array of invoice line items.
+   */
   async getInvoiceLineItems(invoiceId: string) {
     const invoiceLineItems = await this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
+
     return invoiceLineItems.data;
   }
 
