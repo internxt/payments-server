@@ -486,7 +486,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType
       object: 'list',
       data: [
         {
-          id: 'il_tmp_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          id: `il_tmp_${randomDataGenerator.string({ length: 14 })}`,
           object: 'line_item',
           invoice: '',
           amount: 1000,
@@ -496,7 +496,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType
           discount_amounts: [],
           discountable: true,
           discounts: [],
-          invoice_item: 'ii_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          invoice_item: `ii_${randomDataGenerator.string({ length: 14 })}`,
           livemode: false,
           metadata: {},
           period: {
@@ -813,7 +813,7 @@ export const getCurrencies = (count = 2, paramsArray: Partial<Currency>[] = []):
 
 export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe.PaymentMethod => {
   return {
-    id: 'pm_1Q0PsIJvEtkwdCNYMSaVuRz6',
+    id: `pm_${randomDataGenerator.string({ length: 14 })}`,
     object: 'payment_method',
     allow_redisplay: 'unspecified',
     billing_details: {
@@ -825,11 +825,11 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
         postal_code: null,
         state: null,
       },
-      email: null,
-      name: 'John Doe',
-      phone: null,
+      email: randomDataGenerator.email(),
+      name: randomDataGenerator.name(),
+      phone: randomDataGenerator.phone(),
     },
-    created: 1726673582,
+    created: randomDataGenerator.natural({ length: 10 }),
     customer: null,
     livemode: false,
     metadata: {},
@@ -839,7 +839,7 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
       account_type: 'checking',
       bank_name: 'STRIPE TEST BANK',
       financial_connections_account: null,
-      fingerprint: 'LstWJFsCK7P349Bg',
+      fingerprint: randomDataGenerator.string({ length: 12 }),
       last4: '6789',
       networks: {
         preferred: 'ach',
@@ -868,7 +868,7 @@ export const getInvoiceLineItem = (
     },
     data: [
       {
-        id: 'ii_1MtGUtLkdIwHu7ixBYwjAM00',
+        id: `ii_${randomDataGenerator.string({ length: 14 })}`,
         object: 'line_item',
         amount: 1099,
         currency: 'usd',
@@ -889,7 +889,7 @@ export const getInvoiceLineItem = (
         },
         plan: null,
         price: {
-          id: 'price_1MtGUsLkdIwHu7ix1be5Ljaj',
+          id: `price_${randomDataGenerator.string({ length: 14 })}`,
           object: 'price',
           active: true,
           billing_scheme: 'per_unit',
@@ -900,7 +900,7 @@ export const getInvoiceLineItem = (
           lookup_key: null,
           metadata: {},
           nickname: null,
-          product: 'prod_NeZe7xbBdJT8EN',
+          product: `prod_${randomDataGenerator.string({ length: 12 })}`,
           recurring: null,
           tax_behavior: 'unspecified',
           tiers_mode: null,
