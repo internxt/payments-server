@@ -486,7 +486,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType
       object: 'list',
       data: [
         {
-          id: 'il_tmp_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          id: `il_tmp_${randomDataGenerator.string({ length: 14 })}`,
           object: 'line_item',
           invoice: '',
           amount: 1000,
@@ -496,7 +496,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType
           discount_amounts: [],
           discountable: true,
           discounts: [],
-          invoice_item: 'ii_1Nzo1ZGgdF1VjufLzD1UUn9R',
+          invoice_item: `ii_${randomDataGenerator.string({ length: 14 })}`,
           livemode: false,
           metadata: {},
           period: {
@@ -813,7 +813,7 @@ export const getCurrencies = (count = 2, paramsArray: Partial<Currency>[] = []):
 
 export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe.PaymentMethod => {
   return {
-    id: 'pm_1Q0PsIJvEtkwdCNYMSaVuRz6',
+    id: `pm_${randomDataGenerator.string({ length: 14 })}`,
     object: 'payment_method',
     allow_redisplay: 'unspecified',
     billing_details: {
@@ -825,11 +825,11 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
         postal_code: null,
         state: null,
       },
-      email: null,
-      name: 'John Doe',
-      phone: null,
+      email: randomDataGenerator.email(),
+      name: randomDataGenerator.name(),
+      phone: randomDataGenerator.phone(),
     },
-    created: 1726673582,
+    created: randomDataGenerator.natural({ length: 10 }),
     customer: null,
     livemode: false,
     metadata: {},
@@ -839,7 +839,7 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
       account_type: 'checking',
       bank_name: 'STRIPE TEST BANK',
       financial_connections_account: null,
-      fingerprint: 'LstWJFsCK7P349Bg',
+      fingerprint: randomDataGenerator.string({ length: 12 }),
       last4: '6789',
       networks: {
         preferred: 'ach',
@@ -849,6 +849,74 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
       status_details: {},
     },
     ...params,
+  };
+};
+
+export const getInvoiceLineItem = (
+  objParams?: Partial<Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>>,
+  lineItemParams?: Partial<Stripe.InvoiceLineItem>,
+): Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>> => {
+  return {
+    object: 'list',
+    url: '/v1/invoices',
+    has_more: false,
+    lastResponse: {
+      headers: {},
+      requestId: 'req_test',
+      statusCode: 200,
+      apiVersion: '2024-04-10',
+    },
+    data: [
+      {
+        id: `ii_${randomDataGenerator.string({ length: 14 })}`,
+        object: 'line_item',
+        amount: 1099,
+        currency: 'usd',
+        description: 'T-shirt',
+        discountable: true,
+        discounts: [],
+        invoice: null,
+        amount_excluding_tax: 100,
+        discount_amounts: [],
+        proration_details: null,
+        type: 'invoiceitem',
+        unit_amount_excluding_tax: null,
+        livemode: false,
+        metadata: {},
+        period: {
+          end: 1680640231,
+          start: 1680640231,
+        },
+        plan: null,
+        price: {
+          id: `price_${randomDataGenerator.string({ length: 14 })}`,
+          object: 'price',
+          active: true,
+          billing_scheme: 'per_unit',
+          created: 1680640229,
+          currency: 'usd',
+          custom_unit_amount: null,
+          livemode: false,
+          lookup_key: null,
+          metadata: {},
+          nickname: null,
+          product: `prod_${randomDataGenerator.string({ length: 12 })}`,
+          recurring: null,
+          tax_behavior: 'unspecified',
+          tiers_mode: null,
+          transform_quantity: null,
+          type: 'one_time',
+          unit_amount: 1099,
+          unit_amount_decimal: '1099',
+        },
+        proration: false,
+        quantity: 1,
+        subscription: null,
+        tax_rates: [],
+        ...lineItemParams,
+      },
+    ],
+    ...objParams,
   };
 };
 

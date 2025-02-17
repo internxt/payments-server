@@ -211,6 +211,43 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Extracts the product id from the provided product.
+   *
+   * @param {string | Stripe.Product | Stripe.DeletedProduct | undefined} product - The product or its identifier.
+   * @returns {string} - The product identifier.
+   * @throws {ProductNotFoundError} - If the product is undefined.
+   */
+  resolveProductId(product: string | Stripe.Product | Stripe.DeletedProduct | undefined): string {
+    if (!product) {
+      throw new ProductNotFoundError('Product not found');
+    }
+    return typeof product === 'string' ? product : product.id;
+  }
+
+  /**
+   * Gets the product id from the user's lifetime plan.
+   *
+   * @param {User['customerId']} customerId - The user's customerId whose product id we want to extract.
+   * @returns {Promise<string>} - A promise that resolves to the product id.
+   * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
+   * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
+   */
+  async fetchUserLifetimeProductId(customerId: string): Promise<string> {
+    const invoices = await this.getInvoicesFromUser(customerId, {});
+    const paidInvoice = invoices.find((invoice) => invoice.status === 'paid');
+    if (!paidInvoice) {
+      throw new InvoiceNotFoundError('No paid invoice found for this user.');
+    }
+
+    const invoiceLineItems = await this.getInvoiceLineItems(paidInvoice.id);
+    if (!invoiceLineItems[0]) {
+      throw new InvoiceNotFoundError('No line items found in the invoice.');
+    }
+
+    return this.resolveProductId(invoiceLineItems[0].price?.product);
+  }
+
   async getBusinessSubscriptionSeats(priceId: string) {
     const price = await this.provider.prices.retrieve(priceId);
     const minimumSeats = price.metadata.minimumSeats ?? 1;
@@ -1248,10 +1285,18 @@ export class PaymentService {
     });
   }
 
+  /**
+   * Retrieves the invoice line items for a given invoice.
+   *
+   * @param {string} invoiceId - The invoice id.
+   * @returns {Promise<Stripe.InvoiceLineItem[]>} A promise that resolves to an array of invoice line items.
+   */
   async getInvoiceLineItems(invoiceId: string) {
-    return this.provider.invoices.listLineItems(invoiceId, {
+    const invoiceLineItems = await this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
+
+    return invoiceLineItems.data;
   }
 
   getCustomer(customerId: CustomerId) {
@@ -1553,6 +1598,22 @@ export class PaymentService {
     const currencies = await this.bit2MeService.getCurrencies();
 
     return currencies.filter((c) => c.type === 'crypto');
+  }
+}
+
+export class InvoiceNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, InvoiceNotFoundError.prototype);
+  }
+}
+
+export class ProductNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, ProductNotFoundError.prototype);
   }
 }
 
