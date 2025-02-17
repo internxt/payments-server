@@ -226,38 +226,26 @@ export class PaymentService {
   }
 
   /**
-   * Gets the product id from the user's subscription or lifetime plan.
+   * Gets the product id from the user's lifetime plan.
    *
-   * @param {User} user - The user whose product id we want to extract.
+   * @param {User['customerId']} customerId - The user's customerId whose product id we want to extract.
    * @returns {Promise<string>} - A promise that resolves to the product id.
    * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
    * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
    */
-  async fetchUserProductId(user: User): Promise<string> {
-    const { customerId, lifetime } = user;
-
-    if (lifetime) {
-      const invoices = await this.getInvoicesFromUser(customerId, {});
-      const paidInvoice = invoices.find((invoice) => invoice.status === 'paid');
-      if (!paidInvoice) {
-        throw new InvoiceNotFoundError('No paid invoice found for this user.');
-      }
-
-      const invoiceLineItems = await this.getInvoiceLineItems(paidInvoice.id);
-      if (!invoiceLineItems[0]) {
-        throw new InvoiceNotFoundError('No line items found in the invoice.');
-      }
-
-      return this.resolveProductId(invoiceLineItems[0].price?.product);
-    } else {
-      const userSubscription = await this.getSubscriptionById(customerId);
-      const [subscriptionItem] = userSubscription.items.data;
-      if (userSubscription.status !== 'active' || !subscriptionItem) {
-        throw new NotFoundSubscriptionError('No subscription items found for this user.');
-      }
-
-      return this.resolveProductId(subscriptionItem.price?.product);
+  async fetchUserLifetimeProductId(customerId: string): Promise<string> {
+    const invoices = await this.getInvoicesFromUser(customerId, {});
+    const paidInvoice = invoices.find((invoice) => invoice.status === 'paid');
+    if (!paidInvoice) {
+      throw new InvoiceNotFoundError('No paid invoice found for this user.');
     }
+
+    const invoiceLineItems = await this.getInvoiceLineItems(paidInvoice.id);
+    if (!invoiceLineItems[0]) {
+      throw new InvoiceNotFoundError('No line items found in the invoice.');
+    }
+
+    return this.resolveProductId(invoiceLineItems[0].price?.product);
   }
 
   async getBusinessSubscriptionSeats(priceId: string) {
