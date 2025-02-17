@@ -23,7 +23,7 @@ afterAll(async () => {
 const prefix = '/products';
 
 describe('Products controller e2e tests', () => {
-  describe('GET /products', () => {
+  describe('Get user products depending on his tier', () => {
     it('When the user has an active subscription, then it returns the tier products using the subscription productId', async () => {
       const mockedUser = getUser();
       const mockedUserSubscription = getUserSubscription({ type: 'subscription' });
