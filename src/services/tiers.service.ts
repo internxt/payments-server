@@ -23,10 +23,7 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
-  async getTierProductsByProductsId(
-    productId: Tier['productId'],
-    billingType: Tier['billingType'],
-  ): Promise<Tier | Error> {
+  async getTierProductsByProductsId(productId: Tier['productId'], billingType: Tier['billingType']): Promise<Tier> {
     const tier = await this.tiersRepository.findByProductIdAndBillingType(productId, billingType);
 
     if (!tier) {
