@@ -1,8 +1,11 @@
 import Stripe from 'stripe';
 import axios from 'axios';
 import {
+  InvoiceNotFoundError,
+  NotFoundSubscriptionError,
   PaymentIntent,
   PaymentService,
+  ProductNotFoundError,
   PromotionCode,
   SubscriptionCreated,
 } from '../../../src/services/payment.service';
@@ -11,7 +14,8 @@ import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import getMocks from '../mocks';
 import { Bit2MeService, Currency } from '../../../src/services/bit2me.service';
-import { UserType } from '../../../src/core/users/User';
+import { User, UserType } from '../../../src/core/users/User';
+import { getCreatedSubscription, getInvoice, getInvoiceLineItem, getUser } from '../fixtures';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -347,6 +351,145 @@ describe('Payments Service tests', () => {
       await expect(
         paymentService.getDriveInvoices(mockCustomerId, mockPagination, UserType.Individual),
       ).rejects.toThrow('Service error');
+    });
+  });
+
+  describe('Extract the product id from a given Product', () => {
+    const mockedSubscription = getCreatedSubscription();
+
+    it('should return the string if product is a string', () => {
+      const productId = mockedSubscription.items.data[0].price.product;
+      expect(paymentService.extractProductId(productId)).toBe(productId);
+    });
+
+    it('should return the id of the product if product is an object', () => {
+      const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
+      expect(paymentService.extractProductId(product)).toBe(product.id);
+    });
+
+    it('should throw ProductNotFoundError if product is undefined', () => {
+      expect(() => paymentService.extractProductId(undefined)).toThrow(ProductNotFoundError);
+    });
+  });
+
+  describe('Get the user subscription/lifetime product Id', () => {
+    describe('when the user has a lifetime plan', () => {
+      let user: User;
+
+      beforeEach(() => {
+        user = getUser({ lifetime: true });
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it('When there are no paid invoices, then an error indicating so is thrown', async () => {
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([] as Stripe.Invoice[]);
+        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(InvoiceNotFoundError);
+      });
+
+      it('When the invoice does not have line items, then an error indicating so is thrown', async () => {
+        const mockedInvoice = getInvoice();
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([]);
+        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(InvoiceNotFoundError);
+      });
+
+      it('When tge user has a lifetime and a valid invoice, then return the product id of the lifetime plan', async () => {
+        const mockedInvoice = getInvoice({ status: 'paid' });
+        const mockedSubscription = getCreatedSubscription();
+        const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
+        const lineItem = { price: { product } } as Stripe.InvoiceLineItem;
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([lineItem]);
+
+        const result = await paymentService.getProductIdFromUserActivePlan(user);
+        expect(result).toBe(product.id);
+      });
+    });
+
+    describe('when the user has an active subscription', () => {
+      let user: User;
+
+      beforeEach(() => {
+        user = getUser();
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it('When the user does not have a subscription, then an error indicating so is thrown', async () => {
+        const mockedSubscription = {
+          ...getCreatedSubscription({
+            customer: user.customerId,
+            items: { data: [], has_more: false, object: 'list', url: '' },
+          }),
+          lastResponse: {
+            headers: {},
+            requestId: 'req_test',
+            statusCode: 200,
+            apiVersion: '2024-04-10',
+          },
+        };
+        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
+        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(NotFoundSubscriptionError);
+      });
+
+      it('When the user has a subscription but the status is not active, then an error indicating so is thrown', async () => {
+        const mockedSubscription = {
+          ...getCreatedSubscription({
+            customer: user.customerId,
+            items: { data: [], has_more: false, object: 'list', url: '' },
+            status: 'canceled',
+          }),
+          lastResponse: {
+            headers: {},
+            requestId: 'req_test',
+            statusCode: 200,
+            apiVersion: '2024-04-10',
+          },
+        };
+        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
+        await expect(paymentService.getProductIdFromUserActivePlan(user)).rejects.toThrow(NotFoundSubscriptionError);
+      });
+
+      it('When the user has an active subscription, then return the product id of the subscription', async () => {
+        const mockedSubscription = {
+          ...getCreatedSubscription({
+            customer: user.customerId,
+            status: 'active',
+          }),
+          lastResponse: {
+            headers: {},
+            requestId: 'req_test',
+            statusCode: 200,
+            apiVersion: '2024-04-10',
+          },
+        };
+        const productId = mockedSubscription.items.data[0].price.product;
+        jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(mockedSubscription);
+
+        const result = await paymentService.getProductIdFromUserActivePlan(user);
+
+        expect(result).toBe(productId);
+      });
+    });
+  });
+
+  describe('Get the invoice line items', () => {
+    it('When the line items of an invoice is requested, then returns the items from the requested invoice', async () => {
+      const invoiceId = getInvoice({ status: 'paid' }).id;
+      const mockedData = getInvoiceLineItem();
+      jest.spyOn(stripe.invoices, 'listLineItems').mockResolvedValue(mockedData);
+
+      const result = await paymentService.getInvoiceLineItems(invoiceId);
+
+      expect(stripe.invoices.listLineItems).toHaveBeenCalledWith(invoiceId, {
+        expand: ['data.price.product', 'data.discounts'],
+      });
+      expect(result).toEqual(mockedData.data);
     });
   });
 });

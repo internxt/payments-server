@@ -233,7 +233,7 @@ export class PaymentService {
    * @throws {InvoiceNotFoundError} - If no paid invoice or invoice line items are found.
    * @throws {NotFoundSubscriptionError} - If no subscription items are found for the user.
    */
-  async getProductIdForUser(user: User): Promise<string> {
+  async getProductIdFromUserActivePlan(user: User): Promise<string> {
     const { customerId, lifetime } = user;
 
     if (lifetime) {
@@ -252,7 +252,7 @@ export class PaymentService {
     } else {
       const userSubscription = await this.getSubscriptionById(customerId);
       const [subscriptionItem] = userSubscription.items.data;
-      if (!subscriptionItem) {
+      if (userSubscription.status !== 'active' || !subscriptionItem) {
         throw new NotFoundSubscriptionError('No subscription items found for this user.');
       }
 

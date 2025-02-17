@@ -852,4 +852,72 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
   };
 };
 
+export const getInvoiceLineItem = (
+  objParams?: Partial<Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>>,
+  lineItemParams?: Partial<Stripe.InvoiceLineItem>,
+): Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>> => {
+  return {
+    object: 'list',
+    url: '/v1/invoices',
+    has_more: false,
+    lastResponse: {
+      headers: {},
+      requestId: 'req_test',
+      statusCode: 200,
+      apiVersion: '2024-04-10',
+    },
+    data: [
+      {
+        id: 'ii_1MtGUtLkdIwHu7ixBYwjAM00',
+        object: 'line_item',
+        amount: 1099,
+        currency: 'usd',
+        description: 'T-shirt',
+        discountable: true,
+        discounts: [],
+        invoice: null,
+        amount_excluding_tax: 100,
+        discount_amounts: [],
+        proration_details: null,
+        type: 'invoiceitem',
+        unit_amount_excluding_tax: null,
+        livemode: false,
+        metadata: {},
+        period: {
+          end: 1680640231,
+          start: 1680640231,
+        },
+        plan: null,
+        price: {
+          id: 'price_1MtGUsLkdIwHu7ix1be5Ljaj',
+          object: 'price',
+          active: true,
+          billing_scheme: 'per_unit',
+          created: 1680640229,
+          currency: 'usd',
+          custom_unit_amount: null,
+          livemode: false,
+          lookup_key: null,
+          metadata: {},
+          nickname: null,
+          product: 'prod_NeZe7xbBdJT8EN',
+          recurring: null,
+          tax_behavior: 'unspecified',
+          tiers_mode: null,
+          transform_quantity: null,
+          type: 'one_time',
+          unit_amount: 1099,
+          unit_amount_decimal: '1099',
+        },
+        proration: false,
+        quantity: 1,
+        subscription: null,
+        tax_rates: [],
+        ...lineItemParams,
+      },
+    ],
+    ...objParams,
+  };
+};
+
 export const voidPromise = () => Promise.resolve();
