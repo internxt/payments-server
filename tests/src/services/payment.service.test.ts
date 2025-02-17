@@ -357,17 +357,17 @@ describe('Payments Service tests', () => {
   describe('Extract the product id from a given Product', () => {
     const mockedSubscription = getCreatedSubscription();
 
-    it('should return the string if product is a string', () => {
+    it('When the product is a string, then return it directly', () => {
       const productId = mockedSubscription.items.data[0].price.product;
       expect(paymentService.resolveProductId(productId)).toBe(productId);
     });
 
-    it('should return the id of the product if product is an object', () => {
+    it('When the product is an object, then return the id param', () => {
       const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
       expect(paymentService.resolveProductId(product)).toBe(product.id);
     });
 
-    it('should throw ProductNotFoundError if product is undefined', () => {
+    it('When the product is undefined, then an error indicating so is thrown', () => {
       expect(() => paymentService.resolveProductId(undefined)).toThrow(ProductNotFoundError);
     });
   });
