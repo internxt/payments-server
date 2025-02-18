@@ -243,7 +243,7 @@ export class UsersService {
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
   }
 
-  async enableVPNTier(userUuid: User['uuid'], tier: VpnFeatures['featureId']): Promise<void> {
+  async enableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
 
     const requestConfig: AxiosRequestConfig = {
@@ -255,10 +255,10 @@ export class UsersService {
 
     //TODO: Update the endpoint to the correct one
     return this.axios.post(
-      `${this.config.VPN_URL}/users`,
+      `${this.config.VPN_URL}/gateway/users`,
       {
-        userUuid,
-        tier,
+        uuid: userUuid,
+        tierId: featureId,
       },
       requestConfig,
     );
