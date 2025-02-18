@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
-import { getPrices, getUniqueCodes } from './fixtures';
+import { getPrices, getUniqueCodes } from '../fixtures';
+import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/loadTestApp';
 
 let mongoServer: MongoMemoryServer;
 let mongoClient: MongoClient;
