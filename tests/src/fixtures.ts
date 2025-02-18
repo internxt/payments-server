@@ -70,11 +70,11 @@ export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode
 export const getPrices = () => {
   return {
     subscription: {
-      exists: 'price_1PLMh8FAOdcgaBMQlZcGAPY4',
+      exists: 'price_1Qtm8TFAOdcgaBMQat9imLwM',
       doesNotExist: 'price_1PLMerFAOdcgaBMQ17q27Cas',
     },
     lifetime: {
-      exists: 'price_1PLMTpFAOdcgaBMQ0Jag685H',
+      exists: 'price_1Qtm8TFAOdcgaBMQ2QYHKnHD',
       doesNotExist: 'price_1PLMVCFAOdcgaBMQxIQgdXsds',
     },
   };
