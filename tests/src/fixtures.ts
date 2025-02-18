@@ -70,7 +70,7 @@ export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode
 export const getPrices = () => {
   return {
     subscription: {
-      exists: 'price_1PLMh8FAOdcgaBMQlZcGAPY4',
+      exists: 'price_1Qtm8TFAOdcgaBMQat9imLwM',
       doesNotExist: 'price_1PLMerFAOdcgaBMQ17q27Cas',
     },
     lifetime: {
