@@ -76,7 +76,7 @@ export default async function handleInvoiceCompleted(
   }
 
   const items = await paymentService.getInvoiceLineItems(session.id as string);
-  const price = items[0].price;
+  const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
@@ -174,10 +174,10 @@ export default async function handleInvoiceCompleted(
   try {
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
-      const areDiscounts = items[0].discounts.length > 0;
+      const areDiscounts = items.data[0].discounts.length > 0;
 
       if (areDiscounts) {
-        const coupon = (items[0].discounts[0] as Stripe.Discount).coupon;
+        const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
         if (coupon) {
           await usersService.storeCouponUsedByUser(userData, coupon.id);
@@ -193,7 +193,7 @@ export default async function handleInvoiceCompleted(
   }
 
   if (isBusinessPlan) {
-    const amountOfSeats = items[0].quantity;
+    const amountOfSeats = items.data[0].quantity;
     if (!amountOfSeats) return;
 
     const address = customer.address?.line1 ?? undefined;
