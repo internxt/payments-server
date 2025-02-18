@@ -241,11 +241,11 @@ export class PaymentService {
     }
 
     const invoiceLineItems = await this.getInvoiceLineItems(paidInvoice.id);
-    if (!invoiceLineItems[0]) {
+    if (!invoiceLineItems.data[0]) {
       throw new InvoiceNotFoundError('No line items found in the invoice.');
     }
 
-    return this.resolveProductId(invoiceLineItems[0].price?.product);
+    return this.resolveProductId(invoiceLineItems.data[0].price?.product);
   }
 
   async getBusinessSubscriptionSeats(priceId: string) {
@@ -1289,14 +1289,12 @@ export class PaymentService {
    * Retrieves the invoice line items for a given invoice.
    *
    * @param {string} invoiceId - The invoice id.
-   * @returns {Promise<Stripe.InvoiceLineItem[]>} A promise that resolves to an array of invoice line items.
+   * @returns {Promise<Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>>} A promise that resolves to an array of invoice line items.
    */
   async getInvoiceLineItems(invoiceId: string) {
-    const invoiceLineItems = await this.provider.invoices.listLineItems(invoiceId, {
+    return this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
-
-    return invoiceLineItems.data;
   }
 
   getCustomer(customerId: CustomerId) {

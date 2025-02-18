@@ -380,7 +380,7 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Get the user subscription/lifetime product Id', () => {
+  describe('Get the user lifetime product Id', () => {
     describe('when the user has a lifetime plan', () => {
       let userWithLifetime: User;
 
@@ -402,7 +402,17 @@ describe('Payments Service tests', () => {
       it('When the invoice does not have line items, then an error indicating so is thrown', async () => {
         const mockedInvoice = getInvoice();
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
-        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([]);
+        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue({
+          data: [],
+          has_more: false,
+          lastResponse: {
+            headers: {},
+            requestId: '',
+            statusCode: 400,
+          },
+          object: 'list',
+          url: '',
+        });
         await expect(paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId)).rejects.toThrow(
           InvoiceNotFoundError,
         );
@@ -410,11 +420,11 @@ describe('Payments Service tests', () => {
 
       it('When the user has a lifetime and a valid invoice, then return the product id of the lifetime plan', async () => {
         const mockedInvoice = getInvoice({ status: 'paid' });
-        const mockedSubscription = getCreatedSubscription();
-        const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
-        const lineItem = { price: { product } } as Stripe.InvoiceLineItem;
+        const product = mockedInvoice.lines.data[0].price?.product as Stripe.Product;
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
-        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([lineItem]);
+        jest
+          .spyOn(paymentService, 'getInvoiceLineItems')
+          .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
 
         const result = await paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId);
         expect(result).toBe(product.id);
@@ -433,7 +443,7 @@ describe('Payments Service tests', () => {
       expect(stripe.invoices.listLineItems).toHaveBeenCalledWith(invoiceId, {
         expand: ['data.price.product', 'data.discounts'],
       });
-      expect(result).toEqual(mockedData.data);
+      expect(result).toEqual(mockedData);
     });
   });
 
@@ -455,7 +465,7 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Get the user subscription/lifetime product Id', () => {
+  describe('Get the user lifetime product Id', () => {
     describe('when the user has a lifetime plan', () => {
       let userWithLifetime: User;
 
@@ -477,7 +487,17 @@ describe('Payments Service tests', () => {
       it('When the invoice does not have line items, then an error indicating so is thrown', async () => {
         const mockedInvoice = getInvoice();
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
-        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([]);
+        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue({
+          data: [],
+          has_more: false,
+          lastResponse: {
+            headers: {},
+            requestId: '',
+            statusCode: 400,
+          },
+          object: 'list',
+          url: '',
+        });
         await expect(paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId)).rejects.toThrow(
           InvoiceNotFoundError,
         );
@@ -489,7 +509,17 @@ describe('Payments Service tests', () => {
         const product = mockedSubscription.items.data[0].plan.product as Stripe.Product;
         const lineItem = { price: { product } } as Stripe.InvoiceLineItem;
         jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
-        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue([lineItem]);
+        jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue({
+          data: [lineItem],
+          has_more: false,
+          lastResponse: {
+            headers: {},
+            requestId: '',
+            statusCode: 400,
+          },
+          object: 'list',
+          url: '',
+        });
 
         const result = await paymentService.fetchUserLifetimeProductId(userWithLifetime.customerId);
         expect(result).toBe(product.id);
@@ -508,7 +538,7 @@ describe('Payments Service tests', () => {
       expect(stripe.invoices.listLineItems).toHaveBeenCalledWith(invoiceId, {
         expand: ['data.price.product', 'data.discounts'],
       });
-      expect(result).toEqual(mockedData.data);
+      expect(result).toEqual(mockedData);
     });
   });
 });
