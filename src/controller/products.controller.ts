@@ -42,16 +42,18 @@ export default function (
       try {
         const { userType } = req.query;
         const user = await assertUser(req, res, usersService);
-        const { customerId } = user;
+        const { customerId, lifetime } = user;
 
         const userSubscription = await paymentService.getUserSubscription(customerId, userType);
 
-        if (userSubscription.type === 'free') {
+        if (userSubscription.type === 'free' && !lifetime) {
           throw new NotFoundSubscriptionError('User does not have any subscription nor lifetime plan');
         }
 
         let productId: string;
         let tierProducts: Tier;
+
+        if (lifetime) userSubscription.type = 'lifetime';
 
         switch (userSubscription.type) {
           case 'subscription':
