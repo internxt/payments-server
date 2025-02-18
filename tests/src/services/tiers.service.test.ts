@@ -3,7 +3,6 @@ import Stripe from 'stripe';
 
 import testFactory from '../utils/factory';
 import config from '../../../src/config';
-import getMocks from '../mocks';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   TierNotFoundError,
@@ -24,6 +23,7 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { getUser, newTier } from '../fixtures';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -36,7 +36,6 @@ let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
-const mocks = getMocks();
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
@@ -79,7 +78,8 @@ describe('TiersService tests', () => {
 
   describe('getAntivirusTier()', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const mockedUser = getUser();
+      const customerId: CustomerId = mockedUser.customerId;
       const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
       jest
@@ -94,7 +94,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has an active subscription but is not eligible for antivirus, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = getUser().customerId;
       const activeSubscription = { status: 'active', product: { id: 'some_other_product' } };
 
       jest
@@ -109,7 +109,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has no active subscription but has a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = getUser().customerId;
       const isLifetime = true;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
@@ -127,7 +127,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has no active subscription and is not lifetime, then throws NotFoundSubscriptionError', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = getUser().customerId;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
@@ -137,7 +137,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user is lifetime but the product is not in the allowed list, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = getUser().customerId;
       const isLifetime = true;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
@@ -153,7 +153,7 @@ describe('TiersService tests', () => {
     });
 
     it('When the user has both an active subscription and a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = mocks.mockedUserWithLifetime.customerId;
+      const customerId: CustomerId = getUser().customerId;
       const isLifetime = true;
       const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
@@ -176,7 +176,7 @@ describe('TiersService tests', () => {
 
   describe('applyTier()', () => {
     it('When applying the tier, then fails if the tier is not found', async () => {
-      const user = mocks.mockedUserWithLifetime;
+      const user = getUser();
       const productId = 'productId';
 
       const findTierByProductId = jest
@@ -191,8 +191,8 @@ describe('TiersService tests', () => {
     });
 
     it('When applying the tier, then skips disabled features', async () => {
-      const user = mocks.mockedUserWithLifetime;
-      const tier = mocks.newTier();
+      const user = getUser();
+      const tier = newTier();
       const { productId } = tier;
       tier.featuresPerService[Service.Drive].enabled = false;
       tier.featuresPerService[Service.Vpn].enabled = false;
@@ -213,8 +213,8 @@ describe('TiersService tests', () => {
     });
 
     it('When applying the tier, then applies enabled features', async () => {
-      const user = mocks.mockedUserWithLifetime;
-      const tier = mocks.newTier();
+      const user = getUser();
+      const tier = newTier();
       const userWithEmail = { ...user, email: 'fake email' };
       const { productId } = tier;
       tier.featuresPerService[Service.Drive].enabled = true;
@@ -238,8 +238,8 @@ describe('TiersService tests', () => {
 
   describe('applyDriveFeatures()', () => {
     it('When workspaces is enabled, then it is applied exclusively', async () => {
-      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
-      const tier = mocks.newTier();
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
@@ -262,8 +262,8 @@ describe('TiersService tests', () => {
     });
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
-      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
-      const tier = mocks.newTier();
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
@@ -286,8 +286,8 @@ describe('TiersService tests', () => {
     });
 
     it('When workspaces is not enabled, then individual is initialized', async () => {
-      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
-      const tier = mocks.newTier();
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
@@ -305,8 +305,8 @@ describe('TiersService tests', () => {
 
   describe('applyVpnFeatures()', () => {
     it('When it is called, then it does not throw', async () => {
-      const userWithEmail = { ...mocks.mockedUserWithLifetime, email: 'test@internxt.com' };
-      const tier = mocks.newTier();
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
