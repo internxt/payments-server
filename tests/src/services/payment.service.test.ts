@@ -5,7 +5,7 @@ import testFactory from '../utils/factory';
 import envVariablesConfig from '../../../src/config';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { UserType } from '../../../src/core/users/User';
+import { User, UserType } from '../../../src/core/users/User';
 import {
   getCoupon,
   getCreatedSubscription,
@@ -13,6 +13,7 @@ import {
   getCurrencies,
   getCustomer,
   getInvoice,
+  getInvoiceLineItem,
   getInvoices,
   getPaymentIntentResponse,
   getPaymentMethod,
