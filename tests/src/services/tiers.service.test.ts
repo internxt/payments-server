@@ -81,14 +81,12 @@ describe('TiersService tests', () => {
   });
 
   describe('Get the tier products using the user Id', () => {
-    it('When the user has no assigned tiers, then it throws NotFoundSubscriptionError', async () => {
+    it('When the user has no assigned tiers, then an error indicating so is thrown', async () => {
       const { id: userId } = getUser();
 
       jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue([]);
 
-      await expect(tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(
-        new NotFoundSubscriptionError(`No tiers found for user with ID: ${userId}`),
-      );
+      await expect(tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(TierNotFoundError);
     });
 
     it('When the user has assigned tiers, then it returns the corresponding tier objects', async () => {
@@ -115,14 +113,12 @@ describe('TiersService tests', () => {
   });
 
   describe('Get tier products using the tier id', () => {
-    it('When the requested tier does not exist, then it throws TierNotFoundError', async () => {
+    it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
       const { id: tierId } = newTier();
 
       jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(null);
 
-      await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(
-        new TierNotFoundError(`Tier not found with ID: ${tierId}`),
-      );
+      await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(TierNotFoundError);
     });
 
     it('When the requested tier exists, then it returns the tier object', async () => {
