@@ -15,6 +15,7 @@ import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import { TiersService } from '../services/tiers.service';
 
 export default function (
   stripe: Stripe,
@@ -24,6 +25,7 @@ export default function (
   config: AppConfig,
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
+  tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -58,16 +60,17 @@ export default function (
           break;
 
         case 'customer.subscription.deleted':
-          await handleSubscriptionCanceled(
+          await handleSubscriptionCanceled({
             storageService,
             usersService,
             paymentService,
-            event.data.object as Stripe.Subscription,
+            subscription: event.data.object,
             cacheService,
             objectStorageService,
-            fastify.log,
+            log: fastify.log,
             config,
-          );
+            tiersService,
+          });
           break;
 
         case 'customer.subscription.updated':
@@ -106,15 +109,16 @@ export default function (
         }
 
         case 'invoice.payment_succeeded':
-          await handleInvoiceCompleted(
-            event.data.object,
+          await handleInvoiceCompleted({
+            session: event.data.object,
             usersService,
             paymentService,
-            fastify.log,
+            log: fastify.log,
             cacheService,
             config,
             objectStorageService,
-          );
+            tiersService,
+          });
           break;
 
         case 'checkout.session.completed':

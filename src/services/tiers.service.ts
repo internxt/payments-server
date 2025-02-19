@@ -26,6 +26,18 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
+  async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
+    await this.tiersUsersRepository.insertTierToUser(userId, newTierId);
+  }
+
+  async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
+    await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+  }
+
+  async deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
+    await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+  }
+
   async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {
     const userTiers = await this.tiersUsersRepository.findTierIdByUserId(userId);
 
@@ -46,7 +58,7 @@ export class TiersService {
     return tier;
   }
 
-  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier | Error> {
+  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier> {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {

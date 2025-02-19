@@ -737,6 +737,7 @@ export class PaymentService {
           bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
+          product: invoice.lines.data[0].price?.product,
         };
       });
 
