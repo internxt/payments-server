@@ -128,7 +128,7 @@ describe('Test fixtures', () => {
     it('When generating prices, then it should return predefined price IDs', () => {
       const prices = getPrices();
 
-      expect(prices.subscription.exists).toBe('price_1PLMh8FAOdcgaBMQlZcGAPY4');
+      expect(prices.subscription.exists).toBe('price_1Qtm4MFAOdcgaBMQ0cUPiqRA');
       expect(prices.lifetime.doesNotExist).toBe('price_1PLMVCFAOdcgaBMQxIQgdXsds');
     });
   });
