@@ -8,8 +8,8 @@ import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
 export class TierNotFoundError extends Error {
-  constructor(productId: Tier['productId']) {
-    super(`Tier for product ${productId} not found`);
+  constructor(message: string) {
+    super(message);
 
     Object.setPrototypeOf(this, TierNotFoundError.prototype);
   }
@@ -30,7 +30,7 @@ export class TiersService {
     const userTiers = await this.tiersUsersRepository.findTierIdByUserId(userId);
 
     if (userTiers.length === 0) {
-      throw new NotFoundSubscriptionError(`No tiers found for user with ID: ${userId}`);
+      throw new TierNotFoundError(`No tiers found for user with ID: ${userId}`);
     }
 
     return await Promise.all(userTiers.map(async ({ tierId }) => this.getTierProductsByTierId(tierId)));
@@ -50,7 +50,7 @@ export class TiersService {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
-      throw new TierNotFoundError(productId);
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
     }
 
     return tier;
@@ -98,7 +98,7 @@ export class TiersService {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
-      throw new TierNotFoundError(productId);
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
     }
 
     for (const service of Object.keys(tier.featuresPerService)) {
