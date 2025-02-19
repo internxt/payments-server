@@ -28,6 +28,7 @@ import { ObjectStorageService } from './services/objectStorage.service';
 import { Bit2MeService } from './services/bit2me.service';
 import { TiersService } from './services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
+import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -38,6 +39,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
   const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
   const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
+  const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
 
   const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
@@ -60,7 +62,13 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     licenseCodesRepository,
   );
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
-  const tiersService = new TiersService(usersService, paymentService, tiersRepository, envVariablesConfig);
+  const tiersService = new TiersService(
+    usersService,
+    paymentService,
+    tiersRepository,
+    usersTiersRepository,
+    envVariablesConfig,
+  );
 
   const fastify = await buildApp(
     paymentService,

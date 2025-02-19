@@ -2,6 +2,7 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 
@@ -18,6 +19,16 @@ const getUsersRepositoryForTest = (): UsersRepository => {
 
 const getTiersRepository = (): TiersRepository => {
   return { findByProductId: jest.fn() } as TiersRepository;
+};
+
+const getUsersTiersRepository = (): UsersTiersRepository => {
+  return {
+    deleteAllUserTiers: jest.fn(),
+    deleteTierFromUser: jest.fn(),
+    findTierIdByUserId: jest.fn(),
+    insertTierToUser: jest.fn(),
+    updateUserTier: jest.fn(),
+  } as UsersTiersRepository;
 };
 
 const getProductsRepositoryForTest = (): ProductsRepository => {
@@ -62,6 +73,7 @@ const testFactory = {
   getCouponsRepositoryForTest,
   displayBillingRepositoryForTest,
   getTiersRepository,
+  getUsersTiersRepository,
 };
 
 export default testFactory;

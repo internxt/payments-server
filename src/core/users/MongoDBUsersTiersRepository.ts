@@ -2,7 +2,7 @@ import { Collection, MongoClient, WithId } from 'mongodb';
 import { Tier } from './Tier';
 import { User } from './User';
 
-interface UserTier {
+export interface UserTier {
   id: string;
   userId: User['id'];
   tierId: Tier['id'];

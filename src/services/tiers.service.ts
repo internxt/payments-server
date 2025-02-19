@@ -5,6 +5,7 @@ import { createOrUpdateUser, updateUserTier } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
+import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
 export class TierNotFoundError extends Error {
   constructor(productId: Tier['productId']) {
@@ -21,8 +22,31 @@ export class TiersService {
     private readonly usersService: UsersService,
     private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
+    private readonly tiersUsersRepository: UsersTiersRepository,
     private readonly config: AppConfig,
   ) {}
+
+  async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
+    await this.tiersUsersRepository.insertTierToUser(userId, newTierId);
+  }
+
+  async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
+    const updatedUserTier = await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+
+    if (!updatedUserTier) {
+      throw new Error(
+        `Error while updating the older tier ${oldTierId} to the newest tier ${newTierId} from user with Id ${userId}`,
+      );
+    }
+  }
+
+  async deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
+    const deletedTierFromUser = await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+
+    if (!deletedTierFromUser) {
+      throw new Error(`Error while deleting a tier ${tierId} from user Id ${userId}`);
+    }
+  }
 
   async getTierProductsByProductsId(productId: string): Promise<Tier | Error> {
     const tier = await this.tiersRepository.findByProductId(productId);
