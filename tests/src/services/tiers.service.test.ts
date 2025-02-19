@@ -60,7 +60,7 @@ describe('TiersService tests', () => {
     displayBillingRepository = {} as DisplayBillingRepository;
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUserTiersRepository();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
     productsRepository = testFactory.getProductsRepositoryForTest();
     usersTiersRepository = testFactory.getUsersTiersRepository();
     bit2MeService = new Bit2MeService(config, axios);
@@ -78,14 +78,7 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      usersTiersRepository,
-      config,
-    );
+    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
   });
 
   describe('User-Tier Relationship', () => {
