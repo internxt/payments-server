@@ -62,6 +62,7 @@ describe('TiersService tests', () => {
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
     usersTiersRepository = testFactory.getUserTiersRepository();
     productsRepository = testFactory.getProductsRepositoryForTest();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
     bit2MeService = new Bit2MeService(config, axios);
     paymentService = new PaymentService(
       new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
@@ -77,7 +78,74 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      usersTiersRepository,
+      config,
+    );
+  });
+
+  describe('User-Tier Relationship', () => {
+    describe('Insert user-tier relationship', () => {
+      it('When inserting a new tier for a user, then it should be added successfully', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'insertTierToUser').mockResolvedValue();
+
+        await expect(tiersService.insertTierToUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.insertTierToUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+    });
+
+    describe('Update user-tier relationship', () => {
+      it('When updating a user tier, then it should replace the old tier with the new one', async () => {
+        const user = getUser();
+        const oldTier = newTier();
+        const newTierData = newTier();
+
+        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
+
+        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+      });
+
+      it('When updating a user tier and it does not exist, then an error indicating so is thrown', async () => {
+        const user = getUser();
+        const oldTier = newTier();
+        const newTierData = newTier();
+
+        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(false);
+
+        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).rejects.toThrow(Error);
+        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+      });
+    });
+
+    describe('Delete user-tier relationship', () => {
+      it('When deleting a tier from a user, then it should remove the relationship', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(true);
+
+        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+
+      it('When deleting a tier from a user and it does not exist, then an error indicating so is thrown', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(false);
+
+        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).rejects.toThrow(Error);
+        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+    });
   });
 
   describe('Get the tier products using the user Id', () => {
