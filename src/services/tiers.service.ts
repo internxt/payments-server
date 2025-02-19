@@ -8,8 +8,8 @@ import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
 export class TierNotFoundError extends Error {
-  constructor(productId: Tier['productId']) {
-    super(`Tier for product ${productId} not found`);
+  constructor(message: string) {
+    super(message);
 
     Object.setPrototypeOf(this, TierNotFoundError.prototype);
   }
@@ -48,11 +48,31 @@ export class TiersService {
     }
   }
 
-  async getTierProductsByProductsId(productId: string): Promise<Tier | Error> {
+  async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {
+    const userTiers = await this.tiersUsersRepository.findTierIdByUserId(userId);
+
+    if (userTiers.length === 0) {
+      throw new TierNotFoundError(`No tiers found for user with ID: ${userId}`);
+    }
+
+    return await Promise.all(userTiers.map(async ({ tierId }) => this.getTierProductsByTierId(tierId)));
+  }
+
+  async getTierProductsByTierId(tierId: Tier['id']): Promise<Tier> {
+    const tier = await this.tiersRepository.findByTierId(tierId);
+
+    if (!tier) {
+      throw new TierNotFoundError(`Tier not found with ID: ${tierId}`);
+    }
+
+    return tier;
+  }
+
+  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier | Error> {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
-      throw new TierNotFoundError(productId);
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
     }
 
     return tier;
@@ -100,7 +120,7 @@ export class TiersService {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
-      throw new TierNotFoundError(productId);
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
     }
 
     for (const service of Object.keys(tier.featuresPerService)) {
