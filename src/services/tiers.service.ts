@@ -31,11 +31,21 @@ export class TiersService {
   }
 
   async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
-    await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+    const updatedUserTier = await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+
+    if (!updatedUserTier) {
+      throw new Error(
+        `Error while updating the older tier ${oldTierId} to the newest tier ${newTierId} from user with Id ${userId}`,
+      );
+    }
   }
 
   async deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
-    await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+    const deletedTierFromUser = await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+
+    if (!deletedTierFromUser) {
+      throw new Error(`Error while deleting a tier ${tierId} from user Id ${userId}`);
+    }
   }
 
   async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {

@@ -21,7 +21,7 @@ const getTiersRepository = (): TiersRepository => {
   return { findByProductId: jest.fn(), findByTierId: jest.fn() } as TiersRepository;
 };
 
-const getUserTiersRepository = (): UsersTiersRepository => {
+const getUsersTiersRepository = (): UsersTiersRepository => {
   return {
     deleteAllUserTiers: jest.fn(),
     deleteTierFromUser: jest.fn(),
@@ -73,7 +73,7 @@ const testFactory = {
   getCouponsRepositoryForTest,
   displayBillingRepositoryForTest,
   getTiersRepository,
-  getUserTiersRepository,
+  getUsersTiersRepository,
 };
 
 export default testFactory;
