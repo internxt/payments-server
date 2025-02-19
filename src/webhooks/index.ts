@@ -60,17 +60,16 @@ export default function (
           break;
 
         case 'customer.subscription.deleted':
-          await handleSubscriptionCanceled({
+          await handleSubscriptionCanceled(
             storageService,
             usersService,
             paymentService,
-            subscription: event.data.object,
+            event.data.object,
             cacheService,
             objectStorageService,
-            log: fastify.log,
+            fastify.log,
             config,
-            tiersService,
-          });
+          );
           break;
 
         case 'customer.subscription.updated':
