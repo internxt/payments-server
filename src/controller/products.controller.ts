@@ -5,7 +5,7 @@ import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { TiersService } from '../services/tiers.service';
 
 export default function (tiersService: TiersService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
@@ -29,17 +29,15 @@ export default function (tiersService: TiersService, usersService: UsersService,
 
         if (!user) throw new UserNotFoundError('User does not exist');
 
-        const { id } = user;
+        const { customerId, lifetime } = user;
 
-        const userTiers = await tiersService.getTiersProductsByUserId(id);
+        const isLifetimeUser = lifetime ?? false;
 
-        return res.status(200).send(userTiers);
+        const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetimeUser);
+
+        return res.status(200).send(antivirusTier);
       } catch (error) {
-        if (
-          error instanceof UserNotFoundError ||
-          error instanceof NotFoundSubscriptionError ||
-          error instanceof TierNotFoundError
-        ) {
+        if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
           return res.status(404).send({ error: error.message });
         }
 
