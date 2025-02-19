@@ -118,7 +118,7 @@ describe('TiersService tests', () => {
     it('When the requested tier does not exist, then it throws TierNotFoundError', async () => {
       const { id: tierId } = newTier();
 
-      jest.spyOn(tiersRepository, 'findById').mockResolvedValue(null);
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(null);
 
       await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(
         new TierNotFoundError(`Tier not found with ID: ${tierId}`),
@@ -128,12 +128,12 @@ describe('TiersService tests', () => {
     it('When the requested tier exists, then it returns the tier object', async () => {
       const tier = newTier();
 
-      jest.spyOn(tiersRepository, 'findById').mockResolvedValue(tier);
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(tier);
 
       const result = await tiersService.getTierProductsByTierId(tier.id);
 
       expect(result).toEqual(tier);
-      expect(tiersRepository.findById).toHaveBeenCalledWith(tier.id);
+      expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
     });
   });
 

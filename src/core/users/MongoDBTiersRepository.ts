@@ -3,7 +3,7 @@ import { Tier } from './Tier';
 
 export interface TiersRepository {
   findByProductId(productId: Tier['productId']): Promise<Tier | null>;
-  findById(tierId: Tier['id']): Promise<Tier | null>;
+  findByTierId(tierId: Tier['id']): Promise<Tier | null>;
 }
 
 function toDomain(tier: WithId<Omit<Tier, 'id'>>): Tier {
@@ -28,7 +28,7 @@ export class MongoDBTiersRepository implements TiersRepository {
     return tier ? toDomain(tier) : null;
   }
 
-  async findById(tierId: Tier['id']): Promise<Tier | null> {
+  async findByTierId(tierId: Tier['id']): Promise<Tier | null> {
     const tier = await this.collection.findOne({ _id: new ObjectId(tierId) });
 
     return tier ? toDomain(tier) : null;

@@ -37,7 +37,7 @@ export class TiersService {
   }
 
   async getTierProductsByTierId(tierId: Tier['id']): Promise<Tier> {
-    const tier = await this.tiersRepository.findById(tierId);
+    const tier = await this.tiersRepository.findByTierId(tierId);
 
     if (!tier) {
       throw new TierNotFoundError(`Tier not found with ID: ${tierId}`);
@@ -94,7 +94,7 @@ export class TiersService {
     };
   }
 
-  async applyTier(userWithEmail: User & { email: string }, productId: Tier['id']): Promise<void> {
+  async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
