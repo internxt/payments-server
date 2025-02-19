@@ -9,7 +9,7 @@ import {
   TiersService,
 } from '../../../src/services/tiers.service';
 import { UsersService } from '../../../src/services/users.service';
-import { Service, TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import {
   CustomerId,
@@ -24,6 +24,7 @@ import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRe
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { getUser, newTier } from '../fixtures';
+import { Service } from '../../../src/core/users/Tier';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
