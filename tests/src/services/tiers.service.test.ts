@@ -245,7 +245,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId)).rejects.toThrow(
-        new TierNotFoundError(productId),
+        TierNotFoundError,
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
