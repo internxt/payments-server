@@ -9,6 +9,7 @@ import { CouponNotBeingTrackedError, UsersService } from '../services/users.serv
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UserType } from '../core/users/User';
 import { TiersService } from '../services/tiers.service';
+import { createOrUpdateTierFromUser } from './utils/createOrUpdateTierFromUser';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -242,19 +243,15 @@ export default async function handleInvoiceCompleted({
 
   try {
     if (!isObjStoragePlan) {
-      const userType = isBusinessPlan ? UserType.Business : UserType.Individual;
-      const { id: userId } = await usersService.findUserByUuid(user.uuid);
-      const userInvoices = await paymentService.getDriveInvoices(customer.id, {}, userType);
-      const { id: newTierId } = await tiersService.getTierProductsByProductsId(
-        session.lines.data[0].price?.product as string,
-      );
-      if (userInvoices.length > 0) {
-        const productId = userInvoices[0]?.product as string;
-        const { id: oldTierId } = await tiersService.getTierProductsByProductsId(productId);
-        await tiersService.updateTierToUser(userId, oldTierId, newTierId);
-      } else {
-        await tiersService.insertTierToUser(userId, newTierId);
-      }
+      await createOrUpdateTierFromUser({
+        customerId: customer.id,
+        isBusinessPlan,
+        paymentService,
+        productId: product.id,
+        tiersService,
+        usersService,
+        userUuid: user.uuid,
+      });
     }
   } catch (error) {
     const err = error as Error;
