@@ -15,9 +15,13 @@ import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
 import { getInvoice, getUser, newTier } from '../../fixtures';
+import { User } from '../../../../src/core/users/User';
 
-const mockedUser = getUser();
-const mockOldTier = newTier();
+const mockedUser = {
+  ...getUser(),
+  email: 'test@example.com',
+} as User & { email: string };
+const mockedTier = newTier();
 
 describe('Create or update user when afetr successful payment', () => {
   let tiersService: TiersService;
@@ -61,75 +65,90 @@ describe('Create or update user when afetr successful payment', () => {
 
     defaultProps = {
       isBusinessPlan: false,
-      productId: mockOldTier.productId,
+      productId: mockedTier.productId,
       usersService,
-      userUuid: mockedUser.uuid,
+      user: mockedUser,
       paymentService,
       customerId: mockedUser.customerId,
       tiersService,
     };
   });
 
-  it('when the user has no tiers, then an error indicating so is thrown', async () => {
+  it('when the product does not exists, then an error indicating so is thrown', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
-    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
 
     await expect(createOrUpdateTierFromUser(defaultProps)).rejects.toThrow(tierNotFoundError);
   });
 
+  it('When the user does not have tiers, then it should insert a new tier', async () => {
+    const tierNotFoundError = new TierNotFoundError('Tier not found');
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
+    const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
+    const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
+    const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+
+    await createOrUpdateTierFromUser(defaultProps);
+
+    expect(spyInsert).toHaveBeenCalledTimes(1);
+    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
+    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
+    expect(spyUpdate).not.toHaveBeenCalled();
+  });
+
   it('when the user has existing tiers and the second invoice has a product not in the DB list, then it should insert a new tier', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
-    const mockedInvoices = getInvoice(undefined, undefined, mockOldTier.productId);
-
-    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockOldTier);
+    const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
       {
         ...mockedInvoices,
         pdf: '',
-        product: mockOldTier.productId,
+        product: mockedTier.productId,
         bytesInPlan: '',
       },
     ]);
-
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
+    const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+
     await createOrUpdateTierFromUser(defaultProps);
 
     expect(spyInsert).toHaveBeenCalledTimes(1);
-    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockOldTier.id);
+    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
+    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
   it('when the user has existing tiers, then it should update from that old tier to the new tier', async () => {
-    const mockedNewTier = newTier();
-    const mockedInvoices = getInvoice(undefined, undefined, mockOldTier.productId);
-    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedNewTier);
-    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockOldTier]);
+    const mockedOldTier = newTier();
+    const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedOldTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
       {
         ...mockedInvoices,
         pdf: '',
-        product: mockOldTier.productId,
+        product: mockedOldTier.productId,
         bytesInPlan: '',
       },
       {
         ...mockedInvoices,
         pdf: '',
-        product: mockOldTier.productId,
+        product: mockedOldTier.productId,
         bytesInPlan: '',
       },
     ]);
-
-    const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+    const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+    const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     await createOrUpdateTierFromUser(defaultProps);
 
     expect(spyUpdate).toHaveBeenCalledTimes(1);
-    expect(spyUpdate).toHaveBeenCalledWith(mockedUser.id, mockOldTier.id, mockedNewTier.id);
+    expect(spyUpdate).toHaveBeenCalledWith(mockedUser.id, mockedOldTier.id, mockedTier.id);
+    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
     expect(spyInsert).not.toHaveBeenCalled();
   });
 });
