@@ -1,64 +1,15 @@
-import { Collection, MongoClient } from 'mongodb';
-
-interface AntivirusFeatures {
-  enabled: boolean;
-};
-
-interface BackupsFeatures {
-  enabled: boolean;
-};
-
-export interface DriveFeatures {
-  enabled: boolean;
-  maxSpaceBytes: number;
-  workspaces: {
-    enabled: boolean;
-    minimumSeats: number;
-    maximumSeats: number;
-    maxSpaceBytesPerSeat: number;
-  }
-};
-
-interface MeetFeatures {
-  enabled: boolean;
-  paxPerCall: number;
-};
-
-interface MailFeatures {
-  enabled: boolean;
-  addressesPerUser: number;
-}
-
-interface VpnFeatures {
-  enabled: boolean;
-  locationsAvailable: number;
-};
-
-export enum Service {
-  Drive = 'drive',
-  Backups = 'backups',
-  Antivirus = 'antivirus',
-  Meet = 'meet',
-  Mail = 'mail',
-  Vpn = 'vpn'
-}
-
-export interface Tier {
-  label: string;
-  productId: string;
-  billingType: "subscription" | "lifetime",
-  featuresPerService: {
-    [Service.Drive]: DriveFeatures,
-    [Service.Backups]: BackupsFeatures,
-    [Service.Antivirus]: AntivirusFeatures,
-    [Service.Meet]: MeetFeatures,
-    [Service.Mail]: MailFeatures,
-    [Service.Vpn]: VpnFeatures
-  }
-}
+import { Collection, MongoClient, ObjectId, WithId } from 'mongodb';
+import { Tier } from './Tier';
 
 export interface TiersRepository {
   findByProductId(productId: Tier['productId']): Promise<Tier | null>;
+}
+
+function toDomain(tier: WithId<Omit<Tier, 'id'>>): Tier {
+  return {
+    ...tier,
+    id: tier._id.toString(),
+  };
 }
 
 export class MongoDBTiersRepository implements TiersRepository {
@@ -70,9 +21,15 @@ export class MongoDBTiersRepository implements TiersRepository {
 
   async findByProductId(productId: Tier['productId']): Promise<Tier | null> {
     const tier = await this.collection.findOne({
-      productId
+      productId,
     });
 
-    return tier;
+    return tier ? toDomain(tier) : null;
+  }
+
+  async findById(id: Tier['id']): Promise<Tier | null> {
+    const tier = await this.collection.findOne({ _id: new ObjectId(id) });
+
+    return tier ? toDomain(tier) : null;
   }
 }

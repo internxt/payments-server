@@ -4,11 +4,11 @@ import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserType } from '../../src/core/users/User';
-import { Tier } from '../../src/core/users/MongoDBTiersRepository';
 import Stripe from 'stripe';
 import { PaymentIntent, PromotionCode, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
+import { Tier } from '../../src/core/users/Tier';
 
 const randomDataGenerator = new Chance();
 
@@ -70,11 +70,11 @@ export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode
 export const getPrices = () => {
   return {
     subscription: {
-      exists: 'price_1PLMh8FAOdcgaBMQlZcGAPY4',
+      exists: 'price_1Qtm4MFAOdcgaBMQ0cUPiqRA',
       doesNotExist: 'price_1PLMerFAOdcgaBMQ17q27Cas',
     },
     lifetime: {
-      exists: 'price_1PLMTpFAOdcgaBMQ0Jag685H',
+      exists: 'price_1Qtm4MFAOdcgaBMQimNiZsnl',
       doesNotExist: 'price_1PLMVCFAOdcgaBMQxIQgdXsds',
     },
   };
@@ -387,13 +387,14 @@ export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
 
 export const newTier = (params?: Partial<Tier>): Tier => {
   return {
+    id: randomDataGenerator.string({ length: 10 }),
     billingType: 'subscription',
     label: 'test-label',
     productId: randomDataGenerator.string({ length: 15 }),
     featuresPerService: {
       mail: { enabled: false, addressesPerUser: randomDataGenerator.integer({ min: 0, max: 5 }) },
       meet: { enabled: false, paxPerCall: randomDataGenerator.integer({ min: 0, max: 5 }) },
-      vpn: { enabled: false, locationsAvailable: randomDataGenerator.integer({ min: 0, max: 5 }) },
+      vpn: { enabled: false, featureId: randomDataGenerator.string({ length: 10 }) },
       antivirus: { enabled: false },
       backups: { enabled: false },
       drive: {

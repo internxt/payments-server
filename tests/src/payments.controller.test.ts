@@ -87,14 +87,6 @@ describe('Payment controller e2e tests', () => {
             interval: expect.anything(),
             decimalAmount: expect.anything(),
           },
-          upsellPlan: {
-            id: expect.anything(),
-            currency: expect.anything(),
-            amount: expect.anything(),
-            bytes: expect.anything(),
-            interval: expect.anything(),
-            decimalAmount: expect.anything(),
-          },
         };
 
         const response = await app.inject({
