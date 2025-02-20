@@ -1,9 +1,10 @@
-import { Service, Tier, TiersRepository } from '../core/users/MongoDBTiersRepository';
+import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { createOrUpdateUser, updateUserTier } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
+import { Service, Tier } from '../core/users/Tier';
 
 export class TierNotFoundError extends Error {
   constructor(productId: Tier['productId']) {
