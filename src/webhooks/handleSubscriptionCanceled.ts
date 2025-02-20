@@ -8,6 +8,7 @@ import { PaymentService } from '../services/payment.service';
 import { AppConfig } from '../config';
 import Stripe from 'stripe';
 import { ObjectStorageService } from '../services/objectStorage.service';
+import { TiersService } from '../services/tiers.service';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -50,6 +51,7 @@ export default async function handleSubscriptionCanceled(
   objectStorageService: ObjectStorageService,
   log: FastifyBaseLogger,
   config: AppConfig,
+  tiersService: TiersService,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
@@ -66,7 +68,7 @@ export default async function handleSubscriptionCanceled(
     return;
   }
 
-  const { uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
+  const { id: userId, uuid, lifetime: hasBoughtALifetime } = await usersService.findUserByCustomerID(customerId);
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
@@ -78,6 +80,14 @@ export default async function handleSubscriptionCanceled(
 
   if (productType === UserType.Business) {
     return usersService.destroyWorkspace(uuid);
+  }
+
+  try {
+    const { id: tierId } = await tiersService.getTierProductsByProductsId(productId);
+    await tiersService.deleteTierFromUser(userId, tierId);
+  } catch (error) {
+    const err = error as Error;
+    log.error(`ERROR DELETING THE USER-TIER RELATIONSHIP: ${err.stack ?? err.message}`);
   }
 
   if (hasBoughtALifetime) {
