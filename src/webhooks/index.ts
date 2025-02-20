@@ -108,16 +108,15 @@ export default function (
         }
 
         case 'invoice.payment_succeeded':
-          await handleInvoiceCompleted({
-            session: event.data.object,
+          await handleInvoiceCompleted(
+            event.data.object,
             usersService,
             paymentService,
-            log: fastify.log,
+            fastify.log,
             cacheService,
             config,
             objectStorageService,
-            tiersService,
-          });
+          );
           break;
 
         case 'checkout.session.completed':

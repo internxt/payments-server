@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { FastifyBaseLogger } from 'fastify';
+import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/cache.service';
@@ -7,9 +7,8 @@ import { PaymentService, PriceMetadata } from '../services/payment.service';
 import { createOrUpdateUser, updateUserTier } from '../services/storage.service';
 import { CouponNotBeingTrackedError, UsersService } from '../services/users.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { UserType } from '../core/users/User';
-import { TiersService } from '../services/tiers.service';
-import { createOrUpdateTierFromUser } from './utils/createOrUpdateTierFromUser';
+import { User, UserType } from '../core/users/User';
+import { Tier } from '../core/users/Tier';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -19,12 +18,14 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
   );
 }
 
+async function handleUserTierRelationship(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']) {}
+
 async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  log: FastifyBaseLogger,
+  log: FastifyLoggerInstance,
 ) {
   if (invoice.lines.data.length !== 1) {
     log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
@@ -54,25 +55,15 @@ async function handleObjectStorageInvoiceCompleted(
   );
 }
 
-export default async function handleInvoiceCompleted({
-  session,
-  usersService,
-  cacheService,
-  config,
-  log,
-  objectStorageService,
-  paymentService,
-  tiersService,
-}: {
-  session: Stripe.Invoice;
-  usersService: UsersService;
-  paymentService: PaymentService;
-  log: FastifyBaseLogger;
-  cacheService: CacheService;
-  config: AppConfig;
-  objectStorageService: ObjectStorageService;
-  tiersService: TiersService;
-}): Promise<void> {
+export default async function handleInvoiceCompleted(
+  session: Stripe.Invoice,
+  usersService: UsersService,
+  paymentService: PaymentService,
+  log: FastifyLoggerInstance,
+  cacheService: CacheService,
+  config: AppConfig,
+  objectStorageService: ObjectStorageService,
+): Promise<void> {
   if (session.status !== 'paid') {
     log.info(`Invoice processed without action, ${session.customer_email} has not paid successfully`);
     return;
@@ -87,7 +78,7 @@ export default async function handleInvoiceCompleted({
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id);
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
@@ -239,23 +230,6 @@ export default async function handleInvoiceCompleted({
         phoneNumber,
       });
     }
-  }
-
-  try {
-    if (!isObjStoragePlan) {
-      await createOrUpdateTierFromUser({
-        customerId: customer.id,
-        isBusinessPlan,
-        paymentService,
-        productId: product.id,
-        tiersService,
-        usersService,
-        userUuid: user.uuid,
-      });
-    }
-  } catch (error) {
-    const err = error as Error;
-    log.error(`ERROR UPDATING THE USER TIER: ${err.stack ?? err.message}`);
   }
 
   try {
