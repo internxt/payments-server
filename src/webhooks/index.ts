@@ -69,6 +69,7 @@ export default function (
             objectStorageService,
             fastify.log,
             config,
+            tiersService,
           );
           break;
 
