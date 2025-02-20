@@ -68,7 +68,7 @@ export class TiersService {
     return tier;
   }
 
-  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier | Error> {
+  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier> {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
