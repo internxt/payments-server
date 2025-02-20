@@ -166,7 +166,7 @@ describe('TiersService tests', () => {
 
       const result = await tiersService.getTiersProductsByUserId(userId);
 
-      expect(result).toEqual([tier1, tier2]);
+      expect(result).toStrictEqual([tier1, tier2]);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
@@ -189,7 +189,7 @@ describe('TiersService tests', () => {
 
       const result = await tiersService.getTierProductsByTierId(tier.id);
 
-      expect(result).toEqual(tier);
+      expect(result).toStrictEqual(tier);
       expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
     });
   });
