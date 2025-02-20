@@ -4,7 +4,7 @@ import { CustomerId, PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { UsersService } from '../../services/users.service';
 
-interface CreateOrUpdateTierFromUserProps {
+export interface CreateOrUpdateTierFromUserProps {
   isBusinessPlan: boolean;
   productId: Stripe.Product['id'];
   usersService: UsersService;

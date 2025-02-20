@@ -426,7 +426,11 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
   };
 };
 
-export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType): Stripe.Invoice => {
+export const getInvoice = (
+  params?: Partial<Stripe.Invoice>,
+  userType?: UserType,
+  productId?: string,
+): Stripe.Invoice => {
   return {
     id: 'in_eir9242',
     object: 'invoice',
@@ -540,7 +544,7 @@ export const getInvoice = (params?: Partial<Stripe.Invoice>, userType?: UserType
               type: userType as string,
             },
             nickname: null,
-            product: `prod_${randomDataGenerator.string({ length: 12 })}`,
+            product: productId ?? `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
               aggregate_usage: null,
               interval: 'month',
