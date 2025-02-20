@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
@@ -30,6 +30,7 @@ jobs:
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
+      - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
@@ -45,7 +46,7 @@ jobs:
         run: yarn test:cov
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

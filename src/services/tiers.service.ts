@@ -173,12 +173,20 @@ export class TiersService {
 
     const maxSpaceBytes = features.maxSpaceBytes;
 
-    await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email as string, this.config);
+    await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email, this.config);
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
   async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
-    // TODO: API call to the VPN server.
-    const features = tier.featuresPerService[Service.Vpn];
+    const { uuid } = userWithEmail;
+    const { enabled, featureId } = tier.featuresPerService[Service.Vpn];
+
+    if (enabled) {
+      await this.usersService.enableVPNTier(uuid, featureId);
+    }
+  }
+
+  async removeVPNFeatures(userUuid: User['uuid'], featureId: Tier['featuresPerService']['vpn']['featureId']) {
+    await this.usersService.disableVPNTier(userUuid, featureId);
   }
 }

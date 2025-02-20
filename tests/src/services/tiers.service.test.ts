@@ -166,7 +166,7 @@ describe('TiersService tests', () => {
 
       const result = await tiersService.getTiersProductsByUserId(userId);
 
-      expect(result).toEqual([tier1, tier2]);
+      expect(result).toStrictEqual([tier1, tier2]);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
       expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
@@ -189,12 +189,12 @@ describe('TiersService tests', () => {
 
       const result = await tiersService.getTierProductsByTierId(tier.id);
 
-      expect(result).toEqual(tier);
+      expect(result).toStrictEqual(tier);
       expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
     });
   });
 
-  describe('getAntivirusTier()', () => {
+  describe('Antivirus access based on user tier', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
       const mockedUser = getUser();
       const customerId: CustomerId = mockedUser.customerId;
@@ -292,7 +292,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyTier()', () => {
+  describe('Apply the Tier the user paid for', () => {
     it('When applying the tier, then fails if the tier is not found', async () => {
       const user = getUser();
       const productId = 'productId';
@@ -354,7 +354,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyDriveFeatures()', () => {
+  describe('Apply Drive features according the user tier plan', () => {
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
@@ -421,18 +421,29 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('applyVpnFeatures()', () => {
-    it('When it is called, then it does not throw', async () => {
+  describe('VPN access based on user tier', () => {
+    it("When VPN is enabled, then a request to enable user's tier on the VPN service is sent", async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
+      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
 
       await tiersService.applyVpnFeatures(userWithEmail, tier);
 
-      expect(applyVpnFeatures).not.toThrow();
+      expect(enableVPNTierSpy).toHaveBeenCalledWith(userWithEmail.uuid, tier.featuresPerService[Service.Vpn].featureId);
+    });
+
+    it('When VPN is disabled, then it does not send a request to enable a VPN tier', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyVpnFeatures(userWithEmail, tier);
+
+      expect(enableVPNTierSpy).not.toHaveBeenCalled();
     });
   });
 });
