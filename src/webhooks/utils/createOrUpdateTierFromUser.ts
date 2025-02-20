@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { User, UserType } from '../../core/users/User';
 import { CustomerId, PaymentService } from '../../services/payment.service';
-import { TiersService } from '../../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { UsersService } from '../../services/users.service';
 
 interface CreateOrUpdateTierFromUserProps {
@@ -22,18 +22,44 @@ export async function createOrUpdateTierFromUser({
   userUuid,
   usersService,
   productId,
-}: CreateOrUpdateTierFromUserProps) {
+}: CreateOrUpdateTierFromUserProps): Promise<void> {
   const userType = isBusinessPlan ? UserType.Business : UserType.Individual;
-  const userInvoices = await paymentService.getDriveInvoices(customerId, {}, userType);
-
   const { id: userId } = await usersService.findUserByUuid(userUuid);
   const { id: newTierId } = await tiersService.getTierProductsByProductsId(productId);
 
-  if (userInvoices.length > 0) {
-    const productId = userInvoices[0]?.product as string;
-    const { id: oldTierId } = await tiersService.getTierProductsByProductsId(productId);
-    await tiersService.updateTierToUser(userId, oldTierId, newTierId);
-  } else {
+  console.log('USER IN CREATE OR UPDATE TIER FROM USER');
+
+  let existingTiersForUser = [];
+  try {
+    existingTiersForUser = await tiersService.getTiersProductsByUserId(userId);
+    console.log('THERE ARE EXISTENT TIERS: ', existingTiersForUser);
+  } catch (error) {
+    if (!(error instanceof TierNotFoundError)) {
+      throw error;
+    }
+
+    console.log('INSERT USER: ', userId, newTierId);
+
     await tiersService.insertTierToUser(userId, newTierId);
+    return;
+  }
+
+  const userInvoices = await paymentService.getDriveInvoices(customerId, {}, userType);
+  const [, latestInvoice] = userInvoices;
+
+  if (latestInvoice) {
+    let oldTierId;
+    const productId = latestInvoice?.product as string;
+    const existingTier = existingTiersForUser.find((existingUserTier) => existingUserTier.productId === productId);
+
+    if (!existingTier) {
+      await tiersService.insertTierToUser(userId, newTierId);
+    }
+
+    if (existingTier) {
+      oldTierId = existingTier.id;
+      console.log('UPDATING TIER TO USER: ', userId, oldTierId, newTierId);
+      await tiersService.updateTierToUser(userId, oldTierId, newTierId);
+    }
   }
 }

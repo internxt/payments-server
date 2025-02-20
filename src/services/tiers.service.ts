@@ -22,16 +22,16 @@ export class TiersService {
     private readonly usersService: UsersService,
     private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
-    private readonly tiersUsersRepository: UsersTiersRepository,
+    private readonly usersTiersRepository: UsersTiersRepository,
     private readonly config: AppConfig,
   ) {}
 
   async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
-    await this.tiersUsersRepository.insertTierToUser(userId, newTierId);
+    await this.usersTiersRepository.insertTierToUser(userId, newTierId);
   }
 
   async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
-    const updatedUserTier = await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+    const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
       throw new Error(
@@ -41,7 +41,7 @@ export class TiersService {
   }
 
   async deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
-    const deletedTierFromUser = await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+    const deletedTierFromUser = await this.usersTiersRepository.deleteTierFromUser(userId, tierId);
 
     if (!deletedTierFromUser) {
       throw new Error(`Error while deleting a tier ${tierId} from user Id ${userId}`);
@@ -49,7 +49,7 @@ export class TiersService {
   }
 
   async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {
-    const userTiers = await this.tiersUsersRepository.findTierIdByUserId(userId);
+    const userTiers = await this.usersTiersRepository.findTierIdByUserId(userId);
 
     if (userTiers.length === 0) {
       throw new TierNotFoundError(`No tiers found for user with ID: ${userId}`);
