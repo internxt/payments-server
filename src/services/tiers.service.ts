@@ -141,4 +141,8 @@ export class TiersService {
       await this.usersService.enableVPNTier(uuid, featureId);
     }
   }
+
+  async removeVPNFeatures(userUuid: User['uuid'], featureId: Tier['featuresPerService']['vpn']['featureId']) {
+    await this.usersService.disableVPNTier(userUuid, featureId);
+  }
 }

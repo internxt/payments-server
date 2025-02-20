@@ -262,6 +262,23 @@ export class UsersService {
       requestConfig,
     );
   }
+
+  async disableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        uuid: userUuid,
+        tierId: featureId,
+      },
+    };
+
+    return this.axios.delete(`${this.config.VPN_URL}/gateway/users`, requestConfig);
+  }
 }
 
 export class UserNotFoundError extends Error {}

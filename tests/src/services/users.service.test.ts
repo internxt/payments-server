@@ -303,4 +303,25 @@ describe('UsersService tests', () => {
       );
     });
   });
+
+  describe('Disable the VPN feature', () => {
+    it('When called with a userUuid and tier, then disables the VPN for the user', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const tier = newTier().featuresPerService['vpn'].featureId;
+
+      const axiosPostSpy = jest.spyOn(axios, 'delete').mockResolvedValue({} as any);
+
+      await usersService.disableVPNTier(userUuid, tier);
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/gateway/users`, {
+        data: { uuid: userUuid, tierId: tier },
+        headers: {
+          Authorization: 'Bearer undefined',
+          'Content-Type': 'application/json',
+        },
+      });
+    });
+  });
 });
