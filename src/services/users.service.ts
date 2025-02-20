@@ -253,7 +253,6 @@ export class UsersService {
       },
     };
 
-    //TODO: Update the endpoint to the correct one
     return this.axios.post(
       `${this.config.VPN_URL}/gateway/users`,
       {
