@@ -49,7 +49,7 @@ describe('Testing the tier collection', () => {
   });
 
   it('when a tier is searched by a non-existing id, then it should return null', async () => {
-    const result = await repository.findById('64b5b7fb69f1a8eb2ab4bad6');
+    const result = await repository.findByTierId('64b5b7fb69f1a8eb2ab4bad6');
     expect(result).toBeNull();
   });
 
@@ -59,7 +59,7 @@ describe('Testing the tier collection', () => {
     const insertResult = await collection.insertOne(mockTier);
     const insertedId = insertResult.insertedId.toString();
 
-    const foundTier = await repository.findById(insertedId);
+    const foundTier = await repository.findByTierId(insertedId);
 
     expect(foundTier).not.toBeNull();
     expect(foundTier?.id).toBe(insertedId);
