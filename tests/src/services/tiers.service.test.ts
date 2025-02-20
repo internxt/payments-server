@@ -25,6 +25,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { getUser, newTier } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
+import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -35,6 +36,7 @@ let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
+let usersTiersRepository: UsersTiersRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 
@@ -58,7 +60,9 @@ describe('TiersService tests', () => {
     displayBillingRepository = {} as DisplayBillingRepository;
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
     productsRepository = testFactory.getProductsRepositoryForTest();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
     bit2MeService = new Bit2MeService(config, axios);
     paymentService = new PaymentService(
       new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
@@ -74,7 +78,120 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, paymentService, tiersRepository, config);
+    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
+  });
+
+  describe('User-Tier Relationship', () => {
+    describe('Insert user-tier relationship', () => {
+      it('When inserting a new tier for a user, then it should be added successfully', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'insertTierToUser').mockResolvedValue();
+
+        await expect(tiersService.insertTierToUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.insertTierToUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+    });
+
+    describe('Update user-tier relationship', () => {
+      it('When updating a user tier, then it should replace the old tier with the new one', async () => {
+        const user = getUser();
+        const oldTier = newTier();
+        const newTierData = newTier();
+
+        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
+
+        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+      });
+
+      it('When updating a user tier and it does not exist, then an error indicating so is thrown', async () => {
+        const user = getUser();
+        const oldTier = newTier();
+        const newTierData = newTier();
+
+        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(false);
+
+        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).rejects.toThrow(Error);
+        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+      });
+    });
+
+    describe('Delete user-tier relationship', () => {
+      it('When deleting a tier from a user, then it should remove the relationship', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(true);
+
+        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+
+      it('When deleting a tier from a user and it does not exist, then an error indicating so is thrown', async () => {
+        const user = getUser();
+        const tier = newTier();
+
+        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(false);
+
+        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).rejects.toThrow(Error);
+        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+      });
+    });
+  });
+
+  describe('Get the tier products using the user Id', () => {
+    it('When the user has no assigned tiers, then an error indicating so is thrown', async () => {
+      const { id: userId } = getUser();
+
+      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue([]);
+
+      await expect(tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the user has assigned tiers, then it returns the corresponding tier objects', async () => {
+      const { id: userId } = getUser();
+      const tier1 = newTier();
+      const tier2 = newTier();
+      const userTiers: UserTier[] = [
+        { id: '', userId, tierId: tier1.id },
+        { id: '', userId, tierId: tier2.id },
+      ];
+
+      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue(userTiers);
+      jest
+        .spyOn(tiersService, 'getTierProductsByTierId')
+        .mockImplementation(async (tierId) => (tierId === tier1.id ? tier1 : tier2));
+
+      const result = await tiersService.getTiersProductsByUserId(userId);
+
+      expect(result).toStrictEqual([tier1, tier2]);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
+    });
+  });
+
+  describe('Get tier products using the tier id', () => {
+    it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
+      const { id: tierId } = newTier();
+
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(null);
+
+      await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the requested tier exists, then it returns the tier object', async () => {
+      const tier = newTier();
+
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByTierId(tier.id);
+
+      expect(result).toStrictEqual(tier);
+      expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
+    });
   });
 
   describe('getAntivirusTier()', () => {
@@ -185,7 +302,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId)).rejects.toThrow(
-        new TierNotFoundError(productId),
+        TierNotFoundError,
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
