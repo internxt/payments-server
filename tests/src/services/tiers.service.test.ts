@@ -25,7 +25,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { getUser, newTier } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -138,6 +138,59 @@ describe('TiersService tests', () => {
         await expect(tiersService.deleteTierFromUser(user.id, tier.id)).rejects.toThrow(Error);
         expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
       });
+    });
+  });
+
+  describe('Get the tier products using the user Id', () => {
+    it('When the user has no assigned tiers, then an error indicating so is thrown', async () => {
+      const { id: userId } = getUser();
+
+      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue([]);
+
+      await expect(tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the user has assigned tiers, then it returns the corresponding tier objects', async () => {
+      const { id: userId } = getUser();
+      const tier1 = newTier();
+      const tier2 = newTier();
+      const userTiers: UserTier[] = [
+        { id: '', userId, tierId: tier1.id },
+        { id: '', userId, tierId: tier2.id },
+      ];
+
+      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue(userTiers);
+      jest
+        .spyOn(tiersService, 'getTierProductsByTierId')
+        .mockImplementation(async (tierId) => (tierId === tier1.id ? tier1 : tier2));
+
+      const result = await tiersService.getTiersProductsByUserId(userId);
+
+      expect(result).toEqual([tier1, tier2]);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
+      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
+    });
+  });
+
+  describe('Get tier products using the tier id', () => {
+    it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
+      const { id: tierId } = newTier();
+
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(null);
+
+      await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the requested tier exists, then it returns the tier object', async () => {
+      const tier = newTier();
+
+      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByTierId(tier.id);
+
+      expect(result).toEqual(tier);
+      expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
     });
   });
 
