@@ -7,8 +7,7 @@ import { PaymentService, PriceMetadata } from '../services/payment.service';
 import { createOrUpdateUser, updateUserTier } from '../services/storage.service';
 import { CouponNotBeingTrackedError, UsersService } from '../services/users.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { User, UserType } from '../core/users/User';
-import { Tier } from '../core/users/Tier';
+import { UserType } from '../core/users/User';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -17,8 +16,6 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
     (product as Stripe.Product).metadata.type === 'object-storage'
   );
 }
-
-async function handleUserTierRelationship(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']) {}
 
 async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
