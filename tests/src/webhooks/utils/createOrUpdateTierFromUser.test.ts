@@ -42,7 +42,6 @@ describe('Create or update user when afetr successful payment', () => {
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
     usersTiersRepository = testFactory.getUsersTiersRepository();
     productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
     bit2MeService = new Bit2MeService(config, axios);
     paymentService = new PaymentService(
       new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
