@@ -19,9 +19,8 @@ import { getInvoice, getUser, newTier } from '../../fixtures';
 const mockedUser = getUser();
 const mockOldTier = newTier();
 
-describe('createOrUpdateTierFromUser', () => {
+describe('Create or update user when afetr successful payment', () => {
   let tiersService: TiersService;
-  let paymentsService: PaymentService;
   let tiersRepository: TiersRepository;
   let paymentService: PaymentService;
   let usersService: UsersService;
@@ -37,11 +36,6 @@ describe('createOrUpdateTierFromUser', () => {
   beforeEach(() => {
     tiersRepository = testFactory.getTiersRepository();
     usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
     usersRepository = testFactory.getUsersRepositoryForTest();
     displayBillingRepository = {} as DisplayBillingRepository;
     couponsRepository = testFactory.getCouponsRepositoryForTest();
