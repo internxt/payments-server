@@ -9,7 +9,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { type AppConfig } from '../config';
-import { VpnFeatures } from '../core/users/MongoDBTiersRepository';
+import { VpnFeatures } from '../core/users/Tier';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {

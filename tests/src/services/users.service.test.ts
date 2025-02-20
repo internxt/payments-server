@@ -13,7 +13,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import testFactory from '../utils/factory';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getActiveSubscriptions, getCoupon, getUser } from '../fixtures';
+import { getActiveSubscriptions, getCoupon, getUser, newTier } from '../fixtures';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -82,26 +82,28 @@ describe('UsersService tests', () => {
 
   describe('Update existent user values in the database', () => {
     it('When the user is updated successfully, then resolves', async () => {
+      const mockedUser = getUser({ lifetime: true });
       (usersRepository.updateUser as jest.Mock).mockResolvedValue(true);
 
       await expect(
-        usersService.updateUser(mocks.mockedUserWithoutLifetime.customerId, { lifetime: true }),
+        usersService.updateUser(mockedUser.customerId, { lifetime: mockedUser.lifetime }),
       ).resolves.toBeUndefined();
 
       expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
-      expect(usersRepository.updateUser).toHaveBeenCalledWith(mocks.mockedUserWithoutLifetime.customerId, {
+      expect(usersRepository.updateUser).toHaveBeenCalledWith(mockedUser.customerId, {
         lifetime: true,
       });
     });
 
     it('When a user is not found, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser({ lifetime: true });
       (usersRepository.updateUser as jest.Mock).mockImplementation(() =>
         Promise.reject(new UserNotFoundError('User not found')),
       );
 
-      await expect(
-        usersService.updateUser(mocks.mockedUserWithoutLifetime.customerId, { lifetime: true }),
-      ).rejects.toThrow(UserNotFoundError);
+      await expect(usersService.updateUser(mockedUser.customerId, { lifetime: mockedUser.lifetime })).rejects.toThrow(
+        UserNotFoundError,
+      );
 
       expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
     });
@@ -109,7 +111,8 @@ describe('UsersService tests', () => {
 
   describe('Find user by his Customer Id', () => {
     it('When looking for a customer by its customer ID and exists, then the user is returned', async () => {
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mocks.mockedUserWithoutLifetime);
+      const mockedUser = getUser();
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
 
       const result = await usersService.findUserByCustomerID(mockedUser.customerId);
 
@@ -284,15 +287,20 @@ describe('UsersService tests', () => {
 
   describe('Enable the VPN feature based on the tier', () => {
     it('When called with a userUuid and tier, then enables the VPN for the user', async () => {
-      const userUuid = mocks.mockedUserWithLifetime.uuid;
-      const tier = mocks.newTier().featuresPerService['vpn'].featureId;
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const tier = newTier().featuresPerService['vpn'].featureId;
 
       const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
 
       await usersService.enableVPNTier(userUuid, tier);
 
       expect(axiosPostSpy).toHaveBeenCalledTimes(1);
-      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/users`, { userUuid, tier }, expect.anything());
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.VPN_URL}/gateway/users`,
+        { uuid: userUuid, tierId: tier },
+        expect.anything(),
+      );
     });
   });
 });
