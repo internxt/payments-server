@@ -80,7 +80,7 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Update existent user values in the database', () => {
+  describe('Update existent user values', () => {
     it('When the user is updated successfully, then resolves', async () => {
       const mockedUser = getUser({ lifetime: true });
       (usersRepository.updateUser as jest.Mock).mockResolvedValue(true);
