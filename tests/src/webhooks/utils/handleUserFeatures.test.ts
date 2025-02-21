@@ -25,7 +25,7 @@ const mockedTier = newTier();
 const mockedCustomer = getCustomer();
 const mockedPurchasedItem = getInvoice().lines.data[0];
 
-describe('Create or update user when afetr successful payment', () => {
+describe('Create or update user when after successful payment', () => {
   let tiersService: TiersService;
   let tiersRepository: TiersRepository;
   let paymentService: PaymentService;
@@ -102,16 +102,16 @@ describe('Create or update user when afetr successful payment', () => {
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
-  it('when the user has existing tiers and the second invoice has a product not in the DB list, then it should insert a new tier', async () => {
-    const tierNotFoundError = new TierNotFoundError('Tier not found');
+  it('when the user has existing tiers and the second invoice has a product that is not mapped, then it should stop', async () => {
+    const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
-    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
+    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
       {
         ...mockedInvoices,
         pdf: '',
-        product: mockedTier.productId,
+        product: randomMockedTier.productId,
         bytesInPlan: '',
       },
     ]);
@@ -121,14 +121,8 @@ describe('Create or update user when afetr successful payment', () => {
 
     await handleUserFeatures(defaultProps);
 
-    expect(spyInsert).toHaveBeenCalledTimes(1);
-    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(
-      mockedUser,
-      mockedCustomer,
-      mockedPurchasedItem,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
-    );
+    expect(spyInsert).toHaveBeenCalledTimes(0);
+    expect(spyApplyTier).not.toHaveBeenCalled();
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 

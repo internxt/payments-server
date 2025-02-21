@@ -38,13 +38,13 @@ export async function handleUserFeatures({
 
       oldTierId = existingTier.id;
       await tiersService.updateTierToUser(userId, oldTierId, newTierId);
+      await tiersService.applyTier(user, customer, purchasedItem, product.id);
     }
   } catch (error) {
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
     await tiersService.insertTierToUser(userId, newTierId);
+    await tiersService.applyTier(user, customer, purchasedItem, product.id);
   }
-
-  await tiersService.applyTier(user, customer, purchasedItem, product.id);
 }
