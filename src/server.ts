@@ -67,6 +67,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     paymentService,
     tiersRepository,
     usersTiersRepository,
+    storageService,
     envVariablesConfig,
   );
 
