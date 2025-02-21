@@ -17,7 +17,7 @@ import {
   NotFoundSubscriptionError,
   PaymentService,
 } from '../../../src/services/payment.service';
-import { createOrUpdateUser, updateUserTier } from '../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -39,6 +39,7 @@ let usersCouponsRepository: UsersCouponsRepository;
 let usersTiersRepository: UsersTiersRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
+let storageService: StorageService;
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
@@ -78,7 +79,15 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
+    storageService = new StorageService(config, axios);
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      config,
+    );
   });
 
   describe('User-Tier Relationship', () => {

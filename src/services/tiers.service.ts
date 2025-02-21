@@ -1,11 +1,12 @@
 import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
-import { createOrUpdateUser, updateUserTier } from './storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -23,6 +24,7 @@ export class TiersService {
     private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
     private readonly tiersUsersRepository: UsersTiersRepository,
+    private readonly storageService: StorageService,
     private readonly config: AppConfig,
   ) {}
 
@@ -148,6 +150,39 @@ export class TiersService {
     }
   }
 
+  async removeTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
+    const tier = await this.tiersRepository.findByProductId(productId);
+    const { uuid: userUuid } = userWithEmail;
+
+    if (!tier) {
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
+    }
+
+    for (const service of Object.keys(tier.featuresPerService)) {
+      const s = service as Service;
+
+      if (!tier.featuresPerService[s].enabled) {
+        continue;
+      }
+
+      switch (s) {
+        case Service.Drive:
+          await this.removeDriveFeatures(userUuid, tier);
+          break;
+        case Service.Vpn:
+          await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
+          break;
+        case Service.Meet:
+        case Service.Mail:
+        case Service.Backups:
+          break;
+        default:
+          // TODO;
+          break;
+      }
+    }
+  }
+
   async applyDriveFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
@@ -177,6 +212,23 @@ export class TiersService {
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
+  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier): Promise<void> {
+    const features = tier.featuresPerService[Service.Drive];
+
+    if (features.workspaces.enabled) {
+      return this.usersService.destroyWorkspace(userUuid);
+    }
+
+    try {
+      await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
+    } catch (err) {
+      console.log(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${userUuid} `);
+      console.log(err);
+    }
+
+    return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
+  }
+
   async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
     const { uuid } = userWithEmail;
     const { enabled, featureId } = tier.featuresPerService[Service.Vpn];
@@ -186,7 +238,11 @@ export class TiersService {
     }
   }
 
-  async removeVPNFeatures(userUuid: User['uuid'], featureId: Tier['featuresPerService']['vpn']['featureId']) {
-    await this.usersService.disableVPNTier(userUuid, featureId);
+  async removeVPNFeatures(userUuid: User['uuid'], vpnFeature: Tier['featuresPerService']['vpn']) {
+    const { enabled, featureId } = vpnFeature;
+
+    if (enabled) {
+      await this.usersService.disableVPNTier(userUuid, featureId);
+    }
   }
 }
