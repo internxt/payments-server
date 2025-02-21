@@ -9,6 +9,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { type AppConfig } from '../config';
+import { VpnFeatures } from '../core/users/Tier';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -60,25 +61,6 @@ export class UsersService {
     }
 
     return userFound;
-  }
-
-  async cancelUserTeamsSubscriptions(uuid: User['uuid'], teamsUserUuid: User['uuid']) {
-    const user = await this.findUserByUuid(uuid);
-    const activeSubscriptions = await this.paymentService.getActiveSubscriptions(user.customerId);
-
-    if (activeSubscriptions.length === 0) {
-      throw new Error('Subscriptions not found');
-    }
-
-    const subscriptionsToCancel = activeSubscriptions.filter((subscription) => {
-      const isTeams = parseInt(subscription.items.data[0].price.metadata.is_teams);
-
-      return isTeams === 1;
-    }) as Stripe.Subscription[];
-
-    for (const subscriptionToCancel of subscriptionsToCancel) {
-      await this.paymentService.cancelSubscription(subscriptionToCancel.id);
-    }
   }
 
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
@@ -259,6 +241,43 @@ export class UsersService {
     };
 
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
+  }
+
+  async enableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    return this.axios.post(
+      `${this.config.VPN_URL}/gateway/users`,
+      {
+        uuid: userUuid,
+        tierId: featureId,
+      },
+      requestConfig,
+    );
+  }
+
+  async disableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+      data: {
+        uuid: userUuid,
+        tierId: featureId,
+      },
+    };
+
+    return this.axios.delete(`${this.config.VPN_URL}/gateway/users`, requestConfig);
   }
 }
 
