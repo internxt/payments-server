@@ -326,7 +326,7 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription({
+          const subscriptionSetup = await paymentService.createSubscription({
             customerId,
             priceId,
             seatsForBusinessSubscription: seatsForBusinessSubscription ?? 1,
@@ -334,7 +334,7 @@ export default function (
             promoCodeId,
           });
 
-          return res.send(subscriptionSetUp);
+          return res.send(subscriptionSetup);
         } catch (err) {
           const error = err as Error;
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
@@ -442,6 +442,106 @@ export default function (
           }
 
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
+
+          return res.status(500).send({
+            message: 'Internal Server Error',
+          });
+        }
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerId: string;
+        priceId: string;
+        currency: string;
+        token: string;
+        trialCode: string;
+      };
+    }>(
+      '/create-subscription-with-trial',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              token: {
+                type: 'string',
+              },
+              currency: {
+                type: 'string',
+              },
+              trialCode: {
+                type: 'string',
+              }
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { 
+          customerId, 
+          priceId, 
+          currency, 
+          token, 
+          trialCode
+        } = req.body;
+
+        if (!customerId || !priceId) {
+          throw new MissingParametersError(['customerId', 'priceId']);
+        }
+
+        try {
+          const payload = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          const tokenCustomerId = payload.customerId;
+
+          if (customerId !== tokenCustomerId) {
+            return res.status(403).send();
+          }
+        } catch (error) {
+          return res.status(403).send();
+        }
+
+        if (trialCode !== process.env.PC_CLOUD_TRIAL_CODE) {
+          return res.status(403).send('Invalid trial code');
+        }
+
+        try {
+          const subscriptionSetup = await paymentService.createSubscriptionWithTrial({
+            customerId,
+            priceId,
+            currency,
+          }, { 
+            name: 'pc-cloud-25' 
+          });
+
+          return res.send(subscriptionSetup);
+        } catch (err) {
+          const error = err as Error;
+          req.log.error(`[ERROR CREATING SUBSCRIPTION WITH TRIAL]: ${error.stack ?? error.message}`);
+
+          if (error instanceof MissingParametersError) {
+            return res.status(400).send({
+              message: error.message,
+            });
+          } else if (error instanceof PromoCodeIsNotValidError) {
+            return res
+              .status(422)
+              .send({ message: 'The promotion code is not applicable under the current conditions' });
+          } else if (error instanceof ExistingSubscriptionError) {
+            return res.status(409).send({
+              message: error.message,
+            });
+          }
 
           return res.status(500).send({
             message: 'Internal Server Error',
