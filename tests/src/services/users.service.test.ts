@@ -308,15 +308,14 @@ describe('UsersService tests', () => {
     it('When called with a userUuid and tier, then disables the VPN for the user', async () => {
       const mockedUser = getUser({ lifetime: true });
       const userUuid = mockedUser.uuid;
-      const tier = newTier().featuresPerService['vpn'].featureId;
+      const featureId = newTier().featuresPerService['vpn'].featureId;
 
       const axiosPostSpy = jest.spyOn(axios, 'delete').mockResolvedValue({} as any);
 
-      await usersService.disableVPNTier(userUuid, tier);
+      await usersService.disableVPNTier(userUuid, featureId);
 
       expect(axiosPostSpy).toHaveBeenCalledTimes(1);
-      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/gateway/users`, {
-        data: { uuid: userUuid, tierId: tier },
+      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/gateway/users/${userUuid}/tiers/${featureId}`, {
         headers: {
           Authorization: 'Bearer undefined',
           'Content-Type': 'application/json',

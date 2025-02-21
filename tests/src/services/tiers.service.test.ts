@@ -363,6 +363,73 @@ describe('TiersService tests', () => {
     });
   });
 
+  describe('Remove the tier the user canceled or requested a refund', () => {
+    it('When removing the tier, then fails if the tier is not found', async () => {
+      const mockedUser = getUser();
+      const productId = 'productId';
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(null));
+
+      await expect(tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId)).rejects.toThrow(
+        TierNotFoundError,
+      );
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+    });
+
+    it('When removing the tier, then skips the disabled features the tier had', async () => {
+      const mockedUser = getUser();
+      const mockedTier = newTier();
+      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const { productId } = mockedTier;
+      mockedTier.featuresPerService[Service.Drive].enabled = true;
+      mockedTier.featuresPerService[Service.Vpn].enabled = false;
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(mockedTier));
+      const removeDriveFeatures = jest
+        .spyOn(tiersService, 'removeDriveFeatures')
+        .mockImplementation(() => Promise.resolve());
+      const removeVPNFeatures = jest
+        .spyOn(tiersService, 'removeVPNFeatures')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeTier(userWithEmail, productId);
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
+      expect(removeVPNFeatures).not.toHaveBeenCalled();
+    });
+
+    it('When removing the tier, then removes the applied features', async () => {
+      const mockedUser = getUser();
+      const mockedTier = newTier();
+      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const { productId } = mockedTier;
+      mockedTier.featuresPerService[Service.Drive].enabled = true;
+      mockedTier.featuresPerService[Service.Vpn].enabled = true;
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(mockedTier));
+      const removeDriveFeatures = jest
+        .spyOn(tiersService, 'removeDriveFeatures')
+        .mockImplementation(() => Promise.resolve());
+      const removeVPNFeatures = jest
+        .spyOn(tiersService, 'removeVPNFeatures')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeTier(userWithEmail, productId);
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
+      expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
+    });
+  });
+
   describe('Apply Drive features according the user tier plan', () => {
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
