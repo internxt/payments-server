@@ -15,16 +15,27 @@ import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import { TiersService } from '../services/tiers.service';
 
-export default function (
-  stripe: Stripe,
-  storageService: StorageService,
-  usersService: UsersService,
-  paymentService: PaymentService,
-  config: AppConfig,
-  cacheService: CacheService,
-  objectStorageService: ObjectStorageService,
-) {
+export default function ({
+  stripe,
+  storageService,
+  usersService,
+  paymentService,
+  config,
+  cacheService,
+  objectStorageService,
+  tiersService,
+}: {
+  stripe: Stripe;
+  storageService: StorageService;
+  usersService: UsersService;
+  paymentService: PaymentService;
+  config: AppConfig;
+  cacheService: CacheService;
+  objectStorageService: ObjectStorageService;
+  tiersService: TiersService;
+}) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
       done(null, body);
@@ -62,7 +73,7 @@ export default function (
             storageService,
             usersService,
             paymentService,
-            event.data.object as Stripe.Subscription,
+            event.data.object,
             cacheService,
             objectStorageService,
             fastify.log,
@@ -112,7 +123,7 @@ export default function (
             paymentService,
             fastify.log,
             cacheService,
-            config,
+            tiersService,
             objectStorageService,
           );
           break;
