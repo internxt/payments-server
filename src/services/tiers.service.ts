@@ -139,10 +139,7 @@ export class TiersService {
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
           break;
-        case Service.Meet:
-        case Service.Mail:
-        case Service.Backups:
-          break;
+
         default:
           // TODO;
           break;
@@ -171,10 +168,6 @@ export class TiersService {
           break;
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
-          break;
-        case Service.Meet:
-        case Service.Mail:
-        case Service.Backups:
           break;
         default:
           // TODO;
@@ -224,7 +217,6 @@ export class TiersService {
       await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
     } catch (err) {
       console.log(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${userUuid} `);
-      console.log(err);
     }
 
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
