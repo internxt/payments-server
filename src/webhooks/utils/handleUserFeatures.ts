@@ -24,9 +24,8 @@ export async function handleUserFeatures({
   const userId = user.id;
   const { id: newTierId } = await tiersService.getTierProductsByProductsId(product.id);
 
-  let existingTiersForUser = [];
   try {
-    existingTiersForUser = await tiersService.getTiersProductsByUserId(userId);
+    const existingTiersForUser = await tiersService.getTiersProductsByUserId(userId);
     const userInvoices = await paymentService.getDriveInvoices(customer.id, {}, userType);
     const [, latestInvoice] = userInvoices;
 
