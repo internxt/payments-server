@@ -566,11 +566,6 @@ export class PaymentService {
       additionalOptions: {
         trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
         metadata: { reason: reason.name },
-        discounts: [
-          {
-            discount: '',
-          },
-        ],
       },
     });
   }
