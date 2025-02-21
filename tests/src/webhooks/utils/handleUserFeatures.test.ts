@@ -10,11 +10,11 @@ import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
 import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
-import { createOrUpdateTierFromUser } from '../../../../src/webhooks/utils/createOrUpdateTierFromUser';
+import { handleUserFeatures, HandleUserFeaturesProps } from '../../../../src/webhooks/utils/handleUserFeatures';
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
-import { getInvoice, getUser, newTier } from '../../fixtures';
+import { getCustomer, getInvoice, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
 
 const mockedUser = {
@@ -22,6 +22,8 @@ const mockedUser = {
   email: 'test@example.com',
 } as User & { email: string };
 const mockedTier = newTier();
+const mockedCustomer = getCustomer();
+const mockedPurchasedItem = getInvoice().lines.data[0];
 
 describe('Create or update user when afetr successful payment', () => {
   let tiersService: TiersService;
@@ -35,7 +37,7 @@ describe('Create or update user when afetr successful payment', () => {
   let usersTiersRepository: UsersTiersRepository;
   let productsRepository: ProductsRepository;
   let bit2MeService: Bit2MeService;
-  let defaultProps: any;
+  let defaultProps: HandleUserFeaturesProps;
 
   beforeEach(() => {
     tiersRepository = testFactory.getTiersRepository();
@@ -64,12 +66,10 @@ describe('Create or update user when afetr successful payment', () => {
     tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
 
     defaultProps = {
-      isBusinessPlan: false,
-      productId: mockedTier.productId,
-      usersService,
       user: mockedUser,
+      purchasedItem: mockedPurchasedItem,
       paymentService,
-      customerId: mockedUser.customerId,
+      customer: mockedCustomer,
       tiersService,
     };
   });
@@ -78,7 +78,7 @@ describe('Create or update user when afetr successful payment', () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
 
-    await expect(createOrUpdateTierFromUser(defaultProps)).rejects.toThrow(tierNotFoundError);
+    await expect(handleUserFeatures(defaultProps)).rejects.toThrow(tierNotFoundError);
   });
 
   it('When the user does not have tiers, then it should insert a new tier', async () => {
@@ -89,11 +89,16 @@ describe('Create or update user when afetr successful payment', () => {
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
 
-    await createOrUpdateTierFromUser(defaultProps);
+    await handleUserFeatures(defaultProps);
 
     expect(spyInsert).toHaveBeenCalledTimes(1);
     expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
+    expect(spyApplyTier).toHaveBeenCalledWith(
+      mockedUser,
+      mockedCustomer,
+      mockedPurchasedItem,
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+    );
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
@@ -114,11 +119,16 @@ describe('Create or update user when afetr successful payment', () => {
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
 
-    await createOrUpdateTierFromUser(defaultProps);
+    await handleUserFeatures(defaultProps);
 
     expect(spyInsert).toHaveBeenCalledTimes(1);
     expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
+    expect(spyApplyTier).toHaveBeenCalledWith(
+      mockedUser,
+      mockedCustomer,
+      mockedPurchasedItem,
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+    );
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
@@ -144,11 +154,16 @@ describe('Create or update user when afetr successful payment', () => {
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
-    await createOrUpdateTierFromUser(defaultProps);
+    await handleUserFeatures(defaultProps);
 
     expect(spyUpdate).toHaveBeenCalledTimes(1);
     expect(spyUpdate).toHaveBeenCalledWith(mockedUser.id, mockedOldTier.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedTier.productId);
+    expect(spyApplyTier).toHaveBeenCalledWith(
+      mockedUser,
+      mockedCustomer,
+      mockedPurchasedItem,
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+    );
     expect(spyInsert).not.toHaveBeenCalled();
   });
 });

@@ -6,12 +6,21 @@ import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import Stripe from 'stripe';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
     super(message);
 
     Object.setPrototypeOf(this, TierNotFoundError.prototype);
+  }
+}
+
+export class UsersTiersError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, UsersTiersError.prototype);
   }
 }
 
@@ -34,7 +43,7 @@ export class TiersService {
     const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
-      throw new Error(
+      throw new UsersTiersError(
         `Error while updating the older tier ${oldTierId} to the newest tier ${newTierId} from user with Id ${userId}`,
       );
     }
@@ -44,7 +53,7 @@ export class TiersService {
     const deletedTierFromUser = await this.usersTiersRepository.deleteTierFromUser(userId, tierId);
 
     if (!deletedTierFromUser) {
-      throw new Error(`Error while deleting a tier ${tierId} from user Id ${userId}`);
+      throw new UsersTiersError(`Error while deleting a tier ${tierId} from user Id ${userId}`);
     }
   }
 
@@ -116,7 +125,13 @@ export class TiersService {
     };
   }
 
-  async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
+  async applyTier(
+    userWithEmail: User & { email: string },
+    customer: Stripe.Customer,
+    lineItem: Stripe.InvoiceLineItem,
+    productId: string,
+  ): Promise<void> {
+    const amountOfSeats = lineItem.quantity;
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
@@ -132,7 +147,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, tier);
+          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier);
           break;
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
@@ -148,14 +163,20 @@ export class TiersService {
     }
   }
 
-  async applyDriveFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyDriveFeatures(
+    userWithEmail: User & { email: string },
+    customer: Stripe.Customer,
+    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
+    tier: Tier,
+  ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
+      if (!amountOfSeats) return;
+
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
-      const amountOfSeats = 0;
-      const address = '';
-      const phoneNumber = '';
+      const address = customer.address?.line1 ?? undefined;
+      const phoneNumber = customer.phone ?? undefined;
 
       try {
         await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), amountOfSeats);
