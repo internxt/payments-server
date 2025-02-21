@@ -203,6 +203,27 @@ describe('TiersService tests', () => {
     });
   });
 
+  describe('Get tier products using the product id', () => {
+    it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
+      const { id: productId } = newTier();
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(null);
+
+      await expect(tiersService.getTierProductsByProductsId(productId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the requested tier exists, then it returns the tier object', async () => {
+      const tier = newTier();
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByProductsId(tier.productId);
+
+      expect(result).toStrictEqual(tier);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId);
+    });
+  });
+
   describe('Antivirus access based on user tier', () => {
     it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
       const mockedUser = getUser();
