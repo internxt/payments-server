@@ -216,7 +216,8 @@ export class TiersService {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
-      return this.usersService.destroyWorkspace(userUuid);
+      await this.usersService.destroyWorkspace(userUuid);
+      return;
     }
 
     try {

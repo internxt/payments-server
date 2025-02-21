@@ -23,9 +23,10 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getUser, newTier } from '../fixtures';
+import { getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -518,7 +519,44 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('VPN access based on user tier', () => {
+  describe('Remove Drive features', () => {
+    it('When workspaces is enabled, then it is removed exclusively', async () => {
+      const { uuid } = getUser();
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
+      (updateUserTier as jest.Mock).mockClear();
+
+      await tiersService.removeDriveFeatures(uuid, tier);
+
+      expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
+
+      expect(updateUserTier).not.toHaveBeenCalled();
+    });
+
+    it('When workspaces is not enabled, then update the user tier to free and downgrade the storage to the free plan', async () => {
+      const { uuid } = getUser();
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = false;
+
+      const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      (updateUserTier as jest.Mock).mockClear();
+
+      await tiersService.removeDriveFeatures(uuid, tier);
+
+      expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
+      expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);
+      expect(changeStorageSpy).toHaveBeenCalledWith(uuid, FREE_PLAN_BYTES_SPACE);
+    });
+  });
+
+  describe('Enable VPN access based on user tier', () => {
     it("When VPN is enabled, then a request to enable user's tier on the VPN service is sent", async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
@@ -533,6 +571,32 @@ describe('TiersService tests', () => {
     });
 
     it('When VPN is disabled, then it does not send a request to enable a VPN tier', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyVpnFeatures(userWithEmail, tier);
+
+      expect(enableVPNTierSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Remove VPN access based on user tier', () => {
+    it('When VPN is enabled in the canceled tier user, then a request to remove the VPN access for the user is sent', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Vpn].enabled = true;
+
+      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyVpnFeatures(userWithEmail, tier);
+
+      expect(enableVPNTierSpy).toHaveBeenCalledWith(userWithEmail.uuid, tier.featuresPerService[Service.Vpn].featureId);
+    });
+
+    it('When VPN is disabled, then it does not send a request to remove the VPN access for the user', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
