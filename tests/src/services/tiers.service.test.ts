@@ -584,27 +584,28 @@ describe('TiersService tests', () => {
 
   describe('Remove VPN access based on user tier', () => {
     it('When VPN is enabled in the canceled tier user, then a request to remove the VPN access for the user is sent', async () => {
-      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const { uuid } = getUser();
       const tier = newTier();
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+      const removeVPNTierSpy = jest.spyOn(usersService, 'disableVPNTier').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyVpnFeatures(userWithEmail, tier);
+      await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
 
-      expect(enableVPNTierSpy).toHaveBeenCalledWith(userWithEmail.uuid, tier.featuresPerService[Service.Vpn].featureId);
+      expect(removeVPNTierSpy).toHaveBeenCalledWith(uuid, tier.featuresPerService[Service.Vpn].featureId);
     });
 
     it('When VPN is disabled, then it does not send a request to remove the VPN access for the user', async () => {
-      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const { uuid } = getUser();
       const tier = newTier();
+      tier.featuresPerService['vpn'].enabled = false;
 
-      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+      const removeVPNTierSpy = jest.spyOn(usersService, 'disableVPNTier').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyVpnFeatures(userWithEmail, tier);
+      await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
 
-      expect(enableVPNTierSpy).not.toHaveBeenCalled();
+      expect(removeVPNTierSpy).not.toHaveBeenCalled();
     });
   });
 });
