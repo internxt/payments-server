@@ -5,6 +5,7 @@ import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
+  NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
   TiersService,
 } from '../../../src/services/tiers.service';
@@ -481,7 +482,7 @@ describe('TiersService tests', () => {
 
       await expect(
         tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
-      ).rejects.toThrow(Error);
+      ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
       expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });

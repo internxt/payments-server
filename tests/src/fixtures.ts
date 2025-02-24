@@ -67,6 +67,31 @@ export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode
   };
 };
 
+export const getProduct = (params?: Stripe.Product): Stripe.Product => {
+  return {
+    id: `prod_${randomDataGenerator.string({ length: 12 })}`,
+    type: 'service',
+    object: 'product',
+    active: true,
+    created: 1678833149,
+    default_price: null,
+    description: null,
+    images: [],
+    marketing_features: [],
+    livemode: false,
+    metadata: {},
+    name: 'Gold Plan',
+    package_dimensions: null,
+    shippable: null,
+    statement_descriptor: null,
+    tax_code: null,
+    unit_label: null,
+    updated: 1678833149,
+    url: null,
+    ...params,
+  };
+};
+
 export const getPrices = () => {
   return {
     subscription: {
