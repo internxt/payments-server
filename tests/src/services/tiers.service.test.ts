@@ -583,7 +583,7 @@ describe('TiersService tests', () => {
   });
 
   describe('Remove VPN access based on user tier', () => {
-    it('When VPN is enabled in the canceled tier user, then a request to remove the VPN access for the user is sent', async () => {
+    it('When VPN was enabled on the cancelled tier, then the request to disable/remove it is sent', async () => {
       const { uuid } = getUser();
       const tier = newTier();
 
@@ -594,18 +594,6 @@ describe('TiersService tests', () => {
       await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
 
       expect(removeVPNTierSpy).toHaveBeenCalledWith(uuid, tier.featuresPerService[Service.Vpn].featureId);
-    });
-
-    it('When VPN is disabled, then it does not send a request to remove the VPN access for the user', async () => {
-      const { uuid } = getUser();
-      const tier = newTier();
-      tier.featuresPerService['vpn'].enabled = false;
-
-      const removeVPNTierSpy = jest.spyOn(usersService, 'disableVPNTier').mockImplementation(() => Promise.resolve());
-
-      await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
-
-      expect(removeVPNTierSpy).not.toHaveBeenCalled();
     });
   });
 });

@@ -213,12 +213,7 @@ export class TiersService {
       return;
     }
 
-    try {
-      await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
-    } catch (err) {
-      console.log(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${userUuid} `);
-    }
-
+    await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
   }
 
@@ -232,10 +227,8 @@ export class TiersService {
   }
 
   async removeVPNFeatures(userUuid: User['uuid'], vpnFeature: Tier['featuresPerService']['vpn']) {
-    const { enabled, featureId } = vpnFeature;
+    const { featureId } = vpnFeature;
 
-    if (enabled) {
-      await this.usersService.disableVPNTier(userUuid, featureId);
-    }
+    await this.usersService.disableVPNTier(userUuid, featureId);
   }
 }
