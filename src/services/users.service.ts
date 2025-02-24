@@ -271,13 +271,9 @@ export class UsersService {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
       },
-      data: {
-        uuid: userUuid,
-        tierId: featureId,
-      },
     };
 
-    return this.axios.delete(`${this.config.VPN_URL}/gateway/users`, requestConfig);
+    return this.axios.delete(`${this.config.VPN_URL}/gateway/users/${userUuid}/tiers/${featureId}`, requestConfig);
   }
 }
 

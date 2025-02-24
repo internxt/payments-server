@@ -17,15 +17,16 @@ import {
   NotFoundSubscriptionError,
   PaymentService,
 } from '../../../src/services/payment.service';
-import { createOrUpdateUser, updateUserTier } from '../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getCustomer, getInvoice, getUser, newTier } from '../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 
 let tiersService: TiersService;
 let paymentsService: PaymentService;
@@ -39,6 +40,7 @@ let usersCouponsRepository: UsersCouponsRepository;
 let usersTiersRepository: UsersTiersRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
+let storageService: StorageService;
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
@@ -78,7 +80,15 @@ describe('TiersService tests', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
+    storageService = new StorageService(config, axios);
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      config,
+    );
   });
 
   describe('User-Tier Relationship', () => {
@@ -191,6 +201,27 @@ describe('TiersService tests', () => {
 
       expect(result).toStrictEqual(tier);
       expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
+    });
+  });
+
+  describe('Get tier products using the product id', () => {
+    it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
+      const { id: productId } = newTier();
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(null);
+
+      await expect(tiersService.getTierProductsByProductsId(productId)).rejects.toThrow(TierNotFoundError);
+    });
+
+    it('When the requested tier exists, then it returns the tier object', async () => {
+      const tier = newTier();
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByProductsId(tier.productId);
+
+      expect(result).toStrictEqual(tier);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId);
     });
   });
 
@@ -362,6 +393,75 @@ describe('TiersService tests', () => {
     });
   });
 
+  describe('Remove the tier the user canceled or requested a refund', () => {
+    it('When removing the tier, then fails if the tier is not found', async () => {
+      const mockedUser = getUser();
+      const productId = 'productId';
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(null));
+
+      await expect(
+        tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId, getLogger()),
+      ).rejects.toThrow(TierNotFoundError);
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+    });
+
+    it('When removing the tier, then skips the disabled features the tier had', async () => {
+      const mockedUser = getUser();
+      const log = getLogger();
+      const mockedTier = newTier();
+      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const { productId } = mockedTier;
+      mockedTier.featuresPerService[Service.Drive].enabled = true;
+      mockedTier.featuresPerService[Service.Vpn].enabled = false;
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(mockedTier));
+      const removeDriveFeatures = jest
+        .spyOn(tiersService, 'removeDriveFeatures')
+        .mockImplementation(() => Promise.resolve());
+      const removeVPNFeatures = jest
+        .spyOn(tiersService, 'removeVPNFeatures')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeTier(userWithEmail, productId, log);
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
+      expect(removeVPNFeatures).not.toHaveBeenCalled();
+    });
+
+    it('When removing the tier, then removes the applied features', async () => {
+      const mockedUser = getUser();
+      const log = getLogger();
+      const mockedTier = newTier();
+      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const { productId } = mockedTier;
+      mockedTier.featuresPerService[Service.Drive].enabled = true;
+      mockedTier.featuresPerService[Service.Vpn].enabled = true;
+
+      const findTierByProductId = jest
+        .spyOn(tiersRepository, 'findByProductId')
+        .mockImplementation(() => Promise.resolve(mockedTier));
+      const removeDriveFeatures = jest
+        .spyOn(tiersService, 'removeDriveFeatures')
+        .mockImplementation(() => Promise.resolve());
+      const removeVPNFeatures = jest
+        .spyOn(tiersService, 'removeVPNFeatures')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeTier(userWithEmail, productId, log);
+
+      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
+      expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
+    });
+  });
+
   describe('Apply Drive features according the user tier plan', () => {
     it('When workspace is enabled but the quantity of seats is less than the minimum, then an error indicating so is thrown', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
@@ -459,7 +559,44 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('VPN access based on user tier', () => {
+  describe('Remove Drive features', () => {
+    it('When workspaces is enabled, then it is removed exclusively', async () => {
+      const { uuid } = getUser();
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
+      (updateUserTier as jest.Mock).mockClear();
+
+      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+
+      expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
+
+      expect(updateUserTier).not.toHaveBeenCalled();
+    });
+
+    it('When workspaces is not enabled, then update the user tier to free and downgrade the storage to the free plan', async () => {
+      const { uuid } = getUser();
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = false;
+
+      const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      (updateUserTier as jest.Mock).mockClear();
+
+      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+
+      expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
+      expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);
+      expect(changeStorageSpy).toHaveBeenCalledWith(uuid, FREE_PLAN_BYTES_SPACE);
+    });
+  });
+
+  describe('Enable VPN access based on user tier', () => {
     it("When VPN is enabled, then a request to enable user's tier on the VPN service is sent", async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
@@ -482,6 +619,21 @@ describe('TiersService tests', () => {
       await tiersService.applyVpnFeatures(userWithEmail, tier);
 
       expect(enableVPNTierSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Remove VPN access based on user tier', () => {
+    it('When VPN was enabled on the cancelled tier, then the request to disable/remove it is sent', async () => {
+      const { uuid } = getUser();
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Vpn].enabled = true;
+
+      const removeVPNTierSpy = jest.spyOn(usersService, 'disableVPNTier').mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
+
+      expect(removeVPNTierSpy).toHaveBeenCalledWith(uuid, tier.featuresPerService[Service.Vpn].featureId);
     });
   });
 });

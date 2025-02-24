@@ -20,6 +20,7 @@ import config from '../../../../src/config';
 import axios from 'axios';
 import { getCustomer, getInvoice, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
+import { StorageService } from '../../../../src/services/storage.service';
 
 const mockedUser = {
   ...getUser(),
@@ -42,6 +43,7 @@ describe('Create or update user when after successful payment', () => {
   let productsRepository: ProductsRepository;
   let bit2MeService: Bit2MeService;
   let defaultProps: HandleUserFeaturesProps;
+  let storageService: StorageService;
 
   beforeEach(() => {
     tiersRepository = testFactory.getTiersRepository();
@@ -67,7 +69,17 @@ describe('Create or update user when after successful payment', () => {
       config,
       axios,
     );
-    tiersService = new TiersService(usersService, paymentService, tiersRepository, usersTiersRepository, config);
+
+    storageService = new StorageService(config, axios);
+
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      config,
+    );
 
     defaultProps = {
       user: mockedUser,
