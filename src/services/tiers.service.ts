@@ -166,24 +166,25 @@ export class TiersService {
   async applyDriveFeatures(
     userWithEmail: User & { email: string },
     customer: Stripe.Customer,
-    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
+    subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
-      if (!amountOfSeats) return;
+      if (!subscriptionSeats || subscriptionSeats < features.workspaces.minimumSeats)
+        throw new Error('The amount of seats is not allowed for this type of subscription');
 
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
       const address = customer.address?.line1 ?? undefined;
       const phoneNumber = customer.phone ?? undefined;
 
       try {
-        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), amountOfSeats);
+        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
       } catch (err) {
         await this.usersService.initializeWorkspace(userWithEmail.uuid, {
           newStorageBytes: Number(maxSpaceBytes),
-          seats: amountOfSeats,
+          seats: subscriptionSeats,
           address,
           phoneNumber,
         });

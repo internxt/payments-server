@@ -363,7 +363,7 @@ describe('TiersService tests', () => {
   });
 
   describe('Apply Drive features according the user tier plan', () => {
-    it('When workspaces is enabled, then it is applied exclusively', async () => {
+    it('When workspace is enabled but the quantity of seats is less than the minimum, then an error indicating so is thrown', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
       const mockedCustomer = getCustomer();
@@ -379,12 +379,35 @@ describe('TiersService tests', () => {
 
       const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
 
+      await expect(
+        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
+      ).rejects.toThrow(Error);
+      expect(updateWorkspaceStorage).not.toHaveBeenCalled();
+      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
+    });
+    it('When workspaces is enabled, then it is applied exclusively', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
+
+      mockedInvoiceLineItem.quantity = 3;
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
+      const updateWorkspaceStorage = jest
+        .spyOn(usersService, 'updateWorkspaceStorage')
+        .mockImplementation(() => Promise.resolve());
+
+      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
+
       await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        1,
+        mockedInvoiceLineItem.quantity,
       );
 
       expect(createOrUpdateUserSpy).not.toHaveBeenCalled();

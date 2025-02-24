@@ -10,7 +10,11 @@ import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
 import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
-import { handleUserFeatures, HandleUserFeaturesProps } from '../../../../src/webhooks/utils/handleUserFeatures';
+import {
+  handleUserFeatures,
+  HandleUserFeaturesProps,
+  InvoiceNotFoundError,
+} from '../../../../src/webhooks/utils/handleUserFeatures';
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
@@ -102,7 +106,7 @@ describe('Create or update user when after successful payment', () => {
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
-  it('when the user has existing tiers and the second invoice has a product that is not mapped, then it should stop', async () => {
+  it('when the user has existing tiers and the second invoice has a product that is not mapped, then an error indicating so is thrown', async () => {
     const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
@@ -114,12 +118,18 @@ describe('Create or update user when after successful payment', () => {
         product: randomMockedTier.productId,
         bytesInPlan: '',
       },
+      {
+        ...mockedInvoices,
+        pdf: '',
+        product: randomMockedTier.productId,
+        bytesInPlan: '',
+      },
     ]);
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
 
-    await handleUserFeatures(defaultProps);
+    await expect(handleUserFeatures(defaultProps)).rejects.toThrow(InvoiceNotFoundError);
 
     expect(spyInsert).toHaveBeenCalledTimes(0);
     expect(spyApplyTier).not.toHaveBeenCalled();

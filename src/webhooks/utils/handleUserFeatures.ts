@@ -30,13 +30,15 @@ export async function handleUserFeatures({
     const [, latestInvoice] = userInvoices;
 
     if (latestInvoice) {
-      let oldTierId;
       const oldProductId = latestInvoice?.product as string;
       const existingTier = existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
 
-      if (!existingTier) return;
+      if (!existingTier)
+        throw new InvoiceNotFoundError(
+          `Latest invoice references product "${oldProductId}", but no matching tier was found for user ID "${userId}"`,
+        );
 
-      oldTierId = existingTier.id;
+      const oldTierId = existingTier.id;
       await tiersService.updateTierToUser(userId, oldTierId, newTierId);
       await tiersService.applyTier(user, customer, purchasedItem, product.id);
     }
@@ -46,5 +48,13 @@ export async function handleUserFeatures({
     }
     await tiersService.insertTierToUser(userId, newTierId);
     await tiersService.applyTier(user, customer, purchasedItem, product.id);
+  }
+}
+
+export class InvoiceNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, InvoiceNotFoundError.prototype);
   }
 }
