@@ -23,7 +23,7 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getLogger, getUser, newTier, voidPromise } from '../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -327,14 +327,16 @@ describe('TiersService tests', () => {
     it('When applying the tier, then fails if the tier is not found', async () => {
       const user = getUser();
       const productId = 'productId';
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
 
       const findTierByProductId = jest
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(null));
 
-      await expect(tiersService.applyTier({ ...user, email: 'fake email' }, productId)).rejects.toThrow(
-        TierNotFoundError,
-      );
+      await expect(
+        tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId),
+      ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
     });
@@ -343,6 +345,9 @@ describe('TiersService tests', () => {
       const user = getUser();
       const tier = newTier();
       const { productId } = tier;
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
+
       tier.featuresPerService[Service.Drive].enabled = false;
       tier.featuresPerService[Service.Vpn].enabled = false;
 
@@ -354,7 +359,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier({ ...user, email: 'fake email' }, productId);
+      await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
       expect(applyDriveFeatures).not.toHaveBeenCalled();
@@ -366,6 +371,9 @@ describe('TiersService tests', () => {
       const tier = newTier();
       const userWithEmail = { ...user, email: 'fake email' };
       const { productId } = tier;
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
+
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Vpn].enabled = true;
 
@@ -377,10 +385,10 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(userWithEmail, productId);
+      await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
-      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, tier);
+      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier);
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
   });
@@ -455,25 +463,51 @@ describe('TiersService tests', () => {
   });
 
   describe('Apply Drive features according the user tier plan', () => {
-    it('When workspaces is enabled, then it is applied exclusively', async () => {
+    it('When workspace is enabled but the quantity of seats is less than the minimum, then an error indicating so is thrown', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
+      jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
       const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
 
-      await tiersService.applyDriveFeatures(userWithEmail, tier);
+      await expect(
+        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
+      ).rejects.toThrow(Error);
+      expect(updateWorkspaceStorage).not.toHaveBeenCalled();
+      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
+    });
+    it('When workspaces is enabled, then it is applied exclusively', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const mockedInvoiceLineItem = getInvoice().lines.data[0];
+
+      mockedInvoiceLineItem.quantity = 3;
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
+      const updateWorkspaceStorage = jest
+        .spyOn(usersService, 'updateWorkspaceStorage')
+        .mockImplementation(() => Promise.resolve());
+
+      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
+
+      await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        0,
+        mockedInvoiceLineItem.quantity,
       );
 
       expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
@@ -482,6 +516,8 @@ describe('TiersService tests', () => {
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const amountOfSeats = 5;
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
@@ -492,13 +528,13 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'initializeWorkspace')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyDriveFeatures(userWithEmail, tier);
+      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
 
       expect(initializeWorkspace).toHaveBeenCalledWith(userWithEmail.uuid, {
         newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        seats: 0,
-        address: '',
-        phoneNumber: '',
+        seats: amountOfSeats,
+        address: mockedCustomer.address?.line1 ?? undefined,
+        phoneNumber: mockedCustomer.phone ?? undefined,
       });
       expect(createOrUpdateUser).not.toHaveBeenCalled();
     });
@@ -506,11 +542,13 @@ describe('TiersService tests', () => {
     it('When workspaces is not enabled, then individual is initialized', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const amountOfSeats = 1;
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
-      await tiersService.applyDriveFeatures(userWithEmail, tier);
+      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
 
       expect(createOrUpdateUser).toHaveBeenCalledWith(
         tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),

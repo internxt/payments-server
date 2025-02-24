@@ -67,7 +67,7 @@ export interface PaymentIntent {
 }
 
 export type Reason = {
-  name: 'prevent-cancellation';
+  name: 'prevent-cancellation' | 'pc-cloud-25';
 };
 
 const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
@@ -82,6 +82,7 @@ const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCr
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
+  'pc-cloud-25': 6,
 };
 
 export type PriceMetadata = {
@@ -222,6 +223,32 @@ export class PaymentService {
     };
   }
 
+  async createSubscriptionWithTrial(
+    payload: {
+      customerId: string;
+      priceId: string;
+      seatsForBusinessSubscription?: number;
+      currency?: string;
+      promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+      companyName?: string;
+      companyVatId?: string;
+    }, 
+    trialReason: Reason
+  ) {
+    const now = new Date();
+    const trialEnd = Math.floor(
+      now.setMonth(now.getMonth() + reasonFreeMonthsMap[trialReason.name]) / 1000
+    );
+
+    const subscription = await this.createSubscription({
+      ...payload, 
+      trialEnd,
+      metadata: { 'why-trial': trialReason.name },
+    });
+
+    return subscription;
+  }
+
   async createSubscription({
     customerId,
     priceId,
@@ -230,6 +257,8 @@ export class PaymentService {
     promoCodeId,
     companyName,
     companyVatId,
+    trialEnd,
+    metadata,
   }: {
     customerId: string;
     priceId: string;
@@ -238,6 +267,8 @@ export class PaymentService {
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
     companyName?: string;
     companyVatId?: string;
+    trialEnd?: number;
+    metadata?: Stripe.Metadata,
   }): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -285,6 +316,7 @@ export class PaymentService {
       metadata: {
         companyName: companyName ?? null,
         companyVatId: companyVatId ?? null,
+        ...metadata,
       },
       payment_behavior: 'default_incomplete',
       payment_settings: {
@@ -292,6 +324,7 @@ export class PaymentService {
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      trial_end: (trialEnd ? trialEnd : undefined)
     });
 
     if (subscription.pending_setup_intent !== null) {
@@ -737,6 +770,7 @@ export class PaymentService {
           bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
+          product: invoice.lines.data[0].price?.product,
         };
       });
 
