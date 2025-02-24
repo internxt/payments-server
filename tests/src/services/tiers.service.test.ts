@@ -23,7 +23,7 @@ import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getUser, newTier, voidPromise } from '../fixtures';
+import { getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -394,15 +394,16 @@ describe('TiersService tests', () => {
         .spyOn(tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(null));
 
-      await expect(tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId)).rejects.toThrow(
-        TierNotFoundError,
-      );
+      await expect(
+        tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId, getLogger()),
+      ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
     });
 
     it('When removing the tier, then skips the disabled features the tier had', async () => {
       const mockedUser = getUser();
+      const log = getLogger();
       const mockedTier = newTier();
       const userWithEmail = { ...mockedUser, email: 'fake email' };
       const { productId } = mockedTier;
@@ -419,15 +420,16 @@ describe('TiersService tests', () => {
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId);
+      await tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
-      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).not.toHaveBeenCalled();
     });
 
     it('When removing the tier, then removes the applied features', async () => {
       const mockedUser = getUser();
+      const log = getLogger();
       const mockedTier = newTier();
       const userWithEmail = { ...mockedUser, email: 'fake email' };
       const { productId } = mockedTier;
@@ -444,10 +446,10 @@ describe('TiersService tests', () => {
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId);
+      await tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith(productId);
-      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
     });
   });
@@ -530,7 +532,7 @@ describe('TiersService tests', () => {
       const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
       (updateUserTier as jest.Mock).mockClear();
 
-      await tiersService.removeDriveFeatures(uuid, tier);
+      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
 
@@ -548,7 +550,7 @@ describe('TiersService tests', () => {
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
       (updateUserTier as jest.Mock).mockClear();
 
-      await tiersService.removeDriveFeatures(uuid, tier);
+      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
       expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);

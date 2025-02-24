@@ -15,7 +15,7 @@ import testFactory from '../../utils/factory';
 import { PaymentService } from '../../../../src/services/payment.service';
 import { TiersRepository } from '../../../../src/core/users/MongoDBTiersRepository';
 import { UsersTiersRepository } from '../../../../src/core/users/MongoDBUsersTiersRepository';
-import { getCustomer, getUser, newTier, voidPromise } from '../../fixtures';
+import { getCustomer, getLogger, getUser, newTier, voidPromise } from '../../fixtures';
 import { handleCancelPlan } from '../../../../src/webhooks/utils/handleCancelPlan';
 
 let usersRepository: UsersRepository;
@@ -71,6 +71,7 @@ beforeEach(() => {
 describe('Handling canceled plans and refunded lifetimes', () => {
   it('When the user cancels a subscription, then the tier is removed and the free space is applied', async () => {
     const mockedCustomer = getCustomer();
+    const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: false });
     const mockedTier = newTier();
 
@@ -86,18 +87,21 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       productId: mockedTier.productId,
       tiersService,
       usersService,
+      log,
     });
 
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
     expect(removeTierSpy).toHaveBeenCalledWith(
       { ...mockedUser, email: mockedCustomer.email as string },
       mockedTier.productId,
+      log,
     );
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 
   it('When the user cancels a lifetime (refund), then the lifetime field is set to false, the tier is removed and the free space is applied', async () => {
     const mockedCustomer = getCustomer();
+    const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: true });
     const mockedTier = newTier();
 
@@ -118,6 +122,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       productId: mockedTier.productId,
       tiersService,
       usersService,
+      log,
     });
 
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
@@ -125,6 +130,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     expect(removeTierSpy).toHaveBeenCalledWith(
       { ...mockedUser, email: mockedCustomer.email as string },
       mockedTier.productId,
+      log,
     );
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });

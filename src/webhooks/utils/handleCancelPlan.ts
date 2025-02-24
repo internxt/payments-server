@@ -2,6 +2,7 @@ import { CustomerId } from '../../services/payment.service';
 import { UsersService } from '../../services/users.service';
 import { TiersService } from '../../services/tiers.service';
 import Stripe from 'stripe';
+import { FastifyBaseLogger } from 'fastify';
 
 interface HandleCancelPlanProps {
   customerId: CustomerId;
@@ -9,6 +10,7 @@ interface HandleCancelPlanProps {
   productId: Stripe.Product['id'];
   usersService: UsersService;
   tiersService: TiersService;
+  log: FastifyBaseLogger;
 }
 
 export const handleCancelPlan = async ({
@@ -17,6 +19,7 @@ export const handleCancelPlan = async ({
   productId,
   usersService,
   tiersService,
+  log,
 }: HandleCancelPlanProps) => {
   const user = await usersService.findUserByCustomerID(customerId);
   const { id: userId } = user;
@@ -24,6 +27,6 @@ export const handleCancelPlan = async ({
 
   await usersService.updateUser(customerId, { lifetime: false });
 
-  await tiersService.removeTier({ ...user, email: customerEmail }, productId);
+  await tiersService.removeTier({ ...user, email: customerEmail }, productId, log);
   await tiersService.deleteTierFromUser(userId, tier.id);
 };

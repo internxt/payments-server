@@ -7,6 +7,7 @@ import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FastifyBaseLogger } from 'fastify';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -147,7 +148,7 @@ export class TiersService {
     }
   }
 
-  async removeTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
+  async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
     const tier = await this.tiersRepository.findByProductId(productId);
     const { uuid: userUuid } = userWithEmail;
 
@@ -164,7 +165,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.removeDriveFeatures(userUuid, tier);
+          await this.removeDriveFeatures(userUuid, tier, log);
           break;
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
@@ -205,15 +206,19 @@ export class TiersService {
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
-  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier): Promise<void> {
+  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
       await this.usersService.destroyWorkspace(userUuid);
       return;
     }
+    try {
+      await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
+    } catch (error) {
+      log.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
+    }
 
-    await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
   }
 
