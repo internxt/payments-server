@@ -38,11 +38,11 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
-  async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
+  async insertTierToUser(userId: User['uuid'], newTierId: Tier['id']): Promise<void> {
     await this.usersTiersRepository.insertTierToUser(userId, newTierId);
   }
 
-  async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
+  async updateTierToUser(userId: User['uuid'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
     const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
@@ -129,7 +129,7 @@ export class TiersService {
   }
 
   async applyTier(
-    userWithEmail: User & { email: string },
+    userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     lineItem: Stripe.InvoiceLineItem,
     productId: string,
@@ -193,7 +193,7 @@ export class TiersService {
   }
 
   async applyDriveFeatures(
-    userWithEmail: User & { email: string },
+    userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
@@ -244,12 +244,12 @@ export class TiersService {
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
   }
 
-  async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyVpnFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {
     const { uuid } = userWithEmail;
     const { enabled, featureId } = tier.featuresPerService[Service.Vpn];
 
     if (enabled) {
-      await this.usersService.enableVPNTier(uuid, featureId);
+      return this.usersService.enableVPNTier(uuid, featureId);
     }
   }
 

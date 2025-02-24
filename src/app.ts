@@ -50,7 +50,16 @@ export async function buildApp(
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
-    webhook(stripe, storageService, usersService, paymentService, config, cacheService, objectStorageService),
+    webhook(
+      stripe,
+      storageService,
+      usersService,
+      paymentService,
+      config,
+      cacheService,
+      objectStorageService,
+      tiersService,
+    ),
   );
 
   fastify.register(fastifyCors, {

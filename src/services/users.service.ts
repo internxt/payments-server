@@ -15,6 +15,7 @@ function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
+    allowInsecureKeySizes: true,
   });
 }
 
@@ -254,7 +255,7 @@ export class UsersService {
     };
 
     return this.axios.post(
-      `${this.config.VPN_URL}/gateway/users`,
+      `http://host.docker.internal:3005/gateway/users`,
       {
         uuid: userUuid,
         tierId: featureId,

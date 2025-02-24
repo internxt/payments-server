@@ -15,6 +15,7 @@ import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import { TiersService } from '../services/tiers.service';
 
 export default function (
   stripe: Stripe,
@@ -24,6 +25,7 @@ export default function (
   config: AppConfig,
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
+  tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -112,7 +114,7 @@ export default function (
             paymentService,
             fastify.log,
             cacheService,
-            config,
+            tiersService,
             objectStorageService,
           );
           break;

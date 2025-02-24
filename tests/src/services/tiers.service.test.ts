@@ -17,7 +17,7 @@ import {
   NotFoundSubscriptionError,
   PaymentService,
 } from '../../../src/services/payment.service';
-import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
+import { StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -42,9 +42,6 @@ let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 let storageService: StorageService;
 
-jest
-  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
-  .mockImplementation(() => Promise.resolve() as any);
 jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
   .mockImplementation(() => Promise.resolve() as any);
@@ -477,13 +474,10 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
-
       await expect(
         tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
       ).rejects.toThrow(Error);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
-      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
@@ -500,8 +494,6 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
-
       await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
@@ -509,8 +501,6 @@ describe('TiersService tests', () => {
         tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
         mockedInvoiceLineItem.quantity,
       );
-
-      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
@@ -536,7 +526,6 @@ describe('TiersService tests', () => {
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
       });
-      expect(createOrUpdateUser).not.toHaveBeenCalled();
     });
 
     it('When workspaces is not enabled, then individual is initialized', async () => {
@@ -550,11 +539,6 @@ describe('TiersService tests', () => {
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
 
-      expect(createOrUpdateUser).toHaveBeenCalledWith(
-        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),
-        userWithEmail.email,
-        config,
-      );
       expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });
   });
