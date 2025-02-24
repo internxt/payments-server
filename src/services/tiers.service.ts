@@ -6,12 +6,21 @@ import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import Stripe from 'stripe';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
     super(message);
 
     Object.setPrototypeOf(this, TierNotFoundError.prototype);
+  }
+}
+
+export class UsersTiersError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, UsersTiersError.prototype);
   }
 }
 
@@ -22,34 +31,34 @@ export class TiersService {
     private readonly usersService: UsersService,
     private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
-    private readonly tiersUsersRepository: UsersTiersRepository,
+    private readonly usersTiersRepository: UsersTiersRepository,
     private readonly config: AppConfig,
   ) {}
 
   async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
-    await this.tiersUsersRepository.insertTierToUser(userId, newTierId);
+    await this.usersTiersRepository.insertTierToUser(userId, newTierId);
   }
 
   async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
-    const updatedUserTier = await this.tiersUsersRepository.updateUserTier(userId, oldTierId, newTierId);
+    const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
-      throw new Error(
+      throw new UsersTiersError(
         `Error while updating the older tier ${oldTierId} to the newest tier ${newTierId} from user with Id ${userId}`,
       );
     }
   }
 
   async deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
-    const deletedTierFromUser = await this.tiersUsersRepository.deleteTierFromUser(userId, tierId);
+    const deletedTierFromUser = await this.usersTiersRepository.deleteTierFromUser(userId, tierId);
 
     if (!deletedTierFromUser) {
-      throw new Error(`Error while deleting a tier ${tierId} from user Id ${userId}`);
+      throw new UsersTiersError(`Error while deleting a tier ${tierId} from user Id ${userId}`);
     }
   }
 
   async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {
-    const userTiers = await this.tiersUsersRepository.findTierIdByUserId(userId);
+    const userTiers = await this.usersTiersRepository.findTierIdByUserId(userId);
 
     if (userTiers.length === 0) {
       throw new TierNotFoundError(`No tiers found for user with ID: ${userId}`);
@@ -68,7 +77,7 @@ export class TiersService {
     return tier;
   }
 
-  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier | Error> {
+  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier> {
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
@@ -116,7 +125,13 @@ export class TiersService {
     };
   }
 
-  async applyTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
+  async applyTier(
+    userWithEmail: User & { email: string },
+    customer: Stripe.Customer,
+    lineItem: Stripe.InvoiceLineItem,
+    productId: string,
+  ): Promise<void> {
+    const amountOfSeats = lineItem.quantity;
     const tier = await this.tiersRepository.findByProductId(productId);
 
     if (!tier) {
@@ -132,7 +147,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, tier);
+          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier);
           break;
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
@@ -148,21 +163,28 @@ export class TiersService {
     }
   }
 
-  async applyDriveFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyDriveFeatures(
+    userWithEmail: User & { email: string },
+    customer: Stripe.Customer,
+    subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
+    tier: Tier,
+  ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
+      if (!subscriptionSeats || subscriptionSeats < features.workspaces.minimumSeats)
+        throw new Error('The amount of seats is not allowed for this type of subscription');
+
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
-      const amountOfSeats = 0;
-      const address = '';
-      const phoneNumber = '';
+      const address = customer.address?.line1 ?? undefined;
+      const phoneNumber = customer.phone ?? undefined;
 
       try {
-        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), amountOfSeats);
+        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
       } catch (err) {
         await this.usersService.initializeWorkspace(userWithEmail.uuid, {
           newStorageBytes: Number(maxSpaceBytes),
-          seats: amountOfSeats,
+          seats: subscriptionSeats,
           address,
           phoneNumber,
         });
