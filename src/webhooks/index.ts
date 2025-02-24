@@ -67,6 +67,7 @@ export default function (
             event.data.object as Stripe.Subscription,
             cacheService,
             objectStorageService,
+            tiersService,
             fastify.log,
             config,
           );
@@ -157,9 +158,11 @@ export default function (
               await handleLifetimeRefunded(
                 storageService,
                 usersService,
-                event.data.object.customer as string,
+                event.data.object,
                 cacheService,
+                paymentService,
                 fastify.log,
+                tiersService,
                 config,
               );
             }
@@ -167,14 +170,15 @@ export default function (
           break;
 
         case 'charge.dispute.closed':
-          const charge = event.data.object;
+          const dispute = event.data.object;
           await handleDisputeResult({
-            charge,
+            dispute,
             stripe,
             paymentService,
             usersService,
             storageService,
             cacheService,
+            tiersService,
             log: fastify.log,
             config,
           });

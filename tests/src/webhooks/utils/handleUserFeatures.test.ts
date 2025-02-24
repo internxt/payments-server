@@ -18,7 +18,7 @@ import {
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
-import { getCustomer, getInvoice, getUser, newTier } from '../../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
 import { StorageService } from '../../../../src/services/storage.service';
 
@@ -87,6 +87,7 @@ describe('Create or update user when after successful payment', () => {
       paymentService,
       customer: mockedCustomer,
       tiersService,
+      logger: getLogger(),
     };
   });
 
