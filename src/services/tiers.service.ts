@@ -46,11 +46,11 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
-  async insertTierToUser(userId: User['uuid'], newTierId: Tier['id']): Promise<void> {
+  async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
     await this.usersTiersRepository.insertTierToUser(userId, newTierId);
   }
 
-  async updateTierToUser(userId: User['uuid'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
+  async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
     const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
