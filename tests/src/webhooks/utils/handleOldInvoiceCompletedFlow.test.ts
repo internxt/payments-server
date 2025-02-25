@@ -16,10 +16,6 @@ import testFactory from '../../utils/factory';
 import Stripe from 'stripe';
 import { handleOldInvoiceCompletedFlow } from '../../../../src/webhooks/utils/handleOldInvoiceCompletedFlow';
 
-// jest
-//   .spyOn(require('../../../../src/services/storage.service'), 'createOrUpdateUser')
-//   .mockImplementation(() => Promise.resolve() as any);
-
 const logger = getLogger();
 
 let tiersRepository: TiersRepository;
