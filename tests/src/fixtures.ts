@@ -67,7 +67,7 @@ export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode
   };
 };
 
-export const getProduct = (params?: Stripe.Product): Stripe.Product => {
+export const getProduct = ({ params, userType }: { params?: Stripe.Product; userType?: UserType }): Stripe.Product => {
   return {
     id: `prod_${randomDataGenerator.string({ length: 12 })}`,
     type: 'service',
@@ -79,7 +79,9 @@ export const getProduct = (params?: Stripe.Product): Stripe.Product => {
     images: [],
     marketing_features: [],
     livemode: false,
-    metadata: {},
+    metadata: {
+      type: userType ?? UserType.Individual,
+    },
     name: 'Gold Plan',
     package_dimensions: null,
     shippable: null,

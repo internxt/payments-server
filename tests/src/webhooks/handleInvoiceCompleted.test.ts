@@ -12,9 +12,12 @@ import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRe
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import CacheService from '../../../src/services/cache.service';
-import handleInvoiceCompleted from '../../../src/webhooks/handleInvoiceCompleted';
+import handleInvoiceCompleted, {
+  handleObjectStorageInvoiceCompleted,
+} from '../../../src/webhooks/handleInvoiceCompleted';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
-import { getCustomer, getInvoice, getLogger, getUser } from '../fixtures';
+import { getCustomer, getInvoice, getLogger, getProduct, getUser } from '../fixtures';
+import { UserType } from '../../../src/core/users/User';
 
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -315,6 +318,48 @@ describe('Process when an invoice payment is completed', () => {
 
       expect(getActiveSubSpy).not.toHaveBeenCalled();
       expect(mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes).toBeUndefined();
+    });
+  });
+
+  describe('The subscription is for an object storage sub', () => {
+    it('When the product is not an obj storage type, then skips to the next process', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice();
+      const mockedProduct = getProduct({});
+      const log = getLogger();
+
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
+      const reactivateObjAccountSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockImplementation();
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(reactivateObjAccountSpy).not.toHaveBeenCalled();
+    });
+
+    it('When the invoice is completed, then the object storage account is activated', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice();
+      const mockedProduct = getProduct({ userType: UserType.ObjectStorage });
+      const log = getLogger();
+
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
+      const reactivateObjAccountSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockImplementation();
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(reactivateObjAccountSpy).toHaveBeenCalled();
     });
   });
 });
