@@ -18,7 +18,7 @@ import {
   NotFoundSubscriptionError,
   PaymentService,
 } from '../../../src/services/payment.service';
-import { StorageService, updateUserTier } from '../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -45,6 +45,10 @@ let storageService: StorageService;
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
+  .mockImplementation(() => Promise.resolve() as any);
+
+jest
+  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
@@ -540,6 +544,11 @@ describe('TiersService tests', () => {
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
 
+      expect(createOrUpdateUser).toHaveBeenCalledWith(
+        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),
+        userWithEmail.email,
+        config,
+      );
       expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });
   });
