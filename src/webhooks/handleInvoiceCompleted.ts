@@ -147,6 +147,7 @@ export default async function handleInvoiceCompleted(
   } catch (error) {
     const err = error as Error;
     log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
+    throw error;
   }
 
   try {
