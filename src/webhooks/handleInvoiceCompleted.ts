@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import CacheService from '../services/cache.service';
 import { PaymentService, PriceMetadata } from '../services/payment.service';
@@ -7,7 +7,9 @@ import { CouponNotBeingTrackedError, UsersService } from '../services/users.serv
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UserType } from '../core/users/User';
 import { handleUserFeatures } from './utils/handleUserFeatures';
-import { TiersService } from '../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { handleOldInvoiceCompletedFlow } from './utils/handleOldInvoiceCompletedFlow';
+import config from '../config';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -17,12 +19,12 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
   );
 }
 
-async function handleObjectStorageInvoiceCompleted(
+export async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
 ) {
   if (invoice.lines.data.length !== 1) {
     log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
@@ -56,7 +58,7 @@ export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   usersService: UsersService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   cacheService: CacheService,
   tiersService: TiersService,
   objectStorageService: ObjectStorageService,
@@ -75,8 +77,13 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id as string);
-  const price = items.data[0].price;
+  const items = await paymentService.getInvoiceLineItems(session.id);
+  const price = items.data?.[0].price;
+  if (!price) {
+    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
+    return;
+  }
+
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
@@ -84,11 +91,6 @@ export default async function handleInvoiceCompleted(
 
   if (isObjStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
-  }
-
-  if (!price) {
-    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
-    return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
@@ -119,7 +121,9 @@ export default async function handleInvoiceCompleted(
 
   const email = customer.email ?? session.customer_email;
 
-  log.info('Searching for the user in the local DB or in Drive...');
+  log.info(
+    `Searching for the user with mail ${email} and customer Id ${customer.id} in the local DB or directly in Drive...`,
+  );
 
   try {
     user = await usersService.findUserByCustomerID(customer.id);
@@ -140,6 +144,8 @@ export default async function handleInvoiceCompleted(
     await handleUserFeatures({
       customer,
       paymentService,
+      isLifetimeCurrentSub: isLifetimePlan,
+      usersService,
       purchasedItem: items.data[0],
       tiersService,
       user: {
@@ -151,32 +157,51 @@ export default async function handleInvoiceCompleted(
   } catch (error) {
     const err = error as Error;
     log.error(`[USER FEATURES/ERROR]: Error while applying the tier products to the user: ${err.message}`);
-    throw error;
-    // if (!(error instanceof TierNotFoundError)) {
-    // }
+    if (!(error instanceof TierNotFoundError)) {
+      throw error;
+    }
+
+    const maxSpaceBytes = price.metadata.maxSpaceBytes;
+
+    try {
+      await handleOldInvoiceCompletedFlow({
+        config: config,
+        customer,
+        isBusinessPlan,
+        log,
+        maxSpaceBytes,
+        product,
+        subscriptionSeats: items.data[0].quantity,
+        usersService,
+        userUuid: user.uuid,
+      });
+
+      try {
+        const userByCustomerId = await usersService.findUserByCustomerID(customer.id);
+        const isLifetimeCurrentSub = isBusinessPlan ? userByCustomerId.lifetime : isLifetimePlan;
+        await usersService.updateUser(customer.id, {
+          lifetime: isLifetimeCurrentSub,
+        });
+      } catch {
+        await usersService.insertUser({
+          customerId: customer.id,
+          uuid: user.uuid,
+          lifetime: isLifetimePlan,
+        });
+      }
+    } catch (error) {
+      const err = error as Error;
+      log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
+      throw error;
+    }
   }
 
-  try {
-    const { lifetime } = await usersService.findUserByCustomerID(customer.id);
-    const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
-    await usersService.updateUser(customer.id, {
-      lifetime: isLifetimeCurrentSub,
-    });
-  } catch {
-    await usersService.insertUser({
-      customerId: customer.id,
-      uuid: user.uuid,
-      lifetime: isLifetimePlan,
-    });
-  }
-
-  log.info(`User with uuid: ${user.uuid} added/updated in the local DB`);
+  log.info(`User with uuid: ${user.uuid} added/updated in the local DB and available products also updated`);
 
   try {
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
       const areDiscounts = items.data[0].discounts.length > 0;
-
       if (areDiscounts) {
         const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
@@ -195,6 +220,7 @@ export default async function handleInvoiceCompleted(
 
   try {
     await cacheService.clearSubscription(customer.id);
+    log.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }

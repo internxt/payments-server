@@ -26,6 +26,14 @@ export class UsersTiersError extends Error {
   }
 }
 
+export class NoSubscriptionSeatsProvidedError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, NoSubscriptionSeatsProvidedError.prototype);
+  }
+}
+
 export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = ['prod_RY24Z7Axqaz1tG', 'prod_RY27zjzWZWuzEO', 'prod_RY29StsWXwy8Wu'];
 
 export class TiersService {
@@ -38,11 +46,11 @@ export class TiersService {
     private readonly config: AppConfig,
   ) {}
 
-  async insertTierToUser(userId: User['uuid'], newTierId: Tier['id']): Promise<void> {
+  async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
     await this.usersTiersRepository.insertTierToUser(userId, newTierId);
   }
 
-  async updateTierToUser(userId: User['uuid'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
+  async updateTierToUser(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<void> {
     const updatedUserTier = await this.usersTiersRepository.updateUserTier(userId, oldTierId, newTierId);
 
     if (!updatedUserTier) {
@@ -202,7 +210,7 @@ export class TiersService {
 
     if (features.workspaces.enabled) {
       if (!subscriptionSeats || subscriptionSeats < features.workspaces.minimumSeats)
-        throw new Error('The amount of seats is not allowed for this type of subscription');
+        throw new NoSubscriptionSeatsProvidedError('The amount of seats is not allowed for this type of subscription');
 
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
       const address = customer.address?.line1 ?? undefined;

@@ -9,7 +9,7 @@ import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
 import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
-import { UsersService } from '../../../../src/services/users.service';
+import { UserNotFoundError, UsersService } from '../../../../src/services/users.service';
 import {
   handleUserFeatures,
   HandleUserFeaturesProps,
@@ -85,10 +85,14 @@ describe('Create or update user when after successful payment', () => {
       user: mockedUser,
       purchasedItem: mockedPurchasedItem,
       paymentService,
+      usersService,
+      logger: getLogger(),
+      isLifetimeCurrentSub: false,
       customer: mockedCustomer,
       tiersService,
       logger: getLogger(),
     };
+    jest.restoreAllMocks();
   });
 
   it('when the product does not exists, then an error indicating so is thrown', async () => {
@@ -102,6 +106,7 @@ describe('Create or update user when after successful payment', () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
@@ -122,6 +127,7 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers and the second invoice has a product that is not mapped, then an error indicating so is thrown', async () => {
     const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
@@ -152,6 +158,7 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers, then it should update from that old tier to the new tier', async () => {
     const mockedOldTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedOldTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
@@ -182,5 +189,29 @@ describe('Create or update user when after successful payment', () => {
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
     );
     expect(spyInsert).not.toHaveBeenCalled();
+  });
+
+  it('When the tier exists but the user does not, then the tier is added and the user is created', async () => {
+    const userNotFoundError = new UserNotFoundError('Tier not found');
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+    const findByUuidSpy = jest.spyOn(usersService, 'findUserByUuid');
+    findByUuidSpy.mockRejectedValueOnce(userNotFoundError);
+    findByUuidSpy.mockResolvedValueOnce(mockedUser);
+
+    const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
+    const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
+    const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+
+    await handleUserFeatures(defaultProps);
+
+    expect(spyInsert).toHaveBeenCalledTimes(1);
+    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
+    expect(spyApplyTier).toHaveBeenCalledWith(
+      mockedUser,
+      mockedCustomer,
+      mockedPurchasedItem,
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+    );
+    expect(spyUpdate).not.toHaveBeenCalled();
   });
 });
