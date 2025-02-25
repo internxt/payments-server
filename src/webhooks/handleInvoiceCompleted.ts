@@ -7,7 +7,9 @@ import { CouponNotBeingTrackedError, UsersService } from '../services/users.serv
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UserType } from '../core/users/User';
 import { handleUserFeatures } from './utils/handleUserFeatures';
-import { TiersService } from '../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { handleOldInvoiceCompletedFlow } from './utils/handleOldInvoiceCompletedFlow';
+import config from '../config';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -151,9 +153,26 @@ export default async function handleInvoiceCompleted(
   } catch (error) {
     const err = error as Error;
     log.error(`[USER FEATURES/ERROR]: Error while applying the tier products to the user: ${err.message}`);
-    throw error;
-    // if (!(error instanceof TierNotFoundError)) {
-    // }
+    if (!(error instanceof TierNotFoundError)) {
+      throw error;
+    }
+
+    try {
+      await handleOldInvoiceCompletedFlow({
+        config: config,
+        customer,
+        isBusinessPlan,
+        log,
+        maxSpaceBytes,
+        product,
+        subscriptionSeats: items.data[0].quantity,
+        usersService,
+        userUuid: user.uuid,
+      });
+    } catch (error) {
+      const err = error as Error;
+      log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
+      throw error;
   }
 
   try {
