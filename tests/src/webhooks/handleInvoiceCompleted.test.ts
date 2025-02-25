@@ -293,10 +293,13 @@ describe('Process when an invoice payment is completed', () => {
       expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(0);
     });
 
-    it('When the price metadata has no maxSpaceBytes, then log an error and stop processing', async () => {
+    it('When the price metadata has no maxSpaceBytes, then an error indicating so is thrown', async () => {
       const mockedInvoice = getInvoice();
       jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines.data as any);
       const getActiveSubSpy = jest.spyOn(paymentService, 'getActiveSubscriptions');
+      if (mockedInvoice.lines.data[0].price && mockedInvoice.lines.data[0].price.metadata) {
+        mockedInvoice.lines.data[0].price.metadata = {};
+      }
 
       const log = getLogger();
 
@@ -311,6 +314,7 @@ describe('Process when an invoice payment is completed', () => {
       );
 
       expect(getActiveSubSpy).not.toHaveBeenCalled();
+      expect(mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes).toBeUndefined();
     });
   });
 });
