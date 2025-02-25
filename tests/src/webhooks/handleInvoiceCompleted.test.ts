@@ -117,6 +117,24 @@ describe('Process when an invoice payment is completed', () => {
     jest.clearAllMocks();
   });
 
+  it('When the invoice is not paid, then log a message and stop processing', async () => {
+    const mockedInvoice = getInvoice({ status: 'open' });
+    const log = getLogger();
+    const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+
+    await handleInvoiceCompleted(
+      mockedInvoice,
+      usersService,
+      paymentService,
+      log,
+      cacheService,
+      config,
+      objectStorageService,
+    );
+
+    expect(getCustomerSpy).not.toHaveBeenCalled();
+  });
+
   describe('User update', () => {
     it('When the user exists, then update their information as needed', async () => {
       jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(user);
@@ -273,6 +291,26 @@ describe('Process when an invoice payment is completed', () => {
       expect(getCustomerSpy).toHaveBeenCalledTimes(1);
       expect(getInvoiceItemsSpy).toHaveBeenCalledTimes(1);
       expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('When the price metadata has no maxSpaceBytes, then log an error and stop processing', async () => {
+      const mockedInvoice = getInvoice();
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines.data as any);
+      const getActiveSubSpy = jest.spyOn(paymentService, 'getActiveSubscriptions');
+
+      const log = getLogger();
+
+      await handleInvoiceCompleted(
+        mockedInvoice,
+        usersService,
+        paymentService,
+        log,
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(getActiveSubSpy).not.toHaveBeenCalled();
     });
   });
 });
