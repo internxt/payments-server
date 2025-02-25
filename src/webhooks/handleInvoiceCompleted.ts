@@ -75,9 +75,8 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id);
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
   const price = items.data?.[0].price;
-
   if (!price) {
     log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
     return;
