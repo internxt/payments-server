@@ -22,7 +22,7 @@ export const handleCancelPlan = async ({
   log,
 }: HandleCancelPlanProps) => {
   const user = await usersService.findUserByCustomerID(customerId);
-  const { uuid: userId } = user;
+  const { id: userId } = user;
   const tier = await tiersService.getTierProductsByProductsId(productId);
 
   await usersService.updateUser(customerId, { lifetime: false });

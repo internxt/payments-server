@@ -90,7 +90,6 @@ describe('Create or update user when after successful payment', () => {
       isLifetimeCurrentSub: false,
       customer: mockedCustomer,
       tiersService,
-      logger: getLogger(),
     };
     jest.restoreAllMocks();
   });
