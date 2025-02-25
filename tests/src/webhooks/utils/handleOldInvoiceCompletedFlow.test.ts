@@ -71,7 +71,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
       const mockedCustomer = getCustomer({
         id: mockedUser.customerId,
       });
-      const mockedProduct = getProduct();
+      const mockedProduct = getProduct({});
 
       await expect(
         handleOldInvoiceCompletedFlow({
@@ -94,7 +94,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
         const mockedCustomer = getCustomer({
           id: mockedUser.customerId,
         });
-        const mockedProduct = getProduct();
+        const mockedProduct = getProduct({});
 
         jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue({});
 
@@ -118,7 +118,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
         const mockedCustomer = getCustomer({
           id: mockedUser.customerId,
         });
-        const mockedProduct = getProduct();
+        const mockedProduct = getProduct({});
 
         jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue({
           response: { status: 404 },
@@ -148,7 +148,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
         const mockedCustomer = getCustomer({
           id: mockedUser.customerId,
         });
-        const mockedProduct = getProduct();
+        const mockedProduct = getProduct({});
 
         const updateWorkspaceStorageSpy = jest.spyOn(usersService, 'updateWorkspaceStorage').mockResolvedValue();
         const initializeWorkspaceSpy = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
@@ -179,7 +179,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
       const mockedCustomer = getCustomer({
         id: mockedUser.customerId,
       });
-      const mockedProduct = getProduct();
+      const mockedProduct = getProduct({});
 
       await handleOldInvoiceCompletedFlow({
         config,
@@ -202,7 +202,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
       const mockedCustomer = getCustomer({
         id: mockedUser.customerId,
       });
-      const mockedProduct = getProduct();
+      const mockedProduct = getProduct({});
 
       (createOrUpdateUser as jest.Mock).mockRejectedValue(new Error('Failed to update user storage'));
 
@@ -228,7 +228,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
       const mockedCustomer = getCustomer({
         id: mockedUser.customerId,
       });
-      const mockedProduct = getProduct();
+      const mockedProduct = getProduct({});
 
       (updateUserTier as jest.Mock).mockRejectedValue(new Error('Failed to update user storage'));
 

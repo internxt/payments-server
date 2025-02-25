@@ -17,7 +17,7 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
   );
 }
 
-async function handleObjectStorageInvoiceCompleted(
+export async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
