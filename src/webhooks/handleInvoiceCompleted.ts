@@ -121,7 +121,9 @@ export default async function handleInvoiceCompleted(
 
   const email = customer.email ?? session.customer_email;
 
-  log.info('Searching for the user in the local DB or in Drive...');
+  log.info(
+    `Searching for the user with mail ${email} and customer Id ${customer.id} in the local DB or directly in Drive...`,
+  );
 
   try {
     user = await usersService.findUserByCustomerID(customer.id);
@@ -194,7 +196,7 @@ export default async function handleInvoiceCompleted(
     }
   }
 
-  log.info(`User with uuid: ${user.uuid} added/updated in the local DB`);
+  log.info(`User with uuid: ${user.uuid} added/updated in the local DB and available products also updated`);
 
   try {
     if (session.id) {
@@ -218,6 +220,7 @@ export default async function handleInvoiceCompleted(
 
   try {
     await cacheService.clearSubscription(customer.id);
+    log.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }
