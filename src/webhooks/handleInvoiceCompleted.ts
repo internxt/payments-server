@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import CacheService from '../services/cache.service';
 import { PaymentService, PriceMetadata } from '../services/payment.service';
@@ -17,12 +17,12 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
   );
 }
 
-async function handleObjectStorageInvoiceCompleted(
+export async function handleObjectStorageInvoiceCompleted(
   customer: Stripe.Customer,
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
 ) {
   if (invoice.lines.data.length !== 1) {
     log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
@@ -56,7 +56,7 @@ export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   usersService: UsersService,
   paymentService: PaymentService,
-  log: FastifyLoggerInstance,
+  log: FastifyBaseLogger,
   cacheService: CacheService,
   tiersService: TiersService,
   objectStorageService: ObjectStorageService,
@@ -75,8 +75,13 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id as string);
-  const price = items.data[0].price;
+  const items = await paymentService.getInvoiceLineItems(session.id);
+  const price = items.data?.[0].price;
+  if (!price) {
+    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
+    return;
+  }
+
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
@@ -84,11 +89,6 @@ export default async function handleInvoiceCompleted(
 
   if (isObjStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
-  }
-
-  if (!price) {
-    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
-    return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
@@ -176,7 +176,6 @@ export default async function handleInvoiceCompleted(
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
       const areDiscounts = items.data[0].discounts.length > 0;
-
       if (areDiscounts) {
         const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
