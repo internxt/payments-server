@@ -18,7 +18,7 @@ import {
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
-import { getCustomer, getInvoice, getUser, newTier } from '../../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
 import { StorageService } from '../../../../src/services/storage.service';
 
@@ -85,6 +85,9 @@ describe('Create or update user when after successful payment', () => {
       user: mockedUser,
       purchasedItem: mockedPurchasedItem,
       paymentService,
+      usersService,
+      logger: getLogger(),
+      isLifetimeCurrentSub: false,
       customer: mockedCustomer,
       tiersService,
     };
@@ -101,6 +104,7 @@ describe('Create or update user when after successful payment', () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
@@ -121,6 +125,7 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers and the second invoice has a product that is not mapped, then an error indicating so is thrown', async () => {
     const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
@@ -151,6 +156,7 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers, then it should update from that old tier to the new tier', async () => {
     const mockedOldTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedOldTier]);
     jest.spyOn(paymentService, 'getDriveInvoices').mockResolvedValue([
