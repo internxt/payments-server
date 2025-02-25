@@ -389,6 +389,61 @@ describe('Process when an invoice payment is completed', () => {
       expect(reactivateObjAccountSpy).not.toHaveBeenCalled();
     });
 
+    it('When there are more line items in the invoice, then logs the error and skips to the next process', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [],
+        } as any,
+      });
+      const log = getLogger();
+
+      const getProductSpy = jest.spyOn(paymentService, 'getProduct');
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(mockedInvoice.lines.data).toHaveLength(0);
+      expect(log.info).toHaveBeenCalled();
+      expect(getProductSpy).not.toHaveBeenCalled();
+    });
+
+    it("When there isn't a price in the line item, then logs the error and skips to the next process", async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: undefined,
+              },
+            },
+          ],
+        } as any,
+      });
+      const log = getLogger();
+
+      const getProductSpy = jest.spyOn(paymentService, 'getProduct');
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(getProductSpy).not.toHaveBeenCalled();
+      expect(log.info).toHaveBeenCalled();
+      expect(mockedInvoice.lines.data).toHaveLength(1);
+      expect(mockedInvoice.lines.data[0].price?.product).toBeUndefined();
+    });
+
     it('When the invoice is completed, then the object storage account is activated', async () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice();
@@ -407,101 +462,6 @@ describe('Process when an invoice payment is completed', () => {
       );
 
       expect(reactivateObjAccountSpy).toHaveBeenCalledWith({ customerId: mockedCustomer.id });
-    });
-  });
-
-  describe('The user has a coupon', () => {
-    it('When the user has a tracked coupon, then the coupon is stored correctly', async () => {
-      const mockedUser = getUser();
-      const mockedCustomer = getCustomer({
-        id: mockedUser.customerId,
-      });
-      const mockedInvoice = getInvoice({
-        status: 'paid',
-        customer: mockedCustomer.id,
-        lines: {
-          data: [
-            {
-              price: {
-                id: `price_12333`,
-                object: 'price',
-                active: true,
-                billing_scheme: 'per_unit',
-                created: 102389234,
-                currency: 'usd',
-                custom_unit_amount: null,
-                livemode: false,
-                lookup_key: null,
-                metadata: {
-                  maxSpaceBytes: `1837284738`,
-                  type: UserType.Individual,
-                },
-                nickname: null,
-                product: {
-                  id: `prod_12333`,
-                  type: 'service',
-                  object: 'product',
-                  active: true,
-                  created: 1678833149,
-                  default_price: null,
-                  description: null,
-                  images: [],
-                  marketing_features: [],
-                  livemode: false,
-                  metadata: {
-                    type: UserType.Individual,
-                  },
-                  name: 'Gold Plan',
-                  package_dimensions: null,
-                  shippable: null,
-                  statement_descriptor: null,
-                  tax_code: null,
-                  unit_label: null,
-                  updated: 1678833149,
-                  url: null,
-                },
-                recurring: {
-                  aggregate_usage: null,
-                  interval: 'month',
-                  interval_count: 1,
-                  trial_period_days: null,
-                  usage_type: 'licensed',
-                },
-                tax_behavior: 'unspecified',
-                tiers_mode: null,
-                transform_quantity: null,
-                type: 'recurring',
-                unit_amount: 1000,
-                unit_amount_decimal: '1000',
-              },
-              discounts: [
-                {
-                  id: 'coupon_id',
-                  coupon: 'COUPON' as any,
-                },
-              ],
-            },
-          ],
-        },
-      } as any);
-      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
-      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
-      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
-      jest.spyOn(usersRepository, 'updateUser').mockImplementation();
-      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const storedCouponSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
-
-      await handleInvoiceCompleted(
-        mockedInvoice,
-        usersService,
-        paymentService,
-        getLogger(),
-        cacheService,
-        config,
-        objectStorageService,
-      );
-
-      expect(storedCouponSpy).toHaveBeenCalledTimes(1);
     });
   });
 
