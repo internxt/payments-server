@@ -215,6 +215,45 @@ describe('Process when an invoice payment is completed', () => {
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
     });
+
+    it('When updating user executes successfully, it should be called once with correct parameters', async () => {
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+
+      const handleOldInvoiceCompletedFlowSpy = jest
+        .spyOn(require('../../../src/webhooks/utils/handleOldInvoiceCompletedFlow'), 'handleOldInvoiceCompletedFlow')
+        .mockResolvedValue(undefined);
+
+      const log = getLogger();
+
+      await handleInvoiceCompleted(
+        mockedInvoice,
+        usersService,
+        paymentService,
+        log,
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(handleOldInvoiceCompletedFlowSpy).toHaveBeenCalledTimes(1);
+      expect(handleOldInvoiceCompletedFlowSpy).toHaveBeenCalledWith({
+        config,
+        customer: mockedCustomer,
+        isBusinessPlan: false,
+        log,
+        maxSpaceBytes: mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes,
+        product: mockedInvoice.lines.data[0].price?.product,
+        subscriptionSeats: mockedInvoice.lines.data[0].quantity,
+        usersService,
+        userUuid: mockedUser.uuid,
+      });
+    });
   });
 
   describe('Invoice status', () => {
