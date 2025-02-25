@@ -129,6 +129,7 @@ describe('Process when an invoice payment is completed', () => {
       const mockedInvoice = getInvoice({ status: 'paid' });
       const mockedCustomer = getCustomer({ id: mockedUSer.customerId });
       jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUSer);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
       const updateUserSpy = jest.spyOn(usersService, 'updateUser');
 
@@ -157,8 +158,13 @@ describe('Process when an invoice payment is completed', () => {
         email: 'user@inxt.com',
       });
       const mockedInvoice = getInvoice({ status: 'paid' });
+      jest
+        .spyOn(usersService, 'findUserByEmail')
+        .mockResolvedValue({ data: { uuid: mockedUser.uuid, email: 'random@inxt.com' } });
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       (createOrUpdateUser as jest.Mock).mockResolvedValue(Promise.resolve({ data: { user: mockedUser } }));
+      (updateUserTier as jest.Mock).mockImplementation();
 
       const insertUserSpy = jest.spyOn(usersService, 'insertUser');
 
