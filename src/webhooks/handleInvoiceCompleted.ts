@@ -173,47 +173,48 @@ export default async function handleInvoiceCompleted(
       const err = error as Error;
       log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
       throw error;
-  }
+    }
 
-  try {
-    const { lifetime } = await usersService.findUserByCustomerID(customer.id);
-    const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
-    await usersService.updateUser(customer.id, {
-      lifetime: isLifetimeCurrentSub,
-    });
-  } catch {
-    await usersService.insertUser({
-      customerId: customer.id,
-      uuid: user.uuid,
-      lifetime: isLifetimePlan,
-    });
-  }
+    try {
+      const { lifetime } = await usersService.findUserByCustomerID(customer.id);
+      const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
+      await usersService.updateUser(customer.id, {
+        lifetime: isLifetimeCurrentSub,
+      });
+    } catch {
+      await usersService.insertUser({
+        customerId: customer.id,
+        uuid: user.uuid,
+        lifetime: isLifetimePlan,
+      });
+    }
 
-  log.info(`User with uuid: ${user.uuid} added/updated in the local DB`);
+    log.info(`User with uuid: ${user.uuid} added/updated in the local DB`);
 
-  try {
-    if (session.id) {
-      const userData = await usersService.findUserByUuid(user.uuid);
-      const areDiscounts = items.data[0].discounts.length > 0;
-      if (areDiscounts) {
-        const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
+    try {
+      if (session.id) {
+        const userData = await usersService.findUserByUuid(user.uuid);
+        const areDiscounts = items.data[0].discounts.length > 0;
+        if (areDiscounts) {
+          const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
-        if (coupon) {
-          await usersService.storeCouponUsedByUser(userData, coupon.id);
+          if (coupon) {
+            await usersService.storeCouponUsedByUser(userData, coupon.id);
+          }
         }
       }
+    } catch (err) {
+      const error = err as Error;
+      if (!(err instanceof CouponNotBeingTrackedError)) {
+        log.error(`Error while adding user ${user.uuid} and coupon: ${error.stack ?? error.message}`);
+        log.error(error);
+      }
     }
-  } catch (err) {
-    const error = err as Error;
-    if (!(err instanceof CouponNotBeingTrackedError)) {
-      log.error(`Error while adding user ${user.uuid} and coupon: ${error.stack ?? error.message}`);
-      log.error(error);
-    }
-  }
 
-  try {
-    await cacheService.clearSubscription(customer.id);
-  } catch (err) {
-    log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+    try {
+      await cacheService.clearSubscription(customer.id);
+    } catch (err) {
+      log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+    }
   }
 }
