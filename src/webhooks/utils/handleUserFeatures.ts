@@ -41,10 +41,7 @@ export const handleUserFeatures = async ({
   const newTierId = tier.id;
 
   try {
-    const existingUser = await usersService.findUserByUuid(user.uuid).catch(() => null);
-    if (!existingUser) {
-      throw new UserNotFoundError();
-    }
+    const existingUser = await usersService.findUserByUuid(user.uuid);
 
     const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
