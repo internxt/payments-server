@@ -1,13 +1,13 @@
 /* eslint-disable max-len */
-import { FastifyBaseLogger } from 'fastify';
+import { FastifyLoggerInstance } from 'fastify';
 import Stripe from 'stripe';
 import { type AppConfig } from '../config';
 import CacheService from '../services/cache.service';
 import { PaymentService, PriceMetadata } from '../services/payment.service';
+import { createOrUpdateUser, updateUserTier } from '../services/storage.service';
 import { CouponNotBeingTrackedError, UsersService } from '../services/users.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UserType } from '../core/users/User';
-import { handleOldInvoiceCompletedFlow } from './utils/handleOldInvoiceCompletedFlow';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -22,7 +22,7 @@ async function handleObjectStorageInvoiceCompleted(
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  log: FastifyBaseLogger,
+  log: FastifyLoggerInstance,
 ) {
   if (invoice.lines.data.length !== 1) {
     log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
@@ -56,7 +56,7 @@ export default async function handleInvoiceCompleted(
   session: Stripe.Invoice,
   usersService: UsersService,
   paymentService: PaymentService,
-  log: FastifyBaseLogger,
+  log: FastifyLoggerInstance,
   cacheService: CacheService,
   config: AppConfig,
   objectStorageService: ObjectStorageService,
@@ -75,7 +75,7 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id);
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
   const price = items.data[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
@@ -117,36 +117,44 @@ export default async function handleInvoiceCompleted(
     );
   }
 
-  const email = customer.email ?? session.customer_email;
+  if (isBusinessPlan) {
+    const email = customer.email ?? session.customer_email;
 
-  try {
-    user = await usersService.findUserByCustomerID(customer.id);
-  } catch (err) {
-    if (email) {
-      const response = await usersService.findUserByEmail(email);
-      user = response.data;
-    } else {
-      log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
+    try {
+      user = await usersService.findUserByCustomerID(customer.id);
+    } catch (err) {
+      if (email) {
+        const response = await usersService.findUserByEmail(email);
+        user = response.data;
+      } else {
+        log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
+        log.error(err);
+        throw err;
+      }
+    }
+  } else {
+    try {
+      const res = await createOrUpdateUser(maxSpaceBytes, customer.email as string, config);
+      user = res.data.user;
+    } catch (err) {
+      log.error(
+        `Error while creating or updating user in checkout session completed handler, email: ${session.customer_email}`,
+      );
       log.error(err);
+
       throw err;
     }
-  }
 
-  try {
-    await handleOldInvoiceCompletedFlow({
-      config,
-      customer,
-      isBusinessPlan,
-      log,
-      maxSpaceBytes,
-      product,
-      subscriptionSeats: items.data[0].quantity,
-      usersService,
-      userUuid: user.uuid,
-    });
-  } catch (error) {
-    const err = error as Error;
-    log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
+    if (user) {
+      try {
+        await updateUserTier(user.uuid, product.id, config);
+      } catch (err) {
+        log.error(`Error while updating user tier: email: ${session.customer_email}, planId: ${product.id} `);
+        log.error(err);
+
+        throw err;
+      }
+    }
   }
 
   try {
@@ -181,6 +189,43 @@ export default async function handleInvoiceCompleted(
     if (!(err instanceof CouponNotBeingTrackedError)) {
       log.error(`Error while adding user ${user.uuid} and coupon: ${error.stack ?? error.message}`);
       log.error(error);
+    }
+  }
+
+  if (isBusinessPlan) {
+    const amountOfSeats = items.data[0].quantity;
+    if (!amountOfSeats) return;
+
+    const address = customer.address?.line1 ?? undefined;
+    const phoneNumber = customer.phone ?? undefined;
+
+    try {
+      await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), amountOfSeats);
+      log.info(
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } HAS BEEN UPDATED HIS WORKSPACE`,
+      );
+    } catch (err) {
+      const error = err as Error;
+      const statusCode = (err as any)?.response.status;
+
+      if (!statusCode || statusCode !== 404) {
+        log.error(`[ERROR UPDATING WORKSPACE]: ${error.stack ?? error.message}`);
+        throw err;
+      }
+
+      log.info(
+        `USER WITH CUSTOMER ID: ${customer.id} - UUID: ${user.uuid} - EMAIL: ${
+          customer.email ?? session.customer_email
+        } DOES NOT HAVE ANY WORKSPACE TO UPDATE, CREATING A NEW ONE`,
+      );
+      await usersService.initializeWorkspace(user.uuid, {
+        newStorageBytes: Number(maxSpaceBytes),
+        seats: amountOfSeats,
+        address,
+        phoneNumber,
+      });
     }
   }
 
