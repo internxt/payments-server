@@ -75,7 +75,7 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id as string);
+  const items = await paymentService.getInvoiceLineItems(session.id);
   const price = items.data?.[0].price;
   if (!price) {
     log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
@@ -168,7 +168,6 @@ export default async function handleInvoiceCompleted(
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
       const areDiscounts = items.data[0].discounts.length > 0;
-
       if (areDiscounts) {
         const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
