@@ -566,8 +566,7 @@ describe('Process when an invoice payment is completed', () => {
               },
               discounts: [
                 {
-                  id: 'coupon_id',
-                  coupon: 'COUPON' as any,
+                  coupon: { id: 'coupon_id' },
                 },
               ],
             },
@@ -591,7 +590,7 @@ describe('Process when an invoice payment is completed', () => {
         objectStorageService,
       );
 
-      expect(storedCouponSpy).toHaveBeenCalledTimes(1);
+      expect(storedCouponSpy).toHaveBeenCalledWith(mockedUser, 'coupon_id');
     });
   });
 });
