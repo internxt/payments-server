@@ -105,6 +105,8 @@ describe('Process when an invoice payment is completed', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
   it('When the invoice is not paid, then log a message and stop processing', async () => {
     const mockedInvoice = getInvoice({ status: 'open' });
     const log = getLogger();
@@ -262,6 +264,39 @@ describe('Process when an invoice payment is completed', () => {
         usersService,
         userUuid: mockedUser.uuid,
       });
+    });
+
+    it('When there is an error while updating user, then an error indicating so is thrown', async () => {
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const randomError = new Error('Something went wrong');
+      const log = getLogger();
+
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+
+      const handleOldInvoiceSpy = jest
+        .spyOn(require('../../../src/webhooks/utils/handleOldInvoiceCompletedFlow'), 'handleOldInvoiceCompletedFlow')
+        .mockRejectedValue(randomError);
+
+      const logErrorSpy = jest.spyOn(log, 'error').mockImplementation();
+
+      await expect(
+        handleInvoiceCompleted(
+          mockedInvoice,
+          usersService,
+          paymentService,
+          log,
+          cacheService,
+          config,
+          objectStorageService,
+        ),
+      ).rejects.toThrow(randomError);
+
+      expect(handleOldInvoiceSpy).toHaveBeenCalled();
+      expect(logErrorSpy).toHaveBeenCalledWith(expect.stringContaining('ERROR APPLYING USER FEATURES'));
     });
   });
 
