@@ -85,10 +85,6 @@ export default async function handleSubscriptionCanceled(
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
-  if (productType === UserType.Business) {
-    return usersService.destroyWorkspace(uuid);
-  }
-
   if (hasBoughtALifetime) {
     // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
     // The space should not be set to Free plan.
