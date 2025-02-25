@@ -76,7 +76,7 @@ export default async function handleInvoiceCompleted(
   }
 
   const items = await paymentService.getInvoiceLineItems(session.id);
-  const price = items.data[0].price;
+  const price = items.data?.[0].price;
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
