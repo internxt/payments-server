@@ -77,6 +77,12 @@ export default async function handleInvoiceCompleted(
 
   const items = await paymentService.getInvoiceLineItems(session.id);
   const price = items.data?.[0].price;
+
+  if (!price) {
+    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
+    return;
+  }
+
   const product = price?.product as Stripe.Product;
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
@@ -84,11 +90,6 @@ export default async function handleInvoiceCompleted(
 
   if (isObjStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
-  }
-
-  if (!price) {
-    log.error(`Invoice completed does not contain price, customer: ${session.customer_email}`);
-    return;
   }
 
   if (!price.metadata.maxSpaceBytes) {

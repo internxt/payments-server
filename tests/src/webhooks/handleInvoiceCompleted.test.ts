@@ -14,7 +14,7 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import CacheService from '../../../src/services/cache.service';
 import handleInvoiceCompleted from '../../../src/webhooks/handleInvoiceCompleted';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
-import { getCustomer, getLogger, getUser } from '../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser } from '../fixtures';
 
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -202,6 +202,77 @@ describe('Process when an invoice payment is completed', () => {
       expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Invoice status', () => {
+    it('When the invoice is not paid, then log a message and take no action', async () => {
+      const fakeInvoiceCompletedSession = { status: 'open' } as unknown as Stripe.Invoice;
+      jest.spyOn(paymentService, 'getCustomer');
+
+      await handleInvoiceCompleted(
+        fakeInvoiceCompletedSession,
+        usersService,
+        paymentService,
+        getLogger(),
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(paymentService.getCustomer).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe('Customer cases', () => {
+    it('When the customer is marked as deleted, then log an error and stop processing', async () => {
+      const fakeInvoiceCompletedSession = { status: 'paid' } as unknown as Stripe.Invoice;
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: true, customer: user.customerId } as any);
+      jest.spyOn(paymentService, 'getInvoiceLineItems');
+
+      await handleInvoiceCompleted(
+        fakeInvoiceCompletedSession,
+        usersService,
+        paymentService,
+        getLogger(),
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
+      expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe('Invoice details', () => {
+    it('When the invoice lacks price or product details, then an error indicating so is thrown', async () => {
+      const fakeInvoiceCompletedSession = { status: 'paid' } as unknown as Stripe.Invoice;
+      const mockedInvoice = getInvoice({
+        lines: {} as any,
+      });
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(user);
+      const getCustomerSpy = jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue({ deleted: false, customer: user.customerId } as any);
+      const getInvoiceItemsSpy = jest
+        .spyOn(paymentService, 'getInvoiceLineItems')
+        .mockResolvedValue(mockedInvoice.lines as any);
+      const getActiveSubscriptionsSpy = jest.spyOn(paymentService, 'getActiveSubscriptions');
+
+      await handleInvoiceCompleted(
+        fakeInvoiceCompletedSession,
+        usersService,
+        paymentService,
+        getLogger(),
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(getCustomerSpy).toHaveBeenCalledTimes(1);
+      expect(getInvoiceItemsSpy).toHaveBeenCalledTimes(1);
+      expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(0);
     });
   });
 });
