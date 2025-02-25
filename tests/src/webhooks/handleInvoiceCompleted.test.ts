@@ -69,10 +69,6 @@ let stripe: Stripe;
 let objectStorageService: ObjectStorageService;
 let user: ReturnType<typeof getUser>;
 
-const fakeInvoiceCompletedSession = {
-  status: 'paid',
-} as unknown as Stripe.Invoice;
-
 describe('Process when an invoice payment is completed', () => {
   beforeEach(() => {
     user = getUser({ lifetime: true });
@@ -101,24 +97,15 @@ describe('Process when an invoice payment is completed', () => {
     objectStorageService = new ObjectStorageService(paymentService, config, axios);
 
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: false, customer: user.customerId } as any);
-    jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue({
-      data: [
-        {
-          price: {
-            metadata: {
-              maxSpaceBytes: 10,
-            },
-            product: {},
-          },
-        },
-      ],
-    } as any);
+
     jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([] as ExtendedSubscription[]);
     (createOrUpdateUser as jest.Mock).mockResolvedValue(Promise.resolve({ data: { user } }));
     (updateUserTier as jest.Mock).mockResolvedValue(Promise.resolve());
 
     jest.clearAllMocks();
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('When the invoice is not paid, then log a message and stop processing', async () => {
     const mockedInvoice = getInvoice({ status: 'open' });
@@ -141,13 +128,15 @@ describe('Process when an invoice payment is completed', () => {
   describe('User update', () => {
     it('When the user exists, then update their information as needed', async () => {
       const mockedUSer = getUser();
+      const mockedInvoice = getInvoice({ status: 'paid' });
       const mockedCustomer = getCustomer({ id: mockedUSer.customerId });
       jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUSer);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
       const updateUserSpy = jest.spyOn(usersService, 'updateUser');
 
       await handleInvoiceCompleted(
-        fakeInvoiceCompletedSession,
+        mockedInvoice,
         usersService,
         paymentService,
         getLogger(),
@@ -170,13 +159,19 @@ describe('Process when an invoice payment is completed', () => {
         id: mockedUser.customerId,
         email: 'user@inxt.com',
       });
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      jest
+        .spyOn(usersService, 'findUserByEmail')
+        .mockResolvedValue({ data: { uuid: mockedUser.uuid, email: 'random@inxt.com' } });
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       (createOrUpdateUser as jest.Mock).mockResolvedValue(Promise.resolve({ data: { user: mockedUser } }));
+      (updateUserTier as jest.Mock).mockImplementation();
 
       const insertUserSpy = jest.spyOn(usersService, 'insertUser');
 
       await handleInvoiceCompleted(
-        fakeInvoiceCompletedSession,
+        mockedInvoice,
         usersService,
         paymentService,
         getLogger(),
@@ -201,7 +196,9 @@ describe('Process when an invoice payment is completed', () => {
     it('When creating the user fails, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({ status: 'paid' });
       const userNotFoundError = new UserNotFoundError('User has been not found');
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       const insertUserError = new Error('Error while inserting the user');
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
       jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(userNotFoundError);
@@ -213,7 +210,7 @@ describe('Process when an invoice payment is completed', () => {
 
       await expect(
         handleInvoiceCompleted(
-          fakeInvoiceCompletedSession,
+          mockedInvoice,
           usersService,
           paymentService,
           getLogger(),
@@ -228,6 +225,78 @@ describe('Process when an invoice payment is completed', () => {
       expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('When updating user executes successfully, it should be called once with correct parameters', async () => {
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+
+      const handleOldInvoiceCompletedFlowSpy = jest
+        .spyOn(require('../../../src/webhooks/utils/handleOldInvoiceCompletedFlow'), 'handleOldInvoiceCompletedFlow')
+        .mockResolvedValue(undefined);
+
+      const log = getLogger();
+
+      await handleInvoiceCompleted(
+        mockedInvoice,
+        usersService,
+        paymentService,
+        log,
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(handleOldInvoiceCompletedFlowSpy).toHaveBeenCalledTimes(1);
+      expect(handleOldInvoiceCompletedFlowSpy).toHaveBeenCalledWith({
+        config,
+        customer: mockedCustomer,
+        isBusinessPlan: false,
+        log,
+        maxSpaceBytes: mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes,
+        product: mockedInvoice.lines.data[0].price?.product,
+        subscriptionSeats: mockedInvoice.lines.data[0].quantity,
+        usersService,
+        userUuid: mockedUser.uuid,
+      });
+    });
+
+    it('When there is an error while updating user, then an error indicating so is thrown', async () => {
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const randomError = new Error('Something went wrong');
+      const log = getLogger();
+
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+
+      const handleOldInvoiceSpy = jest
+        .spyOn(require('../../../src/webhooks/utils/handleOldInvoiceCompletedFlow'), 'handleOldInvoiceCompletedFlow')
+        .mockRejectedValue(randomError);
+
+      const logErrorSpy = jest.spyOn(log, 'error').mockImplementation();
+
+      await expect(
+        handleInvoiceCompleted(
+          mockedInvoice,
+          usersService,
+          paymentService,
+          log,
+          cacheService,
+          config,
+          objectStorageService,
+        ),
+      ).rejects.toThrow(randomError);
+
+      expect(handleOldInvoiceSpy).toHaveBeenCalled();
+      expect(logErrorSpy).toHaveBeenCalledWith(expect.stringContaining('ERROR APPLYING USER FEATURES'));
     });
   });
 
@@ -355,6 +424,61 @@ describe('Process when an invoice payment is completed', () => {
       expect(reactivateObjAccountSpy).not.toHaveBeenCalled();
     });
 
+    it('When there are more line items in the invoice, then logs the error and skips to the next process', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [],
+        } as any,
+      });
+      const log = getLogger();
+
+      const getProductSpy = jest.spyOn(paymentService, 'getProduct');
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(mockedInvoice.lines.data).toHaveLength(0);
+      expect(log.info).toHaveBeenCalled();
+      expect(getProductSpy).not.toHaveBeenCalled();
+    });
+
+    it("When there isn't a price in the line item, then logs the error and skips to the next process", async () => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: undefined,
+              },
+            },
+          ],
+        } as any,
+      });
+      const log = getLogger();
+
+      const getProductSpy = jest.spyOn(paymentService, 'getProduct');
+
+      await handleObjectStorageInvoiceCompleted(
+        mockedCustomer,
+        mockedInvoice,
+        objectStorageService,
+        paymentService,
+        log,
+      );
+
+      expect(getProductSpy).not.toHaveBeenCalled();
+      expect(log.info).toHaveBeenCalled();
+      expect(mockedInvoice.lines.data).toHaveLength(1);
+      expect(mockedInvoice.lines.data[0].price?.product).toBeUndefined();
+    });
+
     it('When the invoice is completed, then the object storage account is activated', async () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice();
@@ -373,6 +497,100 @@ describe('Process when an invoice payment is completed', () => {
       );
 
       expect(reactivateObjAccountSpy).toHaveBeenCalledWith({ customerId: mockedCustomer.id });
+    });
+  });
+
+  describe('The user has a coupon', () => {
+    it('When the user has a tracked coupon, then the coupon is stored correctly', async () => {
+      const mockedUser = getUser();
+      const mockedCustomer = getCustomer({
+        id: mockedUser.customerId,
+      });
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+        customer: mockedCustomer.id,
+        lines: {
+          data: [
+            {
+              price: {
+                id: `price_12333`,
+                object: 'price',
+                active: true,
+                billing_scheme: 'per_unit',
+                created: 102389234,
+                currency: 'usd',
+                custom_unit_amount: null,
+                livemode: false,
+                lookup_key: null,
+                metadata: {
+                  maxSpaceBytes: `1837284738`,
+                  type: UserType.Individual,
+                },
+                nickname: null,
+                product: {
+                  id: `prod_12333`,
+                  type: 'service',
+                  object: 'product',
+                  active: true,
+                  created: 1678833149,
+                  default_price: null,
+                  description: null,
+                  images: [],
+                  marketing_features: [],
+                  livemode: false,
+                  metadata: {
+                    type: UserType.Individual,
+                  },
+                  name: 'Gold Plan',
+                  package_dimensions: null,
+                  shippable: null,
+                  statement_descriptor: null,
+                  tax_code: null,
+                  unit_label: null,
+                  updated: 1678833149,
+                  url: null,
+                },
+                recurring: {
+                  aggregate_usage: null,
+                  interval: 'month',
+                  interval_count: 1,
+                  trial_period_days: null,
+                  usage_type: 'licensed',
+                },
+                tax_behavior: 'unspecified',
+                tiers_mode: null,
+                transform_quantity: null,
+                type: 'recurring',
+                unit_amount: 1000,
+                unit_amount_decimal: '1000',
+              },
+              discounts: [
+                {
+                  coupon: { id: 'coupon_id' },
+                },
+              ],
+            },
+          ],
+        },
+      } as any);
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(usersRepository, 'updateUser').mockImplementation();
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storedCouponSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      await handleInvoiceCompleted(
+        mockedInvoice,
+        usersService,
+        paymentService,
+        getLogger(),
+        cacheService,
+        config,
+        objectStorageService,
+      );
+
+      expect(storedCouponSpy).toHaveBeenCalledWith(mockedUser, 'coupon_id');
     });
   });
 });
