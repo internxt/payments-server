@@ -49,6 +49,12 @@ export const handleUserFeatures = async ({
     const existingTiersForUser = await tiersService.getTiersProductsByUserId(existingUser.id);
     const userInvoices = await paymentService.getDriveInvoices(customer.id, {}, userType);
     const [, latestInvoice] = userInvoices;
+    if (userInvoices.length === 0 || !latestInvoice) {
+      logger.error(
+        `There are no invoices for this user, should be created -> customer id: ${customer.id}, tierId: ${tier.id}`,
+      );
+      throw new TierNotFoundError('Invoices with Tier not found');
+    }
 
     if (latestInvoice) {
       const oldProductId = latestInvoice.product as string;
@@ -74,7 +80,11 @@ export const handleUserFeatures = async ({
       return;
     }
   } catch (error) {
-    if (!(error instanceof TierNotFoundError) && !(error instanceof UserNotFoundError)) {
+    if (
+      !(error instanceof TierNotFoundError) &&
+      !(error instanceof UserNotFoundError) &&
+      !(error instanceof InvoiceNotFoundError)
+    ) {
       throw error;
     }
 
@@ -95,7 +105,7 @@ export const handleUserFeatures = async ({
       return;
     }
 
-    if (error instanceof TierNotFoundError) {
+    if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
       logger.warn(`TierNotFoundError -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
 
