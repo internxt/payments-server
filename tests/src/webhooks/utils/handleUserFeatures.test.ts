@@ -10,11 +10,7 @@ import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
 import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
 import { UserNotFoundError, UsersService } from '../../../../src/services/users.service';
-import {
-  handleUserFeatures,
-  HandleUserFeaturesProps,
-  InvoiceNotFoundError,
-} from '../../../../src/webhooks/utils/handleUserFeatures';
+import { handleUserFeatures, HandleUserFeaturesProps } from '../../../../src/webhooks/utils/handleUserFeatures';
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import axios from 'axios';
@@ -127,7 +123,7 @@ describe('Create or update user when after successful payment', () => {
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
-  it('when the user has existing tiers and the second invoice has a product that is not mapped, then an error indicating so is thrown', async () => {
+  it('when the user has existing tiers and the second invoice has a product that is not mapped (old subscription), then the user-tier relationship is saved and the tier is applied', async () => {
     const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
     jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -148,18 +144,23 @@ describe('Create or update user when after successful payment', () => {
       },
     ]);
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
-    const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
+    const spyUpdateUser = jest.spyOn(usersService, 'updateUser');
     const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
 
-    await expect(handleUserFeatures(defaultProps)).rejects.toThrow(InvoiceNotFoundError);
+    await handleUserFeatures(defaultProps);
 
     expect(getTierProductsSPy).toHaveBeenCalledWith(
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
       mockedTier.billingType,
     );
-    expect(spyInsert).toHaveBeenCalledTimes(0);
-    expect(spyApplyTier).not.toHaveBeenCalled();
-    expect(spyUpdate).not.toHaveBeenCalled();
+    expect(spyApplyTier).toHaveBeenCalledWith(
+      mockedUser,
+      mockedCustomer,
+      mockedPurchasedItem,
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+    );
+    expect(spyUpdateUser).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
+    expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 
   it('when the user has existing tiers, then it should update from that old tier to the new tier', async () => {
