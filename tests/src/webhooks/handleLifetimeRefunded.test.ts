@@ -172,4 +172,28 @@ describe('Process when a lifetime is refunded', () => {
     expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
     expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
   });
+
+  it('When the cancellation of a subscription that has a Tier is requested and a random error occur, then an error indicating so is thrown', async () => {
+    const randomError = new Error('Tier not found');
+    const mockedUser = getUser();
+    const mockedCharge = getCharge();
+    const mockedInvoiceLineItems = getInvoice().lines;
+
+    jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoiceLineItems as any);
+    jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    (handleCancelPlan as jest.Mock).mockRejectedValue(randomError);
+
+    await expect(
+      handleLifetimeRefunded(
+        storageService,
+        usersService,
+        mockedCharge,
+        cacheService,
+        paymentService,
+        logger,
+        tiersService,
+        config,
+      ),
+    ).rejects.toThrow(randomError);
+  });
 });

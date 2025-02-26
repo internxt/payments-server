@@ -4,6 +4,7 @@ import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
+import { Tier } from '../../core/users/Tier';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
@@ -36,8 +37,8 @@ export const handleUserFeatures = async ({
   const product = purchasedItem.price?.product as Stripe.Product;
   const isBusinessPlan = product.metadata.type === UserType.Business;
   const userType = isBusinessPlan ? UserType.Business : UserType.Individual;
-
-  const tier = await tiersService.getTierProductsByProductsId(product.id);
+  const tierBillingType: Tier['billingType'] = isLifetimeCurrentSub ? 'lifetime' : 'subscription';
+  const tier = await tiersService.getTierProductsByProductsId(product.id, tierBillingType);
   const newTierId = tier.id;
 
   try {
