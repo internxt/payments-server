@@ -8,8 +8,6 @@ import { PaymentService } from '../services/payment.service';
 import { AppConfig } from '../config';
 import Stripe from 'stripe';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { handleCancelPlan } from './utils/handleCancelPlan';
-import { TierNotFoundError, TiersService } from '../services/tiers.service';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -50,19 +48,12 @@ export default async function handleSubscriptionCanceled(
   subscription: Stripe.Subscription,
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
-  tiersService: TiersService,
   log: FastifyBaseLogger,
   config: AppConfig,
 ): Promise<void> {
-  let email: string | null = '';
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
-  const customer = await paymentService.getCustomer(customerId);
-
-  if (!customer.deleted) {
-    email = customer.email;
-  }
 
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(
@@ -85,6 +76,10 @@ export default async function handleSubscriptionCanceled(
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
+  if (productType === UserType.Business) {
+    return usersService.destroyWorkspace(uuid);
+  }
+
   if (hasBoughtALifetime) {
     // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
     // The space should not be set to Free plan.
@@ -92,26 +87,11 @@ export default async function handleSubscriptionCanceled(
   }
 
   try {
-    await handleCancelPlan({
-      customerId,
-      customerEmail: email ?? '',
-      productId,
-      usersService,
-      tiersService,
-      log,
-    });
-  } catch (error) {
-    if (!(error instanceof TierNotFoundError)) {
-      throw error;
-    }
-
-    try {
-      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    } catch (err) {
-      log.error(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `);
-      log.error(err);
-    }
-
-    return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
+    await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
+  } catch (err) {
+    log.error(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `);
+    log.error(err);
   }
+
+  return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
 }
