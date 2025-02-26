@@ -73,8 +73,7 @@ export const handleOldInvoiceCompletedFlow = async ({
   try {
     await updateUserTier(userUuid, product.id, config);
   } catch (err) {
-    log.error(`Error while updating user tier: email: ${customer.email}, planId: ${product.id} `);
-    log.error(err);
+    log.error(`Error while updating user tier: email: ${customer.email}, planId: ${product.id}. ERROR: ${err} `);
 
     throw err;
   }
