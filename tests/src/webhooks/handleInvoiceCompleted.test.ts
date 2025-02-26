@@ -294,12 +294,14 @@ describe('Process when an invoice payment is completed', () => {
 
   describe('Customer cases', () => {
     it('When the customer is marked as deleted, then log an error and stop processing', async () => {
-      const fakeInvoiceCompletedSession = { status: 'paid' } as unknown as Stripe.Invoice;
-      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: true, customer: user.customerId } as any);
+      const mockedInvoice = getInvoice({ status: 'paid' });
+      const getCustomerSpy = jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue({ deleted: true, customer: user.customerId } as any);
       jest.spyOn(paymentService, 'getInvoiceLineItems');
 
       await handleInvoiceCompleted(
-        fakeInvoiceCompletedSession,
+        mockedInvoice,
         usersService,
         paymentService,
         getLogger(),
@@ -308,7 +310,7 @@ describe('Process when an invoice payment is completed', () => {
         objectStorageService,
       );
 
-      expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
+      expect(getCustomerSpy).toHaveBeenCalledWith(mockedInvoice.customer as string);
       expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(0);
     });
   });
