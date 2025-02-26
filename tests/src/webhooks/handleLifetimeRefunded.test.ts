@@ -9,8 +9,8 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import CacheService from '../../../src/services/cache.service';
 import { PaymentService } from '../../../src/services/payment.service';
-import { StorageService } from '../../../src/services/storage.service';
-import { TiersService } from '../../../src/services/tiers.service';
+import { StorageService, updateUserTier } from '../../../src/services/storage.service';
+import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import { UsersService } from '../../../src/services/users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { getCharge, getInvoice, getLogger, getUser } from '../fixtures';
@@ -20,6 +20,7 @@ import axios from 'axios';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
+import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 
 jest.mock('stripe', () => {
   return {
@@ -137,5 +138,38 @@ describe('Process when a lifetime is refunded', () => {
       tiersService,
       log: logger,
     });
+  });
+
+  it('When the cancellation of a subscription that does not have a Tier is requested, then should cancel it using the old way', async () => {
+    const tierNotFoundError = new TierNotFoundError('Tier not found');
+    const mockedUser = getUser();
+    const mockedCharge = getCharge();
+    const mockedInvoiceLineItems = getInvoice().lines;
+
+    const getInvoiceLineItemsSpy = jest
+      .spyOn(paymentService, 'getInvoiceLineItems')
+      .mockResolvedValue(mockedInvoiceLineItems as any);
+    const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+    const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation();
+    (handleCancelPlan as jest.Mock).mockRejectedValue(tierNotFoundError);
+
+    await handleLifetimeRefunded(
+      storageService,
+      usersService,
+      mockedCharge,
+      cacheService,
+      paymentService,
+      logger,
+      tiersService,
+      config,
+    );
+
+    expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
+    expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedCharge.invoice);
+    expect(handleCancelPlan).rejects.toThrow(tierNotFoundError);
+    expect(updateUserSpy).toHaveBeenCalledWith(mockedCharge.customer, { lifetime: false });
+    expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
+    expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
   });
 });
