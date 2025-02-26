@@ -30,7 +30,7 @@ describe('Testing the tier collection', () => {
   });
 
   it('when a tier is searched by a non-existing productId, then it should return null', async () => {
-    const result = await repository.findByProductId('non-existent');
+    const result = await repository.findByProductId({ productId: 'non-existent' });
     expect(result).toBeNull();
   });
 
@@ -39,7 +39,7 @@ describe('Testing the tier collection', () => {
     const mockTier: Omit<Tier, 'id'> = newTier();
     const insertResult = await collection.insertOne(mockTier);
 
-    const foundTier = await repository.findByProductId(mockTier.productId);
+    const foundTier = await repository.findByProductId({ productId: mockTier.productId });
 
     expect(foundTier).not.toBeNull();
     expect(foundTier?.id).toBe(insertResult.insertedId.toString());
@@ -53,7 +53,10 @@ describe('Testing the tier collection', () => {
     const mockTier: Omit<Tier, 'id'> = newTier({ billingType: 'lifetime' });
     const insertResult = await collection.insertOne(mockTier);
 
-    const foundTier = await repository.findByProductId(mockTier.productId, mockTier.billingType);
+    const foundTier = await repository.findByProductId({
+      productId: mockTier.productId,
+      billingType: mockTier.billingType,
+    });
 
     expect(foundTier).not.toBeNull();
     expect(foundTier?.id).toBe(insertResult.insertedId.toString());
