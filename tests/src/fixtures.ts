@@ -770,7 +770,7 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
       },
       type: 'card',
     },
-    receipt_email: null,
+    receipt_email: 'example@inxt.com',
     receipt_number: null,
     receipt_url:
       'https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xTTJKVGtMa2RJd0h1N2l4KOvG06AGMgZfBXyr1aw6LBa9vaaSRWU96d8qBwz9z2J_CObiV_H2-e8RezSK_sw0KISesp4czsOUlVKY',

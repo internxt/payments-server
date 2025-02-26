@@ -16,6 +16,9 @@ import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
 import { FastifyBaseLogger } from 'fastify';
+import { TiersService } from '../../../src/services/tiers.service';
+import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded');
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
@@ -51,6 +54,9 @@ let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
+let tiersService: TiersService;
+let tiersRepository: TiersRepository;
+let usersTiersRepository: UsersTiersRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
 let cacheService: CacheService;
@@ -67,12 +73,22 @@ describe('handleDisputeResult()', () => {
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
     productsRepository = testFactory.getProductsRepositoryForTest();
+    tiersRepository = testFactory.getTiersRepository();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
 
     cacheService = new CacheService(config);
     storageService = new StorageService(config, axios);
     bit2MeService = new Bit2MeService(config, axios);
     paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
 
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      config,
+    );
     usersService = new UsersService(
       usersRepository,
       paymentService,
@@ -103,7 +119,7 @@ describe('handleDisputeResult()', () => {
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        dispute: mockedDispute,
         cacheService,
         config,
         paymentService,
@@ -111,6 +127,7 @@ describe('handleDisputeResult()', () => {
         stripe,
         storageService,
         log: logger,
+        tiersService,
       });
 
       expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
@@ -142,7 +159,8 @@ describe('handleDisputeResult()', () => {
       jest.spyOn(axios, 'request').mockImplementation(voidPromise);
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        dispute: mockedDispute,
+        tiersService,
         cacheService,
         config,
         paymentService,
@@ -158,9 +176,11 @@ describe('handleDisputeResult()', () => {
       expect(handleLifetimeRefunded).toHaveBeenCalledWith(
         storageService,
         usersService,
-        mockedCharge.customer,
+        mockedCharge,
         cacheService,
+        paymentService,
         logger,
+        tiersService,
         config,
       );
     });
@@ -190,7 +210,8 @@ describe('handleDisputeResult()', () => {
       jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
       await handleDisputeResult({
-        charge: mockedDispute,
+        dispute: mockedDispute,
+        tiersService,
         cacheService,
         config,
         paymentService,
