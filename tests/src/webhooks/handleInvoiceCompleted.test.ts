@@ -307,7 +307,7 @@ describe('Process when an invoice payment is completed', () => {
           paymentService,
           log,
           cacheService,
-          config,
+          tiersService,
           objectStorageService,
         ),
       ).rejects.toThrow(randomError);
