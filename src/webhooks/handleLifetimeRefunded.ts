@@ -51,8 +51,8 @@ export default async function handleLifetimeRefunded(
     try {
       await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
     } catch (err) {
-      log.error(`Error while updating user tier: uuid: ${uuid} `);
-      log.error(err);
+      const error = err as Error;
+      log.error(`Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `);
       throw err;
     }
 
