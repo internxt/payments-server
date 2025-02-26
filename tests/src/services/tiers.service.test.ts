@@ -206,7 +206,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('Get tier products using the product id', () => {
+  describe('Get tier products using the product id and/or billing type', () => {
     it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
       const { id: productId } = newTier();
 
@@ -223,7 +223,21 @@ describe('TiersService tests', () => {
       const result = await tiersService.getTierProductsByProductsId(tier.productId);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId, undefined);
+    });
+
+    it('When the requested tier exists and the billing type is lifetime, then it returns the tier object', async () => {
+      const tierBillingType = 'lifetime';
+      const tier = newTier({
+        billingType: tierBillingType,
+      });
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByProductsId(tier.productId, tierBillingType);
+
+      expect(result).toStrictEqual(tier);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId, tierBillingType);
     });
   });
 
