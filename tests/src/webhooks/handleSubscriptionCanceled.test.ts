@@ -173,4 +173,31 @@ describe('Process when a subscription is cancelled', () => {
     expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
     expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
   });
+
+  it('When the cancellation of a subscription has a Tier but an unknown error occurs, then an error indicating so is thrown', async () => {
+    const mockedUser = getUser();
+    const mockedSubscription = getCreatedSubscription();
+    const mockedProduct = getProduct({});
+    const mockedCustomer = getCustomer();
+    const randomError = new Error('Tier not found');
+
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
+    jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+    jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    (handleCancelPlan as jest.Mock).mockRejectedValue(randomError);
+
+    await expect(
+      handleSubscriptionCanceled(
+        storageService,
+        usersService,
+        paymentService,
+        mockedSubscription,
+        cacheService,
+        objectStorageService,
+        tiersService,
+        logger,
+        config,
+      ),
+    ).rejects.toThrow(randomError);
+  });
 });
