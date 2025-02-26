@@ -48,6 +48,21 @@ describe('Testing the tier collection', () => {
     expect(foundTier?.featuresPerService).toStrictEqual(mockTier.featuresPerService);
   });
 
+  it('when a tier is searched by the product Id and billing type, then it should be found and match the inserted data', async () => {
+    const collection = (repository as any).collection;
+    const mockTier: Omit<Tier, 'id'> = newTier({ billingType: 'lifetime' });
+    const insertResult = await collection.insertOne(mockTier);
+
+    const foundTier = await repository.findByProductId(mockTier.productId, mockTier.billingType);
+
+    expect(foundTier).not.toBeNull();
+    expect(foundTier?.id).toBe(insertResult.insertedId.toString());
+    expect(foundTier?.productId).toBe(mockTier.productId);
+    expect(foundTier?.label).toBe(mockTier.label);
+    expect(foundTier?.billingType).toBe(mockTier.billingType);
+    expect(foundTier?.featuresPerService).toStrictEqual(mockTier.featuresPerService);
+  });
+
   it('when a tier is searched by a non-existing id, then it should return null', async () => {
     const result = await repository.findByTierId('64b5b7fb69f1a8eb2ab4bad6');
     expect(result).toBeNull();

@@ -21,11 +21,13 @@ export class MongoDBTiersRepository implements TiersRepository {
   }
 
   async findByProductId(productId: Tier['productId'], billingType?: Tier['billingType']): Promise<Tier | null> {
-    const tier = await this.collection.findOne({
-      productId,
-      billingType,
-    });
+    const query: Record<string, unknown> = { productId };
 
+    if (typeof billingType !== 'undefined') {
+      query.billingType = billingType;
+    }
+
+    const tier = await this.collection.findOne(query);
     return tier ? toDomain(tier) : null;
   }
 
