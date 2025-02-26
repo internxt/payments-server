@@ -34,7 +34,13 @@ export class NoSubscriptionSeatsProvidedError extends Error {
   }
 }
 
-export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = ['prod_RY24Z7Axqaz1tG', 'prod_RY27zjzWZWuzEO', 'prod_RY29StsWXwy8Wu'];
+export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = [
+  'prod_RY24Z7Axqaz1tG',
+  'prod_RY27zjzWZWuzEO',
+  'prod_RY29StsWXwy8Wu',
+  'prod_QRYvMG6BX0TUoU',
+  'prod_QRYtuEtAKhHqIN',
+];
 
 export class TiersService {
   constructor(
@@ -88,8 +94,8 @@ export class TiersService {
     return tier;
   }
 
-  async getTierProductsByProductsId(productId: Tier['productId']): Promise<Tier> {
-    const tier = await this.tiersRepository.findByProductId(productId);
+  async getTierProductsByProductsId(productId: Tier['productId'], billingType?: Tier['billingType']): Promise<Tier> {
+    const tier = await this.tiersRepository.findByProductId({ productId, billingType });
 
     if (!tier) {
       throw new TierNotFoundError(`Tier for product ${productId} not found`);
@@ -105,7 +111,9 @@ export class TiersService {
   ): Promise<{ featuresPerService: { antivirus: boolean } }> {
     let productId;
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
-    const activeUserSubscription = userSubscriptions.find((subscription) => subscription.status === 'active');
+    const activeUserSubscription = userSubscriptions.find(
+      (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
+    );
 
     if (!activeUserSubscription && !isLifetime) {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
@@ -137,13 +145,13 @@ export class TiersService {
   }
 
   async applyTier(
-    userWithEmail: User & { email: string },
+    userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     lineItem: Stripe.InvoiceLineItem,
     productId: string,
   ): Promise<void> {
     const amountOfSeats = lineItem.quantity;
-    const tier = await this.tiersRepository.findByProductId(productId);
+    const tier = await this.tiersRepository.findByProductId({ productId });
 
     if (!tier) {
       throw new TierNotFoundError(`Tier for product ${productId} not found`);
@@ -172,7 +180,7 @@ export class TiersService {
   }
 
   async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId(productId);
+    const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
 
     if (!tier) {
@@ -201,7 +209,7 @@ export class TiersService {
   }
 
   async applyDriveFeatures(
-    userWithEmail: User & { email: string },
+    userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
@@ -252,12 +260,12 @@ export class TiersService {
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
   }
 
-  async applyVpnFeatures(userWithEmail: User & { email: string }, tier: Tier): Promise<void> {
+  async applyVpnFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {
     const { uuid } = userWithEmail;
     const { enabled, featureId } = tier.featuresPerService[Service.Vpn];
 
     if (enabled) {
-      await this.usersService.enableVPNTier(uuid, featureId);
+      return this.usersService.enableVPNTier(uuid, featureId);
     }
   }
 

@@ -18,6 +18,9 @@ import handleInvoiceCompleted, {
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { getCustomer, getInvoice, getLogger, getProduct, getUser } from '../fixtures';
 import { UserType } from '../../../src/core/users/User';
+import { TiersService } from '../../../src/services/tiers.service';
+import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
 
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -60,6 +63,8 @@ let storageService: StorageService;
 let usersService: UsersService;
 let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
+let tierRepository: TiersRepository;
+let usersTiersRepository: UsersTiersRepository;
 let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
@@ -67,6 +72,7 @@ let bit2MeService: Bit2MeService;
 let cacheService: CacheService;
 let stripe: Stripe;
 let objectStorageService: ObjectStorageService;
+let tiersService: TiersService;
 let user: ReturnType<typeof getUser>;
 
 describe('Process when an invoice payment is completed', () => {
@@ -77,6 +83,8 @@ describe('Process when an invoice payment is completed', () => {
     displayBillingRepository = {} as DisplayBillingRepository;
     couponsRepository = testFactory.getCouponsRepositoryForTest();
     usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
+    tierRepository = testFactory.getTiersRepository();
+    usersTiersRepository = testFactory.getUsersTiersRepository();
     productsRepository = testFactory.getProductsRepositoryForTest();
 
     cacheService = new CacheService(config);
@@ -92,6 +100,15 @@ describe('Process when an invoice payment is completed', () => {
       usersCouponsRepository,
       config,
       axios,
+    );
+
+    tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tierRepository,
+      usersTiersRepository,
+      storageService,
+      config,
     );
 
     objectStorageService = new ObjectStorageService(paymentService, config, axios);
@@ -118,7 +135,7 @@ describe('Process when an invoice payment is completed', () => {
       paymentService,
       log,
       cacheService,
-      config,
+      tiersService,
       objectStorageService,
     );
 
@@ -141,7 +158,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         getLogger(),
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -176,7 +193,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         getLogger(),
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -215,7 +232,7 @@ describe('Process when an invoice payment is completed', () => {
           paymentService,
           getLogger(),
           cacheService,
-          config,
+          tiersService,
           objectStorageService,
         ),
       ).rejects.toThrow(insertUserError);
@@ -248,7 +265,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         log,
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -290,7 +307,7 @@ describe('Process when an invoice payment is completed', () => {
           paymentService,
           log,
           cacheService,
-          config,
+          tiersService,
           objectStorageService,
         ),
       ).rejects.toThrow(randomError);
@@ -312,7 +329,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         log,
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -323,23 +340,25 @@ describe('Process when an invoice payment is completed', () => {
 
   describe('Customer cases', () => {
     it('When the customer is marked as deleted, then log an error and stop processing', async () => {
-      const fakeInvoiceCompletedSession = { status: 'paid' } as unknown as Stripe.Invoice;
+      const mockedInvoice = getInvoice({ status: 'paid' });
       const log = getLogger();
-      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: true, customer: user.customerId } as any);
+      const getCustomerSpy = jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue({ deleted: true, customer: user.customerId } as any);
       jest.spyOn(paymentService, 'getInvoiceLineItems');
 
       await handleInvoiceCompleted(
-        fakeInvoiceCompletedSession,
+        mockedInvoice,
         usersService,
         paymentService,
         log,
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
       expect(log.error).toHaveBeenCalled();
-      expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
+      expect(getCustomerSpy).toHaveBeenCalledWith(mockedInvoice.customer as string);
       expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(0);
     });
   });
@@ -366,7 +385,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         log,
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -393,7 +412,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         log,
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 
@@ -586,7 +605,7 @@ describe('Process when an invoice payment is completed', () => {
         paymentService,
         getLogger(),
         cacheService,
-        config,
+        tiersService,
         objectStorageService,
       );
 

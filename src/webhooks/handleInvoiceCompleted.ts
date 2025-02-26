@@ -1,13 +1,15 @@
 /* eslint-disable max-len */
 import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
-import { type AppConfig } from '../config';
 import CacheService from '../services/cache.service';
 import { PaymentService, PriceMetadata } from '../services/payment.service';
 import { CouponNotBeingTrackedError, UsersService } from '../services/users.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UserType } from '../core/users/User';
+import { handleUserFeatures } from './utils/handleUserFeatures';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { handleOldInvoiceCompletedFlow } from './utils/handleOldInvoiceCompletedFlow';
+import config from '../config';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -58,7 +60,7 @@ export default async function handleInvoiceCompleted(
   paymentService: PaymentService,
   log: FastifyBaseLogger,
   cacheService: CacheService,
-  config: AppConfig,
+  tiersService: TiersService,
   objectStorageService: ObjectStorageService,
 ): Promise<void> {
   if (session.status !== 'paid') {
@@ -97,7 +99,7 @@ export default async function handleInvoiceCompleted(
   }
 
   let user: { uuid: string };
-  const { maxSpaceBytes, planType } = price.metadata as PriceMetadata;
+  const { planType } = price.metadata as PriceMetadata;
   const isLifetimePlan = planType === 'one_time';
 
   try {
@@ -119,6 +121,10 @@ export default async function handleInvoiceCompleted(
 
   const email = customer.email ?? session.customer_email;
 
+  log.info(
+    `Searching for the user with mail ${email} and customer Id ${customer.id} in the local DB or directly in Drive...`,
+  );
+
   try {
     user = await usersService.findUserByCustomerID(customer.id);
   } catch (err) {
@@ -132,37 +138,65 @@ export default async function handleInvoiceCompleted(
     }
   }
 
+  log.info(`User with uuid ${user.uuid} was found. Now, updating the user available products`);
+
   try {
-    await handleOldInvoiceCompletedFlow({
-      config,
+    await handleUserFeatures({
       customer,
-      isBusinessPlan,
-      log,
-      maxSpaceBytes,
-      product,
-      subscriptionSeats: items.data[0].quantity,
+      paymentService,
+      isLifetimeCurrentSub: isLifetimePlan,
       usersService,
-      userUuid: user.uuid,
+      purchasedItem: items.data[0],
+      tiersService,
+      user: {
+        email: email ?? '',
+        uuid: user.uuid,
+      },
+      logger: log,
     });
   } catch (error) {
     const err = error as Error;
-    log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
-    throw error;
+    log.error(`[USER FEATURES/ERROR]: Error while applying the tier products to the user: ${err.message}`);
+    if (!(error instanceof TierNotFoundError)) {
+      throw error;
+    }
+
+    const maxSpaceBytes = price.metadata.maxSpaceBytes;
+
+    try {
+      await handleOldInvoiceCompletedFlow({
+        config: config,
+        customer,
+        isBusinessPlan,
+        log,
+        maxSpaceBytes,
+        product,
+        subscriptionSeats: items.data[0].quantity,
+        usersService,
+        userUuid: user.uuid,
+      });
+
+      try {
+        const userByCustomerId = await usersService.findUserByCustomerID(customer.id);
+        const isLifetimeCurrentSub = isBusinessPlan ? userByCustomerId.lifetime : isLifetimePlan;
+        await usersService.updateUser(customer.id, {
+          lifetime: isLifetimeCurrentSub,
+        });
+      } catch {
+        await usersService.insertUser({
+          customerId: customer.id,
+          uuid: user.uuid,
+          lifetime: isLifetimePlan,
+        });
+      }
+    } catch (error) {
+      const err = error as Error;
+      log.error(`ERROR APPLYING USER FEATURES: ${err.stack ?? err.message}`);
+      throw error;
+    }
   }
 
-  try {
-    const { lifetime } = await usersService.findUserByCustomerID(customer.id);
-    const isLifetimeCurrentSub = isBusinessPlan ? lifetime : isLifetimePlan;
-    await usersService.updateUser(customer.id, {
-      lifetime: isLifetimeCurrentSub,
-    });
-  } catch {
-    await usersService.insertUser({
-      customerId: customer.id,
-      uuid: user.uuid,
-      lifetime: isLifetimePlan,
-    });
-  }
+  log.info(`User with uuid: ${user.uuid} added/updated in the local DB and available products also updated`);
 
   try {
     if (session.id) {
@@ -186,6 +220,7 @@ export default async function handleInvoiceCompleted(
 
   try {
     await cacheService.clearSubscription(customer.id);
+    log.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
   }

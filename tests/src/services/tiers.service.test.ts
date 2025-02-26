@@ -44,10 +44,11 @@ let bit2MeService: Bit2MeService;
 let storageService: StorageService;
 
 jest
-  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
-  .mockImplementation(() => Promise.resolve() as any);
-jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
+  .mockImplementation(() => Promise.resolve() as any);
+
+jest
+  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
@@ -205,7 +206,7 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('Get tier products using the product id', () => {
+  describe('Get tier products using the product id and/or billing type', () => {
     it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
       const { id: productId } = newTier();
 
@@ -222,7 +223,24 @@ describe('TiersService tests', () => {
       const result = await tiersService.getTierProductsByProductsId(tier.productId);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({ productId: tier.productId });
+    });
+
+    it('When the requested tier exists and the billing type is lifetime, then it returns the tier object', async () => {
+      const tierBillingType = 'lifetime';
+      const tier = newTier({
+        billingType: tierBillingType,
+      });
+
+      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+
+      const result = await tiersService.getTierProductsByProductsId(tier.productId, tierBillingType);
+
+      expect(result).toStrictEqual(tier);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({
+        productId: tier.productId,
+        billingType: tierBillingType,
+      });
     });
   });
 
@@ -339,7 +357,7 @@ describe('TiersService tests', () => {
         tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId),
       ).rejects.toThrow(TierNotFoundError);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
     });
 
     it('When applying the tier, then skips disabled features', async () => {
@@ -362,7 +380,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).not.toHaveBeenCalled();
       expect(applyVpnFeatures).not.toHaveBeenCalled();
     });
@@ -388,7 +406,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier);
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
@@ -407,7 +425,7 @@ describe('TiersService tests', () => {
         tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId, getLogger()),
       ).rejects.toThrow(TierNotFoundError);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
     });
 
     it('When removing the tier, then skips the disabled features the tier had', async () => {
@@ -431,7 +449,7 @@ describe('TiersService tests', () => {
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).not.toHaveBeenCalled();
     });
@@ -457,7 +475,7 @@ describe('TiersService tests', () => {
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
     });
@@ -478,13 +496,10 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
-
       await expect(
         tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
-      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
@@ -501,8 +516,6 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      const createOrUpdateUserSpy = jest.fn(createOrUpdateUser).mockImplementation(() => Promise.resolve() as any);
-
       await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
@@ -510,8 +523,6 @@ describe('TiersService tests', () => {
         tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
         mockedInvoiceLineItem.quantity,
       );
-
-      expect(createOrUpdateUserSpy).not.toHaveBeenCalled();
     });
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
@@ -537,7 +548,6 @@ describe('TiersService tests', () => {
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
       });
-      expect(createOrUpdateUser).not.toHaveBeenCalled();
     });
 
     it('When workspaces is not enabled, then individual is initialized', async () => {

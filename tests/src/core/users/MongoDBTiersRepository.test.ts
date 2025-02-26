@@ -30,7 +30,7 @@ describe('Testing the tier collection', () => {
   });
 
   it('when a tier is searched by a non-existing productId, then it should return null', async () => {
-    const result = await repository.findByProductId('non-existent');
+    const result = await repository.findByProductId({ productId: 'non-existent' });
     expect(result).toBeNull();
   });
 
@@ -39,12 +39,30 @@ describe('Testing the tier collection', () => {
     const mockTier: Omit<Tier, 'id'> = newTier();
     const insertResult = await collection.insertOne(mockTier);
 
-    const foundTier = await repository.findByProductId(mockTier.productId);
+    const foundTier = await repository.findByProductId({ productId: mockTier.productId });
 
     expect(foundTier).not.toBeNull();
     expect(foundTier?.id).toBe(insertResult.insertedId.toString());
     expect(foundTier?.productId).toBe(mockTier.productId);
     expect(foundTier?.label).toBe(mockTier.label);
+    expect(foundTier?.featuresPerService).toStrictEqual(mockTier.featuresPerService);
+  });
+
+  it('when a tier is searched by the product Id and billing type, then it should be found and match the inserted data', async () => {
+    const collection = (repository as any).collection;
+    const mockTier: Omit<Tier, 'id'> = newTier({ billingType: 'lifetime' });
+    const insertResult = await collection.insertOne(mockTier);
+
+    const foundTier = await repository.findByProductId({
+      productId: mockTier.productId,
+      billingType: mockTier.billingType,
+    });
+
+    expect(foundTier).not.toBeNull();
+    expect(foundTier?.id).toBe(insertResult.insertedId.toString());
+    expect(foundTier?.productId).toBe(mockTier.productId);
+    expect(foundTier?.label).toBe(mockTier.label);
+    expect(foundTier?.billingType).toBe(mockTier.billingType);
     expect(foundTier?.featuresPerService).toStrictEqual(mockTier.featuresPerService);
   });
 

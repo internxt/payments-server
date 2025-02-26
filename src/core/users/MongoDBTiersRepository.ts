@@ -2,7 +2,7 @@ import { Collection, MongoClient, ObjectId, WithId } from 'mongodb';
 import { Tier } from './Tier';
 
 export interface TiersRepository {
-  findByProductId(productId: Tier['productId']): Promise<Tier | null>;
+  findByProductId(where: Partial<Tier>): Promise<Tier | null>;
   findByTierId(tierId: Tier['id']): Promise<Tier | null>;
 }
 
@@ -20,11 +20,8 @@ export class MongoDBTiersRepository implements TiersRepository {
     this.collection = mongo.db('payments').collection<Tier>('tiers');
   }
 
-  async findByProductId(productId: Tier['productId']): Promise<Tier | null> {
-    const tier = await this.collection.findOne({
-      productId,
-    });
-
+  async findByProductId(where: Partial<Tier>): Promise<Tier | null> {
+    const tier = await this.collection.findOne(where);
     return tier ? toDomain(tier) : null;
   }
 
