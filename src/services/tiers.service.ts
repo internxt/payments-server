@@ -89,7 +89,7 @@ export class TiersService {
   }
 
   async getTierProductsByProductsId(productId: Tier['productId'], billingType?: Tier['billingType']): Promise<Tier> {
-    const tier = await this.tiersRepository.findByProductId(productId, billingType);
+    const tier = await this.tiersRepository.findByProductId({ productId, billingType });
 
     if (!tier) {
       throw new TierNotFoundError(`Tier for product ${productId} not found`);
@@ -143,7 +143,7 @@ export class TiersService {
     productId: string,
   ): Promise<void> {
     const amountOfSeats = lineItem.quantity;
-    const tier = await this.tiersRepository.findByProductId(productId);
+    const tier = await this.tiersRepository.findByProductId({ productId });
 
     if (!tier) {
       throw new TierNotFoundError(`Tier for product ${productId} not found`);
@@ -172,7 +172,7 @@ export class TiersService {
   }
 
   async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId(productId);
+    const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
 
     if (!tier) {

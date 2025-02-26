@@ -223,7 +223,7 @@ describe('TiersService tests', () => {
       const result = await tiersService.getTierProductsByProductsId(tier.productId);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId, undefined);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({ productId: tier.productId });
     });
 
     it('When the requested tier exists and the billing type is lifetime, then it returns the tier object', async () => {
@@ -237,7 +237,10 @@ describe('TiersService tests', () => {
       const result = await tiersService.getTierProductsByProductsId(tier.productId, tierBillingType);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith(tier.productId, tierBillingType);
+      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({
+        productId: tier.productId,
+        billingType: tierBillingType,
+      });
     });
   });
 
@@ -354,7 +357,7 @@ describe('TiersService tests', () => {
         tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId),
       ).rejects.toThrow(TierNotFoundError);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
     });
 
     it('When applying the tier, then skips disabled features', async () => {
@@ -377,7 +380,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).not.toHaveBeenCalled();
       expect(applyVpnFeatures).not.toHaveBeenCalled();
     });
@@ -403,7 +406,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier);
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
@@ -422,7 +425,7 @@ describe('TiersService tests', () => {
         tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId, getLogger()),
       ).rejects.toThrow(TierNotFoundError);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
     });
 
     it('When removing the tier, then skips the disabled features the tier had', async () => {
@@ -446,7 +449,7 @@ describe('TiersService tests', () => {
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).not.toHaveBeenCalled();
     });
@@ -472,7 +475,7 @@ describe('TiersService tests', () => {
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
-      expect(findTierByProductId).toHaveBeenCalledWith(productId);
+      expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
     });
