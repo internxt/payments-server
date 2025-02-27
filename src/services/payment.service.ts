@@ -232,16 +232,14 @@ export class PaymentService {
       promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
       companyName?: string;
       companyVatId?: string;
-    }, 
-    trialReason: Reason
+    },
+    trialReason: Reason,
   ) {
     const now = new Date();
-    const trialEnd = Math.floor(
-      now.setMonth(now.getMonth() + reasonFreeMonthsMap[trialReason.name]) / 1000
-    );
+    const trialEnd = Math.floor(now.setMonth(now.getMonth() + reasonFreeMonthsMap[trialReason.name]) / 1000);
 
     const subscription = await this.createSubscription({
-      ...payload, 
+      ...payload,
       trialEnd,
       metadata: { 'why-trial': trialReason.name },
     });
@@ -268,7 +266,7 @@ export class PaymentService {
     companyName?: string;
     companyVatId?: string;
     trialEnd?: number;
-    metadata?: Stripe.Metadata,
+    metadata?: Stripe.Metadata;
   }): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -324,7 +322,7 @@ export class PaymentService {
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
-      trial_end: (trialEnd ? trialEnd : undefined)
+      trial_end: trialEnd ? trialEnd : undefined,
     });
 
     if (subscription.pending_setup_intent !== null) {
@@ -986,8 +984,9 @@ export class PaymentService {
       expandOptions.push('data.product');
     }
 
+    //!TODO: add metadata["show"]:"1" in query param
     const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      query: `active:"true" currency:"${currencyValue}"`,
       expand: expandOptions,
       limit: 100,
     });
