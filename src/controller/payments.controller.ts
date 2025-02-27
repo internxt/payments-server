@@ -451,6 +451,7 @@ export default function (
     );
 
     fastify.post<{
+      Querystring: { trialToken: string };
       Body: {
         customerId: string;
         priceId: string;
@@ -511,8 +512,19 @@ export default function (
           return res.status(403).send();
         }
 
-        if (trialCode !== process.env.PC_CLOUD_TRIAL_CODE) {
-          return res.status(403).send('Invalid trial code');
+        const { trialToken } = req.query;
+
+        if (!trialToken) {
+          return res.status(403).send('Invalid trial token');
+        }
+
+        try {
+          const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
+          if (!payload.trial || payload.trial !== 'pc-cloud-25') {
+            throw new Error('Invalid trial token')
+          }
+        } catch {
+          return res.status(403).send('Invalid trial token');
         }
 
         try {
