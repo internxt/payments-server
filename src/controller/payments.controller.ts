@@ -491,8 +491,7 @@ export default function (
           customerId, 
           priceId, 
           currency, 
-          token, 
-          trialCode
+          token
         } = req.body;
 
         if (!customerId || !priceId) {
@@ -569,7 +568,6 @@ export default function (
       if (!code || code !== process.env.PC_CLOUD_TRIAL_CODE) {
         return rep.status(400).send();
       }
-      await assertUser(req, rep, usersService);
 
       return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET)
     });
