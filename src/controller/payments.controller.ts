@@ -550,6 +550,18 @@ export default function (
       },
     );
 
+    fastify.get<{
+      Querystring: { code: string };
+    }>('/trial-for-subscription', async (req, rep) => {
+      const { code } = req.query;
+      if (!code || code !== process.env.PC_CLOUD_TRIAL_CODE) {
+        return rep.status(400).send();
+      }
+      await assertUser(req, rep, usersService);
+
+      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET)
+    });
+
     fastify.get('/users/exists', async (req, rep) => {
       await assertUser(req, rep, usersService);
 
