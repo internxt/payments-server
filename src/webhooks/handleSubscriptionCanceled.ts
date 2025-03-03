@@ -1,8 +1,8 @@
 import { UserType } from './../core/users/User';
 import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
-import { StorageService, updateUserTier } from '../services/storage.service';
+import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { AppConfig } from '../config';
@@ -79,7 +79,7 @@ export default async function handleSubscriptionCanceled(
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
-  log.info(`User with customerId ${customerId} found. The uuid of the user is: ${uuid}`);
+  log.info(`User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`);
 
   try {
     await cacheService.clearSubscription(customerId, productType);
@@ -107,13 +107,6 @@ export default async function handleSubscriptionCanceled(
     log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
-    }
-
-    try {
-      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    } catch (err) {
-      log.error(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `);
-      log.error(err);
     }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
