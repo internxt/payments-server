@@ -25,8 +25,19 @@ export const handleCancelPlan = async ({
   const { id: userId } = user;
   const tier = await tiersService.getTierProductsByProductsId(productId);
 
+  log.info(`[CANCEL PLAN HANDLER]: The user with id ${userId} exists, and the product with id ${tier.id} also exists.`);
+
   await usersService.updateUser(customerId, { lifetime: false });
 
+  log.info(`[CANCEL PLAN HANDLER]: THe user data for the customer ${userId} has been downgraded in handleCancelPlan`);
+
   await tiersService.removeTier({ ...user, email: customerEmail }, productId, log);
+
+  log.info(`[CANCEL PLAN HANDLER]: The tier for the user ${userId} has been removed`);
+
   await tiersService.deleteTierFromUser(userId, tier.id);
+
+  log.info(
+    `[CANCEL PLAN HANDLER]: The user-tier relationship using the user id ${userId} and tier id ${tier.id} has been deleted`,
+  );
 };

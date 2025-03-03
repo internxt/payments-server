@@ -79,6 +79,10 @@ export default async function handleSubscriptionCanceled(
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
+  log.info(
+    `[SUB CANCEL]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,
+  );
+
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
@@ -101,6 +105,8 @@ export default async function handleSubscriptionCanceled(
       log,
     });
   } catch (error) {
+    const err = error as Error;
+    log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
@@ -108,8 +114,10 @@ export default async function handleSubscriptionCanceled(
     try {
       await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
     } catch (err) {
-      log.error(`[TIER/SUB_CANCELED] Error while updating user tier: uuid: ${uuid} `);
-      log.error(err);
+      const error = err as Error;
+      log.error(
+        `[SUB CANCEL/ERROR]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
+      );
     }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);

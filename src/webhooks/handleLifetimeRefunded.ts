@@ -27,6 +27,10 @@ export default async function handleLifetimeRefunded(
   const invoice = await paymentsService.getInvoiceLineItems(invoiceId);
   const productId = invoice.data[0].price?.product as string;
 
+  log.info(
+    `[LIFETIME REFUNDED]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,
+  );
+
   try {
     await cacheService.clearSubscription(customerId);
   } catch (err) {
@@ -43,6 +47,8 @@ export default async function handleLifetimeRefunded(
       log,
     });
   } catch (error) {
+    const err = error as Error;
+    log.error(`[LIFETIME REFUNDED/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
@@ -52,8 +58,9 @@ export default async function handleLifetimeRefunded(
       await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
     } catch (err) {
       const error = err as Error;
-      log.error(`Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `);
-      throw err;
+      log.error(
+        `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
+      );
     }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
