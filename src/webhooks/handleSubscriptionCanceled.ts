@@ -79,6 +79,8 @@ export default async function handleSubscriptionCanceled(
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
+  log.info(`User with customerId ${customerId} found. The uuid of the user is: ${uuid}`);
+
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
@@ -101,6 +103,8 @@ export default async function handleSubscriptionCanceled(
       log,
     });
   } catch (error) {
+    const err = error as Error;
+    log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }

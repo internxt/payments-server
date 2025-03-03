@@ -132,8 +132,9 @@ export default async function handleInvoiceCompleted(
       const response = await usersService.findUserByEmail(email);
       user = response.data;
     } else {
-      log.error(`Error searching for an user by email in checkout session completed handler, email: ${email}`);
-      log.error(err);
+      log.error(
+        `Error searching for an user by email in checkout session completed handler, email: ${email}. ERROR: ${err}`,
+      );
       throw err;
     }
   }
