@@ -1,7 +1,7 @@
 import { FastifyLoggerInstance } from 'fastify';
-import { FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
-import { StorageService } from '../services/storage.service';
+import { StorageService, updateUserTier } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
@@ -27,7 +27,9 @@ export default async function handleLifetimeRefunded(
   const invoice = await paymentsService.getInvoiceLineItems(invoiceId);
   const productId = invoice.data[0].price?.product as string;
 
-  log.info(`User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`);
+  log.info(
+    `[LIFETIME REFUNDED]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,
+  );
 
   try {
     await cacheService.clearSubscription(customerId);
@@ -51,6 +53,16 @@ export default async function handleLifetimeRefunded(
       throw error;
     }
     await usersService.updateUser(customerId, { lifetime: false });
+
+    try {
+      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
+    } catch (err) {
+      const error = err as Error;
+      log.error(
+        `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
+      );
+      throw err;
+    }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
   }
