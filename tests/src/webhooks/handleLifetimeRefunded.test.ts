@@ -108,7 +108,7 @@ afterEach(() => {
 
 describe('Process when a lifetime is refunded', () => {
   it('When the refund of a lifetime that have Tier is requested, then it is refunded successfully', async () => {
-    const mockedUser = getUser();
+    const mockedUser = getUser({ lifetime: true });
     const mockedCharge = getCharge();
     const mockedInvoiceLineItems = getInvoice().lines;
 
@@ -133,7 +133,8 @@ describe('Process when a lifetime is refunded', () => {
     expect(handleCancelPlan).toHaveBeenCalledWith({
       customerId: mockedCharge.customer,
       customerEmail: mockedCharge.receipt_email,
-      productId: mockedInvoiceLineItems.data[0].price?.product,
+      productId: (mockedInvoiceLineItems.data[0].price?.product as Stripe.Product).id,
+      isLifetime: mockedUser.lifetime,
       usersService,
       tiersService,
       log: logger,

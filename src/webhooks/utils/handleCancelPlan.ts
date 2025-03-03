@@ -11,6 +11,7 @@ interface HandleCancelPlanProps {
   usersService: UsersService;
   tiersService: TiersService;
   log: FastifyBaseLogger;
+  isLifetime?: boolean;
 }
 
 export const handleCancelPlan = async ({
@@ -19,11 +20,13 @@ export const handleCancelPlan = async ({
   productId,
   usersService,
   tiersService,
+  isLifetime,
   log,
 }: HandleCancelPlanProps) => {
   const user = await usersService.findUserByCustomerID(customerId);
   const { id: userId } = user;
-  const tier = await tiersService.getTierProductsByProductsId(productId);
+  const billingType = isLifetime ? 'lifetime' : 'subscription';
+  const tier = await tiersService.getTierProductsByProductsId(productId, billingType);
 
   log.info(`[CANCEL PLAN HANDLER]: The user with id ${userId} exists, and the product with id ${tier.id} also exists.`);
 

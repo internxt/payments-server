@@ -95,7 +95,13 @@ export class TiersService {
   }
 
   async getTierProductsByProductsId(productId: Tier['productId'], billingType?: Tier['billingType']): Promise<Tier> {
-    const tier = await this.tiersRepository.findByProductId({ productId, billingType });
+    const query: Partial<Tier> = { productId };
+
+    if (billingType !== undefined) {
+      query.billingType = billingType;
+    }
+
+    const tier = await this.tiersRepository.findByProductId(query);
 
     if (!tier) {
       throw new TierNotFoundError(`Tier for product ${productId} not found`);
