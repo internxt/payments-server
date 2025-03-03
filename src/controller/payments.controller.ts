@@ -481,18 +481,13 @@ export default function (
               },
               trialCode: {
                 type: 'string',
-              }
+              },
             },
           },
         },
       },
       async (req, res) => {
-        const { 
-          customerId, 
-          priceId, 
-          currency, 
-          token
-        } = req.body;
+        const { customerId, priceId, currency, token } = req.body;
 
         if (!customerId || !priceId) {
           throw new MissingParametersError(['customerId', 'priceId']);
@@ -520,20 +515,23 @@ export default function (
         try {
           const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
           if (!payload.trial || payload.trial !== 'pc-cloud-25') {
-            throw new Error('Invalid trial token')
+            throw new Error('Invalid trial token');
           }
         } catch {
           return res.status(403).send('Invalid trial token');
         }
 
         try {
-          const subscriptionSetup = await paymentService.createSubscriptionWithTrial({
-            customerId,
-            priceId,
-            currency,
-          }, { 
-            name: 'pc-cloud-25' 
-          });
+          const subscriptionSetup = await paymentService.createSubscriptionWithTrial(
+            {
+              customerId,
+              priceId,
+              currency,
+            },
+            {
+              name: 'pc-cloud-25',
+            },
+          );
 
           return res.send(subscriptionSetup);
         } catch (err) {
@@ -569,7 +567,7 @@ export default function (
         return rep.status(400).send();
       }
 
-      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET)
+      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET);
     });
 
     fastify.get('/users/exists', async (req, rep) => {
@@ -710,6 +708,30 @@ export default function (
       },
     );
 
+    fastify.post<{
+      Body: { customerId: string };
+    }>(
+      '/setup-intent',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              trialReason: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { customerId } = req.body;
+        const { client_secret: clientSecret } = await paymentService.getSetupIntent(customerId, {
+          userType: UserType.Individual,
+        });
+
+        return { clientSecret };
+      },
+    );
+
     fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
@@ -718,7 +740,9 @@ export default function (
         schema: {
           querystring: {
             type: 'object',
-            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+            properties: {
+              userType: { type: 'string', enum: ['individual', 'business'] },
+            },
           },
         },
       },
