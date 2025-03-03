@@ -118,7 +118,6 @@ export default async function handleSubscriptionCanceled(
       log.error(
         `[SUB CANCEL/ERROR]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
       );
-      throw err;
     }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);

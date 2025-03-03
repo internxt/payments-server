@@ -61,7 +61,6 @@ export default async function handleLifetimeRefunded(
       log.error(
         `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
       );
-      throw err;
     }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
