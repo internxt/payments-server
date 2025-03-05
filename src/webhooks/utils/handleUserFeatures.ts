@@ -5,6 +5,7 @@ import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
 import { Tier } from '../../core/users/Tier';
+import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
@@ -41,6 +42,8 @@ export const handleUserFeatures = async ({
   const tier = await tiersService.getTierProductsByProductsId(product.id, tierBillingType);
   const newTierId = tier.id;
 
+  logger.info(`The Tier with Id ${newTierId} exists. It can be applied for user with uuid: ${user.uuid}`);
+
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
 
@@ -67,8 +70,22 @@ export const handleUserFeatures = async ({
       }
 
       const oldTierId = existingTier.id;
+      const shouldUpdateTierAndUser = tier.billingType === 'lifetime' && existingUser.lifetime;
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      if (shouldUpdateTierAndUser) {
+        handleStackLifetimeStorage({
+          customer,
+          logger,
+          newTier: tier,
+          oldTier: existingTier,
+          subscriptionSeats: purchasedItem.quantity,
+          tiersService,
+          user: { ...existingUser, email: user.email },
+        });
+        return;
+      }
+
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
@@ -99,7 +116,7 @@ export const handleUserFeatures = async ({
 
       const newUser = await usersService.findUserByUuid(user.uuid);
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
@@ -111,7 +128,7 @@ export const handleUserFeatures = async ({
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
