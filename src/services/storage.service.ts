@@ -13,6 +13,10 @@ function signToken(duration: string, secret: string) {
 export class StorageService {
   public changeStoragePath = 'v2/gateway/storage/users';
 
+  constructor(
+    private readonly config: AppConfig,
+    private readonly axios: Axios,
+  ) {}
 
   async changeStorage(uuid: string, newStorageBytes: number): Promise<void> {
     const jwt = signToken('5m', this.config.STORAGE_GATEWAY_SECRET);
