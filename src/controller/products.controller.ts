@@ -6,6 +6,7 @@ import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { TiersService } from '../services/tiers.service';
+import { User } from '../core/users/User';
 
 export default function (tiersService: TiersService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
@@ -24,8 +25,9 @@ export default function (tiersService: TiersService, usersService: UsersService,
     });
 
     fastify.get('/', async (req, res): Promise<{ featuresPerService: { antivirus: boolean } } | Error> => {
+      let user: User;
       try {
-        const user = await assertUser(req, res, usersService);
+        user = await assertUser(req, res, usersService);
 
         if (!user) throw new UserNotFoundError('User does not exist');
 
@@ -41,7 +43,9 @@ export default function (tiersService: TiersService, usersService: UsersService,
           return res.status(404).send({ error: error.message });
         }
 
-        req.log.error(`Error while checking user subscription products: ${(error as Error).message}`);
+        const userUuid = user! && user.uuid || 'unknown';
+
+        req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
         return res.status(500).send({ error: 'Internal server error' });
       }
     });
