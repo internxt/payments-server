@@ -129,7 +129,7 @@ export default async function handleInvoiceCompleted(
     user = await usersService.findUserByCustomerID(customer.id);
   } catch (err) {
     if (email) {
-      const response = await usersService.findUserByEmail(email);
+      const response = await usersService.findUserByEmail(email.toLowerCase());
       user = response.data;
     } else {
       log.error(
