@@ -35,7 +35,7 @@ export default function (tiersService: TiersService, usersService: UsersService,
 
         const isLifetimeUser = lifetime ?? false;
 
-        const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetimeUser);
+        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetimeUser);
 
         return res.status(200).send(antivirusTier);
       } catch (error) {
@@ -43,7 +43,7 @@ export default function (tiersService: TiersService, usersService: UsersService,
           return res.status(404).send({ error: error.message });
         }
 
-        const userUuid = user! && user.uuid || 'unknown';
+        const userUuid = (user! && user.uuid) || 'unknown';
 
         req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
         return res.status(500).send({ error: 'Internal server error' });

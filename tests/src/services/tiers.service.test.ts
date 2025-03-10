@@ -254,10 +254,10 @@ describe('TiersService tests', () => {
         .spyOn(paymentService, 'getActiveSubscriptions')
         .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, false);
+      const antivirusTier = await tiersService.getProductsTier(customerId, false);
 
       expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true },
+        featuresPerService: { antivirus: true, backups: true },
       });
     });
 
@@ -269,10 +269,10 @@ describe('TiersService tests', () => {
         .spyOn(paymentService, 'getActiveSubscriptions')
         .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, false);
+      const antivirusTier = await tiersService.getProductsTier(customerId, false);
 
       expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: false },
+        featuresPerService: { antivirus: false, backups: false },
       });
     });
 
@@ -287,10 +287,10 @@ describe('TiersService tests', () => {
           { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
         ] as any);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
+      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
 
       expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true },
+        featuresPerService: { antivirus: true, backups: true },
       });
     });
 
@@ -299,7 +299,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
-      await expect(tiersService.getAntivirusTier(customerId, false)).rejects.toThrow(
+      await expect(tiersService.getProductsTier(customerId, false)).rejects.toThrow(
         new NotFoundSubscriptionError('User has no active subscriptions'),
       );
     });
@@ -313,10 +313,10 @@ describe('TiersService tests', () => {
         .spyOn(paymentService, 'getInvoicesFromUser')
         .mockResolvedValue([{ lines: { data: [{ price: { product: 'some_other_product' } }] } }] as any);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
+      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
 
       expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: false },
+        featuresPerService: { antivirus: false, backups: false },
       });
     });
 
@@ -334,10 +334,10 @@ describe('TiersService tests', () => {
           { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] } },
         ] as any);
 
-      const antivirusTier = await tiersService.getAntivirusTier(customerId, isLifetime);
+      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
 
       expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true },
+        featuresPerService: { antivirus: true, backups: true },
       });
     });
   });
