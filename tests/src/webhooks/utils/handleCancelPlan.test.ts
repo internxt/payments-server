@@ -7,7 +7,6 @@ import { DisplayBillingRepository } from '../../../../src/core/users/MongoDBDisp
 import { ProductsRepository } from '../../../../src/core/users/ProductsRepository';
 import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
-import CacheService from '../../../../src/services/cache.service';
 import { StorageService } from '../../../../src/services/storage.service';
 import { TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
@@ -29,7 +28,6 @@ let bit2MeService: Bit2MeService;
 let usersService: UsersService;
 let paymentService: PaymentService;
 let storageService: StorageService;
-let cacheService: CacheService;
 let tiersService: TiersService;
 
 beforeEach(() => {

@@ -41,6 +41,8 @@ export const handleUserFeatures = async ({
   const tier = await tiersService.getTierProductsByProductsId(product.id, tierBillingType);
   const newTierId = tier.id;
 
+  logger.info(`The Tier with Id ${newTierId} exists. It can be applied for user with uuid: ${user.uuid}`);
+
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
 
@@ -68,7 +70,7 @@ export const handleUserFeatures = async ({
 
       const oldTierId = existingTier.id;
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
@@ -99,7 +101,7 @@ export const handleUserFeatures = async ({
 
       const newUser = await usersService.findUserByUuid(user.uuid);
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
@@ -111,7 +113,7 @@ export const handleUserFeatures = async ({
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
-      await tiersService.applyTier(user, customer, purchasedItem, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
