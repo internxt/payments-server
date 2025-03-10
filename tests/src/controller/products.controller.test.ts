@@ -53,6 +53,23 @@ describe('Testing products endpoints', () => {
       expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
     });
 
+    it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedUserToken = getValidToken(mockedUser.uuid);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(mockedUser);
+      jest.spyOn(TiersService.prototype, 'getProductsTier').mockRejectedValue(new Error('Unexpected error'));
+
+      const response = await app.inject({
+        path: `/products`,
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${mockedUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(500);
+    });
+
     it('When the user is found and has a valid subscription, then the user is able to use the products', async () => {
       const mockedAvailableUserProducts = {
         featuresPerService: {

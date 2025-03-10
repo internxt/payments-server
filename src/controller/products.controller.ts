@@ -47,8 +47,6 @@ export default function (tiersService: TiersService, usersService: UsersService,
 
           const userUuid = (user! && user.uuid) || 'unknown';
 
-          console.log('ERROR', error);
-
           req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
           return res.status(500).send({ error: 'Internal server error' });
         }
