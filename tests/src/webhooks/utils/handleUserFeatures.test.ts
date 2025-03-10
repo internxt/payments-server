@@ -17,31 +17,38 @@ import axios from 'axios';
 import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
 import { StorageService } from '../../../../src/services/storage.service';
+import { handleStackLifetimeStorage } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
+import { Tier } from '../../../../src/core/users/Tier';
 
-const mockedUser = {
-  ...getUser(),
-  email: 'test@example.com',
-} as User & { email: string };
-const mockedTier = newTier();
-const mockedCustomer = getCustomer();
-const mockedPurchasedItem = getInvoice().lines.data[0];
+jest.mock('../../../../src/webhooks/utils/handleStackLifetimeStorage');
+
+let tiersService: TiersService;
+let tiersRepository: TiersRepository;
+let paymentService: PaymentService;
+let usersService: UsersService;
+let usersRepository: UsersRepository;
+let displayBillingRepository: DisplayBillingRepository;
+let couponsRepository: CouponsRepository;
+let usersCouponsRepository: UsersCouponsRepository;
+let usersTiersRepository: UsersTiersRepository;
+let productsRepository: ProductsRepository;
+let bit2MeService: Bit2MeService;
+let defaultProps: HandleUserFeaturesProps;
+let storageService: StorageService;
+let mockedTier: Tier;
+let mockedUser: User & { email: string };
+let mockedCustomer: Stripe.Customer;
+let mockedPurchasedItem: Stripe.InvoiceLineItem;
 
 describe('Create or update user when after successful payment', () => {
-  let tiersService: TiersService;
-  let tiersRepository: TiersRepository;
-  let paymentService: PaymentService;
-  let usersService: UsersService;
-  let usersRepository: UsersRepository;
-  let displayBillingRepository: DisplayBillingRepository;
-  let couponsRepository: CouponsRepository;
-  let usersCouponsRepository: UsersCouponsRepository;
-  let usersTiersRepository: UsersTiersRepository;
-  let productsRepository: ProductsRepository;
-  let bit2MeService: Bit2MeService;
-  let defaultProps: HandleUserFeaturesProps;
-  let storageService: StorageService;
-
   beforeEach(() => {
+    mockedUser = {
+      ...getUser(),
+      email: 'test@example.com',
+    } as User & { email: string };
+    mockedTier = newTier();
+    mockedCustomer = getCustomer();
+    mockedPurchasedItem = getInvoice().lines.data[0];
     tiersRepository = testFactory.getTiersRepository();
     usersRepository = testFactory.getUsersRepositoryForTest();
     usersRepository = testFactory.getUsersRepositoryForTest();
@@ -87,6 +94,9 @@ describe('Create or update user when after successful payment', () => {
       customer: mockedCustomer,
       tiersService,
     };
+  });
+
+  afterEach(() => {
     jest.restoreAllMocks();
   });
 
@@ -95,6 +105,35 @@ describe('Create or update user when after successful payment', () => {
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
 
     await expect(handleUserFeatures(defaultProps)).rejects.toThrow(tierNotFoundError);
+  });
+
+  it('When the user has a lifetime plan and purchases a new lifetime plan, then the function to stack lifetime storage is called', async () => {
+    mockedUser.lifetime = true;
+    mockedTier.billingType = 'lifetime';
+    defaultProps.isLifetimeCurrentSub = true;
+
+    const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+    const getDriveInvoicesSpy = jest.spyOn(paymentService, 'getDriveInvoices');
+    const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
+    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+
+    await handleUserFeatures(defaultProps);
+
+    expect(getTierProductsSPy).toHaveBeenCalledWith(
+      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedTier.billingType,
+    );
+    expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
+      customer: mockedCustomer,
+      logger: defaultProps.logger,
+      newTier: mockedTier,
+      oldTier: mockedTier,
+      subscriptionSeats: mockedPurchasedItem.quantity,
+      tiersService,
+      user: { ...mockedUser, email: mockedUser.email },
+    });
+    expect(getDriveInvoicesSpy).not.toHaveBeenCalled();
   });
 
   it('When the user does not have tiers, then it should insert a new tier', async () => {
