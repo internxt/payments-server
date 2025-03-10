@@ -24,30 +24,35 @@ export default function (tiersService: TiersService, usersService: UsersService,
       }
     });
 
-    fastify.get('/', async (req, res): Promise<{ featuresPerService: { antivirus: boolean } } | Error> => {
-      let user: User;
-      try {
-        user = await assertUser(req, res, usersService);
+    fastify.get(
+      '/',
+      async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
+        let user: User;
+        try {
+          user = await assertUser(req, res, usersService);
 
-        if (!user) throw new UserNotFoundError('User does not exist');
+          if (!user) throw new UserNotFoundError('User does not exist');
 
-        const { customerId, lifetime } = user;
+          const { customerId, lifetime } = user;
 
-        const isLifetimeUser = lifetime ?? false;
+          const isLifetimeUser = lifetime ?? false;
 
-        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetimeUser);
+          const antivirusTier = await tiersService.getProductsTier(customerId, isLifetimeUser);
 
-        return res.status(200).send(antivirusTier);
-      } catch (error) {
-        if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-          return res.status(404).send({ error: error.message });
+          return res.status(200).send(antivirusTier);
+        } catch (error) {
+          if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
+            return res.status(404).send({ error: error.message });
+          }
+
+          const userUuid = (user! && user.uuid) || 'unknown';
+
+          console.log('ERROR', error);
+
+          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
+          return res.status(500).send({ error: 'Internal server error' });
         }
-
-        const userUuid = (user! && user.uuid) || 'unknown';
-
-        req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
-        return res.status(500).send({ error: 'Internal server error' });
-      }
-    });
+      },
+    );
   };
 }
