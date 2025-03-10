@@ -77,6 +77,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
     const removeTierSpy = jest.spyOn(tiersService, 'removeTier').mockImplementation(voidPromise);
+    const userTiersSpy = jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     const deleteTierFromUserSpy = jest.spyOn(tiersService, 'deleteTierFromUser').mockImplementation(voidPromise);
 
     await handleCancelPlan({
@@ -94,6 +95,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       mockedTier.productId,
       log,
     );
+    expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 
@@ -101,7 +103,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     const mockedCustomer = getCustomer();
     const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: true });
-    const mockedTier = newTier();
+    const mockedTier = newTier({ billingType: 'lifetime' });
 
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
@@ -112,6 +114,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       return Promise.resolve();
     });
     const removeTierSpy = jest.spyOn(tiersService, 'removeTier').mockImplementation(voidPromise);
+    const userTiersSpy = jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     const deleteTierFromUserSpy = jest.spyOn(tiersService, 'deleteTierFromUser').mockImplementation(voidPromise);
 
     await handleCancelPlan({
@@ -130,6 +133,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       mockedTier.productId,
       log,
     );
+    expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 });
