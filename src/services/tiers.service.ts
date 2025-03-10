@@ -155,7 +155,7 @@ export class TiersService {
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
-    excludedServices?: Service,
+    excludedServices?: Service[],
   ): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
 
