@@ -1,6 +1,6 @@
 import { CustomerId } from '../../services/payment.service';
 import { UsersService } from '../../services/users.service';
-import { TierNotFoundError, TiersService } from '../../services/tiers.service';
+import { TiersService } from '../../services/tiers.service';
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 
@@ -38,16 +38,7 @@ export const handleCancelPlan = async ({
 
   log.info(`[CANCEL PLAN HANDLER]: The tier for the user ${userId} has been removed`);
 
-  const userTiers = await tiersService.getTiersProductsByUserId(user.id);
-
-  const tierToRemove =
-    userTiers.find(({ id }) => tier.id === id) ?? userTiers.find(({ billingType }) => billingType === 'lifetime');
-
-  if (!tierToRemove) {
-    throw new TierNotFoundError(`No tier found to remove for user ID: ${userId}`);
-  }
-
-  await tiersService.deleteTierFromUser(userId, tierToRemove.id);
+  await tiersService.deleteTierFromUser(userId, tier.id);
 
   log.info(
     `[CANCEL PLAN HANDLER]: The user-tier relationship using the user id ${userId} and tier id ${tier.id} has been deleted`,

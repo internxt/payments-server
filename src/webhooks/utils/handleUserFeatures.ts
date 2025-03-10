@@ -5,7 +5,6 @@ import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
 import { Tier } from '../../core/users/Tier';
-import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
@@ -70,20 +69,6 @@ export const handleUserFeatures = async ({
       }
 
       const oldTierId = existingTier.id;
-      const shouldUpdateTierAndUser = tier.billingType === 'lifetime' && existingUser.lifetime;
-
-      if (shouldUpdateTierAndUser) {
-        handleStackLifetimeStorage({
-          customer,
-          logger,
-          newTier: tier,
-          oldTier: existingTier,
-          subscriptionSeats: purchasedItem.quantity,
-          tiersService,
-          user: { ...existingUser, email: user.email },
-        });
-        return;
-      }
 
       await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
       await usersService.updateUser(customer.id, {
