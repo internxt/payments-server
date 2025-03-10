@@ -5,6 +5,7 @@ import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
 import { Tier } from '../../core/users/Tier';
+import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
@@ -45,10 +46,29 @@ export const handleUserFeatures = async ({
 
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
+    const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime;
 
     const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
     const existingTiersForUser = await tiersService.getTiersProductsByUserId(existingUser.id);
+    const oldLifetimeTier = existingTiersForUser.find(
+      (existingUserTier) => existingUserTier.billingType === 'lifetime',
+    );
+
+    if (isLifetimeStackTry && oldLifetimeTier) {
+      logger.info(`User with uuid ${user.uuid} has a lifetime. Updating user and tier...`);
+      handleStackLifetimeStorage({
+        customer,
+        logger,
+        newTier: tier,
+        oldTier: oldLifetimeTier,
+        subscriptionSeats: purchasedItem.quantity,
+        tiersService,
+        user: { ...existingUser, email: user.email },
+      });
+      return;
+    }
+
     const userInvoices = await paymentService.getDriveInvoices(customer.id, {}, userType);
     const [, latestInvoice] = userInvoices;
     if (userInvoices.length === 0 || !latestInvoice) {
@@ -58,28 +78,25 @@ export const handleUserFeatures = async ({
       throw new TierNotFoundError('Invoices with Tier not found');
     }
 
-    if (latestInvoice) {
-      const oldProductId = latestInvoice.product as string;
-      const existingTier = existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
+    const oldProductId = latestInvoice.product as string;
+    const existingTier =
+      oldLifetimeTier ?? existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
 
-      if (!existingTier) {
-        throw new InvoiceNotFoundError(
-          `Latest invoice references product "${oldProductId}", but no matching tier was found for user ID "${existingUser.id}"`,
-        );
-      }
+    if (!existingTier) {
+      throw new InvoiceNotFoundError(
+        `Latest invoice references product "${oldProductId}", but no matching tier was found for user ID "${existingUser.id}"`,
+      );
+    }
 
-      const oldTierId = existingTier.id;
+    const oldTierId = existingTier.id;
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
-      await usersService.updateUser(customer.id, {
-        lifetime: isLifetimePlan,
-      });
+    await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+    await usersService.updateUser(customer.id, {
+      lifetime: isLifetimePlan,
+    });
 
-      if (oldTierId !== newTierId) {
-        await tiersService.updateTierToUser(existingUser.id, oldTierId, newTierId);
-      }
-
-      return;
+    if (oldTierId !== newTierId) {
+      await tiersService.updateTierToUser(existingUser.id, oldTierId, newTierId);
     }
   } catch (error) {
     if (
@@ -108,7 +125,7 @@ export const handleUserFeatures = async ({
     }
 
     if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
-      logger.warn(`TierNotFoundError -> Inserting new tier for user uuid="${user.uuid}"`);
+      logger.warn(`${error.constructor.name} -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;

@@ -111,6 +111,9 @@ export default async function handleInvoiceCompleted(
     const shouldCancelCurrentActiveSubscription = isLifetimePlan && hasIndividualActiveSubscription;
 
     if (shouldCancelCurrentActiveSubscription) {
+      log.info(
+        `User with customer id: ${customer.id} amd email ${customer.email} has an active individual subscription and is buying a lifetime plan. Cancelling individual plan`,
+      );
       await paymentService.cancelSubscription(hasIndividualActiveSubscription.id);
     }
   } catch (error) {
