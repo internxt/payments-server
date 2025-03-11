@@ -29,7 +29,7 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
-import { canUserStackStorage } from '../services/storage.service';
+import { canIncreaseUserStorage } from '../utils/canIncreaseUserStorage';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -797,14 +797,9 @@ export default function (
 
       try {
         const { selectedPlan } = await paymentService.getPlanById(planId);
-        const { canExpand: canPurchaseLifetime } = await canUserStackStorage(
-          uuid,
-          email,
-          selectedPlan.bytes.toString(),
-          config,
-        );
+        const isStorageUpgradeAllowed = await canIncreaseUserStorage(uuid, email, selectedPlan.bytes.toString());
 
-        if (!canPurchaseLifetime) {
+        if (!isStorageUpgradeAllowed) {
           return res.status(400).send({
             message: "The user can't stack more storage",
           });
