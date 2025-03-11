@@ -4,7 +4,7 @@ import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
-import { Tier } from '../../core/users/Tier';
+import { Service, Tier } from '../../core/users/Tier';
 import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
 
 export interface HandleUserFeaturesProps {
@@ -59,15 +59,31 @@ export const handleUserFeatures = async ({
       logger.info(
         `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
       );
-      handleStackLifetimeStorage({
-        customer,
+      await handleStackLifetimeStorage({
         logger,
         newTier: tier,
         oldTier: oldLifetimeTier,
-        subscriptionSeats: purchasedItem.quantity,
-        tiersService,
         user: { ...existingUser, email: user.email },
       });
+
+      const newTierSpaceInBytes = tier.featuresPerService['drive'].maxSpaceBytes;
+      const oldTierSpaceInBytes = oldLifetimeTier.featuresPerService['drive'].maxSpaceBytes;
+
+      const tierToUpdate = newTierSpaceInBytes > oldTierSpaceInBytes ? tier.productId : oldLifetimeTier.productId;
+
+      if (newTierSpaceInBytes > oldTierSpaceInBytes) {
+        logger.info(
+          `Tier updated while stacking lifetime storage because the new one is highest than the old one. User Uuid: ${user.uuid} / tier Id: ${newTierId}`,
+        );
+        await tiersService.applyTier(user, customer, purchasedItem.quantity, tierToUpdate, [Service.Drive]);
+
+        if (oldLifetimeTier.id !== newTierId) {
+          await tiersService.updateTierToUser(existingUser.id, oldLifetimeTier.id, newTierId);
+          logger.info(
+            `Tier-User relationship updated while stacking lifetime storage. User uuid: ${user.uuid} / User Id: ${user.id} / new tier Id: ${newTierId}`,
+          );
+        }
+      }
       return;
     }
 
@@ -101,14 +117,6 @@ export const handleUserFeatures = async ({
       await tiersService.updateTierToUser(existingUser.id, oldTierId, newTierId);
     }
   } catch (error) {
-    if (
-      !(error instanceof TierNotFoundError) &&
-      !(error instanceof UserNotFoundError) &&
-      !(error instanceof InvoiceNotFoundError)
-    ) {
-      throw error;
-    }
-
     if (error instanceof UserNotFoundError) {
       logger.warn(`UserNotFoundError -> Inserting user with uuid="${user.uuid}"`);
 
@@ -124,21 +132,35 @@ export const handleUserFeatures = async ({
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
-    }
-
-    if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
+    } else if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
       logger.warn(`${error.constructor.name} -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
+      const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime;
+      const excludedServices = isLifetimeStackTry ? [Service.Drive] : [];
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+      if (isLifetimeStackTry) {
+        logger.info(
+          `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
+        );
+        await handleStackLifetimeStorage({
+          logger,
+          newTier: tier,
+          oldTier: tier,
+          user: { ...existingUser, email: user.email },
+        });
+      }
+
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, excludedServices);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
       await tiersService.insertTierToUser(existingUser.id, newTierId);
 
       return;
+    } else {
+      throw error;
     }
   }
 };
