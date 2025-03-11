@@ -80,7 +80,7 @@ export const handleUserFeatures = async ({
 
     const oldProductId = latestInvoice.product as string;
     const existingTier =
-      oldLifetimeTier ?? existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
+      existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId) ?? oldLifetimeTier;
 
     if (!existingTier) {
       throw new InvoiceNotFoundError(
