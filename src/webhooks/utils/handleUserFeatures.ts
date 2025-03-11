@@ -56,7 +56,9 @@ export const handleUserFeatures = async ({
     );
 
     if (isLifetimeStackTry && oldLifetimeTier) {
-      logger.info(`User with uuid ${user.uuid} has a lifetime. Updating user and tier...`);
+      logger.info(
+        `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
+      );
       handleStackLifetimeStorage({
         customer,
         logger,
