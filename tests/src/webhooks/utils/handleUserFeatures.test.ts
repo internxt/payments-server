@@ -314,7 +314,7 @@ describe('Create or update user when after successful payment', () => {
       expect(spyUpdate).not.toHaveBeenCalled();
     });
 
-    it('When user already has a new lifetime plan and tier and purchases a higher tier, then the space is stacked, the new tier is applied and user-tier relationship is updated', async () => {
+    it('When user already has a new lifetime plan and tier and purchases a higher tier,  then the storage should be stacked, the tier applied and the user-tier relationship should be updated', async () => {
       const oldLifetimeTier = {
         ...mockedTier,
         id: 'old-lifetime-tier-id',
