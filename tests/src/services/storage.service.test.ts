@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { canUserStackStorage } from '../../../src/services/storage.service';
 import jwt from 'jsonwebtoken';
 import config from '../../../src/config';
 import { getUser } from '../fixtures';
+import { getUserStorage } from '../../../src/services/storage.service';
 
 jest.mock('axios');
 
@@ -31,7 +31,7 @@ describe('Storage service tests', () => {
         },
       });
 
-      const result = await canUserStackStorage(mockUserUuid, mockEmail, mockNewStorage, config);
+      const result = await getUserStorage(mockUserUuid, mockEmail, mockNewStorage, config);
 
       expect(jwt.sign).toHaveBeenCalledTimes(1);
       expect(jwt.sign).toHaveBeenCalledWith({}, expect.any(String), expect.any(Object));
@@ -46,7 +46,7 @@ describe('Storage service tests', () => {
       const randomError = new Error('API request failed');
       mockedAxios.get.mockRejectedValue(randomError);
 
-      await expect(canUserStackStorage(mockUserUuid, mockEmail, mockNewStorage, config)).rejects.toThrow(randomError);
+      await expect(getUserStorage(mockUserUuid, mockEmail, mockNewStorage, config)).rejects.toThrow(randomError);
       expect(mockedAxios.get).toHaveBeenCalledTimes(1);
     });
   });

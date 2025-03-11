@@ -111,10 +111,10 @@ export class TiersService {
   }
 
   // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
-  async getAntivirusTier(
+  async getProductsTier(
     customerId: CustomerId,
     isLifetime: boolean,
-  ): Promise<{ featuresPerService: { antivirus: boolean } }> {
+  ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } }> {
     let productId;
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
     const activeUserSubscription = userSubscriptions.find(
@@ -141,11 +141,12 @@ export class TiersService {
       }
     }
 
-    const hasAntivirusAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
+    const hasToolsAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
 
     return {
       featuresPerService: {
-        antivirus: hasAntivirusAccess,
+        antivirus: hasToolsAccess,
+        backups: hasToolsAccess,
       },
     };
   }
