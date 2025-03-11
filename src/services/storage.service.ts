@@ -61,7 +61,7 @@ export async function updateUserTier(uuid: string, planId: string, config: AppCo
   );
 }
 
-export async function canUserStackStorage(
+export async function getUserStorage(
   userUuid: User['uuid'],
   email: string,
   newStorage: string,
