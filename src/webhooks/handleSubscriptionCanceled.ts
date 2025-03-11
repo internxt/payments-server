@@ -89,7 +89,7 @@ export default async function handleSubscriptionCanceled(
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
-  if (hasBoughtALifetime) {
+  if (hasBoughtALifetime && productType === UserType.Individual) {
     log.info(`User with uuid ${uuid} has a lifetime subscription. No need to downgrade the user.`);
     // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
     // The space should not be set to Free plan.
