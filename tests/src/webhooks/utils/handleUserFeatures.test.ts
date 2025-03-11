@@ -313,5 +313,59 @@ describe('Create or update user when after successful payment', () => {
       );
       expect(spyUpdate).not.toHaveBeenCalled();
     });
+
+    it('When user already has a new lifetime plan and tier and purchases a higher tier, then the space is stacked, the new tier is applied and user-tier relationship is updated', async () => {
+      const oldLifetimeTier = {
+        ...mockedTier,
+        id: 'old-lifetime-tier-id',
+        billingType: 'lifetime',
+        featuresPerService: {
+          drive: { maxSpaceBytes: 1000 },
+        },
+      } as Tier;
+
+      const newLifetimeTier = {
+        ...mockedTier,
+        id: 'new-lifetime-tier-id',
+        billingType: 'lifetime',
+        featuresPerService: {
+          drive: { maxSpaceBytes: 2000 },
+        },
+      } as Tier;
+
+      mockedUser.lifetime = true;
+      defaultProps.isLifetimeCurrentSub = true;
+
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(newLifetimeTier);
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([oldLifetimeTier]);
+
+      const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+      const spyUpdateTierToUser = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+      const getDriveInvoicesSpy = jest.spyOn(paymentService, 'getDriveInvoices');
+
+      const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
+      handleStackLifetimeStorageSpy.mockImplementation();
+
+      await handleUserFeatures(defaultProps);
+
+      expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
+        logger: defaultProps.logger,
+        newTier: newLifetimeTier,
+        oldTier: oldLifetimeTier,
+        user: { ...mockedUser, email: mockedUser.email },
+      });
+
+      expect(spyApplyTier).toHaveBeenCalledWith(
+        defaultProps.user,
+        defaultProps.customer,
+        defaultProps.purchasedItem.quantity,
+        newLifetimeTier.productId,
+        [Service.Drive],
+      );
+
+      expect(spyUpdateTierToUser).toHaveBeenCalledWith(mockedUser.id, oldLifetimeTier.id, newLifetimeTier.id);
+      expect(getDriveInvoicesSpy).not.toHaveBeenCalled();
+    });
   });
 });
