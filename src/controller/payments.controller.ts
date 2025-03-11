@@ -29,6 +29,7 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
+import { canIncreaseUserStorage } from '../utils/canIncreaseUserStorage';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -778,6 +779,7 @@ export default function (
         };
       };
     }>('/payment-intent', async (req, res) => {
+      const { uuid, email } = req.user.payload;
       const { customerId, amount, planId, currency, token, promoCodeName } = req.query;
 
       try {
@@ -794,6 +796,15 @@ export default function (
       }
 
       try {
+        const { selectedPlan } = await paymentService.getPlanById(planId);
+        const isStorageUpgradeAllowed = await canIncreaseUserStorage(uuid, email, selectedPlan.bytes.toString());
+
+        if (!isStorageUpgradeAllowed) {
+          return res.status(400).send({
+            message: "The user can't stack more storage",
+          });
+        }
+
         const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
           customerId,
           amount,
