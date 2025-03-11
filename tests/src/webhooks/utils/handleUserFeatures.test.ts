@@ -18,7 +18,7 @@ import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixt
 import { User } from '../../../../src/core/users/User';
 import { StorageService } from '../../../../src/services/storage.service';
 import { handleStackLifetimeStorage } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
-import { Tier } from '../../../../src/core/users/Tier';
+import { Service, Tier } from '../../../../src/core/users/Tier';
 
 jest.mock('../../../../src/webhooks/utils/handleStackLifetimeStorage');
 
@@ -107,35 +107,6 @@ describe('Create or update user when after successful payment', () => {
     await expect(handleUserFeatures(defaultProps)).rejects.toThrow(tierNotFoundError);
   });
 
-  it('When the user has a lifetime plan and purchases a new lifetime plan, then the function to stack lifetime storage is called', async () => {
-    mockedUser.lifetime = true;
-    mockedTier.billingType = 'lifetime';
-    defaultProps.isLifetimeCurrentSub = true;
-
-    const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
-    const getDriveInvoicesSpy = jest.spyOn(paymentService, 'getDriveInvoices');
-    const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
-    jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-    jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
-
-    await handleUserFeatures(defaultProps);
-
-    expect(getTierProductsSPy).toHaveBeenCalledWith(
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
-      mockedTier.billingType,
-    );
-    expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
-      customer: mockedCustomer,
-      logger: defaultProps.logger,
-      newTier: mockedTier,
-      oldTier: mockedTier,
-      subscriptionSeats: mockedPurchasedItem.quantity,
-      tiersService,
-      user: { ...mockedUser, email: mockedUser.email },
-    });
-    expect(getDriveInvoicesSpy).not.toHaveBeenCalled();
-  });
-
   it('When the user does not have tiers, then it should insert a new tier', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
     const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
@@ -158,6 +129,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      undefined,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
   });
@@ -197,6 +169,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      undefined,
     );
     expect(spyUpdateUser).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
     expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
@@ -268,5 +241,77 @@ describe('Create or update user when after successful payment', () => {
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
+  });
+
+  describe('The user has a lifetime plan', () => {
+    it('When the user has a lifetime plan and purchases a new lifetime plan, then the function to stack lifetime storage is called', async () => {
+      mockedUser.lifetime = true;
+      mockedTier.billingType = 'lifetime';
+      defaultProps.isLifetimeCurrentSub = true;
+
+      const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+      const getDriveInvoicesSpy = jest.spyOn(paymentService, 'getDriveInvoices');
+      const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+
+      await handleUserFeatures(defaultProps);
+
+      expect(getTierProductsSPy).toHaveBeenCalledWith(
+        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        mockedTier.billingType,
+      );
+      expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
+        logger: defaultProps.logger,
+        newTier: mockedTier,
+        oldTier: mockedTier,
+        user: { ...mockedUser, email: mockedUser.email },
+      });
+      expect(getDriveInvoicesSpy).not.toHaveBeenCalled();
+    });
+
+    it('When the user has an old lifetime plan and purchases a new lifetime plan, then the storage should be stacked, the tier applied and the user-tier relationship should be created', async () => {
+      mockedUser.lifetime = true;
+      mockedTier.billingType = 'lifetime';
+      defaultProps.isLifetimeCurrentSub = true;
+
+      const tierNotFoundError = new TierNotFoundError('Tier not found');
+      const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
+      const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
+
+      const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
+      const spyUpdateUser = jest.spyOn(usersService, 'updateUser');
+      const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser');
+      const spyApplyTier = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
+
+      await handleUserFeatures(defaultProps);
+
+      expect(getTierProductsSPy).toHaveBeenCalledWith(
+        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        mockedTier.billingType,
+      );
+      expect(spyInsert).toHaveBeenCalledTimes(1);
+      expect(spyUpdateUser).toHaveBeenCalledTimes(1);
+      expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
+      expect(spyUpdateUser).toHaveBeenCalledWith(mockedCustomer.id, {
+        lifetime: true,
+      });
+      expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
+        logger: defaultProps.logger,
+        newTier: mockedTier,
+        oldTier: mockedTier,
+        user: { ...mockedUser, email: mockedUser.email },
+      });
+      expect(spyApplyTier).toHaveBeenCalledWith(
+        mockedUser,
+        mockedCustomer,
+        mockedPurchasedItem.quantity,
+        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        [Service.Drive],
+      );
+      expect(spyUpdate).not.toHaveBeenCalled();
+    });
   });
 });

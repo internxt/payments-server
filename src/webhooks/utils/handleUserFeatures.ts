@@ -136,7 +136,7 @@ export const handleUserFeatures = async ({
       logger.warn(`${error.constructor.name} -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
       const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime;
-      const excludedServices = isLifetimeStackTry ? [Service.Drive] : [];
+      const excludedServices = isLifetimeStackTry ? [Service.Drive] : undefined;
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
