@@ -2,12 +2,15 @@ import config from '../config';
 import { HUNDRED_TB } from '../constants';
 import { getUserStorage } from '../services/storage.service';
 
-export async function canIncreaseUserStorage(
+export async function fetchUserStorage(
   userUuid: string,
   email: string,
   newStorageBytes: string,
-): Promise<boolean> {
+): Promise<{ canExpand: boolean; currentMaxSpaceBytes: number }> {
   const userSpace = await getUserStorage(userUuid, email, newStorageBytes, config);
 
-  return userSpace.currentMaxSpaceBytes + Number(newStorageBytes) <= HUNDRED_TB;
+  return {
+    canExpand: userSpace.currentMaxSpaceBytes + Number(newStorageBytes) <= HUNDRED_TB,
+    currentMaxSpaceBytes: userSpace.currentMaxSpaceBytes,
+  };
 }

@@ -10,12 +10,7 @@ import { ProductsRepository } from '../../../../src/core/users/ProductsRepositor
 import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
-import {
-  canUserStackStorage,
-  createOrUpdateUser,
-  StorageService,
-  updateUserTier,
-} from '../../../../src/services/storage.service';
+import { createOrUpdateUser, StorageService, updateUserTier } from '../../../../src/services/storage.service';
 import { TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
 import testFactory from '../../utils/factory';
@@ -25,6 +20,9 @@ import {
   handleStackLifetimeStorage,
 } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
 import { Service } from '../../../../src/core/users/Tier';
+import { fetchUserStorage } from '../../../../src/utils/fetchUserStorage';
+
+jest.mock('../../../../src/utils/fetchUserStorage');
 
 jest.mock('../../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../../src/services/storage.service');
@@ -102,7 +100,7 @@ describe('Stack lifetime storage', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("When the user storage can't be expanded, then an error indicating so is thrown", async () => {
-    (canUserStackStorage as jest.Mock).mockResolvedValue({
+    (fetchUserStorage as jest.Mock).mockResolvedValue({
       canExpand: false,
     });
 
@@ -128,7 +126,7 @@ describe('Stack lifetime storage', () => {
         mockedOldTier.featuresPerService['drive'].maxSpaceBytes +
         mockedNewTier.featuresPerService['drive'].maxSpaceBytes;
 
-      (canUserStackStorage as jest.Mock).mockResolvedValue({
+      (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
         currentMaxSpaceBytes: mockedOldTier.featuresPerService['drive'].maxSpaceBytes,
       });
@@ -160,7 +158,7 @@ describe('Stack lifetime storage', () => {
         mockedOldTier.featuresPerService['drive'].maxSpaceBytes +
         mockedNewTier.featuresPerService['drive'].maxSpaceBytes;
 
-      (canUserStackStorage as jest.Mock).mockResolvedValue({
+      (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
         currentMaxSpaceBytes: mockedOldTier.featuresPerService['drive'].maxSpaceBytes,
       });
@@ -192,7 +190,7 @@ describe('Stack lifetime storage', () => {
         mockedOldTier.featuresPerService['drive'].maxSpaceBytes +
         mockedNewTier.featuresPerService['drive'].maxSpaceBytes;
 
-      (canUserStackStorage as jest.Mock).mockResolvedValue({
+      (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
         currentMaxSpaceBytes: mockedOldTier.featuresPerService['drive'].maxSpaceBytes,
       });

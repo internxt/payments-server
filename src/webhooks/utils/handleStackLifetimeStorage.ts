@@ -1,10 +1,11 @@
 import { FastifyBaseLogger } from 'fastify';
 import { Service, Tier } from '../../core/users/Tier';
 import { User } from '../../core/users/User';
-import { canUserStackStorage, createOrUpdateUser, updateUserTier } from '../../services/storage.service';
+import { createOrUpdateUser, updateUserTier } from '../../services/storage.service';
 import { TiersService } from '../../services/tiers.service';
 import config from '../../config';
 import Stripe from 'stripe';
+import { fetchUserStorage } from '../../utils/fetchUserStorage';
 
 export class ExpandStorageNotAvailableError extends Error {
   constructor(message: string) {
@@ -39,15 +40,15 @@ export const handleStackLifetimeStorage = async ({
   const oldTierSpaceInBytes = oldTier.featuresPerService['drive'].maxSpaceBytes;
 
   logger.info(`The user has a lifetime. Checking if the user with uuid ${user.uuid} can stack more storage...`);
-  const stackableLifetime = await canUserStackStorage(user.uuid, user.email, newTierSpaceInBytes.toString(), config);
+  const userStorage = await fetchUserStorage(user.uuid, user.email, newTierSpaceInBytes.toString());
 
-  if (!stackableLifetime.canExpand)
+  if (!userStorage.canExpand)
     throw new ExpandStorageNotAvailableError(`Expand storage not available for user with uuid: ${user.uuid}`);
 
   logger.info(
-    `The user with uuid ${user.uuid} can stack more storage. Actual Storage for the user: ${stackableLifetime.currentMaxSpaceBytes} / Storage to increase: ${newTierSpaceInBytes}`,
+    `The user with uuid ${user.uuid} can stack more storage. Actual Storage for the user: ${userStorage.currentMaxSpaceBytes} / Storage to increase: ${newTierSpaceInBytes}`,
   );
-  const totalSpaceBytes = stackableLifetime.currentMaxSpaceBytes + newTierSpaceInBytes;
+  const totalSpaceBytes = userStorage.currentMaxSpaceBytes + newTierSpaceInBytes;
   const tierToUpdate = newTierSpaceInBytes > oldTierSpaceInBytes ? newTier.productId : oldTier.productId;
 
   await createOrUpdateUser(totalSpaceBytes.toString(), user.email, config);
