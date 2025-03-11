@@ -156,7 +156,7 @@ export class TiersService {
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
-    excludedServices?: Service[],
+    alreadyEnabledServices?: Service[],
   ): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
 
@@ -167,7 +167,7 @@ export class TiersService {
     for (const service of Object.keys(tier.featuresPerService)) {
       const s = service as Service;
 
-      if (excludedServices?.includes(s) || !tier.featuresPerService[s].enabled) {
+      if (alreadyEnabledServices?.includes(s) || !tier.featuresPerService[s].enabled) {
         continue;
       }
 
