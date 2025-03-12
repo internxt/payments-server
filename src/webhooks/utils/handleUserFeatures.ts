@@ -46,7 +46,7 @@ export const handleUserFeatures = async ({
 
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
-    const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime;
+    const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime && !isBusinessPlan;
 
     const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
