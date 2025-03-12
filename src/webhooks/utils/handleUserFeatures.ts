@@ -46,7 +46,7 @@ export const handleUserFeatures = async ({
 
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
-    const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime && !isBusinessPlan;
+    const isStackingLifetimes = tier.billingType === 'lifetime' && existingUser.lifetime && !isBusinessPlan;
 
     const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
@@ -55,7 +55,7 @@ export const handleUserFeatures = async ({
       (existingUserTier) => existingUserTier.billingType === 'lifetime',
     );
 
-    if (isLifetimeStackTry && oldLifetimeTier) {
+    if (isStackingLifetimes && oldLifetimeTier) {
       logger.info(
         `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
       );
@@ -135,12 +135,12 @@ export const handleUserFeatures = async ({
     } else if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
       logger.warn(`${error.constructor.name} -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
-      const isLifetimeStackTry = tier.billingType === 'lifetime' && existingUser.lifetime;
-      const excludedServices = isLifetimeStackTry ? [Service.Drive] : undefined;
+      const isStackingLifetimes = tier.billingType === 'lifetime' && existingUser.lifetime;
+      const excludedServices = isStackingLifetimes ? [Service.Drive] : undefined;
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
-      if (isLifetimeStackTry) {
+      if (isStackingLifetimes) {
         logger.info(
           `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
         );
