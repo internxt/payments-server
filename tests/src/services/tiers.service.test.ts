@@ -354,7 +354,12 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(
-        tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId),
+        tiersService.applyTier(
+          { ...user, email: 'example@internxt.com' },
+          mockedCustomer,
+          mockedInvoiceLineItem.quantity,
+          productId,
+        ),
       ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
@@ -378,7 +383,12 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
+      await tiersService.applyTier(
+        { ...user, email: 'example@internxt.com' },
+        mockedCustomer,
+        mockedInvoiceLineItem.quantity,
+        productId,
+      );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).not.toHaveBeenCalled();
@@ -388,7 +398,7 @@ describe('TiersService tests', () => {
     it('When applying the tier, then applies enabled features', async () => {
       const user = getUser();
       const tier = newTier();
-      const userWithEmail = { ...user, email: 'fake email' };
+      const userWithEmail = { ...user, email: 'example@internxt.com' };
       const { productId } = tier;
       const mockedCustomer = getCustomer();
       const mockedInvoiceLineItem = getInvoice().lines.data[0];
@@ -404,7 +414,12 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
       const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier({ ...user, email: 'fake email' }, mockedCustomer, mockedInvoiceLineItem, productId);
+      await tiersService.applyTier(
+        { ...user, email: 'example@internxt.com' },
+        mockedCustomer,
+        mockedInvoiceLineItem.quantity,
+        productId,
+      );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier);
@@ -422,7 +437,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(
-        tiersService.removeTier({ ...mockedUser, email: 'fake email' }, productId, getLogger()),
+        tiersService.removeTier({ ...mockedUser, email: 'example@internxt.com' }, productId, getLogger()),
       ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
@@ -432,7 +447,7 @@ describe('TiersService tests', () => {
       const mockedUser = getUser();
       const log = getLogger();
       const mockedTier = newTier();
-      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const userWithEmail = { ...mockedUser, email: 'example@internxt.com' };
       const { productId } = mockedTier;
       mockedTier.featuresPerService[Service.Drive].enabled = true;
       mockedTier.featuresPerService[Service.Vpn].enabled = false;
@@ -458,7 +473,7 @@ describe('TiersService tests', () => {
       const mockedUser = getUser();
       const log = getLogger();
       const mockedTier = newTier();
-      const userWithEmail = { ...mockedUser, email: 'fake email' };
+      const userWithEmail = { ...mockedUser, email: 'example@internxt.com' };
       const { productId } = mockedTier;
       mockedTier.featuresPerService[Service.Drive].enabled = true;
       mockedTier.featuresPerService[Service.Vpn].enabled = true;
@@ -497,7 +512,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
 
       await expect(
-        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId),
+        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
     });
@@ -516,7 +531,7 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem, tier.productId);
+      await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId);
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
         userWithEmail.uuid,

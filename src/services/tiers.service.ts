@@ -154,10 +154,10 @@ export class TiersService {
   async applyTier(
     userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
-    lineItem: Stripe.InvoiceLineItem,
+    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
+    alreadyEnabledServices?: Service[],
   ): Promise<void> {
-    const amountOfSeats = lineItem.quantity;
     const tier = await this.tiersRepository.findByProductId({ productId });
 
     if (!tier) {
@@ -167,7 +167,7 @@ export class TiersService {
     for (const service of Object.keys(tier.featuresPerService)) {
       const s = service as Service;
 
-      if (!tier.featuresPerService[s].enabled) {
+      if (alreadyEnabledServices?.includes(s) || !tier.featuresPerService[s].enabled) {
         continue;
       }
 

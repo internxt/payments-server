@@ -29,7 +29,7 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
-import { canIncreaseUserStorage } from '../utils/canIncreaseUserStorage';
+import { fetchUserStorage } from '../utils/fetchUserStorage';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -797,7 +797,11 @@ export default function (
 
       try {
         const { selectedPlan } = await paymentService.getPlanById(planId);
-        const isStorageUpgradeAllowed = await canIncreaseUserStorage(uuid, email, selectedPlan.bytes.toString());
+        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
+          uuid,
+          email,
+          selectedPlan.bytes.toString(),
+        );
 
         if (!isStorageUpgradeAllowed) {
           return res.status(400).send({
