@@ -19,6 +19,7 @@ import { User } from '../../../../src/core/users/User';
 import { StorageService } from '../../../../src/services/storage.service';
 import { handleStackLifetimeStorage } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
 import { Service, Tier } from '../../../../src/core/users/Tier';
+import { FastifyBaseLogger } from 'fastify';
 
 jest.mock('../../../../src/webhooks/utils/handleStackLifetimeStorage');
 
@@ -39,6 +40,7 @@ let mockedTier: Tier;
 let mockedUser: User & { email: string };
 let mockedCustomer: Stripe.Customer;
 let mockedPurchasedItem: Stripe.InvoiceLineItem;
+let logger: jest.Mocked<FastifyBaseLogger>;
 
 describe('Create or update user when after successful payment', () => {
   beforeEach(() => {
@@ -46,6 +48,7 @@ describe('Create or update user when after successful payment', () => {
       ...getUser(),
       email: 'test@example.com',
     } as User & { email: string };
+    logger = getLogger();
     mockedTier = newTier();
     mockedCustomer = getCustomer();
     mockedPurchasedItem = getInvoice().lines.data[0];
@@ -89,7 +92,7 @@ describe('Create or update user when after successful payment', () => {
       purchasedItem: mockedPurchasedItem,
       paymentService,
       usersService,
-      logger: getLogger(),
+      logger,
       isLifetimeCurrentSub: false,
       customer: mockedCustomer,
       tiersService,
@@ -129,6 +132,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      logger,
       undefined,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
@@ -169,6 +173,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      logger,
       undefined,
     );
     expect(spyUpdateUser).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
@@ -211,6 +216,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      logger,
     );
     expect(spyInsert).not.toHaveBeenCalled();
   });
@@ -239,6 +245,7 @@ describe('Create or update user when after successful payment', () => {
       mockedCustomer,
       mockedPurchasedItem.quantity,
       (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      logger,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
   });
@@ -309,6 +316,7 @@ describe('Create or update user when after successful payment', () => {
         mockedCustomer,
         mockedPurchasedItem.quantity,
         (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        logger,
         [Service.Drive],
       );
       expect(spyUpdate).not.toHaveBeenCalled();
@@ -361,6 +369,7 @@ describe('Create or update user when after successful payment', () => {
         defaultProps.customer,
         defaultProps.purchasedItem.quantity,
         newLifetimeTier.productId,
+        logger,
         [Service.Drive],
       );
 

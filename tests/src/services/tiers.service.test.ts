@@ -345,6 +345,7 @@ describe('TiersService tests', () => {
   describe('Apply the Tier the user paid for', () => {
     it('When applying the tier, then fails if the tier is not found', async () => {
       const user = getUser();
+      const logger = getLogger();
       const productId = 'productId';
       const mockedCustomer = getCustomer();
       const mockedInvoiceLineItem = getInvoice().lines.data[0];
@@ -359,6 +360,7 @@ describe('TiersService tests', () => {
           mockedCustomer,
           mockedInvoiceLineItem.quantity,
           productId,
+          logger,
         ),
       ).rejects.toThrow(TierNotFoundError);
 
@@ -367,6 +369,7 @@ describe('TiersService tests', () => {
 
     it('When applying the tier, then skips disabled features', async () => {
       const user = getUser();
+      const logger = getLogger();
       const tier = newTier();
       const { productId } = tier;
       const mockedCustomer = getCustomer();
@@ -388,6 +391,7 @@ describe('TiersService tests', () => {
         mockedCustomer,
         mockedInvoiceLineItem.quantity,
         productId,
+        logger,
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
@@ -397,6 +401,7 @@ describe('TiersService tests', () => {
 
     it('When applying the tier, then applies enabled features', async () => {
       const user = getUser();
+      const logger = getLogger();
       const tier = newTier();
       const userWithEmail = { ...user, email: 'example@internxt.com' };
       const { productId } = tier;
@@ -419,10 +424,11 @@ describe('TiersService tests', () => {
         mockedCustomer,
         mockedInvoiceLineItem.quantity,
         productId,
+        logger,
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
-      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier);
+      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier, logger);
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
   });
@@ -499,6 +505,7 @@ describe('TiersService tests', () => {
   describe('Apply Drive features according the user tier plan', () => {
     it('When workspace is enabled but the quantity of seats is less than the minimum, then an error indicating so is thrown', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
       const tier = newTier();
       const mockedCustomer = getCustomer();
       const mockedInvoiceLineItem = getInvoice().lines.data[0];
@@ -512,12 +519,13 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
 
       await expect(
-        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId),
+        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId, logger),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
     });
     it('When workspaces is enabled, then it is applied exclusively', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
       const tier = newTier();
       const mockedCustomer = getCustomer();
       const mockedInvoiceLineItem = getInvoice().lines.data[0];
@@ -531,7 +539,13 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId);
+      await tiersService.applyTier(
+        userWithEmail,
+        mockedCustomer,
+        mockedInvoiceLineItem.quantity,
+        tier.productId,
+        logger,
+      );
 
       expect(updateWorkspaceStorage).toHaveBeenCalledWith(
         userWithEmail.uuid,
@@ -542,6 +556,7 @@ describe('TiersService tests', () => {
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
       const tier = newTier();
       const mockedCustomer = getCustomer();
       const amountOfSeats = 5;
@@ -555,7 +570,7 @@ describe('TiersService tests', () => {
         .spyOn(usersService, 'initializeWorkspace')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
+      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(initializeWorkspace).toHaveBeenCalledWith(userWithEmail.uuid, {
         newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
@@ -567,6 +582,7 @@ describe('TiersService tests', () => {
 
     it('When workspaces is not enabled, then individual is initialized', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
       const tier = newTier();
       const mockedCustomer = getCustomer();
       const amountOfSeats = 1;
@@ -574,7 +590,7 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier);
+      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(createOrUpdateUser).toHaveBeenCalledWith(
         tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),
