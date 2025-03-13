@@ -8,7 +8,7 @@ import { ProductsRepository } from '../../../../src/core/users/ProductsRepositor
 import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { StorageService } from '../../../../src/services/storage.service';
-import { TiersService } from '../../../../src/services/tiers.service';
+import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
 import testFactory from '../../utils/factory';
 import { PaymentService } from '../../../../src/services/payment.service';
@@ -67,6 +67,43 @@ beforeEach(() => {
 });
 
 describe('Handling canceled plans and refunded lifetimes', () => {
+  it('When the tier id to remove the user-tier relationship does not exists, then an error indicating so is thrown', async () => {
+    const mockedCustomer = getCustomer();
+    const log = getLogger();
+    const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: false });
+    const mockedTier = newTier();
+    const mockedRandomTier = newTier({
+      billingType: 'subscription',
+    });
+
+    jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedRandomTier);
+    const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
+    const removeTierSpy = jest.spyOn(tiersService, 'removeTier').mockImplementation(voidPromise);
+    const userTiersSpy = jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+    const deleteTierFromUserSpy = jest.spyOn(tiersService, 'deleteTierFromUser');
+
+    await expect(
+      handleCancelPlan({
+        customerEmail: mockedCustomer.email as string,
+        customerId: mockedCustomer.id,
+        productId: mockedRandomTier.productId,
+        tiersService,
+        usersService,
+        log,
+      }),
+    ).rejects.toThrow(TierNotFoundError);
+
+    expect(updateUserSpy).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
+    expect(removeTierSpy).toHaveBeenCalledWith(
+      { ...mockedUser, email: mockedCustomer.email as string },
+      mockedRandomTier.productId,
+      log,
+    );
+    expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
+    expect(deleteTierFromUserSpy).not.toHaveBeenCalled();
+  });
+
   it('When the user cancels a subscription, then the tier is removed and the free space is applied', async () => {
     const mockedCustomer = getCustomer();
     const log = getLogger();
@@ -77,6 +114,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
     const removeTierSpy = jest.spyOn(tiersService, 'removeTier').mockImplementation(voidPromise);
+    const userTiersSpy = jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     const deleteTierFromUserSpy = jest.spyOn(tiersService, 'deleteTierFromUser').mockImplementation(voidPromise);
 
     await handleCancelPlan({
@@ -94,6 +132,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       mockedTier.productId,
       log,
     );
+    expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 
@@ -101,7 +140,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     const mockedCustomer = getCustomer();
     const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: true });
-    const mockedTier = newTier();
+    const mockedTier = newTier({ billingType: 'lifetime' });
 
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
@@ -112,6 +151,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       return Promise.resolve();
     });
     const removeTierSpy = jest.spyOn(tiersService, 'removeTier').mockImplementation(voidPromise);
+    const userTiersSpy = jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
     const deleteTierFromUserSpy = jest.spyOn(tiersService, 'deleteTierFromUser').mockImplementation(voidPromise);
 
     await handleCancelPlan({
@@ -130,6 +170,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       mockedTier.productId,
       log,
     );
+    expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
   });
 });

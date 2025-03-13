@@ -4,7 +4,8 @@ import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
-import { Tier } from '../../core/users/Tier';
+import { Service, Tier } from '../../core/users/Tier';
+import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
@@ -45,10 +46,47 @@ export const handleUserFeatures = async ({
 
   try {
     const existingUser = await usersService.findUserByUuid(user.uuid);
+    const isStackingLifetimes = tier.billingType === 'lifetime' && existingUser.lifetime && !isBusinessPlan;
 
     const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
     const existingTiersForUser = await tiersService.getTiersProductsByUserId(existingUser.id);
+    const oldLifetimeTier = existingTiersForUser.find(
+      (existingUserTier) => existingUserTier.billingType === 'lifetime',
+    );
+
+    if (isStackingLifetimes && oldLifetimeTier) {
+      logger.info(
+        `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
+      );
+      await handleStackLifetimeStorage({
+        logger,
+        newTier: tier,
+        oldTier: oldLifetimeTier,
+        user: { ...existingUser, email: user.email },
+      });
+
+      const newTierSpaceInBytes = tier.featuresPerService['drive'].maxSpaceBytes;
+      const oldTierSpaceInBytes = oldLifetimeTier.featuresPerService['drive'].maxSpaceBytes;
+
+      const tierToUpdate = newTierSpaceInBytes > oldTierSpaceInBytes ? tier.productId : oldLifetimeTier.productId;
+
+      if (newTierSpaceInBytes > oldTierSpaceInBytes) {
+        logger.info(
+          `Tier updated while stacking lifetime storage because the new one is highest than the old one. User Uuid: ${user.uuid} / tier Id: ${newTierId}`,
+        );
+        await tiersService.applyTier(user, customer, purchasedItem.quantity, tierToUpdate, logger, [Service.Drive]);
+
+        if (oldLifetimeTier.id !== newTierId) {
+          await tiersService.updateTierToUser(existingUser.id, oldLifetimeTier.id, newTierId);
+          logger.info(
+            `Tier-User relationship updated while stacking lifetime storage. User uuid: ${user.uuid} / User Id: ${user.id} / new tier Id: ${newTierId}`,
+          );
+        }
+      }
+      return;
+    }
+
     const userInvoices = await paymentService.getDriveInvoices(customer.id, {}, userType);
     const [, latestInvoice] = userInvoices;
     if (userInvoices.length === 0 || !latestInvoice) {
@@ -58,38 +96,26 @@ export const handleUserFeatures = async ({
       throw new TierNotFoundError('Invoices with Tier not found');
     }
 
-    if (latestInvoice) {
-      const oldProductId = latestInvoice.product as string;
-      const existingTier = existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
+    const oldProductId = latestInvoice.product as string;
+    const existingTier = existingTiersForUser.find((existingUserTier) => existingUserTier.productId === oldProductId);
 
-      if (!existingTier) {
-        throw new InvoiceNotFoundError(
-          `Latest invoice references product "${oldProductId}", but no matching tier was found for user ID "${existingUser.id}"`,
-        );
-      }
+    if (!existingTier) {
+      throw new InvoiceNotFoundError(
+        `Latest invoice references product "${oldProductId}", but no matching tier was found for user ID "${existingUser.id}"`,
+      );
+    }
 
-      const oldTierId = existingTier.id;
+    const oldTierId = existingTier.id;
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
-      await usersService.updateUser(customer.id, {
-        lifetime: isLifetimePlan,
-      });
+    await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger);
+    await usersService.updateUser(customer.id, {
+      lifetime: isLifetimePlan,
+    });
 
-      if (oldTierId !== newTierId) {
-        await tiersService.updateTierToUser(existingUser.id, oldTierId, newTierId);
-      }
-
-      return;
+    if (oldTierId !== newTierId) {
+      await tiersService.updateTierToUser(existingUser.id, oldTierId, newTierId);
     }
   } catch (error) {
-    if (
-      !(error instanceof TierNotFoundError) &&
-      !(error instanceof UserNotFoundError) &&
-      !(error instanceof InvoiceNotFoundError)
-    ) {
-      throw error;
-    }
-
     if (error instanceof UserNotFoundError) {
       logger.warn(`UserNotFoundError -> Inserting user with uuid="${user.uuid}"`);
 
@@ -101,25 +127,39 @@ export const handleUserFeatures = async ({
 
       const newUser = await usersService.findUserByUuid(user.uuid);
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger);
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
-    }
-
-    if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
-      logger.warn(`TierNotFoundError -> Inserting new tier for user uuid="${user.uuid}"`);
+    } else if (error instanceof TierNotFoundError || error instanceof InvoiceNotFoundError) {
+      logger.warn(`${error.constructor.name} -> Inserting new tier for user uuid="${user.uuid}"`);
       const existingUser = await usersService.findUserByUuid(user.uuid);
+      const isStackingLifetimes = tier.billingType === 'lifetime' && existingUser.lifetime && !isBusinessPlan;
+      const excludedServices = isStackingLifetimes ? [Service.Drive] : undefined;
 
       const isLifetimePlan = isBusinessPlan ? existingUser.lifetime : isLifetimeCurrentSub;
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+      if (isStackingLifetimes) {
+        logger.info(
+          `User with uuid ${user.uuid} has a lifetime and purchased the tier with id ${newTierId}. Updating user and tier...`,
+        );
+        await handleStackLifetimeStorage({
+          logger,
+          newTier: tier,
+          oldTier: tier,
+          user: { ...existingUser, email: user.email },
+        });
+      }
+
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger, excludedServices);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
       await tiersService.insertTierToUser(existingUser.id, newTierId);
 
       return;
+    } else {
+      throw error;
     }
   }
 };
