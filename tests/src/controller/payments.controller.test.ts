@@ -273,14 +273,13 @@ describe('Payment controller e2e tests', () => {
       });
 
       it('When the user does not have a Tier, then the type of subscription is lifetime and the product Id is not returned', async () => {
+        const tierNotFoundError = new TierNotFoundError('Tier not found');
         const mockedUser = getUser({ lifetime: true });
         const mockedToken = getValidToken(mockedUser.uuid);
 
         (assertUser as jest.Mock).mockResolvedValue(mockedUser);
         jest.spyOn(CacheService.prototype, 'getSubscription').mockResolvedValue(null);
-        jest
-          .spyOn(TiersService.prototype, 'getTiersProductsByUserId')
-          .mockRejectedValue(new TierNotFoundError('Tier not found'));
+        jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
 
         const response = await app.inject({
           method: 'GET',
@@ -296,6 +295,26 @@ describe('Payment controller e2e tests', () => {
         expect(responseBody).toStrictEqual({
           type: 'lifetime',
         });
+      });
+
+      it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
+        const unexpectedError = new Error('Unexpected Error');
+        const mockedUser = getUser({ lifetime: true });
+        const mockedToken = getValidToken(mockedUser.uuid);
+
+        (assertUser as jest.Mock).mockResolvedValue(mockedUser);
+        jest.spyOn(CacheService.prototype, 'getSubscription').mockResolvedValue(null);
+        jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockRejectedValue(unexpectedError);
+
+        const response = await app.inject({
+          method: 'GET',
+          path: '/subscriptions',
+          headers: {
+            authorization: `Bearer ${mockedToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(500);
       });
     });
   });
