@@ -939,7 +939,7 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
-      planId: price?.product as string,
+      productId: price?.product as string,
       userType,
       plan,
     };
@@ -967,6 +967,7 @@ export class PaymentService {
       .map((price) => {
         return {
           id: price.id,
+          productId: (price.product as Stripe.Product).id,
           currency: currencyValue,
           amount: price.currency_options![currencyValue].unit_amount as number,
           bytes: parseInt(price.metadata.maxSpaceBytes),

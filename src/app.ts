@@ -44,7 +44,7 @@ export async function buildApp(
     logger: envToLogger[config.NODE_ENV] ?? true,
   });
 
-  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService));
+  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(productsController(tiersService, usersService, config), { prefix: '/products' });
   fastify.register(controllerMigration(paymentService, usersService, config));

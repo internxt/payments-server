@@ -30,6 +30,7 @@ import {
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -55,6 +56,7 @@ export default function (
   config: AppConfig,
   cacheService: CacheService,
   licenseCodesService: LicenseCodesService,
+  tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
@@ -952,7 +954,18 @@ export default function (
         }
 
         if (isLifetimeUser) {
-          response = { type: 'lifetime' };
+          try {
+            const userTier = await tiersService.getTiersProductsByUserId(user.id);
+            const lifetimePlan = userTier.filter((tier) => tier.billingType === 'lifetime');
+
+            response = { type: 'lifetime', productId: lifetimePlan[0].productId };
+          } catch (error) {
+            if (!(error instanceof TierNotFoundError)) {
+              throw error;
+            }
+
+            response = { type: 'lifetime' };
+          }
         } else {
           response = await paymentService.getUserSubscription(user.customerId, userType);
         }
