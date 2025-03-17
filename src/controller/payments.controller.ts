@@ -369,7 +369,7 @@ export default function (
         priceId: string;
         currency: string;
         token: string;
-        promoCodeId: string;
+        promoCodeId?: string;
         companyName: string;
         companyVatId: string;
       };
