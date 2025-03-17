@@ -20,8 +20,12 @@ export const getUser = (params?: Partial<User>): User => ({
   ...params,
 });
 
-export const getValidToken = (userUuid: string): string => {
+export const getValidAuthToken = (userUuid: string): string => {
   return jwt.sign({ payload: { uuid: userUuid } }, config.JWT_SECRET);
+};
+
+export const getValidUserToken = (customerId: string): string => {
+  return jwt.sign({ customerId }, config.JWT_SECRET);
 };
 
 export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer => {

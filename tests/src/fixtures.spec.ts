@@ -1,7 +1,7 @@
 import config from '../../src/config';
 import {
   getUser,
-  getValidToken,
+  getValidAuthToken,
   getActiveSubscriptions,
   getCharge,
   getCoupon,
@@ -82,7 +82,7 @@ describe('Test fixtures', () => {
   describe("Token's fixtures", () => {
     it('When generating a token, then it should be a valid JWT', () => {
       const uuid = '223b88d7-f5a0-4592-a76c-22758c074757';
-      const token = getValidToken(uuid);
+      const token = getValidAuthToken(uuid);
 
       expect(token).toBeDefined();
       expect(typeof token).toBe('string');

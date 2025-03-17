@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getUser, getValidToken } from '../fixtures';
+import { getUser, getValidAuthToken } from '../fixtures';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { TiersService } from '../../../src/services/tiers.service';
 import { NotFoundSubscriptionError } from '../../../src/services/payment.service';
@@ -19,7 +19,7 @@ describe('Testing products endpoints', () => {
   describe('Fetching products available for user', () => {
     it('When the user is not found, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
-      const mockedUserToken = getValidToken(mockedUser.uuid);
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError('User not found'));
 
       const response = await app.inject({
@@ -35,7 +35,7 @@ describe('Testing products endpoints', () => {
 
     it('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
-      const mockedUserToken = getValidToken(mockedUser.uuid);
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const getProductsTierSpy = jest
         .spyOn(TiersService.prototype, 'getProductsTier')
@@ -55,7 +55,7 @@ describe('Testing products endpoints', () => {
 
     it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
-      const mockedUserToken = getValidToken(mockedUser.uuid);
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(mockedUser);
       jest.spyOn(TiersService.prototype, 'getProductsTier').mockRejectedValue(new Error('Unexpected error'));
 
@@ -78,7 +78,7 @@ describe('Testing products endpoints', () => {
         },
       };
       const mockedUser = getUser();
-      const mockedUserToken = getValidToken(mockedUser.uuid);
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const getProductsTierSpy = jest
         .spyOn(TiersService.prototype, 'getProductsTier')
