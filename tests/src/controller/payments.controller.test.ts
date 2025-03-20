@@ -1,6 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { getPrice, getPrices, getUniqueCodes, getUser, getValidToken, newTier } from '../fixtures';
+import {
+  getPrice,
+  getPrices,
+  getPromotionCode,
+  getUniqueCodes,
+  getUser,
+  getValidAuthToken,
+  getValidUserToken,
+  newTier,
+} from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUserStorage } from '../../../src/services/storage.service';
 import { PaymentService } from '../../../src/services/payment.service';
@@ -146,7 +155,7 @@ describe('Payment controller e2e tests', () => {
     it('When the user attempts to purchase a lifetime plan and is a free user, then the user should be allowed to purchase the product', async () => {
       const mockedUser = getUser();
       const mockedPrice = getPrice();
-      const mockedToken = getValidToken(mockedUser.uuid);
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
       const paymentIntentResponse = {
         clientSecret: 'client-secret',
         id: 'client-secret-id',
@@ -198,7 +207,7 @@ describe('Payment controller e2e tests', () => {
     it('When the user is close to the storage limit (100TB) and the product to purchase passes it, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedPrice = getPrice();
-      const mockedToken = getValidToken(mockedUser.uuid);
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
       const paymentIntentResponse = {
         clientSecret: 'client-secret',
         id: 'client-secret-id',
@@ -249,7 +258,7 @@ describe('Payment controller e2e tests', () => {
     describe('The user has a lifetime', () => {
       it('When the user has a Tier, then the type of subscription is lifetime and the product ID of the tier is returned', async () => {
         const mockedUser = getUser({ lifetime: true });
-        const mockedToken = getValidToken(mockedUser.uuid);
+        const mockedToken = getValidAuthToken(mockedUser.uuid);
         const mockedTier = newTier({ billingType: 'lifetime' });
         (assertUser as jest.Mock).mockResolvedValue(mockedUser);
         jest.spyOn(CacheService.prototype, 'getSubscription').mockResolvedValue(null);
@@ -275,7 +284,7 @@ describe('Payment controller e2e tests', () => {
       it('When the user does not have a Tier, then the type of subscription is lifetime and the product Id is not returned', async () => {
         const tierNotFoundError = new TierNotFoundError('Tier not found');
         const mockedUser = getUser({ lifetime: true });
-        const mockedToken = getValidToken(mockedUser.uuid);
+        const mockedToken = getValidAuthToken(mockedUser.uuid);
 
         (assertUser as jest.Mock).mockResolvedValue(mockedUser);
         jest.spyOn(CacheService.prototype, 'getSubscription').mockResolvedValue(null);
@@ -300,7 +309,7 @@ describe('Payment controller e2e tests', () => {
       it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
         const unexpectedError = new Error('Unexpected Error');
         const mockedUser = getUser({ lifetime: true });
-        const mockedToken = getValidToken(mockedUser.uuid);
+        const mockedToken = getValidAuthToken(mockedUser.uuid);
 
         (assertUser as jest.Mock).mockResolvedValue(mockedUser);
         jest.spyOn(CacheService.prototype, 'getSubscription').mockResolvedValue(null);
@@ -315,6 +324,76 @@ describe('Payment controller e2e tests', () => {
         });
 
         expect(response.statusCode).toBe(500);
+      });
+    });
+  });
+
+  describe('Creating a subscription for object storage', () => {
+    describe('Object storage subscription with promotion code', () => {
+      it('When the promotion code is not present, then the subscription should be created without discount/coupon', async () => {
+        const mockedUser = getUser();
+        const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
+        const token = getValidUserToken(mockedUser.customerId);
+
+        const mockedBody = {
+          customerId: mockedUser.customerId,
+          priceId: 'mocked_price_id',
+          token,
+        };
+        const createSubscriptionSpy = jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue({
+          type: 'payment',
+          clientSecret: 'client_secret',
+        });
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/create-subscription-for-object-storage',
+          body: mockedBody,
+          headers: {
+            authorization: mockedAuthToken,
+          },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(createSubscriptionSpy).toHaveBeenCalledWith({
+          customerId: mockedBody.customerId,
+          priceId: mockedBody.priceId,
+          promoCodeId: undefined,
+        });
+      });
+
+      it('When promotion code is present, then the subscription should be created with it', async () => {
+        const mockedUser = getUser();
+        const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
+        const mockedPromoCodeId = getPromotionCode();
+        const token = getValidUserToken(mockedUser.customerId);
+
+        const mockedBody = {
+          customerId: mockedUser.customerId,
+          priceId: 'mocked_price_id',
+          token,
+          promoCodeId: mockedPromoCodeId.codeId,
+        };
+        const createSubscriptionSpy = jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue({
+          type: 'payment',
+          clientSecret: 'client_secret',
+        });
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/create-subscription-for-object-storage',
+          body: mockedBody,
+          headers: {
+            authorization: mockedAuthToken,
+          },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(createSubscriptionSpy).toHaveBeenCalledWith({
+          customerId: mockedBody.customerId,
+          priceId: mockedBody.priceId,
+          promoCodeId: mockedBody.promoCodeId,
+        });
       });
     });
   });

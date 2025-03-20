@@ -369,6 +369,7 @@ export default function (
         priceId: string;
         currency: string;
         token: string;
+        promoCodeId?: string;
         companyName: string;
         companyVatId: string;
       };
@@ -392,6 +393,9 @@ export default function (
               currency: {
                 type: 'string',
               },
+              promoCodeId: {
+                type: 'string',
+              },
               companyName: {
                 type: 'string',
               },
@@ -403,7 +407,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
+        const { customerId, priceId, currency, token, promoCodeId, companyName, companyVatId } = req.body;
 
         if (!customerId || !priceId) {
           throw new MissingParametersError(['customerId', 'priceId']);
@@ -428,6 +432,7 @@ export default function (
             priceId,
             currency,
             companyName,
+            promoCodeId,
             companyVatId,
           });
 
