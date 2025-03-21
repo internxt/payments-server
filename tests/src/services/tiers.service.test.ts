@@ -245,7 +245,7 @@ describe('TiersService tests', () => {
   });
 
   describe('Products based on user tier', () => {
-    it('When the user has no active subscription and is not lifetime, then throws NotFoundSubscriptionError', async () => {
+    it('When the user has no active subscription and is not lifetime, then an error indicating so is thrown', async () => {
       const user = getUser();
       const customerId: CustomerId = user.customerId;
       const isLifetime = user.lifetime ?? false;
