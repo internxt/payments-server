@@ -244,100 +244,84 @@ describe('TiersService tests', () => {
     });
   });
 
-  describe('Antivirus access based on user tier', () => {
-    it('When the user has a valid active subscription, then returns antivirus enabled', async () => {
-      const mockedUser = getUser();
-      const customerId: CustomerId = mockedUser.customerId;
-      const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
-
-      jest
-        .spyOn(paymentService, 'getActiveSubscriptions')
-        .mockResolvedValue([activeSubscription as ExtendedSubscription]);
-
-      const antivirusTier = await tiersService.getProductsTier(customerId, false);
-
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true, backups: true },
-      });
-    });
-
-    it('When the user has an active subscription but is not eligible for antivirus, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = getUser().customerId;
-      const activeSubscription = { status: 'active', product: { id: 'some_other_product' } };
-
-      jest
-        .spyOn(paymentService, 'getActiveSubscriptions')
-        .mockResolvedValue([activeSubscription as ExtendedSubscription]);
-
-      const antivirusTier = await tiersService.getProductsTier(customerId, false);
-
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: false, backups: false },
-      });
-    });
-
-    it('When the user has no active subscription but has a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = getUser().customerId;
-      const isLifetime = true;
-
-      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-      jest
-        .spyOn(paymentService, 'getInvoicesFromUser')
-        .mockResolvedValue([
-          { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
-        ] as any);
-
-      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
-
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true, backups: true },
-      });
-    });
-
+  describe('Products based on user tier', () => {
     it('When the user has no active subscription and is not lifetime, then throws NotFoundSubscriptionError', async () => {
-      const customerId: CustomerId = getUser().customerId;
+      const user = getUser();
+      const customerId: CustomerId = user.customerId;
+      const isLifetime = user.lifetime ?? false;
 
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
-      await expect(tiersService.getProductsTier(customerId, false)).rejects.toThrow(
+      await expect(tiersService.getProductsTier(customerId, isLifetime)).rejects.toThrow(
         new NotFoundSubscriptionError('User has no active subscriptions'),
       );
     });
 
-    it('When the user is lifetime but the product is not in the allowed list, then returns antivirus disabled', async () => {
-      const customerId: CustomerId = getUser().customerId;
-      const isLifetime = true;
+    describe('The user has an old subscription or lifetime product', () => {
+      it('When the user has an old subscription, then Antivirus is not enabled but backups yes', async () => {
+        const mockedUser = getUser();
+        const customerId: CustomerId = mockedUser.customerId;
+        const activeSubscription = { status: 'active' };
 
-      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-      jest
-        .spyOn(paymentService, 'getInvoicesFromUser')
-        .mockResolvedValue([{ lines: { data: [{ price: { product: 'some_other_product' } }] } }] as any);
+        jest
+          .spyOn(paymentService, 'getActiveSubscriptions')
+          .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+        const antivirusTier = await tiersService.getProductsTier(customerId, false);
 
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: false, backups: false },
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: false, backups: true },
+        });
+      });
+
+      it('When the user has an old lifetime, then Antivirus is not enabled but backups yes', async () => {
+        const customerId: CustomerId = getUser().customerId;
+        const isLifetime = true;
+
+        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([{ status: 'paid' }] as any);
+
+        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: false, backups: true },
+        });
       });
     });
 
-    it('When the user has both an active subscription and a valid lifetime product, then returns antivirus enabled', async () => {
-      const customerId: CustomerId = getUser().customerId;
-      const isLifetime = true;
-      const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
+    describe('The user has a new subscription or lifetime product', () => {
+      it('When the user has a new valid active subscription, then returns antivirus and backups enabled', async () => {
+        const mockedUser = getUser();
+        const customerId: CustomerId = mockedUser.customerId;
+        const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
-      jest
-        .spyOn(paymentService, 'getActiveSubscriptions')
-        .mockResolvedValue([activeSubscription as ExtendedSubscription]);
-      jest
-        .spyOn(paymentService, 'getInvoicesFromUser')
-        .mockResolvedValue([
-          { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] } },
-        ] as any);
+        jest
+          .spyOn(paymentService, 'getActiveSubscriptions')
+          .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-      const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+        const antivirusTier = await tiersService.getProductsTier(customerId, false);
 
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: true, backups: true },
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: true, backups: true },
+        });
+      });
+
+      it('When the user has a new valid lifetime product, then returns antivirus and backups enabled', async () => {
+        const customerId: CustomerId = getUser().customerId;
+        const isLifetime = true;
+
+        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest
+          .spyOn(paymentService, 'getInvoicesFromUser')
+          .mockResolvedValue([
+            { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
+          ] as any);
+
+        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: true, backups: true },
+        });
       });
     });
   });
