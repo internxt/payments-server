@@ -120,8 +120,9 @@ export class TiersService {
     const activeUserSubscription = userSubscriptions.find(
       (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
     );
+    const hasActiveSubscription = !!activeUserSubscription;
 
-    if (!activeUserSubscription && !isLifetime) {
+    if (!hasActiveSubscription && !isLifetime) {
       throw new NotFoundSubscriptionError('User has no active subscriptions');
     }
 
@@ -146,7 +147,7 @@ export class TiersService {
     return {
       featuresPerService: {
         antivirus: hasToolsAccess,
-        backups: hasToolsAccess,
+        backups: isLifetime || hasActiveSubscription,
       },
     };
   }
