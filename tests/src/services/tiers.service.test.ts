@@ -258,7 +258,7 @@ describe('TiersService tests', () => {
     });
 
     describe('The user has an old subscription or lifetime product', () => {
-      it('When the user has an old subscription, then Antivirus is not enabled but backups yes', async () => {
+      it('When the user has an old subscription, then antivirus is not enabled but backups are', async () => {
         const mockedUser = getUser();
         const customerId: CustomerId = mockedUser.customerId;
         const activeSubscription = { status: 'active' };
@@ -274,7 +274,7 @@ describe('TiersService tests', () => {
         });
       });
 
-      it('When the user has an old lifetime, then Antivirus is not enabled but backups yes', async () => {
+      it('When the user has an old lifetime, then antivirus is not enabled but backups are', async () => {
         const customerId: CustomerId = getUser().customerId;
         const isLifetime = true;
 
