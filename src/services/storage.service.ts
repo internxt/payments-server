@@ -1,12 +1,13 @@
 import axios, { Axios, AxiosRequestConfig } from 'axios';
 import { sign } from 'jsonwebtoken';
-import { type AppConfig } from '../config';
+import config, { type AppConfig } from '../config';
 import { User } from '../core/users/User';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
+    allowInsecureKeySizes: config.NODE_ENV === 'development',
   });
 }
 
