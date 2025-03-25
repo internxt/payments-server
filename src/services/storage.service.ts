@@ -25,7 +25,7 @@ export class StorageService {
         Authorization: `Bearer ${jwt}`,
       },
     };
-    await this.axios.patch(
+    return this.axios.patch(
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${uuid}`,
       { maxSpaceBytes: newStorageBytes },
       params,
