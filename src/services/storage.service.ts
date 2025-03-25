@@ -7,7 +7,7 @@ function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
-    allowInsecureKeySizes: !isProduction,
+    ...(!isProduction ? { allowInsecureKeySizes: true } : null),
   });
 }
 
