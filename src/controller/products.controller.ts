@@ -1,14 +1,20 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppConfig } from '../config';
 import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TiersService } from '../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { User } from '../core/users/User';
+import { ProductsService } from '../services/products.service';
 
-export default function (tiersService: TiersService, usersService: UsersService, config: AppConfig) {
+export default function (
+  tiersService: TiersService,
+  usersService: UsersService,
+  productsService: ProductsService,
+  config: AppConfig,
+) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -52,5 +58,24 @@ export default function (tiersService: TiersService, usersService: UsersService,
         }
       },
     );
+
+    fastify.get('/tier', async (req: FastifyRequest, rep: FastifyReply) => {
+      const userUuid = req.user.payload.uuid;
+      const ownerId = req.user.payload.ownerId;
+
+      try {
+        const higherTier = await productsService.findHigherTierForUser({ userUuid, ownerId });
+
+        return rep.status(200).send(higherTier);
+      } catch (error) {
+        req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
+        if (error instanceof TierNotFoundError) {
+          const freeTier = await tiersService.getTierProductsByProductsId('free');
+          return rep.status(200).send(freeTier);
+        }
+
+        return rep.status(500).send({ message: 'Internal server error' });
+      }
+    });
   };
 }
