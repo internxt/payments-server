@@ -25,7 +25,7 @@ describe('Storage service tests', () => {
       jest.clearAllMocks();
     });
 
-    it('When the user updates the storage, then it should be called with the necessary data ', async () => {
+    it('When the user updates the storage, then it should be called with the necessary data and resolves', async () => {
       const mockedUserUuid = getUser().uuid;
       const newStorageBytes = 100000;
 
@@ -46,6 +46,7 @@ describe('Storage service tests', () => {
           }),
         }),
       );
+      await expect(storageService.changeStorage(mockedUserUuid, newStorageBytes)).resolves.toBeUndefined();
     });
 
     it('When the API request to update the user storage fails, then an error indicating so is thrown', async () => {
