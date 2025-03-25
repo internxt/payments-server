@@ -25,7 +25,7 @@ describe('Storage service tests', () => {
       jest.clearAllMocks();
     });
 
-    it('When the API request to update the user storage fails, then an error indicating so is thrown', async () => {
+    it('When the updates the storage, then it should be done correctly and called with the necessary data', async () => {
       const mockedUserUuid = getUser().uuid;
       const newStorageBytes = 100000;
 
@@ -48,7 +48,7 @@ describe('Storage service tests', () => {
       );
     });
 
-    it('When the updates the storage, then it should be done correctly and called with the necessary data', async () => {
+    it('When the API request to update the user storage fails, then an error indicating so is thrown', async () => {
       const mockedUserUuid = getUser().uuid;
       const newStorageBytes = 100000;
       const randomError = new Error('API request failed');
