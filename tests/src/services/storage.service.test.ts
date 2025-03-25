@@ -25,7 +25,7 @@ describe('Storage service tests', () => {
       jest.clearAllMocks();
     });
 
-    it('When the updates the storage, then it should be done correctly and called with the necessary data', async () => {
+    it('When the user updates the storage, then it should be called with the necessary data ', async () => {
       const mockedUserUuid = getUser().uuid;
       const newStorageBytes = 100000;
 
