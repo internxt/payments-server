@@ -116,6 +116,7 @@ export default function (
             fastify.log,
             cacheService,
             tiersService,
+            storageService,
             objectStorageService,
           );
           break;

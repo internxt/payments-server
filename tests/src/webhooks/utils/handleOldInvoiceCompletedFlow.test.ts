@@ -8,10 +8,10 @@ import { ProductsRepository } from '../../../../src/core/users/ProductsRepositor
 import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
-import { createOrUpdateUser, updateUserTier } from '../../../../src/services/storage.service';
+import { StorageService, updateUserTier } from '../../../../src/services/storage.service';
 import { NoSubscriptionSeatsProvidedError } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
-import { getCustomer, getLogger, getProduct, getUser } from '../../fixtures';
+import { getCustomer, getLogger, getProduct, getUser, voidPromise } from '../../fixtures';
 import testFactory from '../../utils/factory';
 import Stripe from 'stripe';
 import { handleOldInvoiceCompletedFlow } from '../../../../src/webhooks/utils/handleOldInvoiceCompletedFlow';
@@ -20,6 +20,7 @@ const logger = getLogger();
 
 let tiersRepository: TiersRepository;
 let paymentService: PaymentService;
+let storageService: StorageService;
 let usersService: UsersService;
 let usersRepository: UsersRepository;
 let displayBillingRepository: DisplayBillingRepository;
@@ -52,9 +53,8 @@ beforeEach(() => {
     axios,
   );
 
-  jest
-    .spyOn(require('../../../../src/services/storage.service'), 'createOrUpdateUser')
-    .mockImplementation(() => Promise.resolve());
+  storageService = new StorageService(config, axios);
+
   jest
     .spyOn(require('../../../../src/services/storage.service'), 'updateUserTier')
     .mockImplementation(() => Promise.resolve() as any);
@@ -83,6 +83,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
           subscriptionSeats: null,
           product: mockedProduct,
           usersService,
+          storageService,
           userUuid: mockedUser.uuid,
         }),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
@@ -108,6 +109,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
             subscriptionSeats: 3,
             product: mockedProduct,
             usersService,
+            storageService,
             userUuid: mockedUser.uuid,
           }),
         ).rejects.toThrow(Error);
@@ -125,6 +127,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
         });
 
         const initializeWorkspaceSpy = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
+        const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
         await handleOldInvoiceCompletedFlow({
           config,
@@ -135,11 +138,12 @@ describe('When the user completes a successful payment (Old flow)', () => {
           subscriptionSeats: 3,
           product: mockedProduct,
           usersService,
+          storageService,
           userUuid: mockedUser.uuid,
         });
 
         expect(initializeWorkspaceSpy).toHaveBeenCalledTimes(1);
-        expect(createOrUpdateUser).not.toHaveBeenCalled();
+        expect(changeStorageSpy).not.toHaveBeenCalled();
         expect(updateUserTier).not.toHaveBeenCalled();
       });
 
@@ -152,6 +156,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
 
         const updateWorkspaceStorageSpy = jest.spyOn(usersService, 'updateWorkspaceStorage').mockResolvedValue();
         const initializeWorkspaceSpy = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
+        const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
         await handleOldInvoiceCompletedFlow({
           config,
@@ -162,12 +167,13 @@ describe('When the user completes a successful payment (Old flow)', () => {
           subscriptionSeats: 3,
           product: mockedProduct,
           usersService,
+          storageService,
           userUuid: mockedUser.uuid,
         });
 
         expect(updateWorkspaceStorageSpy).toHaveBeenCalledTimes(1);
         expect(initializeWorkspaceSpy).toHaveBeenCalledTimes(0);
-        expect(createOrUpdateUser).not.toHaveBeenCalled();
+        expect(changeStorageSpy).not.toHaveBeenCalled();
         expect(updateUserTier).not.toHaveBeenCalled();
       });
     });
@@ -180,6 +186,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
         id: mockedUser.customerId,
       });
       const mockedProduct = getProduct({});
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
       await handleOldInvoiceCompletedFlow({
         config,
@@ -190,10 +197,11 @@ describe('When the user completes a successful payment (Old flow)', () => {
         subscriptionSeats: 3,
         product: mockedProduct,
         usersService,
+        storageService,
         userUuid: mockedUser.uuid,
       });
 
-      expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
     });
 
@@ -203,8 +211,9 @@ describe('When the user completes a successful payment (Old flow)', () => {
         id: mockedUser.customerId,
       });
       const mockedProduct = getProduct({});
-
-      (createOrUpdateUser as jest.Mock).mockRejectedValue(new Error('Failed to update user storage'));
+      const changeStorageSpy = jest
+        .spyOn(storageService, 'changeStorage')
+        .mockRejectedValue(new Error('Error updating space'));
 
       await expect(
         handleOldInvoiceCompletedFlow({
@@ -216,10 +225,11 @@ describe('When the user completes a successful payment (Old flow)', () => {
           subscriptionSeats: 3,
           product: mockedProduct,
           usersService,
+          storageService,
           userUuid: mockedUser.uuid,
         }),
       ).rejects.toThrow(Error);
-      expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(0);
     });
 
@@ -230,6 +240,7 @@ describe('When the user completes a successful payment (Old flow)', () => {
       });
       const mockedProduct = getProduct({});
 
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
       (updateUserTier as jest.Mock).mockRejectedValue(new Error('Failed to update user storage'));
 
       await expect(
@@ -242,10 +253,11 @@ describe('When the user completes a successful payment (Old flow)', () => {
           subscriptionSeats: 3,
           product: mockedProduct,
           usersService,
+          storageService,
           userUuid: mockedUser.uuid,
         }),
       ).rejects.toThrow(Error);
-      expect(createOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
     });
   });

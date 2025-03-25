@@ -93,6 +93,7 @@ describe('Create or update user when after successful payment', () => {
       paymentService,
       usersService,
       logger,
+      storageService,
       isLifetimeCurrentSub: false,
       customer: mockedCustomer,
       tiersService,
@@ -270,6 +271,7 @@ describe('Create or update user when after successful payment', () => {
       );
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
+        storageService,
         newTier: mockedTier,
         oldTier: mockedTier,
         user: { ...mockedUser, email: mockedUser.email },
@@ -307,6 +309,7 @@ describe('Create or update user when after successful payment', () => {
       });
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
+        storageService,
         newTier: mockedTier,
         oldTier: mockedTier,
         user: { ...mockedUser, email: mockedUser.email },
@@ -359,6 +362,7 @@ describe('Create or update user when after successful payment', () => {
 
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
+        storageService,
         newTier: newLifetimeTier,
         oldTier: oldLifetimeTier,
         user: { ...mockedUser, email: mockedUser.email },

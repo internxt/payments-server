@@ -18,7 +18,7 @@ import {
   NotFoundSubscriptionError,
   PaymentService,
 } from '../../../src/services/payment.service';
-import { createOrUpdateUser, StorageService, updateUserTier } from '../../../src/services/storage.service';
+import { StorageService, updateUserTier } from '../../../src/services/storage.service';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
@@ -45,10 +45,6 @@ let storageService: StorageService;
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
-  .mockImplementation(() => Promise.resolve() as any);
-
-jest
-  .spyOn(require('../../../src/services/storage.service'), 'createOrUpdateUser')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
@@ -573,13 +569,13 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
-      expect(createOrUpdateUser).toHaveBeenCalledWith(
-        tier.featuresPerService[Service.Drive].maxSpaceBytes.toString(),
-        userWithEmail.email,
-        config,
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        userWithEmail.uuid,
+        tier.featuresPerService[Service.Drive].maxSpaceBytes,
       );
       expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });

@@ -10,11 +10,11 @@ import { ProductsRepository } from '../../../../src/core/users/ProductsRepositor
 import { UsersRepository } from '../../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../../src/services/bit2me.service';
 import { PaymentService } from '../../../../src/services/payment.service';
-import { createOrUpdateUser, StorageService, updateUserTier } from '../../../../src/services/storage.service';
+import { StorageService, updateUserTier } from '../../../../src/services/storage.service';
 import { TiersService } from '../../../../src/services/tiers.service';
 import { UsersService } from '../../../../src/services/users.service';
 import testFactory from '../../utils/factory';
-import { getLogger, newTier as getTier, getUser } from '../../fixtures';
+import { getLogger, newTier as getTier, getUser, voidPromise } from '../../fixtures';
 import {
   ExpandStorageNotAvailableError,
   handleStackLifetimeStorage,
@@ -28,7 +28,6 @@ jest.mock('../../../../src/services/storage.service', () => {
 
   return {
     ...actualModule,
-    createOrUpdateUser: jest.fn(),
     updateUserTier: jest.fn(),
     canUserStackStorage: jest.fn(),
   };
@@ -105,7 +104,7 @@ describe('Stack lifetime storage', () => {
         logger: mockedLogger,
         newTier: mockedNewTier,
         oldTier: mockedOldTier,
-
+        storageService,
         user: mockedUser,
       }),
     ).rejects.toThrow(ExpandStorageNotAvailableError);
@@ -122,18 +121,18 @@ describe('Stack lifetime storage', () => {
       canExpand: true,
       currentMaxSpaceBytes: mockedOldTier.featuresPerService['drive'].maxSpaceBytes,
     });
-    (createOrUpdateUser as jest.Mock).mockImplementation();
+    const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
     (updateUserTier as jest.Mock).mockImplementation();
 
     await handleStackLifetimeStorage({
       logger: mockedLogger,
       newTier: mockedNewTier,
       oldTier: mockedOldTier,
-
+      storageService,
       user: mockedUser,
     });
 
-    expect(createOrUpdateUser).toHaveBeenCalledWith(totalSpaceBytes.toString(), mockedUser.email, config);
+    expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, totalSpaceBytes);
     expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, mockedOldTier.productId, config);
   });
 });
