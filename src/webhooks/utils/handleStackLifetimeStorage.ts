@@ -1,7 +1,7 @@
 import { FastifyBaseLogger } from 'fastify';
 import { Tier } from '../../core/users/Tier';
 import { User } from '../../core/users/User';
-import { createOrUpdateUser, updateUserTier } from '../../services/storage.service';
+import { StorageService, updateUserTier } from '../../services/storage.service';
 import config from '../../config';
 import { fetchUserStorage } from '../../utils/fetchUserStorage';
 
@@ -14,6 +14,7 @@ export class ExpandStorageNotAvailableError extends Error {
 }
 
 interface HandleStackLifetimeStorageProps {
+  storageService: StorageService;
   logger: FastifyBaseLogger;
   user: User & { email: string };
   newTier: Tier;
@@ -21,6 +22,7 @@ interface HandleStackLifetimeStorageProps {
 }
 
 export const handleStackLifetimeStorage = async ({
+  storageService,
   logger,
   user,
   newTier,
@@ -41,7 +43,7 @@ export const handleStackLifetimeStorage = async ({
   const totalSpaceBytes = userStorage.currentMaxSpaceBytes + newTierSpaceInBytes;
   const tierToUpdate = newTierSpaceInBytes >= oldTierSpaceInBytes ? newTier.productId : oldTier.productId;
 
-  await createOrUpdateUser(totalSpaceBytes.toString(), user.email, config);
+  await storageService.changeStorage(user.uuid, totalSpaceBytes);
   await updateUserTier(user.uuid, tierToUpdate, config);
   logger.info(`The user storage has been stacked. User uuid: ${user.uuid} / Total space bytes: ${totalSpaceBytes}`);
 };

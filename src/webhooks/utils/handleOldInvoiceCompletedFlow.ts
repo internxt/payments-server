@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { AppConfig } from '../../config';
-import { createOrUpdateUser, updateUserTier } from '../../services/storage.service';
+import { StorageService, updateUserTier } from '../../services/storage.service';
 import { FastifyBaseLogger } from 'fastify';
 import { User } from '../../core/users/User';
 import { UsersService } from '../../services/users.service';
@@ -15,6 +15,7 @@ interface HandleOldInvoiceCompletedFlowProps {
   config: AppConfig;
   product: Stripe.Product;
   usersService: UsersService;
+  storageService: StorageService;
   log: FastifyBaseLogger;
 }
 
@@ -22,6 +23,7 @@ export const handleOldInvoiceCompletedFlow = async ({
   maxSpaceBytes,
   isBusinessPlan,
   usersService,
+  storageService,
   userUuid,
   subscriptionSeats,
   customer,
@@ -68,7 +70,7 @@ export const handleOldInvoiceCompletedFlow = async ({
     return;
   }
 
-  await createOrUpdateUser(maxSpaceBytes.toString(), customer.email as string, config);
+  await storageService.changeStorage(userUuid, Number(maxSpaceBytes));
 
   try {
     await updateUserTier(userUuid, product.id, config);

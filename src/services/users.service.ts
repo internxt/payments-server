@@ -8,13 +8,14 @@ import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
-import { type AppConfig } from '../config';
+import { isProduction, type AppConfig } from '../config';
 import { VpnFeatures } from '../core/users/Tier';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
+    ...(!isProduction ? { allowInsecureKeySizes: true } : null),
   });
 }
 

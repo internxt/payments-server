@@ -1,35 +1,33 @@
 import axios, { Axios, AxiosRequestConfig } from 'axios';
 import { sign } from 'jsonwebtoken';
-import { type AppConfig } from '../config';
+import { isProduction, type AppConfig } from '../config';
 import { User } from '../core/users/User';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
+    ...(!isProduction ? { allowInsecureKeySizes: true } : null),
   });
 }
 
 export class StorageService {
-  public changeStoragePath = 'v2/gateway/storage/users';
-
   constructor(
     private readonly config: AppConfig,
     private readonly axios: Axios,
   ) {}
 
   async changeStorage(uuid: string, newStorageBytes: number): Promise<void> {
-    const jwt = signToken('5m', this.config.STORAGE_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
       },
     };
-
-    await this.axios.put(
-      `${this.config.STORAGE_GATEWAY_URL}/${this.changeStoragePath}/${uuid}`,
-      { bytes: newStorageBytes },
+    return this.axios.patch(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${uuid}`,
+      { maxSpaceBytes: newStorageBytes },
       params,
     );
   }

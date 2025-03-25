@@ -1,7 +1,7 @@
 import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
-import { createOrUpdateUser, StorageService, updateUserTier } from './storage.service';
+import { StorageService, updateUserTier } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
@@ -256,7 +256,7 @@ export class TiersService {
 
     const maxSpaceBytes = features.maxSpaceBytes;
 
-    await createOrUpdateUser(maxSpaceBytes.toString(), userWithEmail.email, this.config);
+    await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 

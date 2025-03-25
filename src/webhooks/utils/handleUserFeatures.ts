@@ -6,12 +6,14 @@ import { FastifyBaseLogger } from 'fastify';
 import { UserNotFoundError, UsersService } from '../../services/users.service';
 import { Service, Tier } from '../../core/users/Tier';
 import { handleStackLifetimeStorage } from './handleStackLifetimeStorage';
+import { StorageService } from '../../services/storage.service';
 
 export interface HandleUserFeaturesProps {
   purchasedItem: Stripe.InvoiceLineItem;
   user: { email: string; uuid: User['uuid']; id?: User['id'] };
   paymentService: PaymentService;
   usersService: UsersService;
+  storageService: StorageService;
   customer: Stripe.Customer;
   tiersService: TiersService;
   isLifetimeCurrentSub?: boolean;
@@ -29,6 +31,7 @@ export const handleUserFeatures = async ({
   customer,
   purchasedItem,
   usersService,
+  storageService,
   isLifetimeCurrentSub,
   paymentService,
   tiersService,
@@ -61,6 +64,7 @@ export const handleUserFeatures = async ({
       );
       await handleStackLifetimeStorage({
         logger,
+        storageService,
         newTier: tier,
         oldTier: oldLifetimeTier,
         user: { ...existingUser, email: user.email },
@@ -145,6 +149,7 @@ export const handleUserFeatures = async ({
         );
         await handleStackLifetimeStorage({
           logger,
+          storageService,
           newTier: tier,
           oldTier: tier,
           user: { ...existingUser, email: user.email },

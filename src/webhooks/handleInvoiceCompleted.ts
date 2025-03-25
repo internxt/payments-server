@@ -10,6 +10,7 @@ import { handleUserFeatures } from './utils/handleUserFeatures';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { handleOldInvoiceCompletedFlow } from './utils/handleOldInvoiceCompletedFlow';
 import config from '../config';
+import { StorageService } from '../services/storage.service';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -61,6 +62,7 @@ export default async function handleInvoiceCompleted(
   log: FastifyBaseLogger,
   cacheService: CacheService,
   tiersService: TiersService,
+  storageService: StorageService,
   objectStorageService: ObjectStorageService,
 ): Promise<void> {
   if (session.status !== 'paid') {
@@ -152,6 +154,7 @@ export default async function handleInvoiceCompleted(
       usersService,
       purchasedItem: items.data[0],
       tiersService,
+      storageService,
       user: {
         email: email ?? '',
         uuid: user.uuid,
@@ -177,6 +180,7 @@ export default async function handleInvoiceCompleted(
         product,
         subscriptionSeats: items.data[0].quantity,
         usersService,
+        storageService,
         userUuid: user.uuid,
       });
 

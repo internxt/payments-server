@@ -56,4 +56,6 @@ if (undefinedMandatoryVariables.length) {
   throw new Error(`Some mandatory variables are undefined: ${undefinedMandatoryVariables.join(' - ')}.`);
 }
 
+export const isProduction = process.env.NODE_ENV === 'production';
+
 export default process.env as AppConfig;

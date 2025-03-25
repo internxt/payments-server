@@ -40,7 +40,6 @@ jest.mock('../../../src/services/storage.service', () => {
 
   return {
     ...actualModule,
-    createOrUpdateUser: jest.fn(),
     updateUserTier: jest.fn(),
   };
 });
