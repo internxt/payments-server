@@ -67,7 +67,7 @@ export default function (
         const higherTier = await productsService.findHigherTierForUser({
           userUuid,
           ownersId,
-          subscriptionType: UserType.Business,
+          subscriptionType: UserType.Individual,
         });
 
         return rep.status(200).send(higherTier);
