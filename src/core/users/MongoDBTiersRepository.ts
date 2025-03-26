@@ -7,9 +7,11 @@ export interface TiersRepository {
 }
 
 function toDomain(tier: WithId<Omit<Tier, 'id'>>): Tier {
+  const { _id, ...userTier } = tier;
+
   return {
-    ...tier,
-    id: tier._id.toString(),
+    ...userTier,
+    id: _id.toString(),
   };
 }
 

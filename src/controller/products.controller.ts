@@ -6,7 +6,7 @@ import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { User } from '../core/users/User';
+import { User, UserType } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 
 export default function (
@@ -61,10 +61,14 @@ export default function (
 
     fastify.get('/tier', async (req: FastifyRequest, rep: FastifyReply) => {
       const userUuid = req.user.payload.uuid;
-      const ownerId = req.user.payload.ownerId;
+      const ownersId = req.user.payload.workspaces.owners;
 
       try {
-        const higherTier = await productsService.findHigherTierForUser({ userUuid, ownerId });
+        const higherTier = await productsService.findHigherTierForUser({
+          userUuid,
+          ownersId,
+          subscriptionType: UserType.Business,
+        });
 
         return rep.status(200).send(higherTier);
       } catch (error) {
