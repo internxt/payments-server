@@ -67,7 +67,7 @@ export interface PaymentIntent {
 }
 
 export type Reason = {
-  name: 'prevent-cancellation' | 'pc-cloud-25';
+  name: 'prevent-cancellation' | 'pc-cloud-25' |'pc-componentes-25';
 };
 
 const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
@@ -83,6 +83,7 @@ const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCr
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
   'pc-cloud-25': 6,
+  'pc-componentes-25': 6,
 };
 
 export type PriceMetadata = {
