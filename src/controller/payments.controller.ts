@@ -522,7 +522,7 @@ export default function (
 
         try {
           const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
-          if (!payload.trial || payload.trial !== 'pc-cloud-25') {
+          if (!payload.trial ||( payload.trial !== 'pc-cloud-25' && payload.trial !== 'pc-componenes-25')) {
             throw new Error('Invalid trial token');
           }
         } catch {
@@ -537,7 +537,7 @@ export default function (
               currency,
             },
             {
-              name: 'pc-cloud-25',
+              name: trialToken,
             },
           );
 
@@ -571,11 +571,16 @@ export default function (
       Querystring: { code: string };
     }>('/trial-for-subscription', async (req, rep) => {
       const { code } = req.query;
-      if (!code || code !== process.env.PC_CLOUD_TRIAL_CODE) {
-        return rep.status(400).send();
+      if (!code || (code !== process.env.PC_CLOUD_TRIAL_CODE && code !== process.env.PC_COMPONENTES_TRIAL_CODE)) {
+        return rep.status(400).send({ message: 'Invalid trial code' });
       }
 
-      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET);
+      if (code === process.env.PC_CLOUD_TRIAL_CODE) {
+        return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET);
+      }else{
+        return jwt.sign({ trial: 'pc-componentes-25' }, config.JWT_SECRET);
+      }
+
     });
 
     fastify.get('/users/exists', async (req, rep) => {
