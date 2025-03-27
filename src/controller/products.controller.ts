@@ -60,6 +60,7 @@ export default function (
     );
 
     fastify.get('/tier', async (req: FastifyRequest, rep: FastifyReply) => {
+      console.log(req.user);
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces.owners;
 
@@ -73,7 +74,7 @@ export default function (
         return rep.status(200).send(higherTier);
       } catch (error) {
         req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
-        if (error instanceof TierNotFoundError) {
+        if (error instanceof UserNotFoundError || error instanceof TierNotFoundError) {
           const freeTier = await tiersService.getTierProductsByProductsId('free');
           return rep.status(200).send(freeTier);
         }
