@@ -527,11 +527,10 @@ export default function (
           if (!payload.trial || !validTrials.includes(payload.trial)) {
             throw new Error('Invalid trial token');
           }
-        } catch {
-          return res.status(403).send('Invalid trial token');
-        }
-
-        try {
+          const metadata = {
+            name: payload.trial,
+            trialToken: trialToken,
+          };
           const subscriptionSetup = await paymentService.createSubscriptionWithTrial(
             {
               customerId,
@@ -539,10 +538,11 @@ export default function (
               currency,
             },
             {
-              name: trialToken,
+            name: metadata.name as 'pc-cloud-25' | 'pc-componentes-25' | 'prevent-cancellation',
             },
           );
-
+          
+      
           return res.send(subscriptionSetup);
         } catch (err) {
           const error = err as Error;
