@@ -400,5 +400,33 @@ describe('Payments Service tests', () => {
         metadata: { 'why-trial': trialReason.name },
       });
     });
+    
+    it('When creating a subscription with trial for pc-componentes-25, then it creates the sub with the correct trial end date', async () => {
+      const fixedDate = new Date('2024-01-01T12:00:00Z');
+      jest.setSystemTime(fixedDate);
+    
+      const expected = getCreateSubscriptionResponse();
+      const payload = {
+        customerId: getCustomer().id,
+        priceId: getPrices().subscription.exists,
+      };
+      const trialReason: Reason = { name: 'pc-componentes-25' };
+    
+      const trialMonths = 6;
+      const expectedTrialEnd = Math.floor(
+        new Date(fixedDate.setMonth(fixedDate.getMonth() + trialMonths)).getTime() / 1000
+      );
+    
+      const createSubSpy = jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(expected);
+    
+      const received = await paymentService.createSubscriptionWithTrial(payload, trialReason);
+    
+      expect(received).toStrictEqual(expected);  
+      expect(createSubSpy).toHaveBeenCalledWith({
+        ...payload,
+        trialEnd: expectedTrialEnd,
+        metadata: { 'why-trial': trialReason.name },
+      });
+    });
   });  
 });
