@@ -19,7 +19,6 @@ import {
   UserAlreadyExistsError,
   CustomerNotFoundError,
   InvalidTaxIdError,
-  Reason,
 } from '../services/payment.service';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
@@ -520,14 +519,14 @@ export default function (
         if (!trialToken) {
           return res.status(403).send('Invalid trial token');
         }
-        const validTrialValues: Reason['name'][] = ['prevent-cancellation', 'pc-cloud-25', 'pc-componentes-25'];
-       
+
+        const validTrials = ['pc-cloud-25', 'pc-componentes-25'];
+
         try {
           const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
-          if (!payload.trial || !validTrialValues.includes(payload.trial as Reason['name'])) {
+          if (!payload.trial || !validTrials.includes(payload.trial)) {
             throw new Error('Invalid trial token');
           }
-          
         } catch {
           return res.status(403).send('Invalid trial token');
         }
