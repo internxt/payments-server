@@ -538,7 +538,7 @@ export default function (
               currency,
             },
             {
-            name: metadata.name as 'pc-cloud-25' | 'pc-componentes-25' | 'prevent-cancellation',
+            name: 'pc-cloud-25' ,
             },
           );
           
