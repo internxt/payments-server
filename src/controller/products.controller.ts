@@ -42,7 +42,10 @@ export default function (tiersService: TiersService, usersService: UsersService,
           return res.status(200).send(antivirusTier);
         } catch (error) {
           if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-            return res.status(404).send({ error: error.message });
+            return res.status(200).send({
+              antivirus: false,
+              backups: false,
+            });
           }
 
           const userUuid = (user! && user.uuid) || 'unknown';
