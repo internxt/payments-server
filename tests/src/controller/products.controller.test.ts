@@ -34,8 +34,10 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({
-        antivirus: false,
-        backups: false,
+        featuresPerService: {
+          antivirus: false,
+          backups: false,
+        },
       });
     });
 
@@ -59,8 +61,10 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({
-        antivirus: false,
-        backups: false,
+        featuresPerService: {
+          antivirus: false,
+          backups: false,
+        },
       });
       expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
     });
