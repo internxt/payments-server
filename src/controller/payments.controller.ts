@@ -520,17 +520,16 @@ export default function (
           return res.status(403).send('Invalid trial token');
         }
 
-        const validTrials = ['pc-cloud-25', 'pc-componentes-25'];
-
         try {
           const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
-          if (!payload.trial || !validTrials.includes(payload.trial)) {
+          if (!payload.trial || !['pc-cloud-25', 'pc-componentes-25'].includes(payload.trial)) {
             throw new Error('Invalid trial token');
           }
-          const metadata = {
-            name: payload.trial,
-            trialToken: trialToken,
-          };
+        } catch {
+          return res.status(403).send('Invalid trial token');
+        }
+
+        try {
           const subscriptionSetup = await paymentService.createSubscriptionWithTrial(
             {
               customerId,
@@ -538,11 +537,10 @@ export default function (
               currency,
             },
             {
-            name: 'pc-cloud-25' ,
+              name: 'pc-cloud-25',
             },
           );
-          
-      
+
           return res.send(subscriptionSetup);
         } catch (err) {
           const error = err as Error;
