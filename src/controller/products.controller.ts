@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
 import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
@@ -59,16 +59,26 @@ export default function (
       },
     );
 
-    fastify.get('/tier', async (req: FastifyRequest, rep: FastifyReply) => {
-      console.log(req.user);
+    fastify.get<{
+      Querystring: { subscriptionType?: 'individual' | 'business' };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: {
+            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
+          };
+        };
+      };
+    }>('/tier', async (req, rep) => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces.owners;
+      const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
 
       try {
         const higherTier = await productsService.findHigherTierForUser({
           userUuid,
           ownersId,
-          subscriptionType: UserType.Individual,
+          subscriptionType,
         });
 
         return rep.status(200).send(higherTier);
