@@ -26,8 +26,9 @@ export default function (tiersService: TiersService, usersService: UsersService,
     fastify.get(
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
-        const userUuid = req.user.payload.uuid;
         let user: User;
+        const userUuid = req.user.payload.uuid;
+
         try {
           user = await usersService.findUserByUuid(userUuid);
 
@@ -46,9 +47,9 @@ export default function (tiersService: TiersService, usersService: UsersService,
             });
           }
 
-          const userUuid = (user! && user.uuid) || 'unknown';
+          const userId = (user! && user.uuid) || userUuid || 'unknown';
 
-          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
+          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
           return res.status(500).send({ error: 'Internal server error' });
         }
       },
