@@ -8,6 +8,7 @@ import fastifyLimit from '@fastify/rate-limit';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { User, UserType } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
+import { Tier } from '../core/users/Tier';
 
 export default function (
   tiersService: TiersService,
@@ -69,7 +70,7 @@ export default function (
           };
         };
       };
-    }>('/tier', async (req, rep) => {
+    }>('/tier', async (req, rep): Promise<Tier | Error> => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces?.owners ?? [];
       const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
