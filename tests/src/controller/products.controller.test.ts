@@ -71,7 +71,6 @@ describe('Testing products endpoints', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(mockedUser);
       jest.spyOn(TiersService.prototype, 'getProductsTier').mockRejectedValue(new Error('Unexpected error'));
       const errorSpy = jest.spyOn(app.log, 'error').mockImplementation(() => {});
-      const logCalledWithUuid = errorSpy.mock.calls.some(([message]) => message.includes(mockedUser.uuid));
 
       const response = await app.inject({
         path: `/products`,
@@ -85,6 +84,8 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(500);
       expect(responseBody).toStrictEqual({ error: 'Internal server error' });
+
+      const logCalledWithUuid = errorSpy.mock.calls.some(([message]) => message.includes(mockedUser.uuid));
       expect(logCalledWithUuid).toBe(true);
 
       errorSpy.mockRestore();
