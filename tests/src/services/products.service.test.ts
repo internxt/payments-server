@@ -9,7 +9,7 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import { StorageService } from '../../../src/services/storage.service';
-import { TiersService } from '../../../src/services/tiers.service';
+import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { getUser, newTier } from '../fixtures';
 import testFactory from '../utils/factory';
@@ -79,6 +79,16 @@ describe('Products Service Tests', () => {
   });
 
   describe('Finding the higher tier for a user', () => {
+    it('When the subscription type is not Individual or Business, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      await expect(
+        productsService.findHigherTierForUser({
+          userUuid: mockedUser.uuid,
+          subscriptionType: UserType.ObjectStorage,
+        }),
+      ).rejects.toThrow(TierNotFoundError);
+    });
+
     describe('When the subscription type is individual', () => {
       it('When the user has a lifetime subscription, then the higher tier is returned', async () => {
         const mockedUser = getUser({
