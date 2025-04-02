@@ -42,8 +42,10 @@ export default function (tiersService: TiersService, usersService: UsersService,
         } catch (error) {
           if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
             return res.status(200).send({
-              antivirus: false,
-              backups: false,
+              featuresPerService: {
+                antivirus: false,
+                backups: false,
+              },
             });
           }
 
