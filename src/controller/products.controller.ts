@@ -71,7 +71,7 @@ export default function (
       };
     }>('/tier', async (req, rep) => {
       const userUuid = req.user.payload.uuid;
-      const ownersId = req.user.payload.workspaces.owners;
+      const ownersId = req.user.payload.workspaces?.owners ?? [];
       const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
 
       try {
