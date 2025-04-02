@@ -30,7 +30,13 @@ describe('Testing products endpoints', () => {
         },
       });
 
-      expect(response.statusCode).toBe(404);
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        antivirus: false,
+        backups: false,
+      });
     });
 
     it('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
@@ -49,7 +55,13 @@ describe('Testing products endpoints', () => {
         },
       });
 
-      expect(response.statusCode).toBe(404);
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        antivirus: false,
+        backups: false,
+      });
       expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
     });
 
@@ -67,7 +79,10 @@ describe('Testing products endpoints', () => {
         },
       });
 
+      const responseBody = response.json();
+
       expect(response.statusCode).toBe(500);
+      expect(responseBody).toStrictEqual({ error: 'Internal server error' });
     });
 
     it('When the user is found and has a valid subscription, then the user is able to use the products', async () => {

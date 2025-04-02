@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
 import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
-import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { TiersService } from '../services/tiers.service';
@@ -28,10 +27,10 @@ export default function (tiersService: TiersService, usersService: UsersService,
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
         let user: User;
-        try {
-          user = await assertUser(req, res, usersService);
+        const userUuid = req.user.payload.uuid;
 
-          if (!user) throw new UserNotFoundError('User does not exist');
+        try {
+          user = await usersService.findUserByUuid(userUuid);
 
           const { customerId, lifetime } = user;
 
@@ -42,12 +41,15 @@ export default function (tiersService: TiersService, usersService: UsersService,
           return res.status(200).send(antivirusTier);
         } catch (error) {
           if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-            return res.status(404).send({ error: error.message });
+            return res.status(200).send({
+              antivirus: false,
+              backups: false,
+            });
           }
 
-          const userUuid = (user! && user.uuid) || 'unknown';
+          const userId = (user! && user.uuid) || 'unknown';
 
-          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
+          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
           return res.status(500).send({ error: 'Internal server error' });
         }
       },
