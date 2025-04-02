@@ -2,7 +2,6 @@ import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
 import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
-import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { TiersService } from '../services/tiers.service';
@@ -27,11 +26,10 @@ export default function (tiersService: TiersService, usersService: UsersService,
     fastify.get(
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
+        const userUuid = req.user.payload.uuid;
         let user: User;
         try {
-          user = await assertUser(req, res, usersService);
-
-          if (!user) throw new UserNotFoundError('User does not exist');
+          user = await usersService.findUserByUuid(userUuid);
 
           const { customerId, lifetime } = user;
 
