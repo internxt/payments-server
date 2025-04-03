@@ -14,6 +14,7 @@ import webhook from './webhooks';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
+import { ProductsService } from './services/products.service';
 
 const envToLogger = {
   development: {
@@ -37,6 +38,7 @@ export async function buildApp(
   tiersService: TiersService,
   licenseCodesService: LicenseCodesService,
   objectStorageService: ObjectStorageService,
+  productsService: ProductsService,
   stripe: Stripe,
   config: AppConfig,
 ): Promise<FastifyInstance> {
@@ -46,7 +48,7 @@ export async function buildApp(
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
-  fastify.register(productsController(tiersService, usersService, config), { prefix: '/products' });
+  fastify.register(productsController(tiersService, usersService, productsService, config), { prefix: '/products' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(

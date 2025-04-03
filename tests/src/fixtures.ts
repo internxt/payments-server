@@ -20,8 +20,13 @@ export const getUser = (params?: Partial<User>): User => ({
   ...params,
 });
 
-export const getValidAuthToken = (userUuid: string): string => {
-  return jwt.sign({ payload: { uuid: userUuid } }, config.JWT_SECRET);
+export const getValidAuthToken = (
+  userUuid: string,
+  workspaces?: {
+    owners: string[];
+  },
+): string => {
+  return jwt.sign({ payload: { uuid: userUuid, workspaces } }, config.JWT_SECRET);
 };
 
 export const getValidUserToken = (customerId: string): string => {
