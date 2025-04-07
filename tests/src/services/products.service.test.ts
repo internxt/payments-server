@@ -82,7 +82,7 @@ describe('Products Service Tests', () => {
     it('When the subscription type is not Individual or Business, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       await expect(
-        productsService.findHigherTierForUser({
+        productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.ObjectStorage,
         }),
@@ -100,7 +100,7 @@ describe('Products Service Tests', () => {
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
-        const result = await productsService.findHigherTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -118,7 +118,7 @@ describe('Products Service Tests', () => {
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await productsService.findHigherTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -138,7 +138,7 @@ describe('Products Service Tests', () => {
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await productsService.findHigherTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid],
           subscriptionType: UserType.Business,
@@ -175,7 +175,7 @@ describe('Products Service Tests', () => {
           return [];
         });
 
-        const result = await productsService.findHigherTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid, mockedOwner.uuid],
           subscriptionType: UserType.Business,

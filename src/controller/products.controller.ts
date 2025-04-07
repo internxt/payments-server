@@ -76,7 +76,7 @@ export default function (
       const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
 
       try {
-        const higherTier = await productsService.findHigherTierForUser({
+        const higherTier = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
           subscriptionType,

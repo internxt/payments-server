@@ -9,7 +9,7 @@ export class ProductsService {
     private readonly usersService: UsersService,
   ) {}
 
-  async findHigherTierForUser({
+  async getApplicableTierForUser({
     userUuid,
     ownersId,
     subscriptionType,
