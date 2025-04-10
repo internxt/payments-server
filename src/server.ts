@@ -29,6 +29,7 @@ import { Bit2MeService } from './services/bit2me.service';
 import { TiersService } from './services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
+import { ProductsService } from './services/products.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -71,6 +72,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     envVariablesConfig,
   );
 
+  const productsService = new ProductsService(tiersService, usersService);
+
   const fastify = await buildApp(
     paymentService,
     storageService,
@@ -79,6 +82,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     tiersService,
     licenseCodesService,
     objectStorageService,
+    productsService,
     stripe,
     envVariablesConfig,
   );

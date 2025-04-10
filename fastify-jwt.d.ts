@@ -6,10 +6,13 @@ declare module '@fastify/jwt' {
       payload: {
         email: string;
         uuid: string;
+        workspaces: {
+          owners: string[];
+        };
         name: string;
         lastname: string;
         username: string;
-        sharedWorkspace: boolean,
+        sharedWorkspace: boolean;
         networkCredentials: {
           user: string;
           pass: string;

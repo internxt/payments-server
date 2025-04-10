@@ -4,10 +4,17 @@ import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TiersService } from '../services/tiers.service';
-import { User } from '../core/users/User';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { User, UserType } from '../core/users/User';
+import { ProductsService } from '../services/products.service';
+import { Tier } from '../core/users/Tier';
 
-export default function (tiersService: TiersService, usersService: UsersService, config: AppConfig) {
+export default function (
+  tiersService: TiersService,
+  usersService: UsersService,
+  productsService: ProductsService,
+  config: AppConfig,
+) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -56,5 +63,39 @@ export default function (tiersService: TiersService, usersService: UsersService,
         }
       },
     );
+
+    fastify.get<{
+      Querystring: { subscriptionType?: 'individual' | 'business' };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: {
+            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
+          };
+        };
+      };
+    }>('/tier', async (req, rep): Promise<Tier | Error> => {
+      const userUuid = req.user.payload.uuid;
+      const ownersId = req.user.payload.workspaces?.owners ?? [];
+      const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
+
+      try {
+        const higherTier = await productsService.getApplicableTierForUser({
+          userUuid,
+          ownersId,
+          subscriptionType,
+        });
+
+        return rep.status(200).send(higherTier);
+      } catch (error) {
+        req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
+        if (error instanceof UserNotFoundError || error instanceof TierNotFoundError) {
+          const freeTier = await tiersService.getTierProductsByProductsId('free');
+          return rep.status(200).send(freeTier);
+        }
+
+        return rep.status(500).send({ message: 'Internal server error' });
+      }
+    });
   };
 }
