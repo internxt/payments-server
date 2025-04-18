@@ -1,6 +1,7 @@
 import { UsersService } from './users.service';
 import { PaymentService } from './payment.service';
 import { User } from '../core/users/User';
+import Stripe from 'stripe';
 
 export class CustomerSyncService {
   constructor(
@@ -39,11 +40,15 @@ export class CustomerSyncService {
       return customer.id;
     }
 
-    const matchedCustomer = stripeCustomers.find(async (customer) => {
-      const customerId = customer.id;
-      const matched = await this.usersService.findUserByCustomerID(customerId);
-      return matched?.uuid === uuid;
-    });
+    let matchedCustomer: Stripe.Customer | undefined;
+
+    for (const customer of stripeCustomers) {
+      const matched = await this.usersService.findUserByCustomerID(customer.id);
+      if (matched?.uuid === uuid) {
+        matchedCustomer = customer;
+        break;
+      }
+    }
 
     if (matchedCustomer) {
       return matchedCustomer.id;
