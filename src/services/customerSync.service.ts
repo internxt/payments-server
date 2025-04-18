@@ -30,7 +30,6 @@ export class CustomerSyncService {
 
       if (!existingUser) return customer.id;
 
-      // Si el uuid ha cambiado, actualizamos
       if (existingUser.uuid !== uuid) {
         await this.usersService.updateUser(customer.id, {
           uuid,
