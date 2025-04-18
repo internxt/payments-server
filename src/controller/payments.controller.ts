@@ -31,6 +31,7 @@ import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { CustomerSyncService } from '../services/customerSync.service';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -173,6 +174,7 @@ export default function (
       },
       async (req, res) => {
         const { name, email, country, companyVatId } = req.body;
+        const { uuid } = req.user.payload;
 
         if (!email) {
           return res.status(404).send({
@@ -181,26 +183,22 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createOrGetCustomer(
-            {
-              name,
-              email,
-            },
-            country,
-            companyVatId,
-          );
+          const customerSyncService = new CustomerSyncService(usersService, paymentService);
 
-          const token = jwt.sign(
-            {
-              customerId: id,
-            },
-            config.JWT_SECRET,
-          );
+          const existingCustomerId = await customerSyncService.findOrSyncCustomerByUuidOrEmail(uuid, email);
 
-          return res.send({
-            customerId: id,
-            token,
-          });
+          if (existingCustomerId) {
+            const token = jwt.sign({ customerId: existingCustomerId }, config.JWT_SECRET);
+            return res.send({ customerId: existingCustomerId, token });
+          }
+
+          const { id } = await paymentService.createCustomer({ name, email });
+
+          await paymentService.getVatIdAndAttachTaxIdToCustomer(id, country, companyVatId);
+
+          const token = jwt.sign({ customerId: id }, config.JWT_SECRET);
+
+          return res.send({ customerId: id, token });
         } catch (err) {
           const error = err as Error;
 

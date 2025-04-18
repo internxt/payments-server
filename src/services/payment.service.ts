@@ -139,7 +139,7 @@ export class PaymentService {
     return customer;
   }
 
-  private async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
+  async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
     try {
       if (country && companyVatId) {
         const taxIds = this.getVatIdFromCountry(country);
