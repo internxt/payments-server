@@ -183,15 +183,6 @@ export default function (
         }
 
         try {
-          if (uuid) {
-            const user = await usersService.findUserByUuid(uuid);
-            return user.customerId;
-          }
-        } catch (error) {
-          req.log.info(`User with uuid ${uuid} does not exists in our Local DB`);
-        }
-
-        try {
           const customerSyncService = new CustomerSyncService(usersService, paymentService);
 
           const existingCustomerId = await customerSyncService.findOrSyncCustomerByUuidOrEmail(uuid, email);
