@@ -38,7 +38,7 @@ export class UsersService {
     private readonly axios: Axios,
   ) {}
 
-  async updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<void> {
+  async updateUser(customerId: User['customerId'], body: Partial<User>): Promise<void> {
     const updated = await this.usersRepository.updateUser(customerId, body);
     if (!updated) {
       throw new UserNotFoundError();
