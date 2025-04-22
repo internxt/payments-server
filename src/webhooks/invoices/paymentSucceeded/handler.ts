@@ -50,7 +50,7 @@ export async function handleInvoiceCompleted({
 }: HandleInvoiceCompletedProps) {
   // 1. Check if the invoice is paid (status = paid)
   if (session.status !== 'paid') {
-    logger.error(`The invoice ${session.id} has not paid successfully, processed without action`);
+    logger.error(`[${session.id}] The invoice has not paid successfully, processed without action`);
     return;
   }
 
@@ -81,12 +81,16 @@ export async function handleInvoiceCompleted({
   } = ctx;
 
   if (customer.deleted) {
-    logger.error(`Customer ${customerId} from invoice ${invoiceId} does not exist or has been deleted.`);
+    logger.error(
+      `[${session.id}] Customer ${customerId} from invoice ${invoiceId} does not exist or has been deleted.`,
+    );
     return;
   }
 
   if (!price) {
-    logger.error(`Invoice completed with id ${invoiceId} does not contain price, customer: ${session.customer_email}`);
+    logger.error(
+      `[${session.id}] Invoice completed with id ${invoiceId} does not contain price, customer: ${session.customer_email}`,
+    );
     return;
   }
 
@@ -109,7 +113,7 @@ export async function handleInvoiceCompleted({
       user = response.data;
     } else {
       logger.error(
-        `Error searching for an user by email in checkout session completed handler, email: ${customerEmail}. ERROR: ${err}`,
+        `[${session.id}] Error searching for an user by email in checkout session completed handler, email: ${customerEmail}. ERROR: ${err}`,
       );
       throw err;
     }
@@ -123,13 +127,13 @@ export async function handleInvoiceCompleted({
   if (isLifetime && userHasActiveSubscription) {
     try {
       logger.info(
-        `User with customer id: ${customer.id} amd email ${customer.email} has an active individual subscription and is buying a lifetime plan. Cancelling individual plan`,
+        `[${session.id}] User with customer id: ${customer.id} amd email ${customer.email} has an active individual subscription and is buying a lifetime plan. Cancelling individual plan`,
       );
       await paymentService.cancelSubscription(userActiveSubscription.subscriptionId);
     } catch (error) {
       const err = error as Error;
       logger.error(
-        `Error while cancelling the user active subscription - CUSTOMER ID: ${customerId} / SUBSCRIPTION ID: ${userActiveSubscription.subscriptionId}. ERROR: ${err.stack ?? err.message}`,
+        `[${session.id}]  Error while cancelling the user active subscription - CUSTOMER ID: ${customerId} / SUBSCRIPTION ID: ${userActiveSubscription.subscriptionId}. ERROR: ${err.stack ?? err.message}`,
       );
     }
   }
@@ -148,10 +152,12 @@ export async function handleInvoiceCompleted({
           lifetimeTier.featuresPerService[Service.Drive].maxSpaceBytes,
         );
 
-        logger.info(`[LIFETIME/STACK] User ${user.uuid} will stack storage up to ${userStackedStorage} bytes`);
+        logger.info(
+          `[${session.id}] [LIFETIME/STACK] User ${user.uuid} will stack storage up to ${userStackedStorage} bytes`,
+        );
       }
     } catch (error) {
-      logger.warn(`Could not stack storage for user ${user.uuid}: ${(error as Error).message}`);
+      logger.warn(`[${session.id}] Could not stack storage for user ${user.uuid}: ${(error as Error).message}`);
     }
   }
   // 9a. Apply tier
@@ -205,7 +211,7 @@ export async function handleInvoiceCompleted({
       usersService,
     });
   } catch (error) {
-    logger.info('');
+    logger.info(`[${session.id}] Error while Inserting/updating the user-tier relationship`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
@@ -222,8 +228,13 @@ export async function handleInvoiceCompleted({
   // 11. Clear subscription cache
   try {
     await cacheService.clearSubscription(customer.id);
-    logger.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);
+    logger.info(
+      `[${session.id}] Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`,
+    );
   } catch (err) {
-    logger.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);
+    const error = err as Error;
+    logger.error(
+      `[${session.id}] Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription. ERROR: ${error.stack ?? error.message}`,
+    );
   }
 }
