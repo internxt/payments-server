@@ -74,7 +74,7 @@ export default async function handleInvoiceCompleted(
 
   if (customer.deleted) {
     log.error(
-      `Customer ${session.customer} could not be retrieved in invoice.payment_succeeded event for invoice ${session.id}`,
+      `Customer ${session.customer as string} could not be retrieved in invoice.payment_succeeded event for invoice ${session.id}`,
     );
     return;
   }

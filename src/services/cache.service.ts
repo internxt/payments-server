@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
+const INVOICE_LOCK_TTL_SECONDS = 60 * 60 * 24 * 3;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -15,6 +16,24 @@ export default class CacheService {
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {
     return `subscription-${customerId}-${userType}`;
+  }
+
+  private buildInvoiceLockKey(invoiceId: string) {
+    return `invoice-lock:${invoiceId}`;
+  }
+
+  async setInvoiceLock(invoiceId: string): Promise<boolean> {
+    const ok = await this.redis.set(this.buildInvoiceLockKey(invoiceId), '1', 'EX', INVOICE_LOCK_TTL_SECONDS, 'NX');
+    return ok === 'OK';
+  }
+
+  async getInvoiceLock(invoiceId: string): Promise<boolean> {
+    const exists = await this.redis.exists(this.buildInvoiceLockKey(invoiceId));
+    return exists === 1;
+  }
+
+  async clearInvoiceLock(invoiceId: string): Promise<void> {
+    await this.redis.del(this.buildInvoiceLockKey(invoiceId));
   }
 
   async getSubscription(
@@ -30,11 +49,7 @@ export default class CacheService {
     }
   }
 
-  async setSubscription(
-    customerId: string,
-    userType: UserType,
-    subscription: UserSubscription,
-  ): Promise<void> {
+  async setSubscription(customerId: string, userType: UserType, subscription: UserSubscription): Promise<void> {
     await this.redis.set(
       this.buildSubscriptionKey(customerId, userType),
       JSON.stringify(subscription),
@@ -43,10 +58,7 @@ export default class CacheService {
     );
   }
 
-  async clearSubscription(
-    customerId: string,
-    userType: UserType = UserType.Individual,
-  ): Promise<void> {
+  async clearSubscription(customerId: string, userType: UserType = UserType.Individual): Promise<void> {
     await this.redis.del(this.buildSubscriptionKey(customerId, userType));
   }
 }

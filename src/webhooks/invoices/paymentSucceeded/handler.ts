@@ -160,6 +160,16 @@ export async function handleInvoiceCompleted({
       logger.warn(`[${session.id}] Could not stack storage for user ${user.uuid}: ${(error as Error).message}`);
     }
   }
+
+  try {
+    const isFirstTrigger = await cacheService.getInvoiceLock(session.id);
+    if (!isFirstTrigger) return;
+  } catch (error) {
+    const err = error as Error;
+    logger.error(
+      `[${session.id}] Error checking if the event has been triggered previously. ERROR: ${err.stack ?? err.message}`,
+    );
+  }
   // 9a. Apply tier
   try {
     const tier = await tiersService.getTierProductsByProductsId(product.id, billingType);
@@ -190,6 +200,8 @@ export async function handleInvoiceCompleted({
       userUuid: user.uuid,
     });
   }
+
+  await cacheService.setInvoiceLock(session.id);
 
   // 9b. Insert - update user
   await upsertUser({
@@ -228,6 +240,7 @@ export async function handleInvoiceCompleted({
   // 11. Clear subscription cache
   try {
     await cacheService.clearSubscription(customer.id);
+    await cacheService.clearInvoiceLock(session.id);
     logger.info(
       `[${session.id}] Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`,
     );
