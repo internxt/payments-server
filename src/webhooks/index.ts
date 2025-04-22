@@ -6,7 +6,6 @@ import { UsersService } from '../services/users.service';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/payment.service';
-import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
@@ -16,6 +15,7 @@ import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 import { TiersService } from '../services/tiers.service';
+import { handleInvoiceCompleted } from './invoices/paymentSucceeded/handler';
 
 export default function (
   stripe: Stripe,
@@ -109,16 +109,16 @@ export default function (
         }
 
         case 'invoice.payment_succeeded':
-          await handleInvoiceCompleted(
-            event.data.object,
-            usersService,
-            paymentService,
-            fastify.log,
+          await handleInvoiceCompleted({
+            session: event.data.object,
+            logger: fastify.log,
             cacheService,
-            tiersService,
-            storageService,
             objectStorageService,
-          );
+            paymentService,
+            storageService,
+            tiersService,
+            usersService,
+          });
           break;
 
         case 'checkout.session.completed':
