@@ -26,27 +26,35 @@ export class CustomerSyncService {
     }
 
     if (stripeCustomers.length === 1) {
-      const [customer] = stripeCustomers;
-      const existingUser = await this.usersService.findUserByCustomerID(customer.id);
+      try {
+        const [customer] = stripeCustomers;
+        const existingUser = await this.usersService.findUserByCustomerID(customer.id);
 
-      if (!existingUser) return customer.id;
+        if (!existingUser) return customer.id;
 
-      if (existingUser.uuid !== uuid) {
-        await this.usersService.updateUser(customer.id, {
-          uuid,
-        });
+        if (existingUser.uuid !== uuid) {
+          await this.usersService.updateUser(customer.id, {
+            uuid,
+          });
+        }
+
+        return customer.id;
+      } catch {
+        return null;
       }
-
-      return customer.id;
     }
 
     let matchedCustomer: Stripe.Customer | undefined;
 
     for (const customer of stripeCustomers) {
-      const matched = await this.usersService.findUserByCustomerID(customer.id);
-      if (matched?.uuid === uuid) {
-        matchedCustomer = customer;
-        break;
+      try {
+        const matched = await this.usersService.findUserByCustomerID(customer.id);
+        if (matched?.uuid === uuid) {
+          matchedCustomer = customer;
+          break;
+        }
+      } catch {
+        //
       }
     }
 
