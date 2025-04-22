@@ -127,8 +127,9 @@ export async function handleInvoiceCompleted({
       );
       await paymentService.cancelSubscription(userActiveSubscription.subscriptionId);
     } catch (error) {
+      const err = error as Error;
       logger.error(
-        `Error while cancelling the user active subscription - CUSTOMER ID: ${customerId} / SUBSCRIPTION ID: ${userActiveSubscription.subscriptionId}`,
+        `Error while cancelling the user active subscription - CUSTOMER ID: ${customerId} / SUBSCRIPTION ID: ${userActiveSubscription.subscriptionId}. ERROR: ${err.stack ?? err.message}`,
       );
     }
   }
@@ -194,16 +195,23 @@ export async function handleInvoiceCompleted({
   });
 
   // 9c. Insert user-tier relationship if needed
-  await upsertUserTierRelationship({
-    productId: product.id,
-    userUuid: user.uuid,
-    billingType,
-    isBusinessPlan,
-    tiersService,
-    usersService,
-  });
+  try {
+    await upsertUserTierRelationship({
+      productId: product.id,
+      userUuid: user.uuid,
+      billingType,
+      isBusinessPlan,
+      tiersService,
+      usersService,
+    });
+  } catch (error) {
+    logger.info('');
+    if (!(error instanceof TierNotFoundError)) {
+      throw error;
+    }
+  }
 
-  // 9. If the user used a coupon code, check if it is trackable and add the user-coupon relationship if needed
+  // 10. If the user used a coupon code, check if it is trackable and add the user-coupon relationship if needed
   await storeCouponUsedByUser({
     lineItem: lineItems,
     logger,
@@ -211,7 +219,7 @@ export async function handleInvoiceCompleted({
     userUuid: user.uuid,
   });
 
-  // 10. Clear subscription cache
+  // 11. Clear subscription cache
   try {
     await cacheService.clearSubscription(customer.id);
     logger.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);

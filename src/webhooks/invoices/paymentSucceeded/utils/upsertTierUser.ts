@@ -18,19 +18,19 @@ export async function upsertUserTierRelationship({
   tiersService: TiersService;
   usersService: UsersService;
 }) {
-  const tier = await tiersService.getTierProductsByProductsId(productId, billingType);
   const existingUser = await usersService.findUserByUuid(userUuid);
-  const userExistingTiers = await tiersService.getTiersProductsByUserId(existingUser.id);
-
-  const tierToUpdate = isBusinessPlan
-    ? userExistingTiers.find((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled)
-    : userExistingTiers[0];
-
-  if (!tierToUpdate) {
-    throw new TierNotFoundError(`User with ID: ${userUuid} does not have any tier attached to him`);
-  }
+  const tier = await tiersService.getTierProductsByProductsId(productId, billingType);
 
   try {
+    const userExistingTiers = await tiersService.getTiersProductsByUserId(existingUser.id);
+
+    const tierToUpdate = isBusinessPlan
+      ? userExistingTiers.find((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled)
+      : userExistingTiers[0];
+
+    if (!tierToUpdate) {
+      throw new TierNotFoundError(`User with ID: ${userUuid} does not have any tier attached to him`);
+    }
     await tiersService.updateTierToUser(existingUser.id, tierToUpdate.id, tier.id);
   } catch (error) {
     await tiersService.insertTierToUser(existingUser.id, tier.id);

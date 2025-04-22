@@ -34,9 +34,11 @@ export const handleCancelPlan = async ({
 
   log.info(`[CANCEL PLAN HANDLER]: THe user data for the customer ${userId} has been downgraded in handleCancelPlan`);
 
-  await tiersService.removeTier({ ...user, email: customerEmail }, productId, log);
-
-  log.info(`[CANCEL PLAN HANDLER]: The tier for the user ${userId} has been removed`);
+  try {
+    await tiersService.removeTier({ ...user, email: customerEmail }, productId, log);
+  } catch (error) {
+    log.info(`[CANCEL PLAN HANDLER]: The tier for the user ${userId} has been removed`);
+  }
 
   const userTiers = await tiersService.getTiersProductsByUserId(user.id);
 
