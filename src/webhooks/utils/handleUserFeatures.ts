@@ -79,7 +79,9 @@ export const handleUserFeatures = async ({
         logger.info(
           `Tier updated while stacking lifetime storage because the new one is highest than the old one. User Uuid: ${user.uuid} / tier Id: ${newTierId}`,
         );
-        await tiersService.applyTier(user, customer, purchasedItem.quantity, tierToUpdate, logger, [Service.Drive]);
+        await tiersService.applyTier(user, customer, purchasedItem.quantity, tierToUpdate, logger, tier, [
+          Service.Drive,
+        ]);
 
         if (oldLifetimeTier.id !== newTierId) {
           await tiersService.updateTierToUser(existingUser.id, oldLifetimeTier.id, newTierId);
@@ -111,7 +113,7 @@ export const handleUserFeatures = async ({
 
     const oldTierId = existingTier.id;
 
-    await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger);
+    await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger, tier);
     await usersService.updateUser(customer.id, {
       lifetime: isLifetimePlan,
     });
@@ -131,7 +133,7 @@ export const handleUserFeatures = async ({
 
       const newUser = await usersService.findUserByUuid(user.uuid);
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger, tier);
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
@@ -156,7 +158,7 @@ export const handleUserFeatures = async ({
         });
       }
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger, excludedServices);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, logger, tier, excludedServices);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
