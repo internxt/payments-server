@@ -44,7 +44,7 @@ export class DetermineLifetimeConditions {
     if (isFree) {
       return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
     } else if (isSubscriber) {
-      await this.paymentsService.cancelSubscription(subscription.subscriptionId);
+      // await this.paymentsService.cancelSubscription(subscription.subscriptionId);
 
       return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
     } else if (isLifetime) {
