@@ -102,6 +102,7 @@ export async function handleInvoiceCompleted({
   // 4. Handle cases for object storage
   if (isObjectStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, logger);
+    return;
   }
 
   // 5. Get customer UUID
