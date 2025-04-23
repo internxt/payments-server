@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
-const INVOICE_LOCK_TTL_SECONDS = 60 * 60 * 24 * 3;
+const LIFETIME_STACK_TTL = 60 * 60 * 24 * 4;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -18,22 +18,21 @@ export default class CacheService {
     return `subscription-${customerId}-${userType}`;
   }
 
-  private buildInvoiceLockKey(invoiceId: string) {
-    return `invoice-lock:${invoiceId}`;
+  private buildLifetimeStackKey(invoiceId: string) {
+    return `lifetime-stack:${invoiceId}`;
   }
 
-  async setInvoiceLock(invoiceId: string): Promise<boolean> {
-    const ok = await this.redis.set(this.buildInvoiceLockKey(invoiceId), '1', 'EX', INVOICE_LOCK_TTL_SECONDS, 'NX');
-    return ok === 'OK';
-  }
+  async setFirstStackValue(invoiceId: string, bytes: number): Promise<number> {
+    const ok = await this.redis.set(
+      this.buildLifetimeStackKey(invoiceId),
+      String(bytes),
+      'EX',
+      LIFETIME_STACK_TTL,
+      'NX',
+    );
 
-  async getInvoiceLock(invoiceId: string): Promise<boolean> {
-    const exists = await this.redis.exists(this.buildInvoiceLockKey(invoiceId));
-    return exists === 1;
-  }
-
-  async clearInvoiceLock(invoiceId: string): Promise<void> {
-    await this.redis.del(this.buildInvoiceLockKey(invoiceId));
+    if (ok === 'OK') return bytes;
+    return Number(await this.redis.get(this.buildLifetimeStackKey(invoiceId)));
   }
 
   async getSubscription(
