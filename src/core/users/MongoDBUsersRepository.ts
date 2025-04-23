@@ -20,6 +20,11 @@ export class MongoDBUsersRepository implements UsersRepository {
     return result.matchedCount === 1;
   }
 
+  async upsertUser(uuid: string, body: Omit<User, 'id'>): Promise<boolean> {
+    const result = await this.collection.updateOne({ uuid: uuid }, { $set: body }, { upsert: true });
+    return result.matchedCount === 1;
+  }
+
   async findUserByCustomerId(customerId: string): Promise<User | null> {
     const user = await this.collection.findOne({ customer_id: customerId });
 

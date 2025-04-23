@@ -41,7 +41,7 @@ export async function upsertUserTierRelationship({
     if (!shouldUpdateLifetimeTier) return;
 
     await tiersService.updateTierToUser(existingUser.id, tierToUpdate.id, tier.id);
-  } catch (error) {
+  } catch {
     await tiersService.insertTierToUser(existingUser.id, tier.id);
   }
 }

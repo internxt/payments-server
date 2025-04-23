@@ -5,4 +5,5 @@ export interface UsersRepository {
   findUserByUuid(uuid: User['uuid']): Promise<User | null>;
   insertUser(user: Omit<User, 'id'>): Promise<void>;
   updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<boolean>;
+  upsertUser(customerId: User['customerId'], body: Omit<User, 'id'>): Promise<boolean>;
 }

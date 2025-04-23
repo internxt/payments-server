@@ -1,7 +1,7 @@
 import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import { PaymentService, PriceMetadata } from '../../../services/payment.service';
-import { User, UserType } from '../../../core/users/User';
+import { User } from '../../../core/users/User';
 import { ObjectStorageService } from '../../../services/objectStorage.service';
 import { UsersService } from '../../../services/users.service';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
@@ -11,12 +11,12 @@ import CacheService from '../../../services/cache.service';
 import { handleOldInvoiceCompletedFlow } from '../../utils/handleOldInvoiceCompletedFlow';
 import config from '../../../config';
 import { StorageService } from '../../../services/storage.service';
-import { Service } from '../../../core/users/Tier';
+import { Service, Tier } from '../../../core/users/Tier';
 import { handleObjectStorageInvoiceCompleted } from '../../utils/handleObjStorageInvoiceCompleted';
 import { buildInvoiceContext, InvoiceContext } from './utils/buildInvoiceContext';
-import { upsertUser } from './utils/upsertUser';
 import { upsertUserTierRelationship } from './utils/upsertTierUser';
 import { storeCouponUsedByUser } from './utils/storeCouponUsedByUser';
+import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 
 interface HandleInvoiceCompletedProps {
   session: Stripe.Invoice;
@@ -97,7 +97,6 @@ export async function handleInvoiceCompleted({
   const { maxSpaceBytes } = price.metadata as PriceMetadata;
   const amountOfSeats = seats;
   let user: { uuid: string };
-  let userStackedStorage;
 
   // 4. Handle cases for object storage
   if (isObjectStoragePlan) {
@@ -120,59 +119,42 @@ export async function handleInvoiceCompleted({
     }
   }
 
-  // 6. Check if the user purchased a lifetime and has an active subscription
-  const userActiveSubscription = await paymentService.getUserSubscription(customerId, UserType.Individual);
-  const userHasActiveSubscription = userActiveSubscription.type === 'subscription';
+  const existingUser = await usersService.findUserByUuid(user.uuid).catch(() => null);
 
-  // 7. If has an active subscription, cancel it to apply the lifetime tier
-  if (isLifetime && userHasActiveSubscription) {
-    try {
-      logger.info(
-        `[${session.id}] User with customer id: ${customer.id} amd email ${customer.email} has an active individual subscription and is buying a lifetime plan. Cancelling individual plan`,
-      );
-      await paymentService.cancelSubscription(userActiveSubscription.subscriptionId);
-    } catch (error) {
-      const err = error as Error;
-      logger.error(
-        `[${session.id}]  Error while cancelling the user active subscription - CUSTOMER ID: ${customerId} / SUBSCRIPTION ID: ${userActiveSubscription.subscriptionId}. ERROR: ${err.stack ?? err.message}`,
-      );
-    }
-  }
+  const lifetime = isBusinessPlan && existingUser ? existingUser.lifetime : isLifetime;
 
-  // 8. If has a lifetime, stack storage (increasing maxSpaceBytes)
-  if (isLifetime) {
-    try {
-      const userData = await usersService.findUserByUuid(user.uuid);
-      const userHasLifetime = userData.lifetime;
+  await usersService.upsertUserByUuid(user.uuid, {
+    customerId: customer.id,
+    uuid: user.uuid,
+    lifetime,
+  });
 
-      if (userHasLifetime) {
-        const lifetimeTier = await tiersService.getTierProductsByProductsId(product.id, 'lifetime');
-
-        userStackedStorage = await getStackedSpace(
-          { uuid: user.uuid, email: customerEmail },
-          lifetimeTier.featuresPerService[Service.Drive].maxSpaceBytes,
-        );
-
-        logger.info(
-          `[${session.id}] [LIFETIME/STACK] User ${user.uuid} will stack storage up to ${userStackedStorage} bytes`,
-        );
-      }
-    } catch (error) {
-      logger.warn(`[${session.id}] Could not stack storage for user ${user.uuid}: ${(error as Error).message}`);
-    }
-  }
   // 9a. Apply tier
   try {
-    const tier = await tiersService.getTierProductsByProductsId(product.id, billingType);
-    if (userStackedStorage) tier.featuresPerService[Service.Drive].maxSpaceBytes = userStackedStorage;
-    await tiersService.applyTier(
-      { uuid: user.uuid, email: customerEmail },
-      customer,
-      amountOfSeats,
-      product.id,
-      logger,
-      tier,
-    );
+    const existingUser = await usersService.findUserByUuid(user.uuid).catch((err) => {
+      console.error(`❌ Error fetching user ${user.uuid}:`, err);
+      return null;
+    });
+
+    if (!existingUser) return;
+
+    let tier: Tier;
+    let userStackedStorage: number | undefined;
+
+    if (isLifetime) {
+      const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+      const result = await determineLifetimeConditions.determine(existingUser, product.id);
+      userStackedStorage = result.maxSpaceBytes;
+      tier = result.tier;
+    } else {
+      tier = await tiersService.getTierProductsByProductsId(product.id, billingType);
+    }
+
+    if (userStackedStorage && tier) {
+      tier.featuresPerService[Service.Drive].maxSpaceBytes = userStackedStorage;
+    }
+
+    await tiersService.applyTier({ uuid: user.uuid, email: customerEmail }, customer, amountOfSeats, tier);
   } catch (error) {
     if (!(error instanceof TierNotFoundError)) {
       throw error;
@@ -192,16 +174,7 @@ export async function handleInvoiceCompleted({
     });
   }
 
-  // 9b. Insert - update user
-  await upsertUser({
-    customerId: customer.id,
-    userUuid: user.uuid,
-    isBusinessPlan,
-    isLifetime,
-    usersService,
-  });
-
-  // 9c. Insert user-tier relationship if needed
+  // 9b. Insert user-tier relationship if needed
   try {
     await upsertUserTierRelationship({
       productId: product.id,
