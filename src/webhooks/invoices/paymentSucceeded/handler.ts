@@ -14,7 +14,6 @@ import { StorageService } from '../../../services/storage.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import { handleObjectStorageInvoiceCompleted } from '../../utils/handleObjStorageInvoiceCompleted';
 import { buildInvoiceContext, InvoiceContext } from './utils/buildInvoiceContext';
-import { upsertUserTierRelationship } from './utils/upsertTierUser';
 import { storeCouponUsedByUser } from './utils/storeCouponUsedByUser';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 
@@ -123,23 +122,22 @@ export async function handleInvoiceCompleted({
 
   const lifetime = isBusinessPlan && existingUser ? existingUser.lifetime : isLifetime;
 
-  await usersService.upsertUserByUuid(user.uuid, {
+  const localUser = await usersService.upsertUserByUuid(user.uuid, {
     customerId: customer.id,
     uuid: user.uuid,
     lifetime,
   });
 
   // 9a. Apply tier
+  let tier: Tier | null = null;
+  let userStackedStorage: number | undefined;
+
   try {
-    const existingUser = await usersService.findUserByUuid(user.uuid).catch((err) => {
-      console.error(`❌ Error fetching user ${user.uuid}:`, err);
+    const existingUser = await usersService.findUserByUuid(user.uuid).catch(() => {
       return null;
     });
 
     if (!existingUser) return;
-
-    let tier: Tier;
-    let userStackedStorage: number | undefined;
 
     if (isLifetime) {
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
@@ -175,19 +173,28 @@ export async function handleInvoiceCompleted({
   }
 
   // 9b. Insert user-tier relationship if needed
-  try {
-    await upsertUserTierRelationship({
-      productId: product.id,
-      userUuid: user.uuid,
-      billingType,
-      isBusinessPlan,
-      tiersService,
-      usersService,
-    });
-  } catch (error) {
-    logger.info(`[${session.id}] Error while Inserting/updating the user-tier relationship`);
-    if (!(error instanceof TierNotFoundError)) {
-      throw error;
+  if (tier) {
+    try {
+      const tierType = isBusinessPlan ? 'business' : 'individual';
+      const existingUserTier = await tiersService.getTierByUserIdAndTierType(localUser.id, tierType).catch((err) => {
+        if (!(err instanceof TierNotFoundError)) {
+          throw err;
+        }
+
+        return null;
+      });
+
+      if (!existingUserTier) {
+        return tiersService.insertTierToUser(localUser.id, tier.id);
+      }
+
+      await tiersService.updateTierToUser(localUser.id, existingUserTier.id, tier.id);
+    } catch (error) {
+      const err = error as Error;
+      logger.info(
+        `[${session.id}] Error while Inserting/updating the user-tier relationship. ERROR: ${err.stack ?? err.message}`,
+      );
+      throw err;
     }
   }
 
