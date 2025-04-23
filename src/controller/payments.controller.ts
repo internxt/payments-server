@@ -31,7 +31,6 @@ import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { CustomerSyncService } from '../services/customerSync.service';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -183,13 +182,10 @@ export default function (
         }
 
         try {
-          const customerSyncService = new CustomerSyncService(usersService, paymentService);
-
-          const existingCustomerId = await customerSyncService.findOrSyncCustomerByUuidOrEmail(uuid, email);
-
-          if (existingCustomerId) {
-            const token = jwt.sign({ customerId: existingCustomerId }, config.JWT_SECRET);
-            return res.send({ customerId: existingCustomerId, token });
+          const user = await usersService.findUserByUuid(uuid).catch(() => null);
+          if (user) {
+            const token = jwt.sign({ customerId: user.customerId }, config.JWT_SECRET);
+            return res.send({ customerId: user.customerId, token });
           }
 
           const { id } = await paymentService.createCustomer({ name, email });
