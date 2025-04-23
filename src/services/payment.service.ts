@@ -1403,6 +1403,10 @@ export class PaymentService {
     return renewalPeriod;
   }
 
+  async retrieveCustomerCharge(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
+    return this.provider.charges.retrieve(chargeId);
+  }
+
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
     const methods = paymentMethodId
       ? [
