@@ -156,8 +156,6 @@ export class TiersService {
     userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
-    productId: string,
-    log: FastifyBaseLogger,
     tier: Tier,
     alreadyEnabledServices?: Service[],
   ): Promise<void> {
