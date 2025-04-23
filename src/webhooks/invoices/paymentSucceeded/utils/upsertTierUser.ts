@@ -20,6 +20,7 @@ export async function upsertUserTierRelationship({
 }) {
   const existingUser = await usersService.findUserByUuid(userUuid);
   const tier = await tiersService.getTierProductsByProductsId(productId, billingType);
+  const isLifetimePlan = billingType === 'lifetime';
 
   try {
     const userExistingTiers = await tiersService.getTiersProductsByUserId(existingUser.id);
@@ -31,6 +32,14 @@ export async function upsertUserTierRelationship({
     if (!tierToUpdate) {
       throw new TierNotFoundError(`User with ID: ${userUuid} does not have any tier attached to him`);
     }
+
+    const shouldUpdateLifetimeTier =
+      isLifetimePlan &&
+      tierToUpdate.featuresPerService[Service.Drive].maxSpaceBytes <
+        tier.featuresPerService[Service.Drive].maxSpaceBytes;
+
+    if (!shouldUpdateLifetimeTier) return;
+
     await tiersService.updateTierToUser(existingUser.id, tierToUpdate.id, tier.id);
   } catch (error) {
     await tiersService.insertTierToUser(existingUser.id, tier.id);
