@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { TiersService } from '../services/tiers.service';
+import { ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS, TiersService } from '../services/tiers.service';
 import envVariablesConfig from '../config';
 import { PaymentService } from '../services/payment.service';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -86,7 +86,7 @@ async function userLifetimeStorage() {
         const product = line.price?.product;
         return (
           typeof product === 'string' &&
-          // ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product) &&
+          ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product) &&
           line.price?.metadata.planType === 'one_time'
         );
       });
