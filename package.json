@@ -12,7 +12,8 @@
     "test": "jest --detectOpenHandles",
     "test:cov": "jest --coverage",
     "spec": "jest --testMatch='**/*.spec.ts'",
-    "cli": "nodemon src/cli/load-license-codes.ts"
+    "cli:load-license-codes": "nodemon src/cli/load-license-codes.ts",
+    "cli:user-lifetime-storage": "nodemon src/cli/user-lifetime-storage.ts"
   },
   "engines": {
     "node": ">=22.12.0"

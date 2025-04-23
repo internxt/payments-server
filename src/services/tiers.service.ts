@@ -157,7 +157,6 @@ export class TiersService {
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
-    log: FastifyBaseLogger,
     alreadyEnabledServices?: Service[],
   ): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
@@ -175,7 +174,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier, log);
+          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier);
           break;
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
@@ -222,7 +221,6 @@ export class TiersService {
     customer: Stripe.Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
-    log: FastifyBaseLogger,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
@@ -236,13 +234,7 @@ export class TiersService {
 
       try {
         await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
-        log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
-      } catch (err) {
-        log.info(
-          `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${
-            customer.email
-          } does not have a workspace. Creating a new one...`,
-        );
+      } catch {
         await this.usersService.initializeWorkspace(userWithEmail.uuid, {
           newStorageBytes: Number(maxSpaceBytes),
           seats: subscriptionSeats,
