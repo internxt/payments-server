@@ -115,8 +115,19 @@ async function userLifetimeStorage() {
       const customer = await stripe.customers.retrieve(user.customerId);
       if (customer.deleted) return;
 
+      let userStorage;
+
+      try {
+        userStorage = await getUserStorage(user.uuid, customer.email as string, '0', envVariablesConfig);
+      } catch (error) {
+        const err = error as Error;
+        console.error(
+          `The user with UUID: ${user.uuid} does not exist in Drive Server WIP. ERROR: ${err.stack ?? err.message}`,
+        );
+        continue;
+      }
+
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
-      const userStorage = await getUserStorage(user.uuid, customer.email as string, '0', envVariablesConfig);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
         report.push({
@@ -130,7 +141,8 @@ async function userLifetimeStorage() {
     }
 
     console.table(report);
-    console.log(`✅ Invoices filtradas: ${filteredInvoices.length}`);
+    console.log(`✅ Filtered invoices: ${filteredInvoices.length}`);
+    console.log(`✅ Total users: ${report.length}`);
   } finally {
     await mongoClient.close();
   }

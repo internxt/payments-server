@@ -3,6 +3,7 @@ import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
+import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -99,8 +100,9 @@ export class DetermineLifetimeConditions {
             if (!chargeId) return null;
             const charge = await this.paymentsService.retrieveCustomerCharge(chargeId);
             const isFullyRefunded = charge.refunded;
+            const isDisputed = charge.disputed;
 
-            if (isLifetime && isPaid && !isFullyRefunded) {
+            if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
               return invoice;
             }
 
@@ -132,7 +134,7 @@ export class DetermineLifetimeConditions {
     if (userTier) {
       userFinalTier = userTier.filter((tier) => tier.billingType === 'lifetime').at(0);
     } else {
-      await this.tiersService.getTierProductsByProductsId('free');
+      userFinalTier = await this.tiersService.getTierProductsByProductsId('free');
     }
 
     for (const productId of productIds) {
@@ -160,6 +162,9 @@ export class DetermineLifetimeConditions {
       throw new Error(`Tier not found for user ${user.uuid} when stacking lifetime`);
     }
 
-    return { tier: userFinalTier, maxSpaceBytes: totalMaxSpaceBytes };
+    return {
+      tier: userFinalTier,
+      maxSpaceBytes: totalMaxSpaceBytes || FREE_PLAN_BYTES_SPACE,
+    };
   }
 }
