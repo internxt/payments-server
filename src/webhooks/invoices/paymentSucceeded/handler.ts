@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { PaymentService, PriceMetadata } from '../../../services/payment.service';
 import { User } from '../../../core/users/User';
 import { ObjectStorageService } from '../../../services/objectStorage.service';
-import { UsersService } from '../../../services/users.service';
+import { UserNotFoundError, UsersService } from '../../../services/users.service';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
 import { fetchUserStorage } from '../../../utils/fetchUserStorage';
 import { ExpandStorageNotAvailableError } from '../../utils/handleStackLifetimeStorage';
@@ -97,13 +97,13 @@ export async function handleInvoiceCompleted({
   const amountOfSeats = seats;
   let user: { uuid: string };
 
-  // 4. Handle cases for object storage
+  // Handle object storage case
   if (isObjectStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, logger);
     return;
   }
 
-  // 5. Get customer UUID
+  // Get customer UUID
   try {
     user = await usersService.findUserByCustomerID(customer.id);
   } catch (err) {
@@ -118,6 +118,7 @@ export async function handleInvoiceCompleted({
     }
   }
 
+  // Insert or update user in Users collection
   const existingUser = await usersService.findUserByUuid(user.uuid).catch(() => null);
 
   const lifetime = isBusinessPlan && existingUser ? existingUser.lifetime : isLifetime;
@@ -129,6 +130,7 @@ export async function handleInvoiceCompleted({
   });
 
   // 9a. Apply tier
+  // Apply tier
   let tier: Tier | null = null;
   let userStackedStorage: number | undefined;
 
@@ -137,7 +139,7 @@ export async function handleInvoiceCompleted({
       return null;
     });
 
-    if (!existingUser) return;
+    if (!existingUser) throw new UserNotFoundError(`User with ID: ${user.uuid} has not found in the local DB`);
 
     if (isLifetime) {
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
@@ -154,9 +156,13 @@ export async function handleInvoiceCompleted({
 
     await tiersService.applyTier({ uuid: user.uuid, email: customerEmail }, customer, amountOfSeats, tier);
   } catch (error) {
+    const err = error as Error;
+    logger.error(`[${session.id}] Error in tier logic: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
+
+    logger.info('Using the old flow to insert the user storage');
 
     await handleOldInvoiceCompletedFlow({
       config,
@@ -172,7 +178,7 @@ export async function handleInvoiceCompleted({
     });
   }
 
-  // 9b. Insert user-tier relationship if needed
+  // Insert user-tier relationship if needed
   if (tier) {
     try {
       const tierType = isBusinessPlan ? 'business' : 'individual';
@@ -188,7 +194,9 @@ export async function handleInvoiceCompleted({
         return tiersService.insertTierToUser(localUser.id, tier.id);
       }
 
-      await tiersService.updateTierToUser(localUser.id, existingUserTier.id, tier.id);
+      if (existingUserTier.id !== tier.id) {
+        await tiersService.updateTierToUser(localUser.id, existingUserTier.id, tier.id);
+      }
     } catch (error) {
       const err = error as Error;
       logger.info(
@@ -198,7 +206,7 @@ export async function handleInvoiceCompleted({
     }
   }
 
-  // 10. If the user used a coupon code, check if it is trackable and add the user-coupon relationship if needed
+  // If the user used a coupon code, check if it is trackable and add the user-coupon relationship if needed
   await storeCouponUsedByUser({
     lineItem: lineItems,
     logger,
@@ -206,7 +214,7 @@ export async function handleInvoiceCompleted({
     userUuid: user.uuid,
   });
 
-  // 11. Clear subscription cache
+  // Clear subscription cache
   try {
     await cacheService.clearSubscription(customer.id);
     logger.info(
