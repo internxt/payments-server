@@ -127,7 +127,7 @@ async function userLifetimeStorage() {
         continue;
       }
 
-      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
+      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId, true);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
         report.push({

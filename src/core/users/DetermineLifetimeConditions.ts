@@ -22,9 +22,14 @@ export class DetermineLifetimeConditions {
    * - The user is free -> new customer
    * @param user
    * @param productId
+   * @param commandTool - If true, then this will be executed for lifetime users
    * @returns
    */
-  async determine(user: User, productId: string): Promise<{ tier: Tier; maxSpaceBytes: number }> {
+  async determine(
+    user: User,
+    productId: string,
+    commandTool?: boolean,
+  ): Promise<{ tier: Tier; maxSpaceBytes: number }> {
     const isLifetime = user.lifetime;
     const subscription = await this.paymentsService.getUserSubscription(user.customerId, UserType.Individual);
     const isSubscriber = subscription.type === 'subscription';
@@ -42,10 +47,10 @@ export class DetermineLifetimeConditions {
       throw new Error(`Old product ${productId} found`);
     }
 
-    if (isFree) {
+    if (isFree && !commandTool) {
       return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
-    } else if (isSubscriber) {
-      // await this.paymentsService.cancelSubscription(subscription.subscriptionId);
+    } else if (isSubscriber && !commandTool) {
+      await this.paymentsService.cancelSubscription(subscription.subscriptionId);
 
       return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
     } else if (isLifetime) {
