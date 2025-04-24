@@ -85,7 +85,14 @@ export class DetermineLifetimeConditions {
       const paidInvoices = (
         await Promise.all(
           invoices.map(async (invoice) => {
-            const isLifetime = invoice.lines.data[0].price?.metadata?.planType === 'one_time';
+            const line = invoice.lines.data[0];
+
+            if (!line || !line.price || !line.price.metadata) {
+              console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+              return null;
+            }
+
+            const isLifetime = line.price?.metadata?.planType === 'one_time';
             const isPaid = invoice.paid;
             const chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
 
@@ -112,12 +119,34 @@ export class DetermineLifetimeConditions {
       );
     }
 
-    let userFinalTier = (await this.tiersService.getTiersProductsByUserId(user.id))
-      .filter((tier) => tier.billingType === 'lifetime')
-      .at(0);
+    const userTier = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+      if (!(err instanceof TierNotFoundError)) {
+        throw err;
+      }
+
+      return null;
+    });
+
+    let userFinalTier;
+
+    if (userTier) {
+      userFinalTier = userTier.filter((tier) => tier.billingType === 'lifetime').at(0);
+    } else {
+      await this.tiersService.getTierProductsByProductsId('free');
+    }
 
     for (const productId of productIds) {
-      const tierForThisProduct = await this.tiersService.getTierProductsByProductsId(productId, 'lifetime');
+      const tierForThisProduct = await this.tiersService
+        .getTierProductsByProductsId(productId, 'lifetime')
+        .catch((err) => {
+          if (!(err instanceof TierNotFoundError)) {
+            throw err;
+          }
+          return undefined;
+        });
+
+      if (!tierForThisProduct) continue;
+
       if (
         !userFinalTier ||
         userFinalTier.featuresPerService[Service.Drive].maxSpaceBytes <

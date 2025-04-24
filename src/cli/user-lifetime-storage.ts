@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS, TiersService } from '../services/tiers.service';
+import { TiersService } from '../services/tiers.service';
 import envVariablesConfig from '../config';
 import { PaymentService } from '../services/payment.service';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -9,7 +9,7 @@ import { MongoClient } from 'mongodb';
 import axios from 'axios';
 import { Bit2MeService } from '../services/bit2me.service';
 import { UsersRepository } from '../core/users/UsersRepository';
-import { StorageService } from '../services/storage.service';
+import { getUserStorage, StorageService } from '../services/storage.service';
 import {
   DisplayBillingRepository,
   MongoDBDisplayBillingRepository,
@@ -19,7 +19,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
 import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
 import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
-import { UsersService } from '../services/users.service';
+import { UserNotFoundError, UsersService } from '../services/users.service';
 import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { Tier } from '../core/users/Tier';
@@ -64,10 +64,10 @@ async function userLifetimeStorage() {
     const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
     const report: {
       'Customer ID': string;
-      'Customer Email': string;
+      'User UUID': string;
       Tier: Tier['productId'];
       'Max Space (Bytes)': number;
-      'User UUID': string;
+      'User Storage': number;
     }[] = [];
 
     const invoices = await stripe.invoices
@@ -84,46 +84,49 @@ async function userLifetimeStorage() {
     const filteredInvoices = invoices.filter((invoice) => {
       const hasValidProduct = invoice.lines.data.some((line) => {
         const product = line.price?.product;
-        return (
-          typeof product === 'string' &&
-          ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product) &&
-          line.price?.metadata.planType === 'one_time'
-        );
+        return typeof product === 'string' && line.price?.metadata.planType === 'one_time';
       });
 
       return invoice.customer && hasValidProduct && invoice.charge;
     });
 
-    const setInvoices = new Set(filteredInvoices);
+    const seenUsers = new Set<string>();
 
-    for (const invoice of setInvoices) {
-      const user = await usersService.findUserByCustomerID(invoice.customer as string);
+    for (const invoice of filteredInvoices) {
+      const user = await usersService.findUserByCustomerID(invoice.customer as string).catch((err) => {
+        if (!(err instanceof UserNotFoundError)) {
+          throw err;
+        }
+
+        return null;
+      });
+
+      if (!user) {
+        console.log(`User with customer Id ${invoice.customer as string} has not found in our local DB`);
+        continue;
+      }
+
+      if (seenUsers.has(user.uuid)) {
+        continue;
+      }
+      seenUsers.add(user.uuid);
+
       const productId = invoice.lines.data[0].price?.product as string;
       const customer = await stripe.customers.retrieve(user.customerId);
       if (customer.deleted) return;
 
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
-      report.push({
-        'Customer ID': customer.id,
-        'Customer Email': customer.email as string,
-        Tier: tier.productId,
-        'Max Space (Bytes)': maxSpaceBytes,
-        'User UUID': user.uuid,
-      });
+      const userStorage = await getUserStorage(user.uuid, customer.email as string, '0', envVariablesConfig);
 
-      // tier.featuresPerService[Service.Drive].maxSpaceBytes = maxSpaceBytes;
-
-      // await tiersService.applyTier(
-      //   {
-      //     ...user,
-      //     email: invoice.customer_email as string,
-      //   },
-      //   customer,
-      //   invoice.lines.data[0].quantity ?? 1,
-      //   productId,
-      // );
-
-      // await cacheService.clearSubscription(customer.id);
+      if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
+        report.push({
+          'Customer ID': customer.id,
+          'User UUID': user.uuid,
+          Tier: tier.productId,
+          'Max Space (Bytes)': maxSpaceBytes,
+          'User Storage': userStorage.currentMaxSpaceBytes,
+        });
+      }
     }
 
     console.table(report);
@@ -136,5 +139,5 @@ async function userLifetimeStorage() {
 userLifetimeStorage()
   .then(() => console.log('User tier applied'))
   .catch((err) => {
-    console.error('Error applying user tier and space: ', err.message);
+    console.error(`Error applying user tier and space: ${err.stack ?? err.message}`);
   });
