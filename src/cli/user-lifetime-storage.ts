@@ -131,7 +131,11 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       const customer = await stripe.customers.retrieve(user.customerId);
       if (customer.deleted) return;
 
-      let userStorage;
+      let userStorage: {
+        canExpand: boolean;
+        currentMaxSpaceBytes: number;
+        expandableBytes: number;
+      };
 
       try {
         userStorage = await getUserStorage(user.uuid, customer.email as string, '0', envVariablesConfig);
@@ -143,24 +147,50 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
-        // await storageService.changeStorage(user.uuid, maxSpaceBytes);
-        // await tiersService.applyTier(
-        //   {
-        //     ...user,
-        //     email: customer.email as string,
-        //   },
-        //   customer,
-        //   1,
-        //   productId,
-        //   [Service.Drive],
-        // );
-        // await cacheService.clearSubscription(user.customerId);
+        // try {
+        //   await storageService.changeStorage(user.uuid, maxSpaceBytes);
+        //   await tiersService.applyTier(
+        //     {
+        //       ...user,
+        //       email: customer.email as string,
+        //     },
+        //     customer,
+        //     1,
+        //     productId,
+        //     [Service.Drive],
+        //   );
+
+        //   const userActualTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+        //     if (!(err instanceof TierNotFoundError)) {
+        //       throw err;
+        //     }
+        //     return null;
+        //   });
+
+        //   if (!tier) {
+        //     throw new Error(`Tier no definido para el usuario ${user.id}`);
+        //   }
+
+        //   const lifetimeUserTier = userActualTiers?.find((t) => t.billingType === 'lifetime');
+
+        //   if (!lifetimeUserTier) {
+        //     await tiersService.insertTierToUser(user.id, tier.id);
+        //   } else if (lifetimeUserTier.id !== tier.id) {
+        //     await tiersService.updateTierToUser(user.id, lifetimeUserTier.id, tier.id);
+        //   }
+
+        //   await cacheService.clearSubscription(user.customerId);
+        // } catch (error) {
+        //   console.error(`Error managing lifetime tier for user ${user.id}:`, error);
+        //   throw error;
+        // }
+
         report.push({
           'Customer ID': customer.id,
           'User UUID': user.uuid,
           Tier: tier.productId,
           'Max Space (Bytes)': maxSpaceBytes,
-          'User Storage': 0,
+          'User Storage': userStorage.currentMaxSpaceBytes,
         });
       }
     }
@@ -174,10 +204,13 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
   }
 }
 
+const startDateMarch = Math.floor(new Date('2025-03-13T00:00:00Z').getTime() / 1000);
+const endDateMarch = Math.floor(new Date('2025-03-31T23:59:59Z').getTime() / 1000);
+
 const startDateApril = Math.floor(new Date('2025-04-01T00:00:00Z').getTime() / 1000);
 const endDateApril = Math.floor(new Date('2025-04-20T23:59:59Z').getTime() / 1000);
 
-userLifetimeStorage(startDateApril, endDateApril)
+userLifetimeStorage(startDateMarch, endDateMarch)
   .then(() => {
     console.log('✅ User storage compared and updated if needed for April users');
     process.exit(0);
