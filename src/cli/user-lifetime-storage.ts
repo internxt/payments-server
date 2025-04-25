@@ -22,7 +22,7 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import { Service, Tier } from '../core/users/Tier';
+import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 
 async function userLifetimeStorage(startDate: number, endDate: number) {
@@ -130,6 +130,13 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
 
       const customer = await stripe.customers.retrieve(user.customerId);
       if (customer.deleted) return;
+      const userCharges = await paymentService.retrieveCustomerCharges(customer.id);
+
+      userCharges.data.map((charge) => {
+        if (!charge.invoice) {
+          console.log(`Charge ${charge.id} for user ${customer.id} does not have an invoice`);
+        }
+      });
 
       let userStorage: {
         canExpand: boolean;
@@ -147,46 +154,46 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
-        try {
-          await storageService.changeStorage(user.uuid, maxSpaceBytes);
-          await tiersService.applyTier(
-            {
-              ...user,
-              email: customer.email as string,
-            },
-            customer,
-            1,
-            productId,
-            [Service.Drive],
-          );
+        // try {
+        //   const userActualTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+        //     if (!(err instanceof TierNotFoundError)) {
+        //       throw err;
+        //     }
+        //     return null;
+        //   });
 
-          const userActualTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
-            if (!(err instanceof TierNotFoundError)) {
-              throw err;
-            }
-            return null;
-          });
+        //   if (!tier) {
+        //     throw new Error(`Tier not defined for user ${user.uuid}`);
+        //   }
 
-          if (!tier) {
-            throw new Error(`Tier no definido para el usuario ${user.id}`);
-          }
+        //   const individualUserTier = userActualTiers?.find(
+        //     (tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled,
+        //   );
 
-          const individualUserTier = userActualTiers?.find(
-            (tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled,
-          );
+        //   if (!individualUserTier) {
+        //     await tiersService.insertTierToUser(user.id, tier.id);
+        //   } else if (individualUserTier.id !== tier.id) {
+        //     await tiersService.updateTierToUser(user.id, individualUserTier.id, tier.id);
+        //   }
 
-          if (!individualUserTier) {
-            await tiersService.insertTierToUser(user.id, tier.id);
-          } else if (individualUserTier.id !== tier.id) {
-            await tiersService.updateTierToUser(user.id, individualUserTier.id, tier.id);
-          }
+        //   await storageService.changeStorage(user.uuid, maxSpaceBytes);
 
-          await cacheService.clearSubscription(user.customerId);
-        } catch (error) {
-          console.error(`Error managing lifetime tier for user ${user.id}:`, error);
-          throw error;
-        }
+        //   await tiersService.applyTier(
+        //     {
+        //       ...user,
+        //       email: customer.email as string,
+        //     },
+        //     customer,
+        //     1,
+        //     productId,
+        //     [Service.Drive],
+        //   );
 
+        //   await cacheService.clearSubscription(user.customerId);
+        // } catch (error) {
+        //   console.error(`Error managing lifetime tier for user ${user.id}:`, error);
+        //   continue;
+        // }
         report.push({
           'Customer ID': customer.id,
           'User UUID': user.uuid,
@@ -207,13 +214,10 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
   }
 }
 
-const startDateMarch = Math.floor(new Date('2025-03-13T00:00:00Z').getTime() / 1000);
-const endDateMarch = Math.floor(new Date('2025-03-31T23:59:59Z').getTime() / 1000);
+const startDateApril = Math.floor(new Date('2025-03-13T00:00:00Z').getTime() / 1000);
+const endDateApril = Math.floor(new Date().getTime() / 1000);
 
-const startDateApril = Math.floor(new Date('2025-04-01T00:00:00Z').getTime() / 1000);
-const endDateApril = Math.floor(new Date('2025-04-20T23:59:59Z').getTime() / 1000);
-
-userLifetimeStorage(startDateMarch, endDateMarch)
+userLifetimeStorage(startDateApril, endDateApril)
   .then(() => {
     console.log('✅ User storage compared and updated if needed for March users');
     process.exit(0);

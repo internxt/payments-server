@@ -93,12 +93,19 @@ export class DetermineLifetimeConditions {
             return null;
           }
 
+          let chargeId;
           const isLifetime = line.price?.metadata?.planType === 'one_time';
           const isPaid = invoice.paid;
-          const chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          const invoiceMetadata = invoice.metadata;
+          if (invoiceMetadata && invoiceMetadata.chargeId) {
+            console.log(`Customer ${customer.id}`, { invoiceMetadata });
+            chargeId = invoiceMetadata.chargeId;
+          } else {
+            chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          }
 
           if (!chargeId) return null;
-          const charge = await this.paymentsService.retrieveCustomerCharge(chargeId);
+          const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
           const isFullyRefunded = charge.refunded;
           const isDisputed = charge.disputed;
 

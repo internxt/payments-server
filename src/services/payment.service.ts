@@ -1403,8 +1403,19 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  async retrieveCustomerCharge(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
+  async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
     return this.provider.charges.retrieve(chargeId);
+  }
+
+  async retrieveCustomerCharges(customerId: CustomerId): Promise<Stripe.ApiListPromise<Stripe.Charge>> {
+    return this.provider.charges.list({
+      customer: customerId,
+      limit: 100,
+    });
+  }
+
+  async getCustomerPaymentIntents(paymentIntentId: string): Promise<Stripe.PaymentIntent> {
+    return this.provider.paymentIntents.retrieve(paymentIntentId);
   }
 
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
