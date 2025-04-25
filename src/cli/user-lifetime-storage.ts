@@ -22,7 +22,7 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import { Tier } from '../core/users/Tier';
+import { Service, Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 
 async function userLifetimeStorage(startDate: number, endDate: number) {
@@ -147,43 +147,45 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
-        // try {
-        //   await storageService.changeStorage(user.uuid, maxSpaceBytes);
-        //   await tiersService.applyTier(
-        //     {
-        //       ...user,
-        //       email: customer.email as string,
-        //     },
-        //     customer,
-        //     1,
-        //     productId,
-        //     [Service.Drive],
-        //   );
+        try {
+          await storageService.changeStorage(user.uuid, maxSpaceBytes);
+          await tiersService.applyTier(
+            {
+              ...user,
+              email: customer.email as string,
+            },
+            customer,
+            1,
+            productId,
+            [Service.Drive],
+          );
 
-        //   const userActualTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
-        //     if (!(err instanceof TierNotFoundError)) {
-        //       throw err;
-        //     }
-        //     return null;
-        //   });
+          const userActualTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+            if (!(err instanceof TierNotFoundError)) {
+              throw err;
+            }
+            return null;
+          });
 
-        //   if (!tier) {
-        //     throw new Error(`Tier no definido para el usuario ${user.id}`);
-        //   }
+          if (!tier) {
+            throw new Error(`Tier no definido para el usuario ${user.id}`);
+          }
 
-        //   const lifetimeUserTier = userActualTiers?.find((t) => t.billingType === 'lifetime');
+          const individualUserTier = userActualTiers?.find(
+            (tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled,
+          );
 
-        //   if (!lifetimeUserTier) {
-        //     await tiersService.insertTierToUser(user.id, tier.id);
-        //   } else if (lifetimeUserTier.id !== tier.id) {
-        //     await tiersService.updateTierToUser(user.id, lifetimeUserTier.id, tier.id);
-        //   }
+          if (!individualUserTier) {
+            await tiersService.insertTierToUser(user.id, tier.id);
+          } else if (individualUserTier.id !== tier.id) {
+            await tiersService.updateTierToUser(user.id, individualUserTier.id, tier.id);
+          }
 
-        //   await cacheService.clearSubscription(user.customerId);
-        // } catch (error) {
-        //   console.error(`Error managing lifetime tier for user ${user.id}:`, error);
-        //   throw error;
-        // }
+          await cacheService.clearSubscription(user.customerId);
+        } catch (error) {
+          console.error(`Error managing lifetime tier for user ${user.id}:`, error);
+          throw error;
+        }
 
         report.push({
           'Customer ID': customer.id,
@@ -195,6 +197,7 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       }
     }
 
+    console.log('✅ Tier applied for all these users:');
     console.table(report);
     console.log(`✅ Filtered invoices: ${filteredInvoices.length}`);
     console.log(`✅ Total users: ${report.length}`);
@@ -212,7 +215,7 @@ const endDateApril = Math.floor(new Date('2025-04-20T23:59:59Z').getTime() / 100
 
 userLifetimeStorage(startDateMarch, endDateMarch)
   .then(() => {
-    console.log('✅ User storage compared and updated if needed for April users');
+    console.log('✅ User storage compared and updated if needed for March users');
     process.exit(0);
   })
   .catch((err) => {
