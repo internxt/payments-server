@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { TiersService } from '../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import envVariablesConfig from '../config';
 import { PaymentService } from '../services/payment.service';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -25,10 +25,7 @@ import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users
 import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 
-const startDate = Math.floor(new Date('2025-04-01T00:00:00Z').getTime() / 1000);
-const endDate = Math.floor(new Date('2025-04-20T23:59:59Z').getTime() / 1000);
-
-async function userLifetimeStorage() {
+async function userLifetimeStorage(startDate: number, endDate: number) {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
     const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
@@ -91,6 +88,7 @@ async function userLifetimeStorage() {
     });
 
     const seenUsers = new Set<string>();
+    console.time('table-process');
 
     for (const invoice of filteredInvoices) {
       const user = await usersService.findUserByCustomerID(invoice.customer as string).catch((err) => {
@@ -102,7 +100,12 @@ async function userLifetimeStorage() {
       });
 
       if (!user) {
-        console.log(`User with customer Id ${invoice.customer as string} has not found in our local DB`);
+        console.warn(
+          `⚠️ User with customer Id ${invoice.customer as string} has not found in our local DB. Skipping this user...`,
+        );
+        continue;
+      } else if (!user?.lifetime) {
+        console.warn(`⚠️ The user ${user.uuid} does not have a lifetime. Skipping this user...`);
         continue;
       }
 
@@ -112,6 +115,19 @@ async function userLifetimeStorage() {
       seenUsers.add(user.uuid);
 
       const productId = invoice.lines.data[0].price?.product as string;
+      const tierExists = await tiersService.getTierProductsByProductsId(productId, 'lifetime').catch((err) => {
+        if (err instanceof TierNotFoundError) {
+          return null;
+        }
+
+        throw err;
+      });
+
+      if (!tierExists) {
+        console.info(`Product with id ${productId} is not a new product (does not have a tier). Skipping it...`);
+        continue;
+      }
+
       const customer = await stripe.customers.retrieve(user.customerId);
       if (customer.deleted) return;
 
@@ -119,23 +135,32 @@ async function userLifetimeStorage() {
 
       try {
         userStorage = await getUserStorage(user.uuid, customer.email as string, '0', envVariablesConfig);
-      } catch (error) {
-        const err = error as Error;
-        console.error(
-          `The user with UUID: ${user.uuid} does not exist in Drive Server WIP. ERROR: ${err.stack ?? err.message}`,
-        );
+      } catch {
+        console.error(`The user with UUID: ${user.uuid} does not exist in Drive Server WIP. Skipping this user...`);
         continue;
       }
 
-      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId, true);
+      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(user, productId);
 
       if (maxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
+        // await storageService.changeStorage(user.uuid, maxSpaceBytes);
+        // await tiersService.applyTier(
+        //   {
+        //     ...user,
+        //     email: customer.email as string,
+        //   },
+        //   customer,
+        //   1,
+        //   productId,
+        //   [Service.Drive],
+        // );
+        // await cacheService.clearSubscription(user.customerId);
         report.push({
           'Customer ID': customer.id,
           'User UUID': user.uuid,
           Tier: tier.productId,
           'Max Space (Bytes)': maxSpaceBytes,
-          'User Storage': userStorage.currentMaxSpaceBytes,
+          'User Storage': 0,
         });
       }
     }
@@ -145,11 +170,19 @@ async function userLifetimeStorage() {
     console.log(`✅ Total users: ${report.length}`);
   } finally {
     await mongoClient.close();
+    console.timeEnd('table-process');
   }
 }
 
-userLifetimeStorage()
-  .then(() => console.log('User tier applied'))
+const startDateApril = Math.floor(new Date('2025-04-01T00:00:00Z').getTime() / 1000);
+const endDateApril = Math.floor(new Date('2025-04-20T23:59:59Z').getTime() / 1000);
+
+userLifetimeStorage(startDateApril, endDateApril)
+  .then(() => {
+    console.log('✅ User storage compared and updated if needed for April users');
+    process.exit(0);
+  })
   .catch((err) => {
     console.error(`Error applying user tier and space: ${err.stack ?? err.message}`);
+    process.exit(1);
   });

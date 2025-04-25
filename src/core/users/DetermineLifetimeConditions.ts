@@ -39,7 +39,7 @@ export class DetermineLifetimeConditions {
     const oldProduct = !tier;
 
     if (oldProduct) {
-      throw new Error(`Old product ${productId} found`);
+      throw new Error(`Old product ${productId} found for user with id: ${user.uuid}`);
     }
 
     if (isFree) {
