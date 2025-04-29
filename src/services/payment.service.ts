@@ -1672,7 +1672,7 @@ export class UserAlreadyExistsError extends Error {
   constructor(email: string) {
     super(`User with email ${email} already exists.`);
 
-    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
+    Object.setPrototypeOf(this, UserAlreadyExistsError.prototype);
   }
 }
 
