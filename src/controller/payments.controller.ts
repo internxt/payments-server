@@ -150,9 +150,6 @@ export default function (
           req.log.error(
             `[OBJECT_STORAGE_CREATE_CUSTOMER_ERROR] Customer Email: ${email} - Error: ${error.stack ?? error.message}`,
           );
-          req.log.error(
-            `[OBJECT_STORAGE_CREATE_CUSTOMER_ERROR] Customer Email: ${email} - Error: ${error.stack ?? error.message}`,
-          );
           return res.status(500).send({
             message: 'Internal Server Error',
           });
