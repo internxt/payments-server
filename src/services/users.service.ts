@@ -45,6 +45,15 @@ export class UsersService {
     }
   }
 
+  async upsertUserByUuid(uuid: User['uuid'], body: Omit<User, 'id'>): Promise<User> {
+    const upsertUser = await this.usersRepository.upsertUser(uuid, body);
+    if (!upsertUser) {
+      throw new UserNotFoundError();
+    }
+
+    return upsertUser;
+  }
+
   async findUserByCustomerID(customerId: User['customerId']): Promise<User> {
     const userFound = await this.usersRepository.findUserByCustomerId(customerId);
 

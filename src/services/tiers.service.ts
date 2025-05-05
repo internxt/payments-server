@@ -84,6 +84,21 @@ export class TiersService {
     return await Promise.all(userTiers.map(async ({ tierId }) => this.getTierProductsByTierId(tierId)));
   }
 
+  async getTierByUserIdAndTierType(userId: User['id'], tierType: 'individual' | 'business'): Promise<Tier> {
+    const isBusinessPlan = tierType === 'business';
+    const userExistingTiers = await this.getTiersProductsByUserId(userId);
+
+    const selectedTier = isBusinessPlan
+      ? userExistingTiers.find((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled)
+      : userExistingTiers[0];
+
+    if (!selectedTier) {
+      throw new TierNotFoundError(`No tier found for user ${userId} and tier type ${tierType}`);
+    }
+
+    return selectedTier;
+  }
+
   async getTierProductsByTierId(tierId: Tier['id']): Promise<Tier> {
     const tier = await this.tiersRepository.findByTierId(tierId);
 
@@ -156,15 +171,9 @@ export class TiersService {
     userWithEmail: { email: string; uuid: User['uuid'] },
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
-    productId: string,
+    tier: Tier,
     alreadyEnabledServices?: Service[],
   ): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId({ productId });
-
-    if (!tier) {
-      throw new TierNotFoundError(`Tier for product ${productId} not found`);
-    }
-
     for (const service of Object.keys(tier.featuresPerService)) {
       const s = service as Service;
 

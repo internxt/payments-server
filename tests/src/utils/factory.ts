@@ -12,6 +12,7 @@ const getUsersRepositoryForTest = (): UsersRepository => {
     findUserByUuid: jest.fn(),
     insertUser: jest.fn(),
     updateUser: jest.fn().mockResolvedValue(true),
+    upsertUser: jest.fn(),
   };
 
   return usersRepositoryMock;

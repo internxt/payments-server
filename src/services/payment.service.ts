@@ -102,13 +102,13 @@ export interface PlanSubscription {
   planId: string;
   productId: string;
   name: string;
-  simpleName: string;
+  simpleName?: string;
   type: UserType;
   price: number;
   monthlyPrice: number;
   currency: string;
   isTeam: boolean;
-  paymentInterval: string;
+  paymentInterval: string | null;
   isLifetime: boolean;
   renewalPeriod: RenewalPeriod;
   storageLimit: number;

@@ -132,7 +132,7 @@ describe('Create or update user when after successful payment', () => {
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedTier,
       undefined,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
@@ -172,7 +172,7 @@ describe('Create or update user when after successful payment', () => {
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedTier,
       undefined,
     );
     expect(spyUpdateUser).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
@@ -210,12 +210,7 @@ describe('Create or update user when after successful payment', () => {
     );
     expect(spyUpdate).toHaveBeenCalledTimes(1);
     expect(spyUpdate).toHaveBeenCalledWith(mockedUser.id, mockedOldTier.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(
-      mockedUser,
-      mockedCustomer,
-      mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
-    );
+    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedCustomer, mockedPurchasedItem.quantity, mockedTier);
     expect(spyInsert).not.toHaveBeenCalled();
   });
 
@@ -238,12 +233,7 @@ describe('Create or update user when after successful payment', () => {
     );
     expect(spyInsert).toHaveBeenCalledTimes(1);
     expect(spyInsert).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
-    expect(spyApplyTier).toHaveBeenCalledWith(
-      mockedUser,
-      mockedCustomer,
-      mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
-    );
+    expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedCustomer, mockedPurchasedItem.quantity, mockedTier);
     expect(spyUpdate).not.toHaveBeenCalled();
   });
 
@@ -310,13 +300,9 @@ describe('Create or update user when after successful payment', () => {
         oldTier: mockedTier,
         user: { ...mockedUser, email: mockedUser.email },
       });
-      expect(spyApplyTier).toHaveBeenCalledWith(
-        mockedUser,
-        mockedCustomer,
-        mockedPurchasedItem.quantity,
-        (mockedPurchasedItem.price?.product as Stripe.Product).id,
-        [Service.Drive],
-      );
+      expect(spyApplyTier).toHaveBeenCalledWith(mockedUser, mockedCustomer, mockedPurchasedItem.quantity, mockedTier, [
+        Service.Drive,
+      ]);
       expect(spyUpdate).not.toHaveBeenCalled();
     });
 
@@ -367,7 +353,7 @@ describe('Create or update user when after successful payment', () => {
         defaultProps.user,
         defaultProps.customer,
         defaultProps.purchasedItem.quantity,
-        newLifetimeTier.productId,
+        newLifetimeTier,
         [Service.Drive],
       );
 

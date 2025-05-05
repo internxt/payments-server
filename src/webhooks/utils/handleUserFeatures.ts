@@ -73,7 +73,7 @@ export const handleUserFeatures = async ({
       const newTierSpaceInBytes = tier.featuresPerService['drive'].maxSpaceBytes;
       const oldTierSpaceInBytes = oldLifetimeTier.featuresPerService['drive'].maxSpaceBytes;
 
-      const tierToUpdate = newTierSpaceInBytes > oldTierSpaceInBytes ? tier.productId : oldLifetimeTier.productId;
+      const tierToUpdate = newTierSpaceInBytes > oldTierSpaceInBytes ? tier : oldLifetimeTier;
 
       if (newTierSpaceInBytes > oldTierSpaceInBytes) {
         logger.info(
@@ -111,7 +111,7 @@ export const handleUserFeatures = async ({
 
     const oldTierId = existingTier.id;
 
-    await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+    await tiersService.applyTier(user, customer, purchasedItem.quantity, tier);
     await usersService.updateUser(customer.id, {
       lifetime: isLifetimePlan,
     });
@@ -131,7 +131,7 @@ export const handleUserFeatures = async ({
 
       const newUser = await usersService.findUserByUuid(user.uuid);
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, tier);
       await tiersService.insertTierToUser(newUser.id, newTierId);
 
       return;
@@ -156,7 +156,7 @@ export const handleUserFeatures = async ({
         });
       }
 
-      await tiersService.applyTier(user, customer, purchasedItem.quantity, product.id, excludedServices);
+      await tiersService.applyTier(user, customer, purchasedItem.quantity, tier, excludedServices);
       await usersService.updateUser(customer.id, {
         lifetime: isLifetimePlan,
       });
