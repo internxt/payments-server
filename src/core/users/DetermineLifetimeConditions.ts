@@ -3,6 +3,7 @@ import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
+import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -38,7 +39,7 @@ export class DetermineLifetimeConditions {
     const oldProduct = !tier;
 
     if (oldProduct) {
-      throw new Error(`Old product ${productId} found`);
+      throw new Error(`Old product ${productId} found for user with id: ${user.uuid}`);
     }
 
     if (isFree) {
@@ -82,38 +83,60 @@ export class DetermineLifetimeConditions {
       const invoices = await this.paymentsService.getInvoicesFromUser(customer.id, {
         limit: 100,
       });
-      const paidInvoices = (
-        await Promise.all(
-          invoices.map(async (invoice) => {
-            const line = invoice.lines.data[0];
 
-            if (!line || !line.price || !line.price.metadata) {
-              console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
-              return null;
-            }
+      const paidInvoices = await Promise.all(
+        invoices.map(async (invoice) => {
+          const line = invoice.lines.data[0];
 
-            const isLifetime = line.price?.metadata?.planType === 'one_time';
-            const isPaid = invoice.paid;
-            const chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          if (!line || !line.price || !line.price.metadata) {
+            console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+            return null;
+          }
 
-            if (!chargeId) return null;
-            const charge = await this.paymentsService.retrieveCustomerCharge(chargeId);
-            const isFullyRefunded = charge.refunded;
+          let chargeId;
+          const isLifetime = line.price?.metadata?.planType === 'one_time';
+          const isPaid = invoice.paid;
+          const invoiceMetadata = invoice.metadata;
+          const isOutOfBand = invoice.paid_out_of_band;
 
-            if (isLifetime && isPaid && !isFullyRefunded) {
+          if (invoiceMetadata && invoiceMetadata.chargeId) {
+            chargeId = invoiceMetadata.chargeId;
+          } else {
+            chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          }
+
+          if (!chargeId) {
+            if (isLifetime && isPaid && isOutOfBand) {
               return invoice;
             }
-
             return null;
-          }),
-        )
-      ).filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+          }
 
-      paidInvoices.forEach((invoice) => {
+          if (!chargeId && line.price.metadata.type === 'one_time' && invoice.paid && invoice.paid_out_of_band) {
+            return invoice;
+          } else if (!chargeId) {
+            return null;
+          }
+
+          const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
+          const isFullyRefunded = charge.refunded;
+          const isDisputed = charge.disputed;
+
+          if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
+            return invoice;
+          }
+
+          return null;
+        }),
+      );
+
+      const filteredPaidInvoices = paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+
+      filteredPaidInvoices.forEach((invoice) => {
         productIds.push((invoice.lines.data[0].price?.product as string) || '');
       });
 
-      totalMaxSpaceBytes += paidInvoices.reduce(
+      totalMaxSpaceBytes += filteredPaidInvoices.reduce(
         (accum, invoice) => parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
         0,
       );
@@ -132,7 +155,7 @@ export class DetermineLifetimeConditions {
     if (userTier) {
       userFinalTier = userTier.filter((tier) => tier.billingType === 'lifetime').at(0);
     } else {
-      await this.tiersService.getTierProductsByProductsId('free');
+      userFinalTier = await this.tiersService.getTierProductsByProductsId('free');
     }
 
     for (const productId of productIds) {
@@ -160,6 +183,9 @@ export class DetermineLifetimeConditions {
       throw new Error(`Tier not found for user ${user.uuid} when stacking lifetime`);
     }
 
-    return { tier: userFinalTier, maxSpaceBytes: totalMaxSpaceBytes };
+    return {
+      tier: userFinalTier,
+      maxSpaceBytes: totalMaxSpaceBytes || FREE_PLAN_BYTES_SPACE,
+    };
   }
 }

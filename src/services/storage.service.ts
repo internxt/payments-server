@@ -3,6 +3,12 @@ import { sign } from 'jsonwebtoken';
 import { isProduction, type AppConfig } from '../config';
 import { User } from '../core/users/User';
 
+export interface UserStorage {
+  canExpand: boolean;
+  currentMaxSpaceBytes: number;
+  expandableBytes: number;
+}
+
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
@@ -64,11 +70,7 @@ export async function getUserStorage(
   email: string,
   newStorage: string,
   config: AppConfig,
-): Promise<{
-  canExpand: boolean;
-  currentMaxSpaceBytes: number;
-  expandableBytes: number;
-}> {
+): Promise<UserStorage> {
   const jwt = signToken('5m', config.DRIVE_NEW_GATEWAY_SECRET);
   const requestConfig: AxiosRequestConfig = {
     headers: {
