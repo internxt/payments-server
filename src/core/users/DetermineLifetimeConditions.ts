@@ -98,7 +98,6 @@ export class DetermineLifetimeConditions {
           const isPaid = invoice.paid;
           const invoiceMetadata = invoice.metadata;
           if (invoiceMetadata && invoiceMetadata.chargeId) {
-            console.log(`Customer ${customer.id}`, { invoiceMetadata });
             chargeId = invoiceMetadata.chargeId;
           } else {
             chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
