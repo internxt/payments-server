@@ -5,6 +5,14 @@ import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 
+export class OldProductError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, OldProductError.prototype);
+  }
+}
+
 export class DetermineLifetimeConditions {
   constructor(
     private readonly paymentsService: PaymentService,
@@ -17,9 +25,9 @@ export class DetermineLifetimeConditions {
    * consideration different situations.
    *
    * Possible cases:
-   * - The user already has a sub
-   * - The user already has a lifetime -> stacking
    * - The user is free -> new customer
+   * - The user already has a sub -> cancelling the subscription
+   * - The user already has a lifetime -> stacking
    * @param user
    * @param productId
    * @returns
@@ -39,7 +47,7 @@ export class DetermineLifetimeConditions {
     const oldProduct = !tier;
 
     if (oldProduct) {
-      throw new Error(`Old product ${productId} found for user with id: ${user.uuid}`);
+      throw new OldProductError(`Old product ${productId} found for user with id: ${user.uuid}`);
     }
 
     if (isFree) {
@@ -88,7 +96,7 @@ export class DetermineLifetimeConditions {
         invoices.map(async (invoice) => {
           const line = invoice.lines.data[0];
 
-          if (!line || !line.price || !line.price.metadata) {
+          if (!line?.price?.metadata) {
             console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
             return null;
           }
@@ -99,7 +107,7 @@ export class DetermineLifetimeConditions {
           const invoiceMetadata = invoice.metadata;
           const isOutOfBand = invoice.paid_out_of_band;
 
-          if (invoiceMetadata && invoiceMetadata.chargeId) {
+          if (invoiceMetadata?.chargeId) {
             chargeId = invoiceMetadata.chargeId;
           } else {
             chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
