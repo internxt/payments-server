@@ -4,7 +4,6 @@ import { HttpError } from '../errors/HttpError';
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof HttpError) {
-      console.log(error);
       return reply.status(error.statusCode).send({
         error: error.name,
         message: error.message,
