@@ -1,8 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getCustomer, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { UsersService } from '../../../src/services/users.service';
-import { BadRequestError } from '../../../src/errors/Errors';
+import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 
 let app: FastifyInstance;
@@ -47,7 +46,7 @@ describe('Checkout controller', () => {
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken(mockedCustomer.id);
 
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(BadRequestError);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(UserNotFoundError);
       jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
 
       const response = await app.inject({
