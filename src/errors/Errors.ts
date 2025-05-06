@@ -19,7 +19,7 @@ export class ConflictError extends HttpError {
 }
 
 export class InternalServerError extends HttpError {
-  constructor(message = 'Server Internal Error') {
+  constructor(message = 'Internal Server Error') {
     super(message, 500);
   }
 }
