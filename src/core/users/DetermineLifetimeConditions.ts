@@ -87,58 +87,13 @@ export class DetermineLifetimeConditions {
     let totalMaxSpaceBytes = 0;
     const productIds: string[] = [];
 
+    // Get total Max Space Bytes
     for (const customer of customersRelatedToUser) {
       const invoices = await this.paymentsService.getInvoicesFromUser(customer.id, {
         limit: 100,
       });
 
-      const paidInvoices = await Promise.all(
-        invoices.map(async (invoice) => {
-          const line = invoice.lines.data[0];
-
-          if (!line?.price?.metadata) {
-            console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
-            return null;
-          }
-
-          let chargeId;
-          const isLifetime = line.price?.metadata?.planType === 'one_time';
-          const isPaid = invoice.paid;
-          const invoiceMetadata = invoice.metadata;
-          const isOutOfBand = invoice.paid_out_of_band;
-
-          if (invoiceMetadata?.chargeId) {
-            chargeId = invoiceMetadata.chargeId;
-          } else {
-            chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
-          }
-
-          if (!chargeId) {
-            if (isLifetime && isPaid && isOutOfBand) {
-              return invoice;
-            }
-            return null;
-          }
-
-          if (!chargeId && line.price.metadata.type === 'one_time' && invoice.paid && invoice.paid_out_of_band) {
-            return invoice;
-          } else if (!chargeId) {
-            return null;
-          }
-
-          const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
-          const isFullyRefunded = charge.refunded;
-          const isDisputed = charge.disputed;
-
-          if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
-            return invoice;
-          }
-
-          return null;
-        }),
-      );
-
-      const filteredPaidInvoices = paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+      const filteredPaidInvoices = await this.getPaidInvoices(customer, invoices);
 
       filteredPaidInvoices.forEach((invoice) => {
         productIds.push((invoice.lines.data[0].price?.product as string) || '');
@@ -158,12 +113,74 @@ export class DetermineLifetimeConditions {
       return null;
     });
 
+    // Get user higher tier depending on the lifetimes he purchased
+    const userFinalTier = await this.getHigherTier(productIds, userTier);
+
+    if (!userFinalTier) {
+      throw new Error(`Tier not found for user ${user.uuid} when stacking lifetime`);
+    }
+
+    return {
+      tier: userFinalTier,
+      maxSpaceBytes: totalMaxSpaceBytes || FREE_PLAN_BYTES_SPACE,
+    };
+  }
+
+  private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
+    const paidInvoices = await Promise.all(
+      invoices.map(async (invoice) => {
+        const line = invoice.lines.data[0];
+
+        if (!line?.price?.metadata) {
+          console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+          return null;
+        }
+
+        let chargeId;
+        const isLifetime = line.price?.metadata?.planType === 'one_time';
+        const isPaid = invoice.paid;
+        const invoiceMetadata = invoice.metadata;
+        const isOutOfBand = invoice.paid_out_of_band;
+
+        if (invoiceMetadata?.chargeId) {
+          chargeId = invoiceMetadata.chargeId;
+        } else {
+          chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+        }
+
+        if (!chargeId) {
+          if (isLifetime && isPaid && isOutOfBand) {
+            return invoice;
+          }
+          return null;
+        }
+
+        if (!chargeId && line.price.metadata.type === 'one_time' && invoice.paid && invoice.paid_out_of_band) {
+          return invoice;
+        } else if (!chargeId) {
+          return null;
+        }
+
+        const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
+        const isFullyRefunded = charge.refunded;
+        const isDisputed = charge.disputed;
+
+        if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
+          return invoice;
+        }
+
+        return null;
+      }),
+    );
+
+    return paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+  }
+
+  private async getHigherTier(productIds: string[], userTier: Tier[] | null) {
     let userFinalTier;
 
     if (userTier) {
       userFinalTier = userTier.filter((tier) => tier.billingType === 'lifetime').at(0);
-    } else {
-      userFinalTier = await this.tiersService.getTierProductsByProductsId('free');
     }
 
     for (const productId of productIds) {
@@ -187,13 +204,6 @@ export class DetermineLifetimeConditions {
       }
     }
 
-    if (!userFinalTier) {
-      throw new Error(`Tier not found for user ${user.uuid} when stacking lifetime`);
-    }
-
-    return {
-      tier: userFinalTier,
-      maxSpaceBytes: totalMaxSpaceBytes || FREE_PLAN_BYTES_SPACE,
-    };
+    return userFinalTier;
   }
 }
