@@ -16,15 +16,6 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       timeWindow: '1 minute',
     });
 
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
-
     function signUserToken(customerId: string) {
       return jwt.sign({ customerId }, config.JWT_SECRET);
     }
