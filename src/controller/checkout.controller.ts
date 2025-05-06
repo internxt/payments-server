@@ -7,6 +7,7 @@ import config from '../config';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { UnauthorizedError } from '../errors/Errors';
+import Stripe from 'stripe';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -49,17 +50,18 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
+        let customerId: Stripe.Customer['id'];
         const { country, companyVatId } = req.query;
         const { uuid: userUuid, email, name } = req.user.payload;
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
-          const { customerId } = userExists;
-          return res.send({ customerId: customerId, token: signUserToken(customerId) });
+          customerId = userExists.customerId;
+        } else {
+          const { id } = await paymentsService.createCustomer({ name, email });
+          customerId = id;
         }
-
-        const { id: customerId } = await paymentsService.createCustomer({ name, email });
 
         if (country && companyVatId) {
           await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);

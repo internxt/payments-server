@@ -16,7 +16,6 @@ afterAll(async () => {
 
 describe('Checkout controller', () => {
   it('When the jwt verify fails, then an error indicating so is thrown', async () => {
-    const mockedUser = getUser();
     const userAuthToken = 'invalid_token';
 
     const response = await app.inject({
@@ -77,6 +76,42 @@ describe('Checkout controller', () => {
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({
         customerId: mockedCustomer.id,
+        token: userToken,
+      });
+    });
+
+    it('When the user provides country and Vat Id, then they are attached to the user correctly', async () => {
+      const country = 'ES';
+      const companyVatId = 'vat_id';
+
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const userToken = getValidUserToken(mockedUser.customerId);
+
+      const attachCustomerAndVatIdToCustomerSpy = jest
+        .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
+        .mockResolvedValue();
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'GET',
+        query: {
+          country,
+          companyVatId,
+        },
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(attachCustomerAndVatIdToCustomerSpy).toHaveBeenCalledTimes(1);
+      expect(attachCustomerAndVatIdToCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId, country, companyVatId);
+      expect(responseBody).toStrictEqual({
+        customerId: mockedUser.customerId,
         token: userToken,
       });
     });
