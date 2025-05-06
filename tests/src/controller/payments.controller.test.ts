@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 import {
+  getCustomer,
   getPrice,
   getPrices,
   getPromotionCode,
@@ -12,19 +13,20 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUserStorage } from '../../../src/services/storage.service';
-import { PaymentService } from '../../../src/services/payment.service';
+import { InvalidTaxIdError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
 import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
+import { UserAlreadyExistsError } from '../../../src/services/payment.service';
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
-    quit: jest.fn().mockResolvedValue(undefined), // Para cerrar la conexión correctamente
+    quit: jest.fn().mockResolvedValue(undefined),
   }));
 });
 
@@ -395,6 +397,98 @@ describe('Payment controller e2e tests', () => {
           promoCodeId: mockedBody.promoCodeId,
         });
       });
+    });
+  });
+
+  describe('Create customer for object storage', () => {
+    it('When the user provides valid data, then a customer is created and a token is returned', async () => {
+      const name = 'Test User';
+      const email = 'test@example.com';
+      const country = 'ES';
+      const customerId = 'cus_test';
+      const mockCustomer = getCustomer({ id: customerId });
+      const createOrGetCustomerSpy = jest
+        .spyOn(PaymentService.prototype, 'createOrGetCustomer')
+        .mockResolvedValue(mockCustomer);
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, email, country },
+      });
+
+      const responseBody = response.json();
+      expect(response.statusCode).toBe(200);
+      expect(createOrGetCustomerSpy).toHaveBeenCalledWith({ name, email }, country, undefined);
+      expect(responseBody.customerId).toBe(customerId);
+      expect(responseBody.token).toBeDefined();
+
+      const decodedToken = jwt.verify(responseBody.token, config.JWT_SECRET) as { customerId: string };
+      expect(decodedToken.customerId).toBe(customerId);
+    });
+
+    it('When the email is missing, then it returns 404 status code', async () => {
+      const name = 'Test User';
+      const country = 'ES';
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, country },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('When the user already exists, then it returns 409 status code', async () => {
+      const name = 'Test User';
+      const email = 'existing@example.com';
+      const country = 'ES';
+      const userExistsError = new UserAlreadyExistsError(email);
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(userExistsError);
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, email, country },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.body).toBe(userExistsError.message);
+    });
+
+    it('When the tax id is invalid, then it returns 400 status code', async () => {
+      const name = 'Test User';
+      const email = 'invalid@example.com';
+      const country = 'ES';
+      const invalidTaxIdError = new InvalidTaxIdError();
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(invalidTaxIdError);
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, email, country },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: invalidTaxIdError.message });
+    });
+
+    it('When an internal server error occurs, then it returns 500 status code', async () => {
+      const name = 'Test User';
+      const email = 'error@example.com';
+      const country = 'ES';
+      const internalError = new Error('Internal Server Error');
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(internalError);
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, email, country },
+      });
+
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({ message: 'Internal Server Error' });
     });
   });
 });
