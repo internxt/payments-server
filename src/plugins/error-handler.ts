@@ -1,8 +1,9 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { HttpError } from '../errors/HttpError';
+import { InternalServerError } from '../errors/Errors';
 
 export function registerErrorHandler(app: FastifyInstance) {
-  app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
+  app.setErrorHandler((error, _, reply: FastifyReply) => {
     if (error instanceof HttpError) {
       return reply.status(error.statusCode).send({
         error: error.name,
@@ -11,7 +12,7 @@ export function registerErrorHandler(app: FastifyInstance) {
     }
 
     return reply.status(500).send({
-      error: 'InternalServerError',
+      error: InternalServerError.name,
       message: 'Something went wrong',
     });
   });
