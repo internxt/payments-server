@@ -15,7 +15,7 @@ import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions, OldProductError } from '../../../../src/core/users/DetermineLifetimeConditions';
-import { getUser, getSubscription, newTier } from '../../fixtures';
+import { getUser, getSubscription, newTier, getCustomer } from '../../fixtures';
 import { Service } from '../../../../src/core/users/Tier';
 
 let tiersService: TiersService;
@@ -163,6 +163,39 @@ describe('Determining Lifetime conditions', () => {
       });
 
       await expect(determineLifetimeConditions.determine(mockedUser, mockedTier.productId)).rejects.toThrow(Error);
+    });
+
+    describe('The user has invoices', () => {
+      it('When the user has invoices without charge Id, checks if the invoice has the charge Id in the metadata object', async () => {
+        const mockedUser = getUser({
+          lifetime: true,
+        });
+        const mockedTier = newTier({
+          billingType: 'lifetime',
+        });
+        const mockedSubscription = getSubscription({
+          type: 'lifetime',
+        });
+        const mockedCustomer = getCustomer();
+
+        jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue(mockedSubscription);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+        jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(
+          mockedCustomer as Stripe.Customer & {
+            lastResponse: {
+              headers: { [key: string]: string };
+              requestId: string;
+              statusCode: number;
+              apiVersion?: string;
+              idempotencyKey?: string;
+              stripeAccount?: string;
+            };
+          },
+        );
+        jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([getCustomer(), getCustomer()]);
+
+        const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(mockedUser, mockedTier.productId);
+      });
     });
   });
 });
