@@ -26,7 +26,7 @@ jest.mock('ioredis', () => {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
-    quit: jest.fn().mockResolvedValue(undefined), // Para cerrar la conexión correctamente
+    quit: jest.fn().mockResolvedValue(undefined),
   }));
 });
 

@@ -15,6 +15,7 @@ import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
 import { ProductsService } from './services/products.service';
+import { registerErrorHandler } from './plugins/error-handler';
 
 const envToLogger = {
   development: {
@@ -45,6 +46,8 @@ export async function buildApp(
   const fastify = Fastify({
     logger: envToLogger[config.NODE_ENV] ?? true,
   });
+
+  registerErrorHandler(fastify);
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
