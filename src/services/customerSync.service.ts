@@ -27,7 +27,8 @@ export class CustomerSyncService {
 
     if (stripeCustomers.length === 1) {
       const [customer] = stripeCustomers;
-      const existingUser = await this.usersService.findUserByCustomerID(customer.id);
+      // This throws, we need to catch it
+      const existingUser = await this.usersService.findUserByCustomerID(customer.id).catch(() => null);
 
       if (!existingUser) return customer.id;
 
