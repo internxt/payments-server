@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { HttpError } from './HttpError';
+import { HttpError } from '../errors/HttpError';
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
