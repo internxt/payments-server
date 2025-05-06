@@ -10,6 +10,7 @@ import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { VpnFeatures } from '../core/users/Tier';
+import { BadRequestError } from '../errors/Errors';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -58,7 +59,7 @@ export class UsersService {
   async findUserByUuid(uuid: User['uuid']): Promise<User> {
     const userFound = await this.usersRepository.findUserByUuid(uuid);
     if (!userFound) {
-      throw new UserNotFoundError();
+      throw new BadRequestError('User not found');
     }
 
     return userFound;

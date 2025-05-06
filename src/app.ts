@@ -5,6 +5,7 @@ import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import businessController from './controller/business.controller';
 import productsController from './controller/products.controller';
+import checkoutController from './controller/checkout.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -52,6 +53,7 @@ export async function buildApp(
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(productsController(tiersService, usersService, productsService, config), { prefix: '/products' });
+  fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(

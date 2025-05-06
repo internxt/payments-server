@@ -1,12 +1,15 @@
-import fastifyJwt from '@fastify/jwt';
-
 import { FastifyInstance } from 'fastify';
-import config from '../config';
+import jwt from 'jsonwebtoken';
+import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
+
+import config from '../config';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import jwt from 'jsonwebtoken';
-import { requireAuthCallback } from '../utils/requireAuth';
+
+function signUserToken(customerId: string) {
+  return jwt.sign({ customerId }, config.JWT_SECRET);
+}
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -16,18 +19,25 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       timeWindow: '1 minute',
     });
 
-    function signUserToken(customerId: string) {
-      return jwt.sign({ customerId }, config.JWT_SECRET);
-    }
+    fastify.addHook('onRequest', async (request, reply) => {
+      try {
+        await request.jwtVerify();
+      } catch (err) {
+        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
+        reply.status(401).send();
+      }
+    });
 
-    fastify.get<{ Params: { country: string; companyVatId: string } }>(
+    fastify.get<{ Querystring: { country: string; companyVatId: string } }>(
       '/customer',
       {
-        preValidation: requireAuthCallback,
         schema: {
-          params: {
-            country: { type: 'string' },
-            companyVatId: { type: 'string' },
+          querystring: {
+            type: 'object',
+            properties: {
+              country: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
           },
         },
         config: {
@@ -38,7 +48,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
-        const { country, companyVatId } = req.params;
+        const { country, companyVatId } = req.query;
         const { uuid: userUuid, email, name } = req.user.payload;
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
