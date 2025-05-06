@@ -1,7 +1,6 @@
 // tests/error-handler.test.ts
 import fastify, { FastifyInstance } from 'fastify';
 import { testRoutes } from '../utils/error-test-routes';
-import { BadRequestError, NotFoundError, InternalServerError } from '../../../src/errors/Errors';
 import { registerErrorHandler } from '../../../src/plugins/error-handler';
 
 let app: FastifyInstance;
@@ -26,7 +25,6 @@ describe('Custom error handler', () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body)).toEqual({
-      error: BadRequestError.name,
       message: 'Missing parameter',
     });
   });
@@ -39,7 +37,6 @@ describe('Custom error handler', () => {
 
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body)).toEqual({
-      error: NotFoundError.name,
       message: 'User not found',
     });
   });
@@ -52,7 +49,6 @@ describe('Custom error handler', () => {
 
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body)).toEqual({
-      error: InternalServerError.name,
       message: 'Something went wrong',
     });
   });
