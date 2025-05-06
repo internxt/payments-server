@@ -6,6 +6,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import jwt from 'jsonwebtoken';
+import { requireAuth } from '../utils/requireAuth';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -31,6 +32,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     fastify.get<{ Params: { country: string; companyVatId: string } }>(
       '/customer',
       {
+        preValidation: requireAuth,
         schema: {
           params: {
             country: { type: 'string' },
@@ -52,7 +54,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
         if (userExists) {
           const { customerId } = userExists;
-          return res.status(200).send({ customerId: customerId, token: signUserToken(customerId) });
+          return res.send({ customerId: customerId, token: signUserToken(customerId) });
         }
 
         const { id: customerId } = await paymentsService.createCustomer({ name, email });
