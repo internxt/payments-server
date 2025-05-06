@@ -13,7 +13,7 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUserStorage } from '../../../src/services/storage.service';
-import { PaymentService } from '../../../src/services/payment.service';
+import { InvalidTaxIdError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
 import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
@@ -455,6 +455,23 @@ describe('Payment controller e2e tests', () => {
 
       expect(response.statusCode).toBe(409);
       expect(response.body).toBe(userExistsError.message);
+    });
+
+    it('When the tax id is invalid, then it returns 400 status code', async () => {
+      const name = 'Test User';
+      const email = 'invalid@example.com';
+      const country = 'ES';
+      const invalidTaxIdError = new InvalidTaxIdError();
+      jest.spyOn(PaymentService.prototype, 'createOrGetCustomer').mockRejectedValue(invalidTaxIdError);
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/create-customer-for-object-storage',
+        body: { name, email, country },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: invalidTaxIdError.message });
     });
 
     it('When an internal server error occurs, then it returns 500 status code', async () => {

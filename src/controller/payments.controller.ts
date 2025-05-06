@@ -142,6 +142,11 @@ export default function (
           if (err instanceof UserAlreadyExistsError) {
             return res.status(409).send(err.message);
           }
+          if (err instanceof InvalidTaxIdError) {
+            return res.status(400).send({
+              message: error.message,
+            });
+          }
           req.log.error(
             `[OBJECT_STORAGE_CREATE_CUSTOMER_ERROR] Customer Email: ${email} - Error: ${error.stack ?? error.message}`,
           );
