@@ -18,6 +18,12 @@ export class ConflictError extends HttpError {
   }
 }
 
+export class UnauthorizedError extends HttpError {
+  constructor(message = 'User Unauthorized') {
+    super(message, 401);
+  }
+}
+
 export class InternalServerError extends HttpError {
   constructor(message = 'Internal Server Error') {
     super(message, 500);

@@ -15,8 +15,23 @@ afterAll(async () => {
 });
 
 describe('Checkout controller', () => {
+  it('When the jwt verify fails, then an error indicating so is thrown', async () => {
+    const mockedUser = getUser();
+    const userAuthToken = 'invalid_token';
+
+    const response = await app.inject({
+      path: '/checkout/customer',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${userAuthToken}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
   describe('Get customer ID', () => {
-    it('The user exists in Users collection, then the customer Id associated to the user is returned', async () => {
+    it('When the user exists in Users collection, then the customer Id associated to the user is returned', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken(mockedUser.customerId);
@@ -40,7 +55,7 @@ describe('Checkout controller', () => {
       });
     });
 
-    it('The user does not exists in Users collection, then the customer is created and the customer Id is returned', async () => {
+    it('When the user does not exists in Users collection, then the customer is created and the customer Id is returned', async () => {
       const mockedUser = getUser();
       const mockedCustomer = getCustomer();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);

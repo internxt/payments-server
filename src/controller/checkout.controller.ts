@@ -6,6 +6,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import config from '../config';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
+import { UnauthorizedError } from '../errors/Errors';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -24,7 +25,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         await request.jwtVerify();
       } catch (err) {
         request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
+        throw new UnauthorizedError();
       }
     });
 
