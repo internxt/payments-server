@@ -1,12 +1,12 @@
 import fastifyJwt from '@fastify/jwt';
 
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import config from '../config';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import jwt from 'jsonwebtoken';
-import { requireAuth } from '../utils/requireAuth';
+import { requireAuthCallback } from '../utils/requireAuth';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -23,9 +23,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     fastify.get<{ Params: { country: string; companyVatId: string } }>(
       '/customer',
       {
-        preValidation: async (req: FastifyRequest, reply: FastifyReply) => {
-          await requireAuth(req, reply);
-        },
+        preValidation: requireAuthCallback,
         schema: {
           params: {
             country: { type: 'string' },
