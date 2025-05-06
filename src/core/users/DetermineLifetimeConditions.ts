@@ -112,12 +112,6 @@ export class DetermineLifetimeConditions {
             return null;
           }
 
-          if (!chargeId && line.price.metadata.type === 'one_time' && invoice.paid && invoice.paid_out_of_band) {
-            return invoice;
-          } else if (!chargeId) {
-            return null;
-          }
-
           const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
           const isFullyRefunded = charge.refunded;
           const isDisputed = charge.disputed;
