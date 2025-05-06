@@ -1,6 +1,6 @@
 import fastifyJwt from '@fastify/jwt';
 
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import config from '../config';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { UsersService } from '../services/users.service';
@@ -32,7 +32,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     fastify.get<{ Params: { country: string; companyVatId: string } }>(
       '/customer',
       {
-        preValidation: requireAuth,
+        preValidation: async (req: FastifyRequest, reply: FastifyReply) => {
+          await requireAuth(req, reply);
+        },
         schema: {
           params: {
             country: { type: 'string' },
