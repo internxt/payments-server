@@ -112,10 +112,16 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res) => {
         const { customerId, priceId, currency, promoCodeId, quantity, token } = req.body;
+        let tokenCustomerId;
 
-        const { customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as {
-          customerId: string;
-        };
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
 
         if (customerId !== tokenCustomerId) {
           throw new ForbiddenError();

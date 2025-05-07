@@ -230,10 +230,7 @@ describe('Checkout controller', () => {
           },
         });
 
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(500);
-        expect(responseBody).toStrictEqual({ message: 'invalid token' });
+        expect(response.statusCode).toBe(403);
       });
 
       it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
