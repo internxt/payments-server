@@ -193,7 +193,50 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the provided user token is not valid, then an error indicating so is thrown', async () => {
+      it('When the user token is not present in the body, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      it('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const invalidUserToken = 'malformed.token.payload';
+
+        const response = await app.inject({
+          path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: invalidUserToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(500);
+        expect(responseBody).toStrictEqual({ message: 'invalid token' });
+      });
+
+      it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken('invalid_customer_id');

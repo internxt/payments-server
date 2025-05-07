@@ -6,7 +6,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 
 function signUserToken(customerId: string) {
@@ -112,10 +112,6 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res) => {
         const { customerId, priceId, currency, promoCodeId, quantity, token } = req.body;
-
-        if (!customerId || !priceId) {
-          throw new BadRequestError('The following parameters are mandatory: customerId and priceId');
-        }
 
         const { customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as {
           customerId: string;
