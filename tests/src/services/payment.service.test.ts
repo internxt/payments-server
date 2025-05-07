@@ -16,10 +16,12 @@ import {
   getInvoices,
   getPaymentIntentResponse,
   getPaymentMethod,
+  getPrice,
   getPrices,
   getPromotionCode,
   getUser,
 } from '../fixtures';
+import { NotFoundError } from '../../../src/errors/Errors';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -368,37 +370,102 @@ describe('Payments Service tests', () => {
     beforeAll(() => {
       jest.useFakeTimers();
     });
-  
+
     afterAll(() => {
       jest.useRealTimers();
     });
-  
+
     it('When creating a subscription with trial, then it creates the sub with the correct trial end date', async () => {
       const fixedDate = new Date('2024-01-01T12:00:00Z');
       jest.setSystemTime(fixedDate);
-  
+
       const expected = getCreateSubscriptionResponse();
       const payload = {
         customerId: getCustomer().id,
         priceId: getPrices().subscription.exists,
       };
       const trialReason: Reason = { name: 'pc-cloud-25' };
-  
+
       const trialMonths = 6;
       const expectedTrialEnd = Math.floor(
-        new Date(fixedDate.setMonth(fixedDate.getMonth() + trialMonths)).getTime() / 1000
+        new Date(fixedDate.setMonth(fixedDate.getMonth() + trialMonths)).getTime() / 1000,
       );
-  
+
       const createSubSpy = jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(expected);
-  
+
       const received = await paymentService.createSubscriptionWithTrial(payload, trialReason);
-  
-      expect(received).toStrictEqual(expected);  
+
+      expect(received).toStrictEqual(expected);
       expect(createSubSpy).toHaveBeenCalledWith({
         ...payload,
         trialEnd: expectedTrialEnd,
         metadata: { 'why-trial': trialReason.name },
       });
     });
-  });  
+  });
+
+  describe('Fetch the price by its Id', () => {
+    it('When the price does not exist, an error indicating so is thrown', async () => {
+      const mockedPrices = getPrice();
+      const invalidPriceId = 'invalid_price_id';
+
+      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrices]);
+
+      await expect(paymentService.getPriceById(invalidPriceId)).rejects.toThrow(NotFoundError);
+    });
+
+    it('When the price exists, then the price is returned', async () => {
+      const mockedPrice = getPrice({
+        metadata: {
+          maxSpaceBytes: '123456789',
+        },
+      });
+      const validPriceId = mockedPrice.id;
+      const priceResponse = {
+        id: validPriceId,
+        currency: mockedPrice.currency,
+        amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
+        bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
+        interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
+        decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        type: UserType.Individual,
+      };
+      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
+
+      const price = await paymentService.getPriceById(validPriceId);
+
+      expect(price).toStrictEqual(priceResponse);
+    });
+
+    it('When the price exists and it is a business product, then the price is returned with the minimum and maximum seats', async () => {
+      const businessSeats = {
+        minimumSeats: 1,
+        maximumSeats: 3,
+      };
+      const mockedPrice = getPrice({
+        metadata: {
+          type: 'business',
+          maxSpaceBytes: '123456789',
+          minimumSeats: businessSeats.minimumSeats.toString(),
+          maximumSeats: businessSeats.maximumSeats.toString(),
+        },
+      });
+      const validPriceId = mockedPrice.id;
+      const priceResponse = {
+        id: validPriceId,
+        currency: mockedPrice.currency,
+        amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
+        bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
+        interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
+        decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        type: UserType.Business,
+        ...businessSeats,
+      };
+      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
+
+      const price = await paymentService.getPriceById(validPriceId);
+
+      expect(price).toStrictEqual(priceResponse);
+    });
+  });
 });

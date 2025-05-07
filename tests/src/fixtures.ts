@@ -116,14 +116,14 @@ export const getPrices = () => {
   };
 };
 
-export const getPrice = (params?: Stripe.Price): Stripe.Price => {
+export const getPrice = (params?: Partial<Stripe.Price>): Stripe.Price => {
   return {
     id: `price_${randomDataGenerator.string({ length: 12 })}`,
     object: 'price',
     active: true,
     billing_scheme: 'per_unit',
     created: 1679431181,
-    currency: 'usd',
+    currency: 'eur',
     custom_unit_amount: null,
     livemode: false,
     lookup_key: null,
@@ -143,6 +143,14 @@ export const getPrice = (params?: Stripe.Price): Stripe.Price => {
     type: 'recurring',
     unit_amount: 1000,
     unit_amount_decimal: '1000',
+    currency_options: {
+      eur: {
+        tax_behavior: 'exclusive',
+        unit_amount: 1000,
+        custom_unit_amount: null,
+        unit_amount_decimal: null,
+      },
+    },
     ...params,
   };
 };
