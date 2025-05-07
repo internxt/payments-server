@@ -13,13 +13,12 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUserStorage } from '../../../src/services/storage.service';
-import { InvalidTaxIdError, PaymentService } from '../../../src/services/payment.service';
+import { InvalidTaxIdError, PaymentService, UserAlreadyExistsError } from '../../../src/services/payment.service';
 import config from '../../../src/config';
 import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
-import { UserAlreadyExistsError } from '../../../src/services/payment.service';
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
