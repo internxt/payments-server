@@ -76,6 +76,7 @@ let user: ReturnType<typeof getUser>;
 
 describe('Process when an invoice payment is completed', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     user = getUser({ lifetime: true });
     stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
     usersRepository = testFactory.getUsersRepositoryForTest();
@@ -116,8 +117,6 @@ describe('Process when an invoice payment is completed', () => {
 
     jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([] as ExtendedSubscription[]);
     (updateUserTier as jest.Mock).mockResolvedValue(Promise.resolve());
-
-    jest.clearAllMocks();
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -536,7 +535,104 @@ describe('Process when an invoice payment is completed', () => {
   });
 
   describe('The user has a coupon', () => {
-    it('When the user has a tracked coupon, then the coupon is stored correctly', async () => {
+    it('When the user has a tracked coupon for lifetime plans, then the coupon is stored correctly', async () => {
+      const mockedUser = getUser({
+        lifetime: true,
+      });
+      const mockedCustomer = getCustomer({
+        id: mockedUser.customerId,
+      });
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+        customer: mockedCustomer.id,
+        lines: {
+          data: [
+            {
+              price: {
+                id: `price_12333`,
+                object: 'price',
+                active: true,
+                billing_scheme: 'per_unit',
+                created: 102389234,
+                currency: 'usd',
+                custom_unit_amount: null,
+                livemode: false,
+                lookup_key: null,
+                metadata: {
+                  maxSpaceBytes: `1837284738`,
+                  type: UserType.Individual,
+                  planType: 'one_time',
+                },
+                nickname: null,
+                product: {
+                  id: `prod_12333`,
+                  type: 'service',
+                  object: 'product',
+                  active: true,
+                  created: 1678833149,
+                  default_price: null,
+                  description: null,
+                  images: [],
+                  marketing_features: [],
+                  livemode: false,
+                  metadata: {
+                    type: UserType.Individual,
+                  },
+                  name: 'Gold Plan',
+                  package_dimensions: null,
+                  shippable: null,
+                  statement_descriptor: null,
+                  tax_code: null,
+                  unit_label: null,
+                  updated: 1678833149,
+                  url: null,
+                },
+                recurring: {
+                  aggregate_usage: null,
+                  interval: 'month',
+                  interval_count: 1,
+                  trial_period_days: null,
+                  usage_type: 'licensed',
+                },
+                tax_behavior: 'unspecified',
+                tiers_mode: null,
+                transform_quantity: null,
+                type: 'recurring',
+                unit_amount: 1000,
+                unit_amount_decimal: '1000',
+              },
+              discounts: [
+                {
+                  coupon: { id: 'coupon_id' },
+                },
+              ],
+            },
+          ],
+        },
+      } as any);
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+      jest.spyOn(usersRepository, 'updateUser').mockImplementation();
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const storedCouponSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      await handleInvoiceCompleted(
+        mockedInvoice,
+        usersService,
+        paymentService,
+        getLogger(),
+        cacheService,
+        tiersService,
+        storageService,
+        objectStorageService,
+      );
+
+      expect(storedCouponSpy).toHaveBeenCalledWith(mockedUser, 'coupon_id');
+    });
+
+    it('When the user has a tracked coupon for subscription plans, then the coupon is stored correctly', async () => {
       const mockedUser = getUser();
       const mockedCustomer = getCustomer({
         id: mockedUser.customerId,
@@ -544,6 +640,9 @@ describe('Process when an invoice payment is completed', () => {
       const mockedInvoice = getInvoice({
         status: 'paid',
         customer: mockedCustomer.id,
+        discount: {
+          coupon: { id: 'coupon_id' },
+        },
         lines: {
           data: [
             {
@@ -599,11 +698,7 @@ describe('Process when an invoice payment is completed', () => {
                 unit_amount: 1000,
                 unit_amount_decimal: '1000',
               },
-              discounts: [
-                {
-                  coupon: { id: 'coupon_id' },
-                },
-              ],
+              discounts: [],
             },
           ],
         },
