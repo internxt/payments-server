@@ -23,7 +23,7 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import { Tier } from '../core/users/Tier';
+import { Service, Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 
 async function initializeStates() {
@@ -180,104 +180,79 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
       }
 
       if (!userMaxSpaceBytes && !tier) {
+        console.log(`There are no max space bytes and tier for user ${user.customerId}. Skipping this user...`);
         continue;
       }
 
       if (userMaxSpaceBytes !== userStorage.currentMaxSpaceBytes) {
-        // let userTiers: Tier[] | null;
+        let userTiers: Tier[] | null;
 
-        // userTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
-        //   if (!(err instanceof TierNotFoundError)) {
-        //     console.error(`Something went wrong fetching the user tiers: ${err.message}`);
-        //     throw err;
-        //   }
+        userTiers = await tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+          if (!(err instanceof TierNotFoundError)) {
+            console.error(`Something went wrong fetching the user tiers: ${err.message}`);
+            throw err;
+          }
 
-        //   console.log(
-        //     `[${invoice.id}] The user with customer ID ${user.customerId} does not have any individual active tier`,
-        //   );
-        //   return null;
-        // });
-
-        // const individualUserTier = userTiers?.find(
-        //   (tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled,
-        // );
-
-        // try {
-        //   if (!individualUserTier) {
-        //     await tiersService.insertTierToUser(user.id, tier.id);
-        //   } else if (individualUserTier.id !== tier.id) {
-        //     await tiersService.updateTierToUser(user.id, individualUserTier.id, tier.id);
-        //   }
-        // } catch (error) {
-        //   console.error(
-        //     `[${invoice.id}] Error while inserting or updating the user-tier relationship. CUSTOMER ID: ${user.customerId} - PRODUCT ID (TIER): ${tier.productId}. ERROR: ${error.stack ?? error.message}`,
-        //   );
-        //   userErrorWhenApplying.push({
-        //     customerId: user.customerId,
-        //     userUuid: user.uuid,
-        //     reason: 'Error while inserting or updating the user tier relationship',
-        //   });
-        //   continue;
-        // }
-
-        // try {
-        //   await storageService.changeStorage(user.uuid, userMaxSpaceBytes);
-        // } catch (error) {
-        //   console.error(
-        //     `[${invoice.id}] Error while updating the user storage. CUSTOMER ID: ${user.customerId}. ERROR: ${error.stack ?? error.message}`,
-        //   );
-        //   userErrorWhenApplying.push({
-        //     customerId: user.customerId,
-        //     userUuid: user.uuid,
-        //     reason: 'Error while changing the user storage in Drive',
-        //   });
-        //   continue;
-        // }
-
-        // try {
-        //   await tiersService.applyTier(
-        //     {
-        //       ...user,
-        //       email: customer.email as string,
-        //     },
-        //     customer,
-        //     1,
-        //     productId,
-        //     [Service.Drive],
-        //   );
-        // } catch (error) {
-        //   console.error(
-        //     `[${invoice.id}] Error applying lifetime tier for user with customer ID ${user.customerId}:`,
-        //     error,
-        //   );
-        //   userErrorWhenApplying.push({
-        //     customerId: user.customerId,
-        //     userUuid: user.uuid,
-        //     reason: 'Error applying the lifetime tier to the user',
-        //   });
-        //   continue;
-        // }
-
-        // try {
-        //   await cacheService.clearSubscription(user.customerId);
-        // } catch {
-        //   console.error(
-        //     `[${invoice.id}] Error while clearing subscription cache for user with customer ID: ${user.customerId}`,
-        //   );
-        //   userErrorWhenApplying.push({
-        //     customerId: user.customerId,
-        //     userUuid: user.uuid,
-        //     reason: 'Error while cleaning the cached user subscription',
-        //   });
-        // }
-
-        report.push({
-          'Customer ID': customer.id,
-          'User UUID': user.uuid,
-          Tier: tier.productId,
-          'Max Space (Bytes)': userMaxSpaceBytes,
-          'User Storage': userStorage.currentMaxSpaceBytes,
+          console.log(
+            `[${invoice.id}] The user with customer ID ${user.customerId} does not have any individual active tier`,
+          );
+          return null;
         });
+
+        const individualUserTier = userTiers?.find(
+          (tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled,
+        );
+
+        try {
+          if (!individualUserTier) {
+            await tiersService.insertTierToUser(user.id, tier.id);
+          } else if (individualUserTier.id !== tier.id) {
+            await tiersService.updateTierToUser(user.id, individualUserTier.id, tier.id);
+          }
+        } catch (error) {
+          console.error(
+            `[${invoice.id}] Error while inserting or updating the user-tier relationship. CUSTOMER ID: ${user.customerId} - PRODUCT ID (TIER): ${tier.productId}. ERROR: ${error.stack ?? error.message}`,
+          );
+          continue;
+        }
+
+        try {
+          await storageService.changeStorage(user.uuid, userMaxSpaceBytes);
+        } catch (error) {
+          console.error(
+            `[${invoice.id}] Error while updating the user storage. CUSTOMER ID: ${user.customerId}. ERROR: ${error.stack ?? error.message}`,
+          );
+          continue;
+        }
+
+        try {
+          await tiersService.applyTier(
+            {
+              ...user,
+              email: customer.email as string,
+            },
+            customer,
+            1,
+            productId,
+            [Service.Drive],
+          );
+        } catch (error) {
+          console.error(
+            `[${invoice.id}] Error applying lifetime tier for user with customer ID ${user.customerId}:`,
+            error,
+          );
+          continue;
+        }
+
+        try {
+          await cacheService.clearSubscription(user.customerId);
+        } catch {
+          console.error(
+            `[${invoice.id}] Error while clearing subscription cache for user with customer ID: ${user.customerId}`,
+          );
+        }
+
+        console.log(`Changes applied for user with customer ID: ${user.customerId} and uuid: ${user.uuid}`);
       }
     }
 
@@ -293,7 +268,6 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
 
 const startDate = Math.floor(new Date('2025-03-13T00:00:00Z').getTime() / 1000);
 const endDate = Math.floor(new Date().getTime() / 1000);
-// const endDate = Math.floor(new Date('2025-04-17T19:30:00Z').getTime() / 1000);
 
 userLifetimeStorage(startDate, endDate)
   .then(() => {
