@@ -209,9 +209,11 @@ export default async function handleInvoiceCompleted(
   try {
     if (session.id) {
       const userData = await usersService.findUserByUuid(user.uuid);
-      const areDiscounts = items.data[0].discounts.length > 0;
+      const areDiscounts = isLifetimePlan ? items.data[0].discounts.length > 0 : session.discount?.coupon;
       if (areDiscounts) {
-        const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
+        const coupon = isLifetimePlan
+          ? (items.data[0].discounts[0] as Stripe.Discount).coupon
+          : session.discount?.coupon;
 
         if (coupon) {
           await usersService.storeCouponUsedByUser(userData, coupon.id);
