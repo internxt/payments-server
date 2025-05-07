@@ -404,7 +404,7 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Fetch the price by its Id', () => {
+  describe('Fetch a price by its ID', () => {
     it('When the price does not exist, an error indicating so is thrown', async () => {
       const mockedPrices = getPrice();
       const invalidPriceId = 'invalid_price_id';
@@ -414,7 +414,7 @@ describe('Payments Service tests', () => {
       await expect(paymentService.getPriceById(invalidPriceId)).rejects.toThrow(NotFoundError);
     });
 
-    it('When the price exists, then the price is returned', async () => {
+    it('When the price exists, then the correct price object is returned', async () => {
       const mockedPrice = getPrice({
         metadata: {
           maxSpaceBytes: '123456789',
@@ -437,7 +437,7 @@ describe('Payments Service tests', () => {
       expect(price).toStrictEqual(priceResponse);
     });
 
-    it('When the price exists and it is a business product, then the price is returned with the minimum and maximum seats', async () => {
+    it('When the price exists and belongs to a business product, then the price is returned with minimum and maximum seats', async () => {
       const businessSeats = {
         minimumSeats: 1,
         maximumSeats: 3,
