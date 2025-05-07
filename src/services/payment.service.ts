@@ -4,6 +4,7 @@ import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
+import { NotFoundError } from '../errors/Errors';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -1035,6 +1036,50 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Returns the requested price if exists
+   * @param priceId - The id of the requested price
+   * @param currency - The currency of the requested price
+   * @returns - The selected price if it exists and it is active
+   */
+  async getPriceById(priceId: string, currency = 'eur') {
+    const availablePrices = await this.getPricesRaw(currency);
+
+    const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
+
+    if (!selectedPrice) {
+      throw new NotFoundError('The requested price does not exists');
+    }
+
+    let businessSeats;
+    const { currency_options, recurring, metadata, type } = selectedPrice;
+    const isBusinessPrice = metadata?.type === 'business';
+
+    if (isBusinessPrice) {
+      businessSeats = {
+        minimumSeats: Number(metadata.minimumSeats),
+        maximumSeats: Number(metadata.maximumSeats),
+      };
+    }
+
+    return {
+      id: priceId,
+      currency,
+      amount: currency_options![currency].unit_amount as number,
+      bytes: parseInt(metadata?.maxSpaceBytes),
+      interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
+      decimalAmount: (currency_options![currency].unit_amount as number) / 100,
+      type: isBusinessPrice ? UserType.Business : UserType.Individual,
+      ...businessSeats,
+    };
+  }
+
+  /**
+   * Deprecated - Use getPriceById instead
+   * @param priceId - Id of the price we want to fetch
+   * @param currency - Currency if needed
+   * @returns - The selected plan and their upsell if needed
+   */
   async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
     let upsellPlan: RequestedPlan['upsellPlan'];
     let businessSeats;

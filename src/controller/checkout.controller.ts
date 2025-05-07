@@ -1,13 +1,13 @@
 import { FastifyInstance } from 'fastify';
+import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 
-import config from '../config';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import { UnauthorizedError } from '../errors/Errors';
-import Stripe from 'stripe';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import config from '../config';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -21,7 +21,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       timeWindow: '1 minute',
     });
 
-    fastify.addHook('onRequest', async (request, reply) => {
+    fastify.addHook('onRequest', async (request, _) => {
       try {
         await request.jwtVerify();
       } catch (err) {
@@ -68,6 +68,72 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         }
 
         return res.send({ customerId, token: signUserToken(customerId) });
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerId: string;
+        priceId: string;
+        token: string;
+        currency?: string;
+        promoCodeId?: string;
+        quantity?: number;
+      };
+    }>(
+      '/subscription',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId', 'token'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              token: {
+                type: 'string',
+              },
+              currency: {
+                type: 'string',
+              },
+              promoCodeId: {
+                type: 'string',
+              },
+              quantity: {
+                type: 'number',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { customerId, priceId, currency, promoCodeId, quantity, token } = req.body;
+
+        if (!customerId || !priceId) {
+          throw new BadRequestError('The following parameters are mandatory: customerId and priceId');
+        }
+
+        const { customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as {
+          customerId: string;
+        };
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        const subscriptionAttempt = await paymentsService.createSubscription({
+          customerId,
+          priceId,
+          currency,
+          seatsForBusinessSubscription: quantity ?? 1,
+          promoCodeId,
+        });
+
+        return res.status(200).send(subscriptionAttempt);
       },
     );
   };
