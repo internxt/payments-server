@@ -21,7 +21,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       timeWindow: '1 minute',
     });
 
-    fastify.addHook('onRequest', async (request, _) => {
+    fastify.addHook('onRequest', async (request) => {
       try {
         await request.jwtVerify();
       } catch (err) {

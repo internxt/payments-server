@@ -1048,7 +1048,7 @@ export class PaymentService {
     const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
 
     if (!selectedPrice) {
-      throw new NotFoundError('The requested price does not exists');
+      throw new NotFoundError('The requested price does not exist');
     }
 
     let businessSeats;
