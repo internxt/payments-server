@@ -206,12 +206,10 @@ export default async function handleInvoiceCompleted(
 
   log.info(`User with uuid: ${user.uuid} added/updated in the local DB and available products also updated`);
 
-  console.log('SIUU');
   try {
     const userData = await usersService.findUserByUuid(user.uuid);
 
     const areDiscounts = isLifetimePlan ? items.data[0].discounts.length > 0 : !!session.discount?.coupon;
-    console.log(`ARE DISCOUNTS: ${areDiscounts}`);
     if (areDiscounts) {
       const coupon = isLifetimePlan ? (items.data[0].discounts[0] as Stripe.Discount).coupon : session.discount?.coupon;
 
@@ -221,7 +219,6 @@ export default async function handleInvoiceCompleted(
     }
   } catch (err) {
     const error = err as Error;
-    console.log('ERROR IN STORE COUPON');
     if (!(err instanceof CouponNotBeingTrackedError)) {
       log.error(`Error while adding user ${user.uuid} and coupon: ${error.stack ?? error.message}`);
     }
