@@ -112,6 +112,11 @@ export default async function handleSubscriptionCanceled(
       throw error;
     }
 
+    if (productType === UserType.Business) {
+      await usersService.destroyWorkspace(uuid);
+      return;
+    }
+
     try {
       await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
     } catch (err) {
