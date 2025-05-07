@@ -79,6 +79,7 @@ const report: {
   'Max Space (Bytes)': number;
   'User Storage': number;
 }[] = [];
+const fixedUsers = [{}];
 
 const filteredInvoices = async (stripe: Stripe, startDate: number, endDate: number) => {
   const invoices = await stripe.invoices
@@ -253,11 +254,17 @@ async function userLifetimeStorage(startDate: number, endDate: number) {
         }
 
         console.log(`Changes applied for user with customer ID: ${user.customerId} and uuid: ${user.uuid}`);
+
+        fixedUsers.push({
+          uuid: user.uuid,
+          customerId: user.customerId,
+          email: customer.email,
+        });
       }
     }
 
     console.log('✅ Tier applied for all these users:');
-    console.table(report);
+    console.table(fixedUsers);
     console.log(`✅ Filtered invoices: ${filteredInvoices.length}`);
     console.log(`✅ Total users: ${report.length}`);
   } finally {
