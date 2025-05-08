@@ -6,7 +6,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 
@@ -176,12 +176,18 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
+        let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
 
-        const { customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as {
-          customerId: string;
-        };
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
 
         if (customerId !== tokenCustomerId) {
           throw new ForbiddenError();
@@ -191,9 +197,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
 
         if (!isStorageUpgradeAllowed) {
-          return res.status(400).send({
-            message: "The user can't stack more storage",
-          });
+          throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
         const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice(
