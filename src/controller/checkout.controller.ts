@@ -212,7 +212,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           promoCodeId,
         );
 
-        return { clientSecret, id, invoiceStatus };
+        return res.status(200).send({ clientSecret, id, invoiceStatus });
       },
     );
 
