@@ -116,6 +116,44 @@ export const getPrices = () => {
   };
 };
 
+export const getTaxes = (): Stripe.Tax.Calculation => {
+  return {
+    id: 'taxcalc_1RMT1aFAOdcgaBMQEoAm2Pee',
+    object: 'tax.calculation',
+    amount_total: 14505,
+    currency: 'eur',
+    customer: null,
+    customer_details: {
+      address: null,
+      address_source: null,
+      ip_address: '93.176.146.32',
+      tax_ids: [],
+      taxability_override: 'none',
+    },
+    expires_at: 1754481242,
+    livemode: false,
+    ship_from_details: null,
+    shipping_cost: null,
+    tax_amount_exclusive: 2517,
+    tax_amount_inclusive: 0,
+    tax_breakdown: [
+      {
+        amount: 2517,
+        inclusive: false,
+        tax_rate_details: {
+          country: 'ES',
+          percentage_decimal: '21',
+          state: 'ES',
+          tax_type: 'vat',
+        },
+        taxability_reason: 'standard_rated',
+        taxable_amount: 11988,
+      },
+    ],
+    tax_date: 1746705242,
+  };
+};
+
 export const priceById = ({
   bytes,
   interval,

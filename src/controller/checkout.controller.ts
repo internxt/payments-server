@@ -224,6 +224,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           querystring: {
             type: 'object',
+            required: ['priceId'],
             properties: {
               priceId: { type: 'string', description: 'Price ID to fetch' },
               currency: { type: 'string', description: 'Optional currency for the price', default: 'eur' },

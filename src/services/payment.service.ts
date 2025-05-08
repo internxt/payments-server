@@ -1156,6 +1156,14 @@ export class PaymentService {
     };
   }
 
+  /**
+   * Returns the tax for a given price
+   * @param priceId - The Id of the price that we want to calculate the tax for
+   * @param amount - The amount of the price
+   * @param ipAddress - The IP address of the user
+   * @param currency - The currency of the price
+   * @returns - The tax calculation object
+   */
   async getTaxForPrice(
     priceId: string,
     amount: number,
