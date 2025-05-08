@@ -182,7 +182,7 @@ export class PaymentService {
     return newCustomer;
   }
 
-  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
+  public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
     const hasUserPaidInvoices = userInvoices.some((invoice) => invoice.status === 'paid');
@@ -377,8 +377,8 @@ export class PaymentService {
 
     await this.provider.invoiceItems.create({
       customer: customerId,
-      price: priceId,
       invoice: invoice.id,
+      price: priceId,
       discounts: [
         {
           coupon: couponId,
