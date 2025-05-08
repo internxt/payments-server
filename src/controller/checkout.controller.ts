@@ -8,6 +8,7 @@ import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
+import { fetchUserStorage } from '../utils/fetchUserStorage';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -136,6 +137,73 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         });
 
         return res.status(200).send(subscriptionAttempt);
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerId: string;
+        priceId: string;
+        token: string;
+        currency?: string;
+        promoCodeId?: string;
+      };
+    }>(
+      '/payment-intent',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId', 'token'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              token: {
+                type: 'string',
+              },
+              currency: {
+                type: 'string',
+              },
+              promoCodeId: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        const { uuid, email } = req.user.payload;
+        const { customerId, priceId, token, currency, promoCodeId } = req.body;
+
+        const { customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as {
+          customerId: string;
+        };
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        const price = await paymentsService.getPriceById(priceId);
+        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
+
+        if (!isStorageUpgradeAllowed) {
+          return res.status(400).send({
+            message: "The user can't stack more storage",
+          });
+        }
+
+        const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice(
+          customerId,
+          priceId,
+          currency,
+          promoCodeId,
+        );
+
+        return { clientSecret, id, invoiceStatus };
       },
     );
   };
