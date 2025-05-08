@@ -3,13 +3,18 @@ import {
   getCreatedSubscription,
   getCreateSubscriptionResponse,
   getCustomer,
+  getInvoice,
   getUser,
   getValidAuthToken,
   getValidUserToken,
+  priceById,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
+import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
+
+jest.mock('../../../src/utils/fetchUserStorage');
 
 let app: FastifyInstance;
 
@@ -240,6 +245,183 @@ describe('Checkout controller', () => {
 
         const response = await app.inject({
           path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: userToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+      });
+    });
+  });
+
+  describe('Create an invoice and returns the payment intent', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice();
+      const mockedPrice = priceById({
+        bytes: 123456789,
+        interval: 'lifetime',
+      });
+      const authToken = getValidAuthToken(mockedUser.uuid);
+      const userToken = getValidUserToken(mockedUser.customerId);
+      const mockedPaymentIntent = {
+        clientSecret: 'client_secret',
+        id: 'payment_intent_id',
+      };
+
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      (fetchUserStorage as jest.Mock).mockResolvedValue({
+        canExpand: true,
+      });
+      jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
+
+      const response = await app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: mockedInvoice.lines.data[0].price?.id,
+          token: userToken,
+        },
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedPaymentIntent);
+    });
+
+    it('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice();
+      const mockedPrice = priceById({
+        bytes: 123456789,
+        interval: 'lifetime',
+      });
+      const authToken = getValidAuthToken(mockedUser.uuid);
+      const userToken = getValidUserToken(mockedUser.customerId);
+
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      (fetchUserStorage as jest.Mock).mockResolvedValue({
+        canExpand: false,
+      });
+      const createInvoiceSpy = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: mockedInvoice.lines.data[0].price?.id,
+          token: userToken,
+        },
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(createInvoiceSpy).not.toHaveBeenCalled();
+    });
+
+    describe('Handling errors', () => {
+      it('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      it('When the id of the customer is not present in the body, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      it('When the user token is not present in the body, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      it('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const invalidUserToken = 'malformed.token.payload';
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: invalidUserToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+      });
+
+      it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken('invalid_customer_id');
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
           method: 'POST',
           body: {
             priceId: 'price_id',

@@ -116,6 +116,33 @@ export const getPrices = () => {
   };
 };
 
+export const priceById = ({
+  bytes,
+  interval,
+  type = UserType.Individual,
+  businessSeats,
+}: {
+  bytes: number;
+  interval: 'lifetime' | 'year';
+  type?: UserType;
+  businessSeats?: {
+    maxSeats: number;
+    minSeats: number;
+  };
+}) => {
+  const mockedPrice = getPrice();
+  return {
+    id: mockedPrice.id,
+    currency: mockedPrice.currency,
+    amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
+    bytes,
+    interval,
+    decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+    type,
+    ...businessSeats,
+  };
+};
+
 export const getPrice = (params?: Partial<Stripe.Price>): Stripe.Price => {
   return {
     id: `price_${randomDataGenerator.string({ length: 12 })}`,

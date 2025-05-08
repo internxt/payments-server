@@ -103,30 +103,92 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Obtain the paymentIntent customer secret', () => {
-    it('When fetching the Payment Intent customer with the correct payload, then returns the client secret to pay in the client side', async () => {
+  describe('Creating an invoice', () => {
+    it('When trying to create an invoice with the correct params, then it is successfully created', async () => {
       const mockedPaymentIntent = getPaymentIntentResponse();
       const mockedCreateSubscription = getCreatedSubscription();
 
       const paymentIntentSpy = jest
-        .spyOn(paymentService, 'createPaymentIntent')
+        .spyOn(paymentService, 'createInvoice')
         .mockImplementation(() => Promise.resolve(mockedPaymentIntent));
 
-      const paymentIntent = await paymentService.createPaymentIntent(
+      const paymentIntent = await paymentService.createInvoice(
         mockedCreateSubscription.customer as string,
-        mockedCreateSubscription.items.data[0].price.unit_amount as number,
         mockedCreateSubscription.items.data[0].price.id,
         mockedCreateSubscription.items.data[0].price.currency,
         ((mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
       );
       expect(paymentIntentSpy).toHaveBeenCalledWith(
         mockedCreateSubscription.customer as string,
-        mockedCreateSubscription.items.data[0].price.unit_amount as number,
         mockedCreateSubscription.items.data[0].price.id,
         mockedCreateSubscription.items.data[0].price.currency,
         ((mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
       );
-      expect(paymentIntent).toEqual(mockedPaymentIntent);
+      expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
+    });
+  });
+
+  describe('Obtain the paymentIntent customer secret', () => {
+    it('When fetching the Payment Intent customer with the correct payload, then returns the client secret', async () => {
+      const mockedInvoice = getInvoice();
+      const mockedPaymentIntent = getPaymentIntentResponse();
+
+      jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.InvoiceItem>);
+      jest
+        .spyOn(stripe.invoices, 'finalizeInvoice')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValue({
+        ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
+        client_secret: mockedPaymentIntent.clientSecret,
+      });
+
+      const paymentIntent = await paymentService.createInvoice(
+        mockedInvoice.customer as string,
+        mockedInvoice.lines.data[0].price?.id as string,
+        mockedInvoice.lines.data[0].price?.currency,
+      );
+
+      expect(paymentIntent).toStrictEqual({
+        clientSecret: mockedPaymentIntent.clientSecret,
+        id: mockedPaymentIntent.id,
+      });
+    });
+
+    it('When the invoice is created and marked as paid, then it returns the invoice status', async () => {
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+      });
+      const mockedPaymentIntent = getPaymentIntentResponse({
+        clientSecret: '',
+        id: '',
+        invoiceStatus: 'paid',
+      });
+
+      jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.InvoiceItem>);
+      jest
+        .spyOn(stripe.invoices, 'finalizeInvoice')
+        .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValue({
+        ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
+      });
+
+      const paymentIntent = await paymentService.createInvoice(
+        mockedInvoice.customer as string,
+        mockedInvoice.lines.data[0].price?.id as string,
+        mockedInvoice.lines.data[0].price?.currency,
+      );
+
+      expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
     });
   });
 

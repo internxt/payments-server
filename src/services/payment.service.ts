@@ -182,7 +182,7 @@ export class PaymentService {
     return newCustomer;
   }
 
-  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
+  public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
     const hasUserPaidInvoices = userInvoices.some((invoice) => invoice.status === 'paid');
@@ -341,6 +341,88 @@ export class PaymentService {
       };
     }
   }
+
+  /**
+   * Creates an invoice to purchase a one time plan.
+   *
+   * @param customerId - The ID of the customer who is purchasing the plan.
+   * @param priceId - The ID of the price associated with the lifetime plan.
+   * @param currency - The currency in which the purchase is made.
+   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
+   *
+   * @returns {PaymentIntent} An object containing:
+   * - `client_secret`: to be used with Stripe Elements,
+   * - `invoice_id`: the ID of the created invoice,
+   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   */
+  async createInvoice(
+    customerId: string,
+    priceId: string,
+    currency = 'eur',
+    promoCodeId?: string,
+  ): Promise<PaymentIntent> {
+    let couponId: string | undefined = undefined;
+
+    const invoice = await this.provider.invoices.create({
+      customer: customerId,
+      currency: currency,
+      payment_settings: {
+        payment_method_types: ['card', 'paypal'],
+      },
+    });
+
+    if (promoCodeId) {
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
+    await this.provider.invoiceItems.create({
+      customer: customerId,
+      invoice: invoice.id,
+      price: priceId,
+      discounts: [
+        {
+          coupon: couponId,
+        },
+      ],
+    });
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+      return {
+        clientSecret: '',
+        id: '',
+        invoiceStatus: finalizedInvoice.status,
+      };
+    }
+
+    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
+      paymentIntentForFinalizedInvoice as string,
+    );
+
+    return {
+      clientSecret: client_secret,
+      id,
+    };
+  }
+
+  /**
+   * @deprecated Use `createInvoice` instead.
+   *
+   * Creates an invoice to purchase a lifetime plan.
+   *
+   * @param customerId - The ID of the customer who is purchasing the plan.
+   * @param priceId - The ID of the price associated with the lifetime plan.
+   * @param currency - The currency in which the purchase is made.
+   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
+   *
+   * @returns {PaymentIntent} An object containing:
+   * - `client_secret`: to be used with Stripe Elements,
+   * - `invoice_id`: the ID of the created invoice,
+   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   */
 
   async createPaymentIntent(
     customerId: CustomerId,

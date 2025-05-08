@@ -6,8 +6,9 @@ import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
+import { fetchUserStorage } from '../utils/fetchUserStorage';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -136,6 +137,77 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         });
 
         return res.status(200).send(subscriptionAttempt);
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerId: string;
+        priceId: string;
+        token: string;
+        currency?: string;
+        promoCodeId?: string;
+      };
+    }>(
+      '/payment-intent',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'priceId', 'token'],
+            properties: {
+              customerId: {
+                type: 'string',
+              },
+              priceId: {
+                type: 'string',
+              },
+              token: {
+                type: 'string',
+              },
+              currency: {
+                type: 'string',
+              },
+              promoCodeId: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (req, res) => {
+        let tokenCustomerId: string;
+        const { uuid, email } = req.user.payload;
+        const { customerId, priceId, token, currency, promoCodeId } = req.body;
+
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        const price = await paymentsService.getPriceById(priceId);
+        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
+
+        if (!isStorageUpgradeAllowed) {
+          throw new BadRequestError('The user already has the maximum storage allowed');
+        }
+
+        const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice(
+          customerId,
+          priceId,
+          currency,
+          promoCodeId,
+        );
+
+        return res.status(200).send({ clientSecret, id, invoiceStatus });
       },
     );
   };
