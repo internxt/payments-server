@@ -4,6 +4,7 @@ import {
   getCreateSubscriptionResponse,
   getCustomer,
   getInvoice,
+  getTaxes,
   getUser,
   getValidAuthToken,
   getValidUserToken,
@@ -434,6 +435,52 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
+      });
+    });
+  });
+
+  describe('Get Price by its ID', () => {
+    it('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
+      const mockedPrice = priceById({
+        bytes: 123456789,
+        interval: 'year',
+      });
+      const mockedTaxes = getTaxes();
+
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(PaymentService.prototype, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
+
+      const response = await app.inject({
+        path: `/checkout/price-by-id?priceId=${mockedPrice.id}`,
+        method: 'GET',
+        headers: {
+          'X-Real-Ip': 'user-ip',
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        ...mockedPrice,
+        tax: mockedTaxes.tax_amount_exclusive,
+        decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+        amountWithTax: mockedTaxes.amount_total,
+        decimalAmountWithTax: mockedTaxes.amount_total / 100,
+      });
+    });
+
+    describe('Handling errors', () => {
+      it('When the priceId is not present in the query, then an error indicating so is thrown', async () => {
+        const response = await app.inject({
+          path: '/checkout/price-by-id',
+          method: 'GET',
+          headers: {
+            'X-Real-Ip': 'user-ip',
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
       });
     });
   });

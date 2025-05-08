@@ -19,6 +19,7 @@ import {
   getPrice,
   getPrices,
   getPromotionCode,
+  getTaxes,
   getUser,
 } from '../fixtures';
 import { NotFoundError } from '../../../src/errors/Errors';
@@ -528,6 +529,20 @@ describe('Payments Service tests', () => {
       const price = await paymentService.getPriceById(validPriceId);
 
       expect(price).toStrictEqual(priceResponse);
+    });
+  });
+
+  describe('Get tax for a price', () => {
+    it('When the params are correct, then a tax object is returned for the requested price', async () => {
+      const mockedPrice = getPrice();
+      const mockedTaxes = getTaxes();
+      jest
+        .spyOn(stripe.tax.calculations, 'create')
+        .mockResolvedValue(mockedTaxes as Stripe.Response<Stripe.Tax.Calculation>);
+
+      const taxes = await paymentService.getTaxForPrice(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
+
+      expect(taxes).toStrictEqual(mockedTaxes);
     });
   });
 });

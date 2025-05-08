@@ -1157,6 +1157,38 @@ export class PaymentService {
   }
 
   /**
+   * Returns the tax for a given price
+   * @param priceId - The Id of the price that we want to calculate the tax for
+   * @param amount - The amount of the price
+   * @param ipAddress - The IP address of the user
+   * @param currency - The currency of the price
+   * @returns - The tax calculation object
+   */
+  async getTaxForPrice(
+    priceId: string,
+    amount: number,
+    ipAddress: string,
+    currency = 'eur',
+  ): Promise<Stripe.Tax.Calculation> {
+    const tax = await this.provider.tax.calculations.create({
+      customer_details: {
+        ip_address: ipAddress,
+      },
+      line_items: [
+        {
+          amount,
+          reference: priceId,
+          tax_behavior: 'exclusive',
+          quantity: 1,
+        },
+      ],
+      currency,
+    });
+
+    return tax;
+  }
+
+  /**
    * Deprecated - Use getPriceById instead
    * @param priceId - Id of the price we want to fetch
    * @param currency - Currency if needed

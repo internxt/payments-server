@@ -23,6 +23,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     });
 
     fastify.addHook('onRequest', async (request) => {
+      const skipAuth = request.routeOptions?.config?.skipAuth;
+
+      if (skipAuth) {
+        return;
+      }
       try {
         await request.jwtVerify();
       } catch (err) {
@@ -208,6 +213,43 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         );
 
         return res.status(200).send({ clientSecret, id, invoiceStatus });
+      },
+    );
+
+    fastify.get<{
+      Querystring: { priceId: string; currency?: string };
+    }>(
+      '/price-by-id',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            required: ['priceId'],
+            properties: {
+              priceId: { type: 'string', description: 'Price ID to fetch' },
+              currency: { type: 'string', description: 'Optional currency for the price', default: 'eur' },
+            },
+          },
+        },
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, res) => {
+        const { priceId, currency } = req.query;
+        const userIp = req.headers['x-real-ip'] as string;
+
+        const price = await paymentsService.getPriceById(priceId, currency);
+
+        const taxForPrice = await paymentsService.getTaxForPrice(priceId, price.amount, userIp, currency);
+
+        return res.status(200).send({
+          ...price,
+          tax: taxForPrice.tax_amount_exclusive,
+          decimalTax: taxForPrice.tax_amount_exclusive / 100,
+          amountWithTax: taxForPrice.amount_total,
+          decimalAmountWithTax: taxForPrice.amount_total / 100,
+        });
       },
     );
   };
