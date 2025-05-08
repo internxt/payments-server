@@ -536,7 +536,9 @@ describe('Payments Service tests', () => {
     it('When the params are correct, then a tax object is returned for the requested price', async () => {
       const mockedPrice = getPrice();
       const mockedTaxes = getTaxes();
-      jest.spyOn(paymentService, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
+      jest
+        .spyOn(stripe.tax.calculations, 'create')
+        .mockResolvedValue(mockedTaxes as Stripe.Response<Stripe.Tax.Calculation>);
 
       const taxes = await paymentService.getTaxForPrice(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
 
