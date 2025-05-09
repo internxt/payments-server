@@ -113,18 +113,22 @@ describe('Payments Service tests', () => {
         .spyOn(paymentService, 'createInvoice')
         .mockImplementation(() => Promise.resolve(mockedPaymentIntent));
 
-      const paymentIntent = await paymentService.createInvoice(
-        mockedCreateSubscription.customer as string,
-        mockedCreateSubscription.items.data[0].price.id,
-        mockedCreateSubscription.items.data[0].price.currency,
-        ((mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
-      );
-      expect(paymentIntentSpy).toHaveBeenCalledWith(
-        mockedCreateSubscription.customer as string,
-        mockedCreateSubscription.items.data[0].price.id,
-        mockedCreateSubscription.items.data[0].price.currency,
-        ((mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
-      );
+      const paymentIntent = await paymentService.createInvoice({
+        customerId: mockedCreateSubscription.customer as string,
+        priceId: mockedCreateSubscription.items.data[0].price.id,
+        currency: mockedCreateSubscription.items.data[0].price.currency,
+        promoCodeId: (
+          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+        ).code,
+      });
+      expect(paymentIntentSpy).toHaveBeenCalledWith({
+        customerId: mockedCreateSubscription.customer as string,
+        priceId: mockedCreateSubscription.items.data[0].price.id,
+        currency: mockedCreateSubscription.items.data[0].price.currency,
+        promoCodeId: (
+          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+        ).code,
+      });
       expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
     });
   });
@@ -148,11 +152,11 @@ describe('Payments Service tests', () => {
         client_secret: mockedPaymentIntent.clientSecret,
       });
 
-      const paymentIntent = await paymentService.createInvoice(
-        mockedInvoice.customer as string,
-        mockedInvoice.lines.data[0].price?.id as string,
-        mockedInvoice.lines.data[0].price?.currency,
-      );
+      const paymentIntent = await paymentService.createInvoice({
+        customerId: mockedInvoice.customer as string,
+        priceId: mockedInvoice.lines.data[0].price?.id as string,
+        currency: mockedInvoice.lines.data[0].price?.currency,
+      });
 
       expect(paymentIntent).toStrictEqual({
         clientSecret: mockedPaymentIntent.clientSecret,
@@ -183,11 +187,11 @@ describe('Payments Service tests', () => {
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
       });
 
-      const paymentIntent = await paymentService.createInvoice(
-        mockedInvoice.customer as string,
-        mockedInvoice.lines.data[0].price?.id as string,
-        mockedInvoice.lines.data[0].price?.currency,
-      );
+      const paymentIntent = await paymentService.createInvoice({
+        customerId: mockedInvoice.customer as string,
+        priceId: mockedInvoice.lines.data[0].price?.id as string,
+        currency: mockedInvoice.lines.data[0].price?.currency,
+      });
 
       expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
     });
