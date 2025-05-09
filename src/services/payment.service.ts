@@ -258,6 +258,7 @@ export class PaymentService {
     companyVatId,
     trialEnd,
     metadata,
+    additionalOptions,
   }: {
     customerId: string;
     priceId: string;
@@ -268,6 +269,7 @@ export class PaymentService {
     companyVatId?: string;
     trialEnd?: number;
     metadata?: Stripe.Metadata;
+    additionalOptions?: Partial<Stripe.SubscriptionCreateParams>;
   }): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -324,6 +326,7 @@ export class PaymentService {
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
       trial_end: trialEnd ? trialEnd : undefined,
+      ...additionalOptions,
     });
 
     if (subscription.pending_setup_intent !== null) {
@@ -368,6 +371,9 @@ export class PaymentService {
       currency: currency,
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
+      },
+      automatic_tax: {
+        enabled: true,
       },
     });
 

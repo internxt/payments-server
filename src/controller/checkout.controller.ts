@@ -59,13 +59,21 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         let customerId: Stripe.Customer['id'];
         const { country, companyVatId } = req.query;
         const { uuid: userUuid, email, name } = req.user.payload;
+        const userIpAddress = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
           customerId = userExists.customerId;
         } else {
-          const { id } = await paymentsService.createCustomer({ name, email });
+          const { id } = await paymentsService.createCustomer({
+            name,
+            email,
+            tax: {
+              ip_address: userIpAddress,
+              validate_location: 'immediately',
+            },
+          });
           customerId = id;
         }
 
@@ -139,6 +147,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           currency,
           seatsForBusinessSubscription: quantity ?? 1,
           promoCodeId,
+          additionalOptions: {
+            automatic_tax: {
+              enabled: true,
+            },
+          },
         });
 
         return res.status(200).send(subscriptionAttempt);
