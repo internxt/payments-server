@@ -237,7 +237,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res) => {
         const { priceId, currency } = req.query;
-        const userIp = req.headers['x-real-ip'] as string;
+        const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
 
         const price = await paymentsService.getPriceById(priceId, currency);
 
