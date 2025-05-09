@@ -218,12 +218,17 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
-        const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice(
+        const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice({
           customerId,
           priceId,
           currency,
           promoCodeId,
-        );
+          additionalInvoiceOptions: {
+            automatic_tax: {
+              enabled: true,
+            },
+          },
+        });
 
         return res.status(200).send({ clientSecret, id, invoiceStatus });
       },

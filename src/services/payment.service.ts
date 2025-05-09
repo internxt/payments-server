@@ -358,12 +358,19 @@ export class PaymentService {
    * - `invoice_id`: the ID of the created invoice,
    * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
    */
-  async createInvoice(
-    customerId: string,
-    priceId: string,
+  async createInvoice({
+    customerId,
+    priceId,
     currency = 'eur',
-    promoCodeId?: string,
-  ): Promise<PaymentIntent> {
+    promoCodeId,
+    additionalInvoiceOptions,
+  }: {
+    customerId: string;
+    priceId: string;
+    currency?: string;
+    promoCodeId?: string;
+    additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
+  }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
 
     const invoice = await this.provider.invoices.create({
@@ -372,9 +379,7 @@ export class PaymentService {
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
       },
-      automatic_tax: {
-        enabled: true,
-      },
+      ...additionalInvoiceOptions,
     });
 
     if (promoCodeId) {
