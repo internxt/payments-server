@@ -177,6 +177,7 @@ export const priceById = ({
     interval,
     decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
     type,
+    product: mockedPrice.product as string,
     ...businessSeats,
   };
 };
