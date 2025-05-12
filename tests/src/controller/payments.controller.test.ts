@@ -4,7 +4,7 @@ import {
   getCustomer,
   getPrice,
   getPrices,
-  getPromotionCode,
+  getPromotionCodeResponse,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -366,7 +366,7 @@ describe('Payment controller e2e tests', () => {
       it('When promotion code is present, then the subscription should be created with it', async () => {
         const mockedUser = getUser();
         const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
-        const mockedPromoCodeId = getPromotionCode();
+        const mockedPromoCodeId = getPromotionCodeResponse();
         const token = getValidUserToken(mockedUser.customerId);
 
         const mockedBody = {

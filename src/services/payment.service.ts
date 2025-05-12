@@ -4,7 +4,7 @@ import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
-import { NotFoundError } from '../errors/Errors';
+import { BadRequestError, NotFoundError } from '../errors/Errors';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -1330,6 +1330,12 @@ export class PaymentService {
     return lastActiveCoupon;
   }
 
+  /**
+   *
+   * @param product - The id of the product we want to apply the promo code
+   * @param promoCodeName - The name of the promotion code
+   * @returns The promotion code object
+   */
   async getPromoCodeByName(product: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
     const promoCode = await this.getPromoCode(promoCodeName);
 
@@ -1338,7 +1344,7 @@ export class PaymentService {
     const isProductAllowed = promoCodeIsAppliedTo?.find((productId) => productId === product);
 
     if (promoCodeIsAppliedTo && !isProductAllowed) {
-      throw new PromoCodeIsNotValidError(`Promo code ${promoCodeName} is not valid`);
+      throw new BadRequestError(`Promo code ${promoCodeName} is not valid`);
     }
 
     return {

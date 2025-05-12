@@ -18,11 +18,12 @@ import {
   getPaymentMethod,
   getPrice,
   getPrices,
-  getPromotionCode,
+  getPromoCode,
+  getPromotionCodeResponse,
   getTaxes,
   getUser,
 } from '../fixtures';
-import { NotFoundError } from '../../../src/errors/Errors';
+import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 
 let productsRepository: ProductsRepository;
 let paymentService: PaymentService;
@@ -58,7 +59,7 @@ describe('Payments Service tests', () => {
 
   describe('Fetching the promotion code object', () => {
     it('When requesting the Promotion Code with the correct params, then returns the promoCodeId, name, amount off and/or discount off', async () => {
-      const mockedPromoCode = getPromotionCode();
+      const mockedPromoCode = getPromotionCodeResponse();
       const mockedPrices = getPrices();
       const mockedCoupon = getCoupon();
 
@@ -549,6 +550,105 @@ describe('Payments Service tests', () => {
       const taxes = await paymentService.getTaxForPrice(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
 
       expect(taxes).toStrictEqual(mockedTaxes);
+    });
+  });
+
+  describe('Get Promotion Code', () => {
+    describe('Get active promotion code by name', () => {
+      it('When the promotion code is active, then it returns the correct promo code', async () => {
+        const mockedPromoCode = getPromoCode();
+        jest.spyOn(stripe.promotionCodes, 'list').mockResolvedValue({
+          data: [mockedPromoCode],
+          has_more: false,
+          url: '',
+          lastResponse: {} as any,
+          object: 'list',
+        });
+
+        const promoCode = await paymentService.getPromoCode(mockedPromoCode.code);
+
+        expect(promoCode).toStrictEqual(mockedPromoCode);
+        expect(promoCode.active).toBeTruthy();
+      });
+
+      it('When the promotion code is not active, then an error indicating so is thrown', async () => {
+        const mockedPromoCode = getPromoCode({
+          active: false,
+        });
+        jest.spyOn(stripe.promotionCodes, 'list').mockResolvedValue({
+          data: [mockedPromoCode],
+          has_more: false,
+          url: '',
+          lastResponse: {} as any,
+          object: 'list',
+        });
+
+        await expect(paymentService.getPromoCode(mockedPromoCode.code)).rejects.toThrow(NotFoundError);
+      });
+
+      it('When there are no promotion codes with the given name, then an error indicating so is thrown', async () => {
+        const mockedPromoCode = getPromoCode();
+        jest.spyOn(stripe.promotionCodes, 'list').mockResolvedValue({
+          data: [],
+          has_more: false,
+          url: '',
+          lastResponse: {} as any,
+          object: 'list',
+        });
+
+        await expect(paymentService.getPromoCode(mockedPromoCode.code)).rejects.toThrow(NotFoundError);
+      });
+    });
+
+    describe('Get promotion code object by name', () => {
+      it('When the promotion code is active and the product can be applied, then it returns the correct promo code', async () => {
+        const mockedPrice = getPrice();
+        const mockedPromoCode = getPromoCode();
+        mockedPromoCode.coupon.applies_to = { products: [mockedPrice.product as string] };
+        jest.spyOn(paymentService, 'getPromoCode').mockResolvedValue(mockedPromoCode);
+
+        const promoCodeByName = await paymentService.getPromoCodeByName(
+          mockedPrice.product as string,
+          mockedPromoCode.code,
+        );
+
+        expect(promoCodeByName).toStrictEqual({
+          promoCodeName: mockedPromoCode.code,
+          codeId: mockedPromoCode.id,
+          amountOff: mockedPromoCode.coupon.amount_off,
+          percentOff: mockedPromoCode.coupon.percent_off,
+        });
+      });
+
+      it('When the promotion code is active and there are no products to apply, then it returns the correct promo code', async () => {
+        const mockedPrice = getPrice();
+        const mockedPromoCode = getPromoCode();
+        jest.spyOn(paymentService, 'getPromoCode').mockResolvedValue(mockedPromoCode);
+
+        const promoCodeByName = await paymentService.getPromoCodeByName(
+          mockedPrice.product as string,
+          mockedPromoCode.code,
+        );
+
+        expect(promoCodeByName).toStrictEqual({
+          promoCodeName: mockedPromoCode.code,
+          codeId: mockedPromoCode.id,
+          amountOff: mockedPromoCode.coupon.amount_off,
+          percentOff: mockedPromoCode.coupon.percent_off,
+        });
+      });
+
+      it('When the promotion code is active but the product cannot be applied, then an error indicating so is thrown', async () => {
+        const mockedPrice = getPrice();
+        const mockedPromoCode = getPromoCode();
+        jest.spyOn(paymentService, 'getPromoCode').mockResolvedValue(mockedPromoCode);
+
+        mockedPromoCode.coupon.applies_to = { products: ['other_product'] };
+
+        await expect(
+          paymentService.getPromoCodeByName(mockedPrice.product as string, mockedPromoCode.code),
+        ).rejects.toThrow(BadRequestError);
+      });
     });
   });
 });

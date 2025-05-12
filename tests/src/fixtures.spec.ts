@@ -14,7 +14,7 @@ import {
   getLogger,
   getPaymentIntentResponse,
   getPrices,
-  getPromotionCode,
+  getPromotionCodeResponse,
   newTier,
   getUniqueCodes,
 } from './fixtures';
@@ -111,14 +111,14 @@ describe('Test fixtures', () => {
 
   describe('Promotion code fixture', () => {
     it('When generating a promotion code, then it should have default values', () => {
-      const promoCode = getPromotionCode({});
+      const promoCode = getPromotionCodeResponse({});
 
       expect(promoCode.codeId).toBe('promo_id');
       expect(promoCode.percentOff).toBe(75);
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {
-      const promoCode = getPromotionCode({ percentOff: 50 });
+      const promoCode = getPromotionCodeResponse({ percentOff: 50 });
 
       expect(promoCode.percentOff).toBe(50);
     });
