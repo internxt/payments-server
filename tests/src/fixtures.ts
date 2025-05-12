@@ -116,7 +116,7 @@ export const getPrices = () => {
   };
 };
 
-export const getTaxes = (): Stripe.Tax.Calculation => {
+export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.Calculation => {
   return {
     id: 'taxcalc_1RMT1aFAOdcgaBMQEoAm2Pee',
     object: 'tax.calculation',
@@ -151,6 +151,7 @@ export const getTaxes = (): Stripe.Tax.Calculation => {
       },
     ],
     tax_date: 1746705242,
+    ...params,
   };
 };
 

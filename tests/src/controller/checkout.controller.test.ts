@@ -28,6 +28,10 @@ afterAll(async () => {
 });
 
 describe('Checkout controller', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+  });
   it('When the jwt verify fails, then an error indicating so is thrown', async () => {
     const userAuthToken = 'invalid_token';
 
@@ -475,20 +479,22 @@ describe('Checkout controller', () => {
         bytes: 123456789,
         interval: 'year',
       });
+      const promoCode = {
+        promoCodeName: 'promo_code_name',
+        amountOff: 1000,
+        percentOff: null,
+        codeId: 'promo_code_id',
+      };
       const mockedTaxes = getTaxes();
-      const promoCodeName = 'promo_code_name';
+      mockedTaxes.tax_amount_exclusive = mockedTaxes.tax_amount_exclusive - promoCode.amountOff;
+      mockedTaxes.amount_total = mockedTaxes.amount_total - promoCode.amountOff;
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue({
-        amountOff: 1000,
-        promoCodeName,
-        codeId: 'promo_code_id',
-        percentOff: null,
-      });
+      jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
       jest.spyOn(PaymentService.prototype, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
 
       const response = await app.inject({
-        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCodeName}`,
+        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
         method: 'GET',
         headers: {
           'X-Real-Ip': 'user-ip',
@@ -502,8 +508,8 @@ describe('Checkout controller', () => {
         ...mockedPrice,
         tax: mockedTaxes.tax_amount_exclusive,
         decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-        amountWithTax: mockedTaxes.amount_total - 1000,
-        decimalAmountWithTax: (mockedTaxes.amount_total - 1000) / 100,
+        amountWithTax: mockedTaxes.amount_total,
+        decimalAmountWithTax: mockedTaxes.amount_total / 100,
       });
     });
 
