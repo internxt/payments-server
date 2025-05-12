@@ -1145,7 +1145,7 @@ export class PaymentService {
     }
 
     let businessSeats;
-    const { currency_options, recurring, metadata, type } = selectedPrice;
+    const { currency_options, recurring, metadata, type, product } = selectedPrice;
     const isBusinessPrice = metadata?.type === 'business';
 
     if (isBusinessPrice) {
@@ -1163,6 +1163,7 @@ export class PaymentService {
       interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
       decimalAmount: (currency_options![currency].unit_amount as number) / 100,
       type: isBusinessPrice ? UserType.Business : UserType.Individual,
+      product: product as string,
       ...businessSeats,
     };
   }
@@ -1280,6 +1281,11 @@ export class PaymentService {
     return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
+  /**
+   * @deprecated Use `getPromoCode` instead
+   * @param promoCodeName - The name of the promotion code
+   * @returns The ACTIVE promotion code object
+   */
   async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
     const { data: promotionCodes } = await this.provider.promotionCodes.list({
       active: true,
@@ -1298,6 +1304,49 @@ export class PaymentService {
     }
 
     return lastActiveCoupon;
+  }
+
+  /**
+   * This function is used to get the promotion code object from Stripe.
+   * @param promoCodeName - The name of the promotion code
+   * @returns The ACTIVE promotion code object
+   */
+  async getPromoCode(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
+    const { data: promotionCodes } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+      expand: ['data.coupon.applies_to'],
+    });
+
+    if (!promotionCodes || promotionCodes.length === 0) {
+      throw new NotFoundError(`The promotion code ${promoCodeName} does not exist`);
+    }
+
+    const [lastActiveCoupon] = promotionCodes;
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundError(`The promotion code ${promoCodeName} is not active`);
+    }
+
+    return lastActiveCoupon;
+  }
+
+  async getPromoCodeByName(product: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const promoCode = await this.getPromoCode(promoCodeName);
+
+    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+
+    const isProductAllowed = promoCodeIsAppliedTo?.find((productId) => productId === product);
+
+    if (promoCodeIsAppliedTo && !isProductAllowed) {
+      throw new PromoCodeIsNotValidError(`Promo code ${promoCodeName} is not valid`);
+    }
+
+    return {
+      promoCodeName,
+      codeId: promoCode.id,
+      amountOff: promoCode.coupon.amount_off,
+      percentOff: promoCode.coupon.percent_off,
+    };
   }
 
   async getPromotionCodeByName(priceId: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {

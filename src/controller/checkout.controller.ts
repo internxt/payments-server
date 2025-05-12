@@ -259,24 +259,22 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res) => {
         const { priceId, currency, promoCodeName } = req.query;
-        let couponCode: PromotionCode | null = null;
-        req.log.info(`Headers in request: ${JSON.stringify(req.headers)}`);
         const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
-
-        if (promoCodeName) {
-          couponCode = await paymentsService.getPromotionCodeByName(priceId, promoCodeName);
-        }
 
         const price = await paymentsService.getPriceById(priceId, currency);
         let amount = price.amount;
 
-        if (couponCode) {
+        if (promoCodeName) {
+          const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
+          console.log('Coupon code:', couponCode);
           if (couponCode.amountOff) {
             amount = price.amount - couponCode.amountOff;
           } else if (couponCode.percentOff) {
             const percentDiscount = 100 - couponCode.percentOff;
             const discount = (price.amount * percentDiscount) / 100;
-            amount = price.amount - discount;
+            amount = discount;
+            price.amount = discount;
+            price.decimalAmount = discount / 100;
           }
         }
 
