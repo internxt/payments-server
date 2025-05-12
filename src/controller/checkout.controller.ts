@@ -266,7 +266,6 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
         if (promoCodeName) {
           const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
-          console.log('Coupon code:', couponCode);
           if (couponCode.amountOff) {
             amount = price.amount - couponCode.amountOff;
           } else if (couponCode.percentOff) {

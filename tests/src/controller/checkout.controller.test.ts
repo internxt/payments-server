@@ -470,6 +470,43 @@ describe('Checkout controller', () => {
       });
     });
 
+    it('When the user provides a promo code, then the price is returned with the discount applied', async () => {
+      const mockedPrice = priceById({
+        bytes: 123456789,
+        interval: 'year',
+      });
+      const mockedTaxes = getTaxes();
+      const promoCodeName = 'promo_code_name';
+
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue({
+        amountOff: 1000,
+        promoCodeName,
+        codeId: 'promo_code_id',
+        percentOff: null,
+      });
+      jest.spyOn(PaymentService.prototype, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
+
+      const response = await app.inject({
+        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCodeName}`,
+        method: 'GET',
+        headers: {
+          'X-Real-Ip': 'user-ip',
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        ...mockedPrice,
+        tax: mockedTaxes.tax_amount_exclusive,
+        decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+        amountWithTax: mockedTaxes.amount_total - 1000,
+        decimalAmountWithTax: (mockedTaxes.amount_total - 1000) / 100,
+      });
+    });
+
     describe('Handling errors', () => {
       it('When the priceId is not present in the query, then an error indicating so is thrown', async () => {
         const response = await app.inject({
