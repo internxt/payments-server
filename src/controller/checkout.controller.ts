@@ -5,7 +5,7 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { PaymentService } from '../services/payment.service';
+import { PaymentService, PromotionCode } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
@@ -36,7 +36,6 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
-    fastify.get<{ Querystring: { country: string; companyVatId: string } }>(
     fastify.get<{ Querystring: { country: string; postalCode: string; companyVatId: string } }>(
       '/customer',
       {
@@ -65,6 +64,16 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
+          await paymentsService.updateCustomer(
+            userExists.customerId,
+            {},
+            {
+              address: {
+                country: country,
+                postal_code: postalCode,
+              },
+            },
+          );
           customerId = userExists.customerId;
         } else {
           const { id } = await paymentsService.createCustomer({

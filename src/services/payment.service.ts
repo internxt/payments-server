@@ -1726,10 +1726,12 @@ export class PaymentService {
         type: Stripe.TaxIdCreateParams.Type;
       };
     },
+    additionalOptions?: Partial<Stripe.CustomerUpdateParams>,
   ): Promise<void> {
     if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
       await this.provider.customers.update(customerId, {
         name: updatableAttributes.customer.name,
+        ...additionalOptions,
       });
     }
     if (updatableAttributes.tax) {
