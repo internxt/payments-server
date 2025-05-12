@@ -95,7 +95,7 @@ describe('Payment controller e2e tests', () => {
           path: `/plan-by-id?planId=${mockedPrice.subscription.exists}`,
           method: 'GET',
         });
-        const responseBody = JSON.parse(response.body);
+        const responseBody = response.json();
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toMatchObject(expectedKeys);
@@ -133,7 +133,7 @@ describe('Payment controller e2e tests', () => {
           method: 'GET',
         });
 
-        const responseBody = JSON.parse(response.body);
+        const responseBody = response.json();
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toMatchObject(expectedKeys);
@@ -199,7 +199,7 @@ describe('Payment controller e2e tests', () => {
         query: mockedQuery,
       });
 
-      const responseBody = JSON.parse(response.body);
+      const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(paymentIntentResponse);

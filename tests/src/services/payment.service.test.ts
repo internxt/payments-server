@@ -495,6 +495,7 @@ describe('Payments Service tests', () => {
         bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
         interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
         decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        product: mockedPrice.product as string,
         type: UserType.Individual,
       };
       jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
@@ -525,6 +526,7 @@ describe('Payments Service tests', () => {
         bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
         interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
         decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        product: mockedPrice.product as string,
         type: UserType.Business,
         ...businessSeats,
       };
