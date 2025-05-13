@@ -466,11 +466,13 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({
-        ...mockedPrice,
-        tax: mockedTaxes.tax_amount_exclusive,
-        decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-        amountWithTax: mockedTaxes.amount_total,
-        decimalAmountWithTax: mockedTaxes.amount_total / 100,
+        price: mockedPrice,
+        taxes: {
+          tax: mockedTaxes.tax_amount_exclusive,
+          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+          amountWithTax: mockedTaxes.amount_total,
+          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+        },
       });
     });
 
@@ -506,11 +508,13 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          ...mockedPrice,
-          tax: mockedTaxes.tax_amount_exclusive,
-          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-          amountWithTax: mockedTaxes.amount_total,
-          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+          price: mockedPrice,
+          taxes: {
+            tax: mockedTaxes.tax_amount_exclusive,
+            decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+            amountWithTax: mockedTaxes.amount_total,
+            decimalAmountWithTax: mockedTaxes.amount_total / 100,
+          },
         });
       });
 
@@ -546,11 +550,13 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          ...mockedPrice,
-          tax: mockedTaxes.tax_amount_exclusive,
-          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-          amountWithTax: mockedTaxes.amount_total,
-          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+          price: mockedPrice,
+          taxes: {
+            tax: mockedTaxes.tax_amount_exclusive,
+            decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+            amountWithTax: mockedTaxes.amount_total,
+            decimalAmountWithTax: mockedTaxes.amount_total / 100,
+          },
         });
       });
     });
