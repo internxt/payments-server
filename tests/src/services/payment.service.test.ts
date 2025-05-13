@@ -547,7 +547,7 @@ describe('Payments Service tests', () => {
         .spyOn(stripe.tax.calculations, 'create')
         .mockResolvedValue(mockedTaxes as Stripe.Response<Stripe.Tax.Calculation>);
 
-      const taxes = await paymentService.getTaxForPrice(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
+      const taxes = await paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
 
       expect(taxes).toStrictEqual(mockedTaxes);
     });

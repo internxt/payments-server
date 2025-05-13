@@ -24,6 +24,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
     fastify.addHook('onRequest', async (request) => {
       const skipAuth = request.routeOptions?.config?.skipAuth;
+      const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
 
       if (skipAuth) {
         return;
@@ -31,6 +32,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       try {
         await request.jwtVerify();
       } catch (err) {
+        if (allowAnonymous) {
+          return;
+        }
         request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         throw new UnauthorizedError();
       }
@@ -235,7 +239,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     );
 
     fastify.get<{
-      Querystring: { priceId: string; currency?: string; promoCodeName?: string };
+      Querystring: {
+        priceId: string;
+        currency?: string;
+        promoCodeName?: string;
+        postalCode?: string;
+        country?: string;
+      };
     }>(
       '/price-by-id',
       {
@@ -250,16 +260,28 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
                 type: 'string',
                 description: 'Optional coupon code name to apply to the price',
               },
+              postalCode: {
+                type: 'string',
+                description: 'Optional postal code for tax calculation',
+              },
+              country: {
+                type: 'string',
+                description: 'Optional country for tax calculation',
+              },
             },
           },
         },
         config: {
-          skipAuth: true,
+          allowAnonymous: true,
         },
       },
       async (req, res) => {
-        const { priceId, currency, promoCodeName } = req.query;
+        const { priceId, currency, promoCodeName, postalCode, country } = req.query;
         const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
+
+        const userUuid = req.user?.payload?.uuid;
+        const user = await usersService.findUserByUuid(userUuid).catch(() => null);
+        console.log({ userUuid, customerId: user?.customerId });
 
         const price = await paymentsService.getPriceById(priceId, currency);
         let amount = price.amount;
@@ -277,7 +299,15 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           }
         }
 
-        const taxForPrice = await paymentsService.getTaxForPrice(priceId, amount, userIp, currency);
+        const taxForPrice = await paymentsService.calculateTax(
+          priceId,
+          amount,
+          userIp,
+          currency,
+          user?.customerId,
+          postalCode,
+          country,
+        );
 
         return res.status(200).send({
           ...price,

@@ -1176,16 +1176,30 @@ export class PaymentService {
    * @param currency - The currency of the price
    * @returns - The tax calculation object
    */
-  async getTaxForPrice(
+  async calculateTax(
     priceId: string,
     amount: number,
     ipAddress: string,
     currency = 'eur',
+    customerId?: string,
+    postalCode?: string,
+    country?: string,
   ): Promise<Stripe.Tax.Calculation> {
-    const tax = await this.provider.tax.calculations.create({
-      customer_details: {
-        ip_address: ipAddress,
-      },
+    const customerDetails: Stripe.Tax.CalculationCreateParams.CustomerDetails = {};
+
+    if (postalCode && country) {
+      customerDetails.address = {
+        postal_code: postalCode,
+        country: country,
+      };
+      customerDetails.address_source = 'billing';
+    } else {
+      customerDetails.ip_address = ipAddress;
+    }
+
+    return this.provider.tax.calculations.create({
+      customer: customerId,
+      customer_details: customerId ? undefined : customerDetails,
       line_items: [
         {
           amount,
@@ -1196,8 +1210,6 @@ export class PaymentService {
       ],
       currency,
     });
-
-    return tax;
   }
 
   /**

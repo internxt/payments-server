@@ -452,7 +452,7 @@ describe('Checkout controller', () => {
       const mockedTaxes = getTaxes();
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(PaymentService.prototype, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
+      jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
       const response = await app.inject({
         path: `/checkout/price-by-id?priceId=${mockedPrice.id}`,
@@ -491,7 +491,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-      jest.spyOn(PaymentService.prototype, 'getTaxForPrice').mockResolvedValue(mockedTaxes);
+      jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
       const response = await app.inject({
         path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
