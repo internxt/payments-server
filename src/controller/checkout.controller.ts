@@ -290,8 +290,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           if (couponCode.amountOff) {
             amount = price.amount - couponCode.amountOff;
           } else if (couponCode.percentOff) {
-            const percentDiscount = 100 - couponCode.percentOff;
-            const discountedPrice = (price.amount * percentDiscount) / 100;
+            const discount = Math.floor((price.amount * couponCode.percentOff) / 100);
+            const discountedPrice = price.amount - discount;
             amount = discountedPrice;
           }
         }
@@ -307,11 +307,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         );
 
         return res.status(200).send({
-          ...price,
-          tax: taxForPrice.tax_amount_exclusive,
-          decimalTax: taxForPrice.tax_amount_exclusive / 100,
-          amountWithTax: taxForPrice.amount_total,
-          decimalAmountWithTax: taxForPrice.amount_total / 100,
+          price,
+          taxes: {
+            tax: taxForPrice.tax_amount_exclusive,
+            decimalTax: taxForPrice.tax_amount_exclusive / 100,
+            amountWithTax: taxForPrice.amount_total,
+            decimalAmountWithTax: taxForPrice.amount_total / 100,
+          },
         });
       },
     );
