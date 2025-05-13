@@ -1343,7 +1343,7 @@ export class PaymentService {
   }
 
   /**
-   *
+   * This function is used to get some information about the promotion code using the code of the Promotion code.
    * @param product - The id of the product we want to apply the promo code
    * @param promoCodeName - The name of the promotion code
    * @returns The promotion code object
