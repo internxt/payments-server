@@ -32,6 +32,7 @@ describe('Checkout controller', () => {
     jest.restoreAllMocks();
     jest.clearAllMocks();
   });
+
   it('When the jwt verify fails, then an error indicating so is thrown', async () => {
     const userAuthToken = 'invalid_token';
 
@@ -73,7 +74,16 @@ describe('Checkout controller', () => {
 
     it('When the user does not exists in Users collection, then the customer is created and the customer Id is returned', async () => {
       const mockedUser = getUser();
-      const mockedCustomer = getCustomer();
+      const mockedCustomer = getCustomer({
+        address: {
+          country: 'ES',
+          postal_code: '08001',
+          city: 'Barcelona',
+          line1: 'Carrer de la Pau',
+          line2: '08001',
+          state: 'Catalonia',
+        },
+      });
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken(mockedCustomer.id);
 
@@ -83,6 +93,10 @@ describe('Checkout controller', () => {
       const response = await app.inject({
         path: '/checkout/customer',
         method: 'GET',
+        query: {
+          country: 'ES',
+          postalCode: '08001',
+        },
         headers: {
           Authorization: `Bearer ${userAuthToken}`,
         },

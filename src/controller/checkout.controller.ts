@@ -40,7 +40,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
-    fastify.get<{ Querystring: { country: string; companyVatId: string } }>(
+    fastify.get<{ Querystring: { country: string; postalCode: string; companyVatId: string } }>(
       '/customer',
       {
         schema: {
@@ -48,6 +48,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             type: 'object',
             properties: {
               country: { type: 'string' },
+              postalCode: { type: 'string' },
               companyVatId: { type: 'string' },
             },
           },
@@ -61,9 +62,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { country, companyVatId } = req.query;
+        const { country, postalCode, companyVatId } = req.query;
         const { uuid: userUuid, email, name } = req.user.payload;
-        const userIpAddress = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
@@ -73,9 +73,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           const { id } = await paymentsService.createCustomer({
             name,
             email,
-            tax: {
-              ip_address: userIpAddress,
-              validate_location: 'immediately',
+            address: {
+              country,
+              postal_code: postalCode,
             },
           });
           customerId = id;
