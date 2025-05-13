@@ -474,42 +474,84 @@ describe('Checkout controller', () => {
       });
     });
 
-    it('When the user provides a promo code, then the price is returned with the discount applied', async () => {
-      const mockedPrice = priceById({
-        bytes: 123456789,
-        interval: 'year',
+    describe('Handling promo codes', () => {
+      it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
+        const mockedPrice = priceById({
+          bytes: 123456789,
+          interval: 'year',
+        });
+        const promoCode = {
+          promoCodeName: 'promo_code_name',
+          amountOff: 1000,
+          percentOff: null,
+          codeId: 'promo_code_id',
+        };
+        const mockedTaxes = getTaxes();
+        mockedTaxes.tax_amount_exclusive = mockedTaxes.tax_amount_exclusive - promoCode.amountOff;
+        mockedTaxes.amount_total = mockedTaxes.amount_total - promoCode.amountOff;
+
+        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+
+        const response = await app.inject({
+          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
+          method: 'GET',
+          headers: {
+            'X-Real-Ip': 'user-ip',
+          },
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          ...mockedPrice,
+          tax: mockedTaxes.tax_amount_exclusive,
+          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+          amountWithTax: mockedTaxes.amount_total,
+          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+        });
       });
-      const promoCode = {
-        promoCodeName: 'promo_code_name',
-        amountOff: 1000,
-        percentOff: null,
-        codeId: 'promo_code_id',
-      };
-      const mockedTaxes = getTaxes();
-      mockedTaxes.tax_amount_exclusive = mockedTaxes.tax_amount_exclusive - promoCode.amountOff;
-      mockedTaxes.amount_total = mockedTaxes.amount_total - promoCode.amountOff;
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-      jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+      it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
+        const mockedPrice = priceById({
+          bytes: 123456789,
+          interval: 'year',
+        });
+        const promoCode = {
+          promoCodeName: 'promo_code_name',
+          amountOff: null,
+          percentOff: 20,
+          codeId: 'promo_code_id',
+        };
+        const mockedTaxes = getTaxes();
+        const percentDiscount = 100 - promoCode.percentOff;
+        mockedTaxes.tax_amount_exclusive = (mockedTaxes.tax_amount_exclusive * percentDiscount) / 100;
+        mockedTaxes.amount_total = (mockedTaxes.tax_amount_exclusive * percentDiscount) / 100;
 
-      const response = await app.inject({
-        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
-        method: 'GET',
-        headers: {
-          'X-Real-Ip': 'user-ip',
-        },
-      });
+        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
-      const responseBody = response.json();
+        const response = await app.inject({
+          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
+          method: 'GET',
+          headers: {
+            'X-Real-Ip': 'user-ip',
+          },
+        });
 
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual({
-        ...mockedPrice,
-        tax: mockedTaxes.tax_amount_exclusive,
-        decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-        amountWithTax: mockedTaxes.amount_total,
-        decimalAmountWithTax: mockedTaxes.amount_total / 100,
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          ...mockedPrice,
+          tax: mockedTaxes.tax_amount_exclusive,
+          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
+          amountWithTax: mockedTaxes.amount_total,
+          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+        });
       });
     });
 
