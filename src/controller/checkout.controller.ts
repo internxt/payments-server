@@ -291,10 +291,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             amount = price.amount - couponCode.amountOff;
           } else if (couponCode.percentOff) {
             const percentDiscount = 100 - couponCode.percentOff;
-            const discount = (price.amount * percentDiscount) / 100;
-            amount = discount;
-            price.amount = discount;
-            price.decimalAmount = discount / 100;
+            const discountedPrice = (price.amount * percentDiscount) / 100;
+            amount = discountedPrice;
           }
         }
 
