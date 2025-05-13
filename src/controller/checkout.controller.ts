@@ -281,7 +281,6 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
         const userUuid = req.user?.payload?.uuid;
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
-        console.log({ userUuid, customerId: user?.customerId });
 
         const price = await paymentsService.getPriceById(priceId, currency);
         let amount = price.amount;
