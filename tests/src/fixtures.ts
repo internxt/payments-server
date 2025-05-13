@@ -66,7 +66,7 @@ export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer 
   };
 };
 
-export const getPromotionCode = (params?: Partial<PromotionCode>): PromotionCode => {
+export const getPromotionCodeResponse = (params?: Partial<PromotionCode>): PromotionCode => {
   return {
     codeId: 'promo_id',
     promoCodeName: 'PROMO_NAME',
@@ -116,7 +116,7 @@ export const getPrices = () => {
   };
 };
 
-export const getTaxes = (): Stripe.Tax.Calculation => {
+export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.Calculation => {
   return {
     id: 'taxcalc_1RMT1aFAOdcgaBMQEoAm2Pee',
     object: 'tax.calculation',
@@ -151,6 +151,46 @@ export const getTaxes = (): Stripe.Tax.Calculation => {
       },
     ],
     tax_date: 1746705242,
+    ...params,
+  };
+};
+
+export const getPromoCode = (params?: Partial<Stripe.PromotionCode>): Stripe.PromotionCode => {
+  return {
+    id: `promo_${randomDataGenerator.string({ length: 22 })}`,
+    object: 'promotion_code',
+    active: true,
+    code: randomDataGenerator.string({ length: 10 }),
+    coupon: {
+      id: randomDataGenerator.string({ length: 10 }),
+      object: 'coupon',
+      amount_off: null,
+      created: 1678040164,
+      currency: null,
+      duration: 'repeating',
+      duration_in_months: 3,
+      livemode: false,
+      max_redemptions: null,
+      metadata: {},
+      name: null,
+      percent_off: 25.5,
+      redeem_by: null,
+      times_redeemed: 0,
+      valid: true,
+    },
+    created: 1678040164,
+    customer: null,
+    expires_at: null,
+    livemode: false,
+    max_redemptions: null,
+    metadata: {},
+    restrictions: {
+      first_time_transaction: false,
+      minimum_amount: null,
+      minimum_amount_currency: null,
+    },
+    times_redeemed: 0,
+    ...params,
   };
 };
 
@@ -177,6 +217,7 @@ export const priceById = ({
     interval,
     decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
     type,
+    product: mockedPrice.product as string,
     ...businessSeats,
   };
 };

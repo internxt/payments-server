@@ -24,6 +24,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
     fastify.addHook('onRequest', async (request) => {
       const skipAuth = request.routeOptions?.config?.skipAuth;
+      const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
 
       if (skipAuth) {
         return;
@@ -31,6 +32,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       try {
         await request.jwtVerify();
       } catch (err) {
+        if (allowAnonymous) {
+          return;
+        }
         request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         throw new UnauthorizedError();
       }
@@ -235,7 +239,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     );
 
     fastify.get<{
-      Querystring: { priceId: string; currency?: string };
+      Querystring: {
+        priceId: string;
+        currency?: string;
+        promoCodeName?: string;
+        postalCode?: string;
+        country?: string;
+      };
     }>(
       '/price-by-id',
       {
@@ -246,21 +256,57 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             properties: {
               priceId: { type: 'string', description: 'Price ID to fetch' },
               currency: { type: 'string', description: 'Optional currency for the price', default: 'eur' },
+              promoCodeName: {
+                type: 'string',
+                description: 'Optional coupon code name to apply to the price',
+              },
+              postalCode: {
+                type: 'string',
+                description: 'Optional postal code for tax calculation',
+              },
+              country: {
+                type: 'string',
+                description: 'Optional country for tax calculation',
+              },
             },
           },
         },
         config: {
-          skipAuth: true,
+          allowAnonymous: true,
         },
       },
       async (req, res) => {
-        const { priceId, currency } = req.query;
-        req.log.info(`Headers in request: ${JSON.stringify(req.headers)}`);
+        const { priceId, currency, promoCodeName, postalCode, country } = req.query;
         const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
 
-        const price = await paymentsService.getPriceById(priceId, currency);
+        const userUuid = req.user?.payload?.uuid;
+        const user = await usersService.findUserByUuid(userUuid).catch(() => null);
 
-        const taxForPrice = await paymentsService.getTaxForPrice(priceId, price.amount, userIp, currency);
+        const price = await paymentsService.getPriceById(priceId, currency);
+        let amount = price.amount;
+
+        if (promoCodeName) {
+          const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
+          if (couponCode.amountOff) {
+            amount = price.amount - couponCode.amountOff;
+          } else if (couponCode.percentOff) {
+            const percentDiscount = 100 - couponCode.percentOff;
+            const discount = (price.amount * percentDiscount) / 100;
+            amount = discount;
+            price.amount = discount;
+            price.decimalAmount = discount / 100;
+          }
+        }
+
+        const taxForPrice = await paymentsService.calculateTax(
+          priceId,
+          amount,
+          userIp,
+          currency,
+          user?.customerId,
+          postalCode,
+          country,
+        );
 
         return res.status(200).send({
           ...price,

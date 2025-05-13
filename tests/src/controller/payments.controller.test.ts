@@ -4,7 +4,7 @@ import {
   getCustomer,
   getPrice,
   getPrices,
-  getPromotionCode,
+  getPromotionCodeResponse,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -95,7 +95,7 @@ describe('Payment controller e2e tests', () => {
           path: `/plan-by-id?planId=${mockedPrice.subscription.exists}`,
           method: 'GET',
         });
-        const responseBody = JSON.parse(response.body);
+        const responseBody = response.json();
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toMatchObject(expectedKeys);
@@ -133,7 +133,7 @@ describe('Payment controller e2e tests', () => {
           method: 'GET',
         });
 
-        const responseBody = JSON.parse(response.body);
+        const responseBody = response.json();
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toMatchObject(expectedKeys);
@@ -199,7 +199,7 @@ describe('Payment controller e2e tests', () => {
         query: mockedQuery,
       });
 
-      const responseBody = JSON.parse(response.body);
+      const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(paymentIntentResponse);
@@ -366,7 +366,7 @@ describe('Payment controller e2e tests', () => {
       it('When promotion code is present, then the subscription should be created with it', async () => {
         const mockedUser = getUser();
         const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
-        const mockedPromoCodeId = getPromotionCode();
+        const mockedPromoCodeId = getPromotionCodeResponse();
         const token = getValidUserToken(mockedUser.customerId);
 
         const mockedBody = {
