@@ -267,18 +267,21 @@ export class TiersService {
     if (features.workspaces.enabled) {
       try {
         await this.usersService.destroyWorkspace(userUuid);
+        return;
       } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
-          const status = error.response.status;
-          const responseData = JSON.stringify(error.response.data);
-          log.error(`Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${responseData}`);
+          const { status, data } = error.response;
+          log.error(
+            `Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${JSON.stringify(data)}`,
+          );
+          throw data;
         } else {
           log.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
+          throw error;
         }
       }
-
-      return;
     }
+
     try {
       await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
     } catch (error) {
