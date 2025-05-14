@@ -9,6 +9,7 @@ import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository'
 import Stripe from 'stripe';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import { FastifyBaseLogger } from 'fastify';
+import axios from 'axios';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -264,7 +265,18 @@ export class TiersService {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
-      await this.usersService.destroyWorkspace(userUuid);
+      try {
+        await this.usersService.destroyWorkspace(userUuid);
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response) {
+          const status = error.response.status;
+          const responseData = JSON.stringify(error.response.data);
+          log.error(`Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${responseData}`);
+        } else {
+          log.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
+        }
+      }
+
       return;
     }
     try {
