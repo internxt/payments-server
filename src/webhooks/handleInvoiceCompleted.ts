@@ -93,6 +93,7 @@ export default async function handleInvoiceCompleted(
 
   if (isObjStoragePlan) {
     await handleObjectStorageInvoiceCompleted(customer, session, objectStorageService, paymentService, log);
+    return;
   }
 
   if (!price.metadata.maxSpaceBytes) {
