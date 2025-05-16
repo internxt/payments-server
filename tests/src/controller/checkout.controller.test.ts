@@ -54,6 +54,7 @@ describe('Checkout controller', () => {
       const userToken = getValidUserToken(mockedUser.customerId);
 
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -123,6 +124,7 @@ describe('Checkout controller', () => {
         .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
         .mockResolvedValue();
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -469,11 +471,8 @@ describe('Checkout controller', () => {
       jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
       const response = await app.inject({
-        path: `/checkout/price-by-id?priceId=${mockedPrice.id}`,
+        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&userAddress=123.12.12.12`,
         method: 'GET',
-        headers: {
-          'X-Real-Ip': 'user-ip',
-        },
       });
 
       const responseBody = response.json();
@@ -511,7 +510,7 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
+          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
           method: 'GET',
           headers: {
             'X-Real-Ip': 'user-ip',
@@ -553,7 +552,7 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}`,
+          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
           method: 'GET',
           headers: {
             'X-Real-Ip': 'user-ip',
@@ -586,6 +585,37 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(400);
+      });
+    });
+
+    describe('User address, country and postal code are not provided', () => {
+      it('When any of user location params are provided, then the price is returned with taxes to 0', async () => {
+        const mockedPrice = priceById({
+          bytes: 123456789,
+          interval: 'year',
+        });
+        const mockedTaxes = getTaxes();
+
+        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+
+        const response = await app.inject({
+          path: `/checkout/price-by-id?priceId=${mockedPrice.id}`,
+          method: 'GET',
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          price: mockedPrice,
+          taxes: {
+            tax: 0,
+            decimalTax: 0,
+            amountWithTax: mockedPrice.amount,
+            decimalAmountWithTax: mockedPrice.amount / 100,
+          },
+        });
       });
     });
   });
