@@ -276,6 +276,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
+        let taxForPrice;
         const { priceId, currency, promoCodeName, postalCode, country } = req.query;
         const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
 
@@ -296,23 +297,27 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           }
         }
 
-        const taxForPrice = await paymentsService.calculateTax(
-          priceId,
-          amount,
-          userIp,
-          currency,
-          user?.customerId,
-          postalCode,
-          country,
-        );
+        if (userIp || (postalCode && country)) {
+          taxForPrice = await paymentsService.calculateTax(
+            priceId,
+            amount,
+            userIp,
+            currency,
+            user?.customerId,
+            postalCode,
+            country,
+          );
+        }
+        const taxAmount = taxForPrice?.tax_amount_exclusive ?? 0;
+        const amountTotal = taxForPrice?.amount_total ?? 0;
 
         return res.status(200).send({
           price,
           taxes: {
-            tax: taxForPrice.tax_amount_exclusive,
-            decimalTax: taxForPrice.tax_amount_exclusive / 100,
-            amountWithTax: taxForPrice.amount_total,
-            decimalAmountWithTax: taxForPrice.amount_total / 100,
+            tax: taxAmount,
+            decimalTax: Number((taxAmount / 100).toFixed(2)),
+            amountWithTax: amountTotal,
+            decimalAmountWithTax: Number((amountTotal / 100).toFixed(2)),
           },
         });
       },
