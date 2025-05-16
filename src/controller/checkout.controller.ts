@@ -68,6 +68,20 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
+          await paymentsService.updateCustomer(
+            userExists.customerId,
+            {
+              customer: {
+                name,
+              },
+            },
+            {
+              address: {
+                postal_code: postalCode,
+                country,
+              },
+            },
+          );
           customerId = userExists.customerId;
         } else {
           const { id } = await paymentsService.createCustomer({
@@ -242,6 +256,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       Querystring: {
         priceId: string;
         currency?: string;
+        userAddress?: string;
         promoCodeName?: string;
         postalCode?: string;
         country?: string;
@@ -256,6 +271,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             properties: {
               priceId: { type: 'string', description: 'Price ID to fetch' },
               currency: { type: 'string', description: 'Optional currency for the price', default: 'eur' },
+              userAddress: { type: 'string', description: 'The address of the user' },
               promoCodeName: {
                 type: 'string',
                 description: 'Optional coupon code name to apply to the price',
@@ -277,8 +293,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res) => {
         let taxForPrice;
-        const { priceId, currency, promoCodeName, postalCode, country } = req.query;
-        const userIp = (req.headers['X-Real-Ip'] as string) ?? (req.headers['x-real-ip'] as string);
+        const { priceId, currency, userAddress, promoCodeName, postalCode, country } = req.query;
 
         const userUuid = req.user?.payload?.uuid;
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
@@ -297,27 +312,28 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           }
         }
 
-        if (userIp || (postalCode && country)) {
+        if (userAddress || (postalCode && country) || user?.customerId) {
           taxForPrice = await paymentsService.calculateTax(
             priceId,
             amount,
-            userIp,
+            userAddress,
             currency,
             user?.customerId,
             postalCode,
             country,
           );
         }
+
         const taxAmount = taxForPrice?.tax_amount_exclusive ?? 0;
-        const amountTotal = taxForPrice?.amount_total ?? 0;
+        const amountTotal = taxForPrice?.amount_total ?? price.amount;
 
         return res.status(200).send({
           price,
           taxes: {
             tax: taxAmount,
-            decimalTax: Number((taxAmount / 100).toFixed(2)),
+            decimalTax: taxAmount / 100,
             amountWithTax: amountTotal,
-            decimalAmountWithTax: Number((amountTotal / 100).toFixed(2)),
+            decimalAmountWithTax: amountTotal / 100,
           },
         });
       },
