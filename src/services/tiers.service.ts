@@ -132,14 +132,17 @@ export class TiersService {
     }
 
     if (isLifetime) {
-      const activeLifetime = (await this.paymentService.getInvoicesFromUser(customerId, {})).filter(
-        (invoice) => invoice.status === 'paid',
-      );
-      const firstInvoice = activeLifetime?.[0];
-      const firstLine = firstInvoice?.lines?.data?.[0];
+      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
+      const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
 
-      if (firstLine?.price?.product) {
-        productId = firstLine.price.product as string;
+      for (const invoice of paidInvoices) {
+        const lineItem = invoice.lines?.data[0];
+        const product = lineItem?.price?.product as string | undefined;
+
+        if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
+          productId = product;
+          break;
+        }
       }
     }
 
