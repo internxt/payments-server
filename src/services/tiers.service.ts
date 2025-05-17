@@ -136,7 +136,7 @@ export class TiersService {
       const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
 
       for (const invoice of paidInvoices) {
-        const lineItem = invoice.lines.data[0];
+        const lineItem = invoice.lines?.data[0];
         const product = lineItem?.price?.product as string | undefined;
 
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
