@@ -460,6 +460,11 @@ describe('Checkout controller', () => {
   });
 
   describe('Get Price by its ID', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      jest.restoreAllMocks();
+    });
+
     it('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
       const mockedPrice = priceById({
         bytes: 123456789,
@@ -512,9 +517,6 @@ describe('Checkout controller', () => {
         const response = await app.inject({
           path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
           method: 'GET',
-          headers: {
-            'X-Real-Ip': 'user-ip',
-          },
         });
 
         const responseBody = response.json();
@@ -554,9 +556,6 @@ describe('Checkout controller', () => {
         const response = await app.inject({
           path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
           method: 'GET',
-          headers: {
-            'X-Real-Ip': 'user-ip',
-          },
         });
 
         const responseBody = response.json();
