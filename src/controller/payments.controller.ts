@@ -16,7 +16,6 @@ import {
   NotFoundPromoCodeByNameError,
   PaymentService,
   PromoCodeIsNotValidError,
-  UserAlreadyExistsError,
   CustomerNotFoundError,
   InvalidTaxIdError,
 } from '../services/payment.service';
@@ -32,6 +31,7 @@ import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { CustomerSyncService } from '../services/customerSync.service';
+import { ForbiddenError } from '../errors/Errors';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -45,10 +45,6 @@ const ALLOWED_PATHS: {
   '/plan-by-id': ['GET'],
   '/promo-code-by-name': ['GET'],
   '/promo-code-info': ['GET'],
-  '/object-storage-plan-by-id': ['GET'],
-  '/create-customer-for-object-storage': ['POST'],
-  '/payment-intent-for-object-storage': ['GET'],
-  '/create-subscription-for-object-storage': ['POST'],
 };
 
 export default function (
@@ -67,18 +63,22 @@ export default function (
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
+        const skipAuth = request.routeOptions?.config?.skipAuth;
         const config: { url?: string; method?: AllowedMethods } = {
           url: request.url.split('?')[0],
           method: request.method as AllowedMethods,
         };
+
         if (
-          config.method &&
-          config.url &&
-          ALLOWED_PATHS[config.url] &&
-          ALLOWED_PATHS[config.url].includes(config.method)
+          (config.method &&
+            config.url &&
+            ALLOWED_PATHS[config.url] &&
+            ALLOWED_PATHS[config.url].includes(config.method)) ||
+          skipAuth
         ) {
           return;
         }
+
         await request.jwtVerify();
       } catch (err) {
         request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
@@ -86,17 +86,19 @@ export default function (
       }
     });
 
-    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
-      '/create-customer-for-object-storage',
+    fastify.get<{
+      Querystring: { email: string; customerName: string; country: string; postalCode: string; companyVatId?: string };
+    }>(
+      '/object-storage/customer',
       {
         schema: {
-          body: {
+          querystring: {
             type: 'object',
-            required: ['email', 'name'],
             properties: {
-              name: { type: 'string' },
               email: { type: 'string' },
+              customerName: { type: 'string' },
               country: { type: 'string' },
+              postalCode: { type: 'string' },
               companyVatId: { type: 'string' },
             },
           },
@@ -106,54 +108,50 @@ export default function (
             max: 5,
             timeWindow: '1 hour',
           },
+          skipAuth: true,
         },
       },
       async (req, res) => {
-        const { name, email, country, companyVatId } = req.body;
+        let customerId: Stripe.Customer['id'];
+        const { email, customerName, country, postalCode, companyVatId } = req.query;
 
-        if (!email) {
-          return res.status(404).send({
-            message: 'Email should be provided',
-          });
-        }
-        try {
-          const { id } = await paymentService.createOrGetCustomer(
+        const userExists = await paymentService.getCustomerIdByEmail(email).catch(() => null);
+
+        if (userExists) {
+          await paymentService.updateCustomer(
+            userExists.id,
             {
-              name,
-              email,
+              customer: {
+                name: customerName,
+              },
             },
-            country,
-            companyVatId,
-          );
-
-          const token = jwt.sign(
             {
-              customerId: id,
+              address: {
+                postal_code: postalCode,
+                country,
+              },
             },
-            config.JWT_SECRET,
           );
-
-          return res.send({
-            customerId: id,
-            token,
+          customerId = userExists.id;
+        } else {
+          const { id } = await paymentService.createCustomer({
+            name: customerName,
+            email,
+            address: {
+              country,
+              postal_code: postalCode,
+            },
           });
-        } catch (err) {
-          const error = err as Error;
-          if (err instanceof UserAlreadyExistsError) {
-            return res.status(409).send(err.message);
-          }
-          if (err instanceof InvalidTaxIdError) {
-            return res.status(400).send({
-              message: error.message,
-            });
-          }
-          req.log.error(
-            `[OBJECT_STORAGE_CREATE_CUSTOMER_ERROR] Customer Email: ${email} - Error: ${error.stack ?? error.message}`,
-          );
-          return res.status(500).send({
-            message: 'Internal Server Error',
-          });
+          customerId = id;
         }
+
+        if (country && companyVatId) {
+          await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
+        }
+
+        const token = jwt.sign({ customerId }, config.JWT_SECRET);
+
+        return res.send({ customerId, token });
       },
     );
 
@@ -375,11 +373,9 @@ export default function (
         currency: string;
         token: string;
         promoCodeId?: string;
-        companyName: string;
-        companyVatId: string;
       };
     }>(
-      '/create-subscription-for-object-storage',
+      '/object-storage/subscription',
       {
         schema: {
           body: {
@@ -401,22 +397,15 @@ export default function (
               promoCodeId: {
                 type: 'string',
               },
-              companyName: {
-                type: 'string',
-              },
-              companyVatId: {
-                type: 'string',
-              },
             },
           },
         },
+        config: {
+          skipAuth: true,
+        },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId, companyName, companyVatId } = req.body;
-
-        if (!customerId || !priceId) {
-          throw new MissingParametersError(['customerId', 'priceId']);
-        }
+        const { customerId, priceId, currency, token, promoCodeId } = req.body;
 
         try {
           const payload = jwt.verify(token, config.JWT_SECRET) as {
@@ -425,30 +414,29 @@ export default function (
           const tokenCustomerId = payload.customerId;
 
           if (customerId !== tokenCustomerId) {
-            return res.status(403).send();
+            throw new ForbiddenError();
           }
-        } catch (error) {
-          return res.status(403).send();
+        } catch {
+          throw new ForbiddenError();
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription({
+          const createdSubscription = await paymentService.createSubscription({
             customerId,
             priceId,
             currency,
-            companyName,
             promoCodeId,
-            companyVatId,
+            additionalOptions: {
+              automatic_tax: {
+                enabled: true,
+              },
+            },
           });
 
-          return res.send(subscriptionSetUp);
+          return res.send(createdSubscription);
         } catch (err) {
           const error = err as Error;
-          if (error instanceof MissingParametersError) {
-            return res.status(400).send({
-              message: error.message,
-            });
-          } else if (error instanceof ExistingSubscriptionError) {
+          if (error instanceof ExistingSubscriptionError) {
             return res.status(409).send({
               message: error.message,
             });
@@ -852,66 +840,6 @@ export default function (
     });
 
     fastify.get<{
-      Querystring: {
-        customerId: CustomerId;
-        amount: number;
-        planId: string;
-        token: string;
-        currency?: string;
-      };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: {
-            customerId: { type: 'string' };
-            planId: { type: 'string' };
-            amount: { type: 'number' };
-            token: { type: 'string' };
-            currency: { type: 'string' };
-          };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 hour';
-        };
-      };
-    }>('/payment-intent-for-object-storage', async (req, res) => {
-      const { customerId, amount, planId, currency, token } = req.query;
-
-      try {
-        const payload = jwt.verify(token, config.JWT_SECRET) as {
-          customerId: string;
-        };
-        const tokenCustomerId = payload.customerId;
-
-        if (customerId !== tokenCustomerId) {
-          return res.status(403).send();
-        }
-      } catch (error) {
-        return res.status(403).send();
-      }
-
-      try {
-        const { clientSecret } = await paymentService.createPaymentIntent(customerId, amount, planId, currency);
-
-        return { clientSecret };
-      } catch (err) {
-        const error = err as Error;
-        if (error instanceof MissingParametersError) {
-          return res.status(404).send({
-            message: error.message,
-          });
-        }
-        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
-        return res.status(500).send({
-          message: 'Internal Server Error',
-        });
-      }
-    });
-
-    fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/default-payment-method',
@@ -1136,35 +1064,41 @@ export default function (
 
     fastify.get<{
       Querystring: { planId: string; currency?: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { planId: { type: 'string' }; currency: { type: 'string' } };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 minute';
-        };
-      };
-    }>('/object-storage-plan-by-id', async (req, rep) => {
-      const { planId, currency } = req.query;
+    }>(
+      '/object-storage/price',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { planId: { type: 'string' }, currency: { type: 'string' } },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+          skipAuth: true,
+        },
+      },
+      async (req, rep) => {
+        const { planId, currency } = req.query;
 
-      try {
-        const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
+        try {
+          const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
 
-        return rep.status(200).send(planObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send({ message: err.message });
+          return rep.status(200).send(planObject);
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof NotFoundPlanByIdError) {
+            return rep.status(404).send({ message: err.message });
+          }
+
+          req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
         }
-
-        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
+      },
+    );
 
     fastify.get<{
       Querystring: { promotionCode: string };
