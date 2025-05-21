@@ -533,7 +533,7 @@ describe('Checkout controller', () => {
         });
       });
 
-      it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
+      it('When the user provides a promo code with percent off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,
           interval: 'year',
@@ -545,9 +545,11 @@ describe('Checkout controller', () => {
           codeId: 'promo_code_id',
         };
         const mockedTaxes = getTaxes();
-        const percentDiscount = 100 - promoCode.percentOff;
-        mockedTaxes.tax_amount_exclusive = (mockedTaxes.tax_amount_exclusive * percentDiscount) / 100;
-        mockedTaxes.amount_total = (mockedTaxes.tax_amount_exclusive * percentDiscount) / 100;
+        const discount = Math.floor((mockedPrice.amount * promoCode.percentOff) / 100);
+        const discountedPrice = mockedPrice.amount - discount;
+
+        mockedTaxes.tax_amount_exclusive = (mockedTaxes.tax_amount_exclusive * discountedPrice) / 100;
+        mockedTaxes.amount_total = mockedTaxes.tax_amount_exclusive + discountedPrice;
 
         jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);

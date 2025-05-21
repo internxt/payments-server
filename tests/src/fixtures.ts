@@ -106,11 +106,11 @@ export const getProduct = ({ params, userType }: { params?: Stripe.Product; user
 export const getPrices = () => {
   return {
     subscription: {
-      exists: 'price_1Qtm4MFAOdcgaBMQ0cUPiqRA',
+      exists: 'price_1RQYKvFAOdcgaBMQfAYnxyMN',
       doesNotExist: 'price_1PLMerFAOdcgaBMQ17q27Cas',
     },
     lifetime: {
-      exists: 'price_1Qtm4MFAOdcgaBMQimNiZsnl',
+      exists: 'price_1RQYKvFAOdcgaBMQk7jdUope',
       doesNotExist: 'price_1PLMVCFAOdcgaBMQxIQgdXsds',
     },
   };
