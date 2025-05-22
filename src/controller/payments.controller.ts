@@ -840,6 +840,67 @@ export default function (
       }
     });
 
+    // TODO: Remove this useless endpoint
+    fastify.get<{
+      Querystring: {
+        customerId: CustomerId;
+        amount: number;
+        planId: string;
+        token: string;
+        currency?: string;
+      };
+      schema: {
+        querystring: {
+          type: 'object';
+          properties: {
+            customerId: { type: 'string' };
+            planId: { type: 'string' };
+            amount: { type: 'number' };
+            token: { type: 'string' };
+            currency: { type: 'string' };
+          };
+        };
+      };
+      config: {
+        rateLimit: {
+          max: 5;
+          timeWindow: '1 hour';
+        };
+      };
+    }>('/payment-intent-for-object-storage', async (req, res) => {
+      const { customerId, amount, planId, currency, token } = req.query;
+
+      try {
+        const payload = jwt.verify(token, config.JWT_SECRET) as {
+          customerId: string;
+        };
+        const tokenCustomerId = payload.customerId;
+
+        if (customerId !== tokenCustomerId) {
+          return res.status(403).send();
+        }
+      } catch (error) {
+        return res.status(403).send();
+      }
+
+      try {
+        const { clientSecret } = await paymentService.createPaymentIntent(customerId, amount, planId, currency);
+
+        return { clientSecret };
+      } catch (err) {
+        const error = err as Error;
+        if (error instanceof MissingParametersError) {
+          return res.status(404).send({
+            message: error.message,
+          });
+        }
+        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
+        return res.status(500).send({
+          message: 'Internal Server Error',
+        });
+      }
+    });
+
     fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
