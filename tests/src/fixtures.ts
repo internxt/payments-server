@@ -37,7 +37,14 @@ export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer 
   return {
     id: `cus_${randomDataGenerator.string({ length: 20 })}`,
     object: 'customer',
-    address: null,
+    address: {
+      postal_code: '123456',
+      country: 'ES',
+      city: 'Valencia',
+      line1: 'Avenida el Port',
+      line2: 'Angels',
+      state: 'Valencia',
+    },
     balance: 0,
     created: 1680893993,
     currency: null,
@@ -1061,3 +1068,11 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
 };
 
 export const voidPromise = () => Promise.resolve();
+
+export const mockCalculateTaxFor = (amount: number, taxRate = 0.21) => {
+  const tax = Math.floor(amount * taxRate);
+  return {
+    tax_amount_exclusive: tax,
+    amount_total: amount + tax,
+  };
+};

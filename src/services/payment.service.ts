@@ -159,6 +159,7 @@ export class PaymentService {
     }
   }
 
+  // TODO: Remove this useless function
   async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
