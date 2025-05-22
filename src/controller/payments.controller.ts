@@ -135,11 +135,12 @@ export default function (
               postal_code: postalCode,
             },
           });
-          customerId = id;
-        }
 
-        if (country && companyVatId) {
-          await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
+          if (country && companyVatId) {
+            await paymentService.getVatIdAndAttachTaxIdToCustomer(id, country, companyVatId);
+          }
+
+          customerId = id;
         }
 
         const token = jwt.sign({ customerId }, config.JWT_SECRET);

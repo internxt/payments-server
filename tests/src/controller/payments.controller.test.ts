@@ -432,7 +432,7 @@ describe('Payment controller e2e tests', () => {
         expect(response.statusCode).toBe(500);
       });
 
-      it('When the country and the tax Id are provided, then the tax Id is attached to the customer', async () => {
+      it('When the country and the tax Id are provided and is new customer, then the tax Id is attached to the customer', async () => {
         const mockedCustomer = getCustomer();
         const companyVatId = 'ES123456789';
         jest
