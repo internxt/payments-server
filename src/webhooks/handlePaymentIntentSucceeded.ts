@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
@@ -40,6 +40,9 @@ export default async function handlePaymentIntentSucceeded(
     additionalOptions: {
       default_payment_method: paymentIntent.payment_method as string,
       off_session: true,
+      automatic_tax: {
+        enabled: true,
+      },
     },
   });
 
