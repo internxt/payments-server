@@ -14,7 +14,7 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUserStorage } from '../../../src/services/storage.service';
-import { PaymentService } from '../../../src/services/payment.service';
+import { CustomerNotFoundError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
 import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
@@ -332,14 +332,11 @@ describe('Payment controller e2e tests', () => {
 
   describe('Object storage tests', () => {
     describe('Create customer', () => {
-      it('When the user exists, the existing customer is updated and its ID is returned with the user token', async () => {
+      it('When the user exists, then its ID is returned with the user token', async () => {
         const mockCustomer = getCustomer();
         const getCustomerIdSpy = jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockResolvedValue(mockCustomer);
-        const updatedCustomerSpy = jest
-          .spyOn(PaymentService.prototype, 'updateCustomer')
-          .mockImplementation(voidPromise);
 
         const response = await app.inject({
           method: 'GET',
@@ -359,20 +356,6 @@ describe('Payment controller e2e tests', () => {
         expect(responseBody.customerId).toBe(mockCustomer.id);
         expect(responseBody.token).toBeDefined();
         expect(getCustomerIdSpy).toHaveBeenCalledWith(mockCustomer.email);
-        expect(updatedCustomerSpy).toHaveBeenCalledWith(
-          mockCustomer.id,
-          {
-            customer: {
-              name: mockCustomer.name,
-            },
-          },
-          {
-            address: {
-              postal_code: mockCustomer.address?.postal_code,
-              country: mockCustomer.address?.country,
-            },
-          },
-        );
         expect(decodedToken.customerId).toBe(mockCustomer.id);
       });
 
@@ -394,7 +377,9 @@ describe('Payment controller e2e tests', () => {
 
       it('When the user does not exists, then a new one is created and the customer Id and token are provided', async () => {
         const mockedCustomer = getCustomer();
-        jest.spyOn(PaymentService.prototype, 'getCustomerIdByEmail').mockRejectedValue(null);
+        jest
+          .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
+          .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
         const createdCustomerSpy = jest
           .spyOn(PaymentService.prototype, 'createCustomer')
           .mockResolvedValue(mockedCustomer);
@@ -411,7 +396,6 @@ describe('Payment controller e2e tests', () => {
         });
 
         const responseBody = response.json();
-        const decodedToken = jwt.verify(responseBody.token, config.JWT_SECRET) as { customerId: string };
 
         expect(response.statusCode).toBe(200);
         expect(responseBody.customerId).toBe(mockedCustomer.id);
@@ -425,13 +409,35 @@ describe('Payment controller e2e tests', () => {
           },
         });
 
+        const decodedToken = jwt.verify(responseBody.token, config.JWT_SECRET) as { customerId: string };
         expect(decodedToken.customerId).toBe(mockedCustomer.id);
+      });
+
+      it('When there is an unexpected error while getting the existing user, then an error indicating so is thrown', async () => {
+        const mockedCustomer = getCustomer();
+        const unexpectedError = new Error('Random error');
+        jest.spyOn(PaymentService.prototype, 'getCustomerIdByEmail').mockRejectedValue(unexpectedError);
+
+        const response = await app.inject({
+          method: 'GET',
+          path: '/object-storage/customer',
+          query: {
+            customerName: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+            country: mockedCustomer.address?.country as string,
+            postalCode: mockedCustomer.address?.postal_code as string,
+          },
+        });
+
+        expect(response.statusCode).toBe(500);
       });
 
       it('When the country and the tax Id are provided, then the tax Id is attached to the customer', async () => {
         const mockedCustomer = getCustomer();
         const companyVatId = 'ES123456789';
-        jest.spyOn(PaymentService.prototype, 'getCustomerIdByEmail').mockRejectedValue(null);
+        jest
+          .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
+          .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
         jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
         const attachVatIdSpy = jest
           .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')

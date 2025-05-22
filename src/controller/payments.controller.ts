@@ -116,23 +116,15 @@ export default function (
         let customerId: Stripe.Customer['id'];
         const { email, customerName, country, postalCode, companyVatId } = req.query;
 
-        const userExists = await paymentService.getCustomerIdByEmail(email).catch(() => null);
+        const userExists = await paymentService.getCustomerIdByEmail(email).catch((err) => {
+          if (err instanceof CustomerNotFoundError) {
+            return null;
+          }
+
+          throw err;
+        });
 
         if (userExists) {
-          await paymentService.updateCustomer(
-            userExists.id,
-            {
-              customer: {
-                name: customerName,
-              },
-            },
-            {
-              address: {
-                postal_code: postalCode,
-                country,
-              },
-            },
-          );
           customerId = userExists.id;
         } else {
           const { id } = await paymentService.createCustomer({
