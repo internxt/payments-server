@@ -12,7 +12,7 @@ export default async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
   paymentsService: PaymentService,
   objectStorageService: ObjectStorageService,
-  logger: FastifyLoggerInstance,
+  logger: FastifyBaseLogger,
 ): Promise<void> {
   if (!paymentIntent.metadata.type || paymentIntent.metadata.type !== 'object-storage') {
     return;
@@ -32,9 +32,15 @@ export default async function handlePaymentIntentSucceeded(
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 
-  await objectStorageService.initObjectStorageUser({
-    email: customer.email,
+  const products = await paymentsService.getObjectStorageProduct();
+
+  await paymentsService.createSubscription({
     customerId: customer.id,
+    priceId: products.paymentGatewayId,
+    additionalOptions: {
+      default_payment_method: paymentIntent.payment_method as string,
+      off_session: true,
+    },
   });
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) has been initialized!`);

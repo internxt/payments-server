@@ -1641,6 +1641,51 @@ export class PaymentService {
     return renewalPeriod;
   }
 
+  async getObjectStorageProduct() {
+    const objectStorage = await this.productsRepository.findByType(UserType.ObjectStorage);
+    if (objectStorage.length === 0) {
+      throw new NotFoundError('There is no object storage product');
+    }
+
+    return objectStorage[0];
+  }
+
+  /**
+   * @description Retrieves a list of charges made by a specific customer.
+   * @param customerId - The Stripe customer ID whose charges should be retrieved.
+   * @returns An array of Stripe charge objects.
+   */
+  async getUserCharges(customerId: string): Promise<Stripe.Charge[]> {
+    return (
+      await this.provider.charges.list({
+        customer: customerId,
+        limit: 100,
+      })
+    ).data;
+  }
+
+  /**
+   * @description Creates a payment intent for a given customer, specifying the amount and currency.
+   * @param customerId - The Stripe customer ID for whom the payment intent will be created.
+   * @param currency - The currency in which the payment will be made (e.g., 'usd', 'eur').
+   * @param amount - The total amount to charge, in the smallest currency unit (in cents).
+   * @param additionalOptions - Optional additional parameters to customize the payment intent.
+   * @returns The payment intent object.
+   */
+  async paymentIntent(
+    customerId: string,
+    currency: string,
+    amount: number,
+    additionalOptions?: Partial<Stripe.PaymentIntentCreateParams>,
+  ) {
+    return this.provider.paymentIntents.create({
+      customer: customerId,
+      currency,
+      amount,
+      ...additionalOptions,
+    });
+  }
+
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
     const methods = paymentMethodId
       ? [

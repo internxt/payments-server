@@ -86,6 +86,13 @@ export default function (
           );
           break;
 
+        case 'payment_intent.amount_capturable_updated': {
+          const eventData = event.data.object;
+          await stripe.paymentIntents.cancel(eventData.id);
+          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
+
+          break;
+        }
         case 'payment_intent.succeeded': {
           const eventData = event.data.object;
           const paymentMethod = await stripe.paymentMethods.retrieve(eventData.payment_method as string);

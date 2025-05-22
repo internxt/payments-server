@@ -31,7 +31,7 @@ import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { CustomerSyncService } from '../services/customerSync.service';
-import { ForbiddenError } from '../errors/Errors';
+import { BadRequestError, ForbiddenError } from '../errors/Errors';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -442,6 +442,98 @@ export default function (
             message: 'Internal Server Error',
           });
         }
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerId: string;
+        token: string;
+        paymentMethod: string;
+        currency?: string;
+      };
+    }>(
+      '/payment-method-verification',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'token'],
+            properties: {
+              customerId: {
+                type: 'string',
+                description: 'The ID of the customer we want to verify the payment method',
+              },
+              token: {
+                type: 'string',
+                description: 'The user tokens',
+              },
+              currency: {
+                type: 'string',
+                description: 'The currency the customer will use (optional)',
+                default: 'eur',
+              },
+            },
+          },
+        },
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, res) => {
+        let tokenCustomerId: string;
+        const { customerId, currency = 'eur', token, paymentMethod } = req.body;
+
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        const charges = await paymentService.getUserCharges(customerId);
+
+        const oneTimeChargesWithThatPaymentMethod = charges.filter(
+          (c) => c.paid && c.metadata.type === 'object-storage',
+        );
+        const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
+
+        if (paymentMethodAlreadyVerified) {
+          res.log.info(`Payment method has been already verified for customer ${customerId}, skipping one time charge`);
+          throw new BadRequestError('The payment method has been already verified, skipping one time charged');
+        }
+
+        res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
+
+        const paymentIntentVerification = await paymentService.paymentIntent(customerId, currency, 100, {
+          metadata: {
+            type: 'object-storage',
+          },
+          description: 'Card verification charge',
+          capture_method: 'manual',
+          setup_future_usage: 'off_session',
+          payment_method_types: ['card', 'paypal'],
+          payment_method: paymentMethod,
+        });
+
+        if (paymentIntentVerification.status === 'requires_capture') {
+          return res.status(200).send({
+            intentId: paymentIntentVerification.id,
+            verified: true,
+          });
+        }
+
+        return res.status(200).send({
+          intentId: paymentIntentVerification.id,
+          verified: false,
+          clientSecret: paymentIntentVerification.client_secret,
+        });
       },
     );
 
