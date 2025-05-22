@@ -1,12 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 import {
+  getCreateSubscriptionResponse,
   getCustomer,
   getPrice,
   getPrices,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
+  getValidUserToken,
   newTier,
   voidPromise,
 } from '../fixtures';
@@ -329,74 +331,6 @@ describe('Payment controller e2e tests', () => {
   });
 
   describe('Object storage tests', () => {
-    // describe('Creating a subscription', () => {
-    //   it('When the promotion code is not present, then the subscription should be created without discount/coupon', async () => {
-    //     const mockedUser = getUser();
-    //     const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
-    //     const token = getValidUserToken(mockedUser.customerId);
-
-    //     const mockedBody = {
-    //       customerId: mockedUser.customerId,
-    //       priceId: 'mocked_price_id',
-    //       token,
-    //     };
-    //     const createSubscriptionSpy = jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue({
-    //       type: 'payment',
-    //       clientSecret: 'client_secret',
-    //     });
-
-    //     const response = await app.inject({
-    //       method: 'POST',
-    //       path: '/object-storage/subscription',
-    //       body: mockedBody,
-    //       headers: {
-    //         authorization: mockedAuthToken,
-    //       },
-    //     });
-
-    //     expect(response.statusCode).toBe(200);
-    //     expect(createSubscriptionSpy).toHaveBeenCalledWith({
-    //       customerId: mockedBody.customerId,
-    //       priceId: mockedBody.priceId,
-    //       promoCodeId: undefined,
-    //     });
-    //   });
-
-    //   it('When promotion code is present, then the subscription should be created with it', async () => {
-    //     const mockedUser = getUser();
-    //     const mockedAuthToken = `Bearer ${getValidAuthToken(mockedUser.uuid)}`;
-    //     const mockedPromoCodeId = getPromotionCodeResponse();
-    //     const token = getValidUserToken(mockedUser.customerId);
-
-    //     const mockedBody = {
-    //       customerId: mockedUser.customerId,
-    //       priceId: 'mocked_price_id',
-    //       token,
-    //       promoCodeId: mockedPromoCodeId.codeId,
-    //     };
-    //     const createSubscriptionSpy = jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue({
-    //       type: 'payment',
-    //       clientSecret: 'client_secret',
-    //     });
-
-    //     const response = await app.inject({
-    //       method: 'POST',
-    //       path: '/object-storage/subscription',
-    //       body: mockedBody,
-    //       headers: {
-    //         authorization: mockedAuthToken,
-    //       },
-    //     });
-
-    //     expect(response.statusCode).toBe(200);
-    //     expect(createSubscriptionSpy).toHaveBeenCalledWith({
-    //       customerId: mockedBody.customerId,
-    //       priceId: mockedBody.priceId,
-    //       promoCodeId: mockedBody.promoCodeId,
-    //     });
-    //   });
-    // });
-
     describe('Create customer', () => {
       it('When the user exists, the existing customer is updated and its ID is returned with the user token', async () => {
         const mockCustomer = getCustomer();
@@ -524,6 +458,103 @@ describe('Payment controller e2e tests', () => {
         });
         expect(attachVatIdSpy).toHaveBeenCalled();
         expect(attachVatIdSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedCustomer.address?.country, companyVatId);
+      });
+    });
+
+    describe('Create subscription', () => {
+      it('When the user wants to create a sub for object storage, then the subscription is created successfully with the additional taxes', async () => {
+        const mockedUser = getUser();
+        const token = getValidUserToken(mockedUser.customerId);
+        const subResponse = getCreateSubscriptionResponse();
+
+        const createSubscriptionSpy = jest
+          .spyOn(PaymentService.prototype, 'createSubscription')
+          .mockResolvedValue(subResponse);
+
+        const body = {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          token,
+        };
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/object-storage/subscription',
+          body,
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual(subResponse);
+        expect(createSubscriptionSpy).toHaveBeenCalledWith({
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          additionalOptions: {
+            automatic_tax: {
+              enabled: true,
+            },
+          },
+        });
+      });
+
+      it('When the user wants to create a subscription with promotional code, then the promotional code is applied', async () => {
+        const mockedUser = getUser();
+        const token = getValidUserToken(mockedUser.customerId);
+        const promoCodeName = 'obj-sotrage-promo-code-name';
+        const subResponse = getCreateSubscriptionResponse();
+
+        const createSubscriptionSpy = jest
+          .spyOn(PaymentService.prototype, 'createSubscription')
+          .mockResolvedValue(subResponse);
+
+        const body = {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          token,
+          promoCodeId: promoCodeName,
+        };
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/object-storage/subscription',
+          body,
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(createSubscriptionSpy).toHaveBeenCalledWith({
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+          promoCodeId: promoCodeName,
+          additionalOptions: {
+            automatic_tax: {
+              enabled: true,
+            },
+          },
+        });
+        expect(responseBody).toStrictEqual(subResponse);
+      });
+
+      it('When the user token is not provided, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const subResponse = getCreateSubscriptionResponse();
+
+        jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(subResponse);
+
+        const body = {
+          customerId: mockedUser.customerId,
+          priceId: 'price_id',
+        };
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/object-storage/subscription',
+          body,
+        });
+
+        expect(response.statusCode).toBe(400);
       });
     });
   });

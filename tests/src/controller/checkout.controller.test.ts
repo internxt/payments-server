@@ -495,6 +495,9 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling promo codes', () => {
+      beforeEach(() => {
+        jest.restoreAllMocks();
+      });
       it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,

@@ -381,7 +381,7 @@ export default function (
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId'],
+            required: ['customerId', 'priceId', 'token'],
             properties: {
               customerId: {
                 type: 'string',
