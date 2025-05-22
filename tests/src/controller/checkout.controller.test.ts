@@ -8,12 +8,14 @@ import {
   getUser,
   getValidAuthToken,
   getValidUserToken,
+  mockCalculateTaxFor,
   priceById,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
+import Stripe from 'stripe';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -470,10 +472,12 @@ describe('Checkout controller', () => {
         bytes: 123456789,
         interval: 'year',
       });
-      const mockedTaxes = getTaxes();
+      const taxes = mockCalculateTaxFor(mockedPrice.amount);
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+      jest
+        .spyOn(PaymentService.prototype, 'calculateTax')
+        .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
 
       const response = await app.inject({
         path: `/checkout/price-by-id?priceId=${mockedPrice.id}&userAddress=123.12.12.12`,
@@ -486,10 +490,10 @@ describe('Checkout controller', () => {
       expect(responseBody).toStrictEqual({
         price: mockedPrice,
         taxes: {
-          tax: mockedTaxes.tax_amount_exclusive,
-          decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-          amountWithTax: mockedTaxes.amount_total,
-          decimalAmountWithTax: mockedTaxes.amount_total / 100,
+          tax: taxes.tax_amount_exclusive,
+          decimalTax: taxes.tax_amount_exclusive / 100,
+          amountWithTax: taxes.amount_total,
+          decimalAmountWithTax: taxes.amount_total / 100,
         },
       });
     });
@@ -509,13 +513,14 @@ describe('Checkout controller', () => {
           percentOff: null,
           codeId: 'promo_code_id',
         };
-        const mockedTaxes = getTaxes();
-        mockedTaxes.tax_amount_exclusive = mockedTaxes.tax_amount_exclusive - promoCode.amountOff;
-        mockedTaxes.amount_total = mockedTaxes.amount_total - promoCode.amountOff;
+        const discountedAmount = mockedPrice.amount - promoCode.amountOff;
+        const taxes = mockCalculateTaxFor(discountedAmount);
 
         jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+        jest
+          .spyOn(PaymentService.prototype, 'calculateTax')
+          .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
           path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
@@ -528,10 +533,10 @@ describe('Checkout controller', () => {
         expect(responseBody).toStrictEqual({
           price: mockedPrice,
           taxes: {
-            tax: mockedTaxes.tax_amount_exclusive,
-            decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-            amountWithTax: mockedTaxes.amount_total,
-            decimalAmountWithTax: mockedTaxes.amount_total / 100,
+            tax: taxes.tax_amount_exclusive,
+            decimalTax: taxes.tax_amount_exclusive / 100,
+            amountWithTax: taxes.amount_total,
+            decimalAmountWithTax: taxes.amount_total / 100,
           },
         });
       });
@@ -547,16 +552,15 @@ describe('Checkout controller', () => {
           percentOff: 20,
           codeId: 'promo_code_id',
         };
-        const mockedTaxes = getTaxes();
-        const discount = Math.floor((mockedPrice.amount * promoCode.percentOff) / 100);
-        const discountedPrice = mockedPrice.amount - discount;
-
-        mockedTaxes.tax_amount_exclusive = (mockedTaxes.tax_amount_exclusive * discountedPrice) / 100;
-        mockedTaxes.amount_total = mockedTaxes.tax_amount_exclusive + discountedPrice;
+        const discount = Math.floor(mockedPrice.amount * (promoCode.percentOff / 100));
+        const discountedAmount = mockedPrice.amount - discount;
+        const taxes = mockCalculateTaxFor(discountedAmount);
 
         jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
+        jest
+          .spyOn(PaymentService.prototype, 'calculateTax')
+          .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
           path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
@@ -569,10 +573,10 @@ describe('Checkout controller', () => {
         expect(responseBody).toStrictEqual({
           price: mockedPrice,
           taxes: {
-            tax: mockedTaxes.tax_amount_exclusive,
-            decimalTax: mockedTaxes.tax_amount_exclusive / 100,
-            amountWithTax: mockedTaxes.amount_total,
-            decimalAmountWithTax: mockedTaxes.amount_total / 100,
+            tax: taxes.tax_amount_exclusive,
+            decimalTax: taxes.tax_amount_exclusive / 100,
+            amountWithTax: taxes.amount_total,
+            decimalAmountWithTax: taxes.amount_total / 100,
           },
         });
       });
