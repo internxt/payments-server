@@ -37,7 +37,14 @@ export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer 
   return {
     id: `cus_${randomDataGenerator.string({ length: 20 })}`,
     object: 'customer',
-    address: null,
+    address: {
+      postal_code: '123456',
+      country: 'ES',
+      city: 'Valencia',
+      line1: 'Avenida el Port',
+      line2: 'Angels',
+      state: 'Valencia',
+    },
     balance: 0,
     created: 1680893993,
     currency: null,

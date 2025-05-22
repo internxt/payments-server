@@ -94,6 +94,7 @@ export default function (
         schema: {
           querystring: {
             type: 'object',
+            required: ['email', 'customerName', 'country', 'postalCode'],
             properties: {
               email: { type: 'string' },
               customerName: { type: 'string' },

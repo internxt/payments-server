@@ -159,29 +159,6 @@ export class PaymentService {
     }
   }
 
-  async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
-    if (!payload.email) {
-      throw new MissingParametersError(['email']);
-    }
-
-    const { data: customer } = await this.provider.customers.search({
-      query: `email:'${payload.email}'`,
-    });
-    const userExists = !!customer.length;
-
-    if (userExists) {
-      await this.getVatIdAndAttachTaxIdToCustomer(customer[0].id, country, companyVatId);
-
-      return customer[0];
-    }
-
-    const newCustomer = await this.createCustomer(payload);
-
-    await this.getVatIdAndAttachTaxIdToCustomer(newCustomer.id, country, companyVatId);
-
-    return newCustomer;
-  }
-
   public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
