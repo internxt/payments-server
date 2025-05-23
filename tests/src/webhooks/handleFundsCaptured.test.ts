@@ -19,7 +19,6 @@ import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository'
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { BadRequestError, GoneError } from '../../../src/errors/Errors';
-import { UserType } from '../../../src/core/users/User';
 
 jest.mock('stripe', () => {
   return {
@@ -88,7 +87,7 @@ beforeEach(() => {
 
 describe('Handling captured funds from a payment method', () => {
   describe('Checking the metadata', () => {
-    it('When the payment intent does not contains a type in the metadata, then do nothing', async () => {
+    it('When the payment intent does not contains the object-storage type in the metadata, then do nothing', async () => {
       const mockPaymentIntent = getPaymentIntent();
       const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
 
@@ -109,12 +108,26 @@ describe('Handling captured funds from a payment method', () => {
 
       expect(getCustomerSpy).not.toHaveBeenCalled();
     });
+
+    it('When the payment intent contains the type but not the ID of the price the user wants to subscribe to, then do nothing', async () => {
+      const mockPaymentIntent = getPaymentIntent({
+        metadata: {
+          type: 'object-storage',
+        },
+      });
+      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+
+      expect(getCustomerSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('Customer check', () => {
     it('When the user does not exists, then an error indicating so is thrown', async () => {
+      const mockedPrice = 'price_id';
       const mockPaymentIntent = getPaymentIntent({
-        metadata: { type: 'object-storage' },
+        metadata: { type: 'object-storage', priceId: mockedPrice },
       });
       const mockCustomer = { deleted: true } as Stripe.DeletedCustomer;
       jest
@@ -127,8 +140,9 @@ describe('Handling captured funds from a payment method', () => {
     });
 
     it('The user exists but does not have an email, then an error indicating so is thrown', async () => {
+      const mockedPrice = 'price_id';
       const mockPaymentIntent = getPaymentIntent({
-        metadata: { type: 'object-storage' },
+        metadata: { type: 'object-storage', priceId: mockedPrice },
       });
       const mockCustomer = getCustomer({
         email: '',
@@ -146,7 +160,7 @@ describe('Handling captured funds from a payment method', () => {
   it('When the the funds are captured, then the payment intent is cancelled, the subscription is created and the object storage account is initialized', async () => {
     const mockedPrice = 'price_id';
     const mockPaymentIntent = getPaymentIntent({
-      metadata: { type: 'object-storage' },
+      metadata: { type: 'object-storage', priceId: mockedPrice },
     });
     const mockCustomer = getCustomer();
     const mockSubscription = getCreateSubscriptionResponse();
@@ -157,10 +171,6 @@ describe('Handling captured funds from a payment method', () => {
     const cancelPaymentIntentSpy = jest
       .spyOn(stripe.paymentIntents, 'cancel')
       .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
-    jest.spyOn(paymentService, 'getObjectStorageProduct').mockResolvedValue({
-      paymentGatewayId: mockedPrice,
-      userType: UserType.ObjectStorage,
-    });
     const createdSubscriptionSpy = jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(mockSubscription);
     const objectStorageInitializationSpy = jest
       .spyOn(objectStorageService, 'initObjectStorageUser')
