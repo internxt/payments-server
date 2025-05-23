@@ -31,7 +31,7 @@ import { assertUser } from '../utils/assertUser';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { CustomerSyncService } from '../services/customerSync.service';
-import { BadRequestError, ForbiddenError } from '../errors/Errors';
+import { ForbiddenError } from '../errors/Errors';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -458,7 +458,7 @@ export default function (
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'token'],
+            required: ['customerId', 'token', 'paymentMethod'],
             properties: {
               customerId: {
                 type: 'string',
@@ -472,6 +472,10 @@ export default function (
                 type: 'string',
                 description: 'The currency the customer will use (optional)',
                 default: 'eur',
+              },
+              paymentMethod: {
+                type: 'string',
+                description: 'The payment method Id the user wants to verify',
               },
             },
           },
@@ -495,18 +499,6 @@ export default function (
 
         if (customerId !== tokenCustomerId) {
           throw new ForbiddenError();
-        }
-
-        const charges = await paymentService.getUserCharges(customerId);
-
-        const oneTimeChargesWithThatPaymentMethod = charges.filter(
-          (c) => c.paid && c.metadata.type === 'object-storage',
-        );
-        const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
-
-        if (paymentMethodAlreadyVerified) {
-          res.log.info(`Payment method has been already verified for customer ${customerId}, skipping one time charge`);
-          throw new BadRequestError('The payment method has been already verified, skipping one time charged');
         }
 
         res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
