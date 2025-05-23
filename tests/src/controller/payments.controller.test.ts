@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import {
   getCreateSubscriptionResponse,
   getCustomer,
+  getPaymentIntent,
   getPrice,
   getPrices,
   getUniqueCodes,
@@ -20,6 +21,7 @@ import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
+import Stripe from 'stripe';
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
@@ -562,6 +564,129 @@ describe('Payment controller e2e tests', () => {
 
         expect(response.statusCode).toBe(400);
       });
+    });
+  });
+
+  describe('Payment method verification', () => {
+    describe('The payment intent is created correctly', () => {
+      it('When the payment intent is created and verified, then there is no client secret returned', async () => {
+        const paymentMethod = 'pm_123';
+        const priceId = 'price_id';
+        const mockedUser = getUser();
+        const mockedPaymentIntent = getPaymentIntent({
+          status: 'requires_capture',
+        });
+        const token = jwt.sign(
+          {
+            customerId: mockedUser.customerId,
+          },
+          config.JWT_SECRET,
+        );
+        const paymentIntentSpy = jest
+          .spyOn(PaymentService.prototype, 'paymentIntent')
+          .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/payment-method-verification',
+          body: {
+            customerId: mockedUser.customerId,
+            token,
+            paymentMethod,
+            priceId,
+          },
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          intentId: mockedPaymentIntent.id,
+          verified: true,
+        });
+        expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
+          metadata: {
+            type: 'object-storage',
+            priceId,
+          },
+          description: 'Card verification charge',
+          capture_method: 'manual',
+          setup_future_usage: 'off_session',
+          payment_method_types: ['card', 'paypal'],
+          payment_method: paymentMethod,
+        });
+      });
+
+      it('When the payment intent needs an additional step (such as 3D secure), then the client secret is returned to allow the user finish the process', async () => {
+        const paymentMethod = 'pm_123';
+        const priceId = 'price_id';
+        const mockedUser = getUser();
+        const mockedPaymentIntent = getPaymentIntent();
+        const token = jwt.sign(
+          {
+            customerId: mockedUser.customerId,
+          },
+          config.JWT_SECRET,
+        );
+        const paymentIntentSpy = jest
+          .spyOn(PaymentService.prototype, 'paymentIntent')
+          .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/payment-method-verification',
+          body: {
+            customerId: mockedUser.customerId,
+            token,
+            paymentMethod,
+            priceId,
+          },
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          intentId: mockedPaymentIntent.id,
+          verified: false,
+          clientSecret: mockedPaymentIntent.client_secret,
+        });
+        expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
+          metadata: {
+            type: 'object-storage',
+            priceId,
+          },
+          description: 'Card verification charge',
+          capture_method: 'manual',
+          setup_future_usage: 'off_session',
+          payment_method_types: ['card', 'paypal'],
+          payment_method: paymentMethod,
+        });
+      });
+    });
+
+    it('When the customer ID from the user token does not match with the real user customer ID, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const priceId = 'price_id';
+      const token = jwt.sign(
+        {
+          customerId: 'cus_123',
+        },
+        config.JWT_SECRET,
+      );
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/payment-method-verification',
+        body: {
+          customerId: mockedUser.customerId,
+          token,
+          paymentMethod: 'pm_123',
+          priceId,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
     });
   });
 });

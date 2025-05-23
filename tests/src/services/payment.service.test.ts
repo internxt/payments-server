@@ -14,6 +14,7 @@ import {
   getCustomer,
   getInvoice,
   getInvoices,
+  getPaymentIntent,
   getPaymentIntentResponse,
   getPaymentMethod,
   getPrice,
@@ -648,6 +649,50 @@ describe('Payments Service tests', () => {
         await expect(
           paymentService.getPromoCodeByName(mockedPrice.product as string, mockedPromoCode.code),
         ).rejects.toThrow(BadRequestError);
+      });
+    });
+  });
+
+  describe('Create payment intent', () => {
+    it('When a new payment intent is requested, then the payment intent is returned', async () => {
+      const mockedUser = getUser();
+      const mockedPaymentIntent = getPaymentIntent();
+      const paymentIntentSpy = jest
+        .spyOn(stripe.paymentIntents, 'create')
+        .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+
+      const paymentIntent = await paymentService.paymentIntent(mockedUser.customerId, 'eur', 100);
+
+      expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
+      expect(paymentIntentSpy).toHaveBeenCalledWith({
+        customer: mockedUser.customerId,
+        currency: 'eur',
+        amount: 100,
+      });
+    });
+
+    it('When a new payment intent is requested with additional parameters, then the additional params are applied and payment intent is returned', async () => {
+      const metadata = {
+        type: 'test',
+      };
+      const mockedUser = getUser();
+      const mockedPaymentIntent = getPaymentIntent({
+        metadata,
+      });
+      const paymentIntentSpy = jest
+        .spyOn(stripe.paymentIntents, 'create')
+        .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+
+      const paymentIntent = await paymentService.paymentIntent(mockedUser.customerId, 'eur', 100, {
+        metadata,
+      });
+
+      expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
+      expect(paymentIntentSpy).toHaveBeenCalledWith({
+        customer: mockedUser.customerId,
+        currency: 'eur',
+        amount: 100,
+        metadata,
       });
     });
   });

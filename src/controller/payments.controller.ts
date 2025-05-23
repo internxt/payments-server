@@ -446,6 +446,96 @@ export default function (
     );
 
     fastify.post<{
+      Body: {
+        customerId: string;
+        token: string;
+        priceId: string;
+        paymentMethod: string;
+        currency?: string;
+      };
+    }>(
+      '/payment-method-verification',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'token', 'paymentMethod', 'priceId'],
+            properties: {
+              customerId: {
+                type: 'string',
+                description: 'The ID of the customer we want to verify the payment method',
+              },
+              token: {
+                type: 'string',
+                description: 'The user tokens',
+              },
+              priceId: {
+                type: 'string',
+                description: 'The ID of the price we want to subscribe the user',
+              },
+              currency: {
+                type: 'string',
+                description: 'The currency the customer will use (optional)',
+                default: 'eur',
+              },
+              paymentMethod: {
+                type: 'string',
+                description: 'The payment method Id the user wants to verify',
+              },
+            },
+          },
+        },
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, res) => {
+        let tokenCustomerId: string;
+        const { customerId, currency = 'eur', priceId, token, paymentMethod } = req.body;
+
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
+
+        const paymentIntentVerification = await paymentService.paymentIntent(customerId, currency, 100, {
+          metadata: {
+            type: 'object-storage',
+            priceId,
+          },
+          description: 'Card verification charge',
+          capture_method: 'manual',
+          setup_future_usage: 'off_session',
+          payment_method_types: ['card', 'paypal'],
+          payment_method: paymentMethod,
+        });
+
+        if (paymentIntentVerification.status === 'requires_capture') {
+          return res.status(200).send({
+            intentId: paymentIntentVerification.id,
+            verified: true,
+          });
+        }
+
+        return res.status(200).send({
+          intentId: paymentIntentVerification.id,
+          verified: false,
+          clientSecret: paymentIntentVerification.client_secret,
+        });
+      },
+    );
+
+    fastify.post<{
       Querystring: { trialToken: string };
       Body: {
         customerId: string;

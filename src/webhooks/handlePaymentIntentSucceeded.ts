@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
@@ -12,7 +12,7 @@ export default async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
   paymentsService: PaymentService,
   objectStorageService: ObjectStorageService,
-  logger: FastifyLoggerInstance,
+  logger: FastifyBaseLogger,
 ): Promise<void> {
   if (!paymentIntent.metadata.type || paymentIntent.metadata.type !== 'object-storage') {
     return;

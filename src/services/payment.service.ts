@@ -1641,6 +1641,28 @@ export class PaymentService {
     return renewalPeriod;
   }
 
+  /**
+   * @description Creates a payment intent for a given customer, specifying the amount and currency.
+   * @param customerId - The Stripe customer ID for whom the payment intent will be created.
+   * @param currency - The currency in which the payment will be made (e.g., 'usd', 'eur').
+   * @param amount - The total amount to charge, in the smallest currency unit (in cents).
+   * @param additionalOptions - Optional additional parameters to customize the payment intent.
+   * @returns The payment intent object.
+   */
+  async paymentIntent(
+    customerId: string,
+    currency: string,
+    amount: number,
+    additionalOptions?: Partial<Stripe.PaymentIntentCreateParams>,
+  ) {
+    return this.provider.paymentIntents.create({
+      customer: customerId,
+      currency,
+      amount,
+      ...additionalOptions,
+    });
+  }
+
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
     const methods = paymentMethodId
       ? [
