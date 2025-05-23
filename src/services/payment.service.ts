@@ -1641,19 +1641,6 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  /**
-   * This function is used to fetch the product storage product
-   * @returns the Object Storage product stored in Products collection
-   */
-  async getObjectStorageProduct() {
-    const objectStorage = await this.productsRepository.findByType(UserType.ObjectStorage);
-    if (objectStorage.length === 0) {
-      throw new NotFoundError('There is no object storage product');
-    }
-
-    return objectStorage[0];
-  }
-
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
     const methods = paymentMethodId
       ? [
