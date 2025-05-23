@@ -1,0 +1,188 @@
+import Stripe from 'stripe';
+import axios from 'axios';
+import { getPaymentIntent, getLogger, getCustomer, getCreateSubscriptionResponse } from '../fixtures';
+import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { PaymentService } from '../../../src/services/payment.service';
+import testFactory from '../utils/factory';
+import { UsersService } from '../../../src/services/users.service';
+import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
+import { StorageService } from '../../../src/services/storage.service';
+import config from '../../../src/config';
+import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
+import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
+import { UsersRepository } from '../../../src/core/users/UsersRepository';
+import { FastifyBaseLogger } from 'fastify';
+import { TiersService } from '../../../src/services/tiers.service';
+import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
+import { ObjectStorageService } from '../../../src/services/objectStorage.service';
+import { BadRequestError, GoneError } from '../../../src/errors/Errors';
+import { UserType } from '../../../src/core/users/User';
+
+jest.mock('stripe', () => {
+  return {
+    __esModule: true,
+    default: jest.fn().mockImplementation(() => ({
+      paymentIntents: {
+        cancel: jest.fn(),
+      },
+    })),
+  };
+});
+
+let paymentService: PaymentService;
+let storageService: StorageService;
+let usersService: UsersService;
+let objectStorageService: ObjectStorageService;
+let usersRepository: UsersRepository;
+let displayBillingRepository: DisplayBillingRepository;
+let couponsRepository: CouponsRepository;
+let usersCouponsRepository: UsersCouponsRepository;
+let tiersService: TiersService;
+let tiersRepository: TiersRepository;
+let usersTiersRepository: UsersTiersRepository;
+let productsRepository: ProductsRepository;
+let bit2MeService: Bit2MeService;
+let stripe: Stripe;
+let logger: jest.Mocked<FastifyBaseLogger>;
+
+beforeEach(() => {
+  logger = getLogger();
+
+  stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
+  usersRepository = testFactory.getUsersRepositoryForTest();
+  displayBillingRepository = {} as DisplayBillingRepository;
+  couponsRepository = testFactory.getCouponsRepositoryForTest();
+  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
+  productsRepository = testFactory.getProductsRepositoryForTest();
+  tiersRepository = testFactory.getTiersRepository();
+  usersTiersRepository = testFactory.getUsersTiersRepository();
+
+  storageService = new StorageService(config, axios);
+  bit2MeService = new Bit2MeService(config, axios);
+  paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+  objectStorageService = new ObjectStorageService(paymentService, config, axios);
+
+  tiersService = new TiersService(
+    usersService,
+    paymentService,
+    tiersRepository,
+    usersTiersRepository,
+    storageService,
+    config,
+  );
+  usersService = new UsersService(
+    usersRepository,
+    paymentService,
+    displayBillingRepository,
+    couponsRepository,
+    usersCouponsRepository,
+    config,
+    axios,
+  );
+
+  jest.clearAllMocks();
+});
+
+describe('Handling captured funds from a payment method', () => {
+  describe('Checking the metadata', () => {
+    it('When the payment intent does not contains a type in the metadata, then do nothing', async () => {
+      const mockPaymentIntent = getPaymentIntent();
+      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+
+      expect(getCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    it('When the payment intent has a type value in metadata but it is not object-storage, then do nothing', async () => {
+      const mockPaymentIntent = getPaymentIntent({
+        metadata: {
+          type: 'business',
+        },
+      });
+      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+
+      expect(getCustomerSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Customer check', () => {
+    it('When the user does not exists, then an error indicating so is thrown', async () => {
+      const mockPaymentIntent = getPaymentIntent({
+        metadata: { type: 'object-storage' },
+      });
+      const mockCustomer = { deleted: true } as Stripe.DeletedCustomer;
+      jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.DeletedCustomer>);
+
+      await expect(
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+      ).rejects.toThrow(GoneError);
+    });
+
+    it('The user exists but does not have an email, then an error indicating so is thrown', async () => {
+      const mockPaymentIntent = getPaymentIntent({
+        metadata: { type: 'object-storage' },
+      });
+      const mockCustomer = getCustomer({
+        email: '',
+      });
+      jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+
+      await expect(
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+      ).rejects.toThrow(BadRequestError);
+    });
+  });
+
+  it('When the the funds are captured, then the payment intent is cancelled, the subscription is created and the object storage account is initialized', async () => {
+    const mockedPrice = 'price_id';
+    const mockPaymentIntent = getPaymentIntent({
+      metadata: { type: 'object-storage' },
+    });
+    const mockCustomer = getCustomer();
+    const mockSubscription = getCreateSubscriptionResponse();
+
+    jest
+      .spyOn(paymentService, 'getCustomer')
+      .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+    const cancelPaymentIntentSpy = jest
+      .spyOn(stripe.paymentIntents, 'cancel')
+      .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
+    jest.spyOn(paymentService, 'getObjectStorageProduct').mockResolvedValue({
+      paymentGatewayId: mockedPrice,
+      userType: UserType.ObjectStorage,
+    });
+    const createdSubscriptionSpy = jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(mockSubscription);
+    const objectStorageInitializationSpy = jest
+      .spyOn(objectStorageService, 'initObjectStorageUser')
+      .mockResolvedValue();
+
+    await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+
+    expect(cancelPaymentIntentSpy).toHaveBeenCalledWith(mockPaymentIntent.id);
+    expect(createdSubscriptionSpy).toHaveBeenCalledWith({
+      customerId: mockCustomer.id,
+      priceId: mockedPrice,
+      additionalOptions: {
+        default_payment_method: mockPaymentIntent.payment_method as string,
+        off_session: true,
+        automatic_tax: {
+          enabled: true,
+        },
+      },
+    });
+    expect(objectStorageInitializationSpy).toHaveBeenCalledWith({
+      email: mockCustomer.email,
+      customerId: mockCustomer.id,
+    });
+  });
+});

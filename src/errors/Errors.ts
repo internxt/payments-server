@@ -30,6 +30,12 @@ export class ForbiddenError extends HttpError {
   }
 }
 
+export class GoneError extends HttpError {
+  constructor(message = 'Gone') {
+    super(message, 410);
+  }
+}
+
 export class InternalServerError extends HttpError {
   constructor(message = 'Internal Server Error') {
     super(message, 500);
