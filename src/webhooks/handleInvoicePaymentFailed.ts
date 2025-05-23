@@ -11,6 +11,21 @@ function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is 
   );
 }
 
+async function findObjectStorageLineItem(
+  invoice: Stripe.Invoice,
+  paymentService: PaymentService,
+): Promise<Stripe.InvoiceLineItem | undefined> {
+  for (const line of invoice.lines.data) {
+    const price = line.price;
+    if (!price?.product) continue;
+
+    const product = await paymentService.getProduct(price.product as string);
+    if (isProduct(product)) return line;
+  }
+
+  return undefined;
+}
+
 /**
  * This function only handles the Object Storage sub payment failed
  * @param invoice
@@ -28,20 +43,10 @@ export default async function handleInvoicePaymentFailed(
     throw new Error('No customer found for this payment');
   }
 
-  if (invoice.lines.data.length !== 1) {
-    throw new Error(`Unexpected invoice lines count for invoice ${invoice.id}`);
-  }
+  const relevantLineItem = await findObjectStorageLineItem(invoice, paymentService);
 
-  const [{ price }] = invoice.lines.data;
-
-  if (!price || !price.product) {
-    throw new Error(`Product not found for not paid invoice ${invoice.id}`);
-  }
-
-  const product = await paymentService.getProduct(price.product as string);
-
-  if (!isProduct(product)) {
-    logger.warn(`Not handling product ${price.product} for not paid invoice ${invoice.id}`);
+  if (!relevantLineItem) {
+    logger.info(`Invoice ${invoice.id} does not contain an object storage product. Skipping...`);
     return;
   }
 
