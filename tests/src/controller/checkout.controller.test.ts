@@ -29,12 +29,12 @@ afterAll(async () => {
   await closeServerAndDatabase();
 });
 
-describe('Checkout controller', () => {
-  beforeEach(() => {
-    jest.restoreAllMocks();
-    jest.clearAllMocks();
-  });
+beforeEach(() => {
+  jest.restoreAllMocks();
+  jest.clearAllMocks();
+});
 
+describe('Checkout controller', () => {
   it('When the jwt verify fails, then an error indicating so is thrown', async () => {
     const userAuthToken = 'invalid_token';
 
@@ -462,11 +462,6 @@ describe('Checkout controller', () => {
   });
 
   describe('Get Price by its ID', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
-      jest.restoreAllMocks();
-    });
-
     it('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
       const mockedPrice = priceById({
         bytes: 123456789,
@@ -477,10 +472,14 @@ describe('Checkout controller', () => {
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       jest
         .spyOn(PaymentService.prototype, 'calculateTax')
-        .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
+        .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
       const response = await app.inject({
         path: `/checkout/price-by-id?priceId=${mockedPrice.id}&userAddress=123.12.12.12`,
+        query: {
+          priceId: mockedPrice.id,
+          userAddress: '123.12.12.12',
+        },
         method: 'GET',
       });
 
@@ -499,9 +498,6 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling promo codes', () => {
-      beforeEach(() => {
-        jest.restoreAllMocks();
-      });
       it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,
@@ -509,7 +505,7 @@ describe('Checkout controller', () => {
         });
         const promoCode = {
           promoCodeName: 'promo_code_name',
-          amountOff: 1000,
+          amountOff: 100,
           percentOff: null,
           codeId: 'promo_code_id',
         };
@@ -520,10 +516,15 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
-          .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
+          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
+          path: '/checkout/price-by-id',
+          query: {
+            priceId: mockedPrice.id,
+            promoCodeName: promoCode.promoCodeName,
+            userAddress: '123.12.12.12',
+          },
           method: 'GET',
         });
 
@@ -560,10 +561,15 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
-          .mockResolvedValue(taxes as unknown as Stripe.Tax.Calculation);
+          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id?priceId=${mockedPrice.id}&promoCodeName=${promoCode.promoCodeName}&userAddress=123.12.12.12`,
+          path: `/checkout/price-by-id`,
+          query: {
+            priceId: mockedPrice.id,
+            promoCodeName: promoCode.promoCodeName,
+            userAddress: '123.12.12.12',
+          },
           method: 'GET',
         });
 
@@ -587,9 +593,6 @@ describe('Checkout controller', () => {
         const response = await app.inject({
           path: '/checkout/price-by-id',
           method: 'GET',
-          headers: {
-            'X-Real-Ip': 'user-ip',
-          },
         });
 
         expect(response.statusCode).toBe(400);
@@ -608,8 +611,11 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id?priceId=${mockedPrice.id}`,
+          path: `/checkout/price-by-id`,
           method: 'GET',
+          query: {
+            priceId: mockedPrice.id,
+          },
         });
 
         const responseBody = response.json();
