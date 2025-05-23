@@ -8,10 +8,11 @@ function isCustomer(customer: Stripe.Customer | Stripe.DeletedCustomer): custome
   return !customer.deleted;
 }
 
-export default async function handlePaymentIntentSucceeded(
+export default async function handleFoundsCaptured(
   paymentIntent: Stripe.PaymentIntent,
   paymentsService: PaymentService,
   objectStorageService: ObjectStorageService,
+  stripe: Stripe,
   logger: FastifyBaseLogger,
 ): Promise<void> {
   if (!paymentIntent.metadata.type || paymentIntent.metadata.type !== 'object-storage') {
@@ -32,6 +33,8 @@ export default async function handlePaymentIntentSucceeded(
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 
+  await stripe.paymentIntents.cancel(paymentIntent.id);
+
   const products = await paymentsService.getObjectStorageProduct();
 
   await paymentsService.createSubscription({
@@ -44,6 +47,11 @@ export default async function handlePaymentIntentSucceeded(
         enabled: true,
       },
     },
+  });
+
+  await objectStorageService.initObjectStorageUser({
+    email: customer.email,
+    customerId: customer.id,
   });
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) has been initialized!`);

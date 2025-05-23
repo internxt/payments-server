@@ -12,7 +12,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
-import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
+import handlePaymentIntentSucceeded from './handleFoundsCaptured';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 import { TiersService } from '../services/tiers.service';
@@ -87,9 +87,8 @@ export default function (
           break;
 
         case 'payment_intent.amount_capturable_updated': {
-          const eventData = event.data.object;
-          await stripe.paymentIntents.cancel(eventData.id);
-          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
+          const paymentIntent = event.data.object;
+          await handlePaymentIntentSucceeded(paymentIntent, paymentService, objectStorageService, stripe, fastify.log);
 
           break;
         }
@@ -111,7 +110,6 @@ export default function (
             });
           }
 
-          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
           break;
         }
 
