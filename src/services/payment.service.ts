@@ -1641,29 +1641,6 @@ export class PaymentService {
     return renewalPeriod;
   }
 
-  async getObjectStorageProduct() {
-    const objectStorage = await this.productsRepository.findByType(UserType.ObjectStorage);
-    if (objectStorage.length === 0) {
-      throw new NotFoundError('There is no object storage product');
-    }
-
-    return objectStorage[0];
-  }
-
-  /**
-   * @description Retrieves a list of charges made by a specific customer.
-   * @param customerId - The Stripe customer ID whose charges should be retrieved.
-   * @returns An array of Stripe charge objects.
-   */
-  async getUserCharges(customerId: string): Promise<Stripe.Charge[]> {
-    return (
-      await this.provider.charges.list({
-        customer: customerId,
-        limit: 100,
-      })
-    ).data;
-  }
-
   /**
    * @description Creates a payment intent for a given customer, specifying the amount and currency.
    * @param customerId - The Stripe customer ID for whom the payment intent will be created.
