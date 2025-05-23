@@ -571,6 +571,7 @@ describe('Payment controller e2e tests', () => {
     describe('The payment intent is created correctly', () => {
       it('When the payment intent is created and verified, then there is no client secret returned', async () => {
         const paymentMethod = 'pm_123';
+        const priceId = 'price_id';
         const mockedUser = getUser();
         const mockedPaymentIntent = getPaymentIntent({
           status: 'requires_capture',
@@ -592,6 +593,7 @@ describe('Payment controller e2e tests', () => {
             customerId: mockedUser.customerId,
             token,
             paymentMethod,
+            priceId,
           },
         });
 
@@ -605,6 +607,7 @@ describe('Payment controller e2e tests', () => {
         expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
           metadata: {
             type: 'object-storage',
+            priceId,
           },
           description: 'Card verification charge',
           capture_method: 'manual',
@@ -616,6 +619,7 @@ describe('Payment controller e2e tests', () => {
 
       it('When the payment intent needs an additional step (such as 3D secure), then the client secret is returned to allow the user finish the process', async () => {
         const paymentMethod = 'pm_123';
+        const priceId = 'price_id';
         const mockedUser = getUser();
         const mockedPaymentIntent = getPaymentIntent();
         const token = jwt.sign(
@@ -635,6 +639,7 @@ describe('Payment controller e2e tests', () => {
             customerId: mockedUser.customerId,
             token,
             paymentMethod,
+            priceId,
           },
         });
 
@@ -649,6 +654,7 @@ describe('Payment controller e2e tests', () => {
         expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
           metadata: {
             type: 'object-storage',
+            priceId,
           },
           description: 'Card verification charge',
           capture_method: 'manual',
@@ -661,6 +667,7 @@ describe('Payment controller e2e tests', () => {
 
     it('When the customer ID from the user token does not match with the real user customer ID, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
+      const priceId = 'price_id';
       const token = jwt.sign(
         {
           customerId: 'cus_123',
@@ -675,6 +682,7 @@ describe('Payment controller e2e tests', () => {
           customerId: mockedUser.customerId,
           token,
           paymentMethod: 'pm_123',
+          priceId,
         },
       });
 

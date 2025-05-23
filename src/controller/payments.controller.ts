@@ -449,6 +449,7 @@ export default function (
       Body: {
         customerId: string;
         token: string;
+        priceId: string;
         paymentMethod: string;
         currency?: string;
       };
@@ -458,7 +459,7 @@ export default function (
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'token', 'paymentMethod'],
+            required: ['customerId', 'token', 'paymentMethod', 'priceId'],
             properties: {
               customerId: {
                 type: 'string',
@@ -467,6 +468,10 @@ export default function (
               token: {
                 type: 'string',
                 description: 'The user tokens',
+              },
+              priceId: {
+                type: 'string',
+                description: 'The ID of the price we want to subscribe the user',
               },
               currency: {
                 type: 'string',
@@ -486,7 +491,7 @@ export default function (
       },
       async (req, res) => {
         let tokenCustomerId: string;
-        const { customerId, currency = 'eur', token, paymentMethod } = req.body;
+        const { customerId, currency = 'eur', priceId, token, paymentMethod } = req.body;
 
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
@@ -506,6 +511,7 @@ export default function (
         const paymentIntentVerification = await paymentService.paymentIntent(customerId, currency, 100, {
           metadata: {
             type: 'object-storage',
+            priceId,
           },
           description: 'Card verification charge',
           capture_method: 'manual',
