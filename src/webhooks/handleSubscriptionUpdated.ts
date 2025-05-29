@@ -27,45 +27,6 @@ async function handleObjectStorageScheduledForCancelation(
   logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
 }
 
-async function handleObjectStorageProduct(
-  product: Stripe.Product,
-  customer: Stripe.Customer,
-  subscription: Stripe.Subscription,
-  paymentsService: PaymentService,
-  logger: FastifyLoggerInstance,
-): Promise<void> {
-  const subscriptionScheduledForCancelation =
-    subscription.cancellation_details && subscription.cancellation_details.reason === 'cancellation_requested';
-  const subscriptionCancelled = subscription.status === 'canceled';
-
-  if (subscriptionCancelled || subscriptionScheduledForCancelation) {
-    logger.error(`Sub ${subscription.id} is/is being canceled, it should not be processed by object storage handler`);
-    throw new Error(
-      `Sub ${subscription.id} is/is being canceled, it should not be processed by object storage handler`,
-    );
-  }
-
-  if (customer.deleted) {
-    throw new Error('Customer has been deleted');
-  }
-
-  if (subscription.items.data.length !== 1) {
-    throw new Error('Unexpected items length for object storage');
-  }
-
-  if (!customer.email) {
-    throw new Error('Missing customer email on subscription updated');
-  }
-
-  await paymentsService.billCardVerificationCharge(
-    customer.id,
-    subscription.currency,
-    subscription.default_payment_method ? (subscription.default_payment_method as string) : undefined,
-  );
-
-  logger.info(`Customer ${customer.id} with sub ${subscription.id} has been billed successfully`);
-}
-
 export default async function handleSubscriptionUpdated(
   storageService: StorageService,
   usersService: UsersService,
@@ -97,14 +58,6 @@ export default async function handleSubscriptionUpdated(
         (await paymentService.getCustomer(customerId)) as Stripe.Customer,
         subscription,
         objectStorageService,
-        log,
-      );
-    } else {
-      await handleObjectStorageProduct(
-        product,
-        (await paymentService.getCustomer(customerId)) as Stripe.Customer,
-        subscription,
-        paymentService,
         log,
       );
     }

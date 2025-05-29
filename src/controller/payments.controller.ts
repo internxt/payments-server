@@ -32,6 +32,7 @@ import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { CustomerSyncService } from '../services/customerSync.service';
 import { ForbiddenError } from '../errors/Errors';
+import { VERIFICATION_CHARGE } from '../constants';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -508,17 +509,22 @@ export default function (
 
         res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
 
-        const paymentIntentVerification = await paymentService.paymentIntent(customerId, currency, 100, {
-          metadata: {
-            type: 'object-storage',
-            priceId,
+        const paymentIntentVerification = await paymentService.paymentIntent(
+          customerId,
+          currency,
+          VERIFICATION_CHARGE,
+          {
+            metadata: {
+              type: 'object-storage',
+              priceId,
+            },
+            description: 'Card verification charge',
+            capture_method: 'manual',
+            setup_future_usage: 'off_session',
+            payment_method_types: ['card', 'paypal'],
+            payment_method: paymentMethod,
           },
-          description: 'Card verification charge',
-          capture_method: 'manual',
-          setup_future_usage: 'off_session',
-          payment_method_types: ['card', 'paypal'],
-          payment_method: paymentMethod,
-        });
+        );
 
         if (paymentIntentVerification.status === 'requires_capture') {
           return res.status(200).send({
