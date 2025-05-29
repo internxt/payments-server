@@ -79,9 +79,9 @@ export default async function handleFundsCaptured(
     if (axios.isAxiosError(error) && error.response) {
       const { status, data } = error.response;
 
-      if (status === ConflictError.prototype.statusCode) {
+      if (status === 409) {
         logger.info('The user already has an Object Storage account activated');
-        return;
+        throw new ConflictError(error.message);
       }
 
       logger.error(`Unexpected error from Object Storage service [status=${status}]: ${JSON.stringify(data)}`);
