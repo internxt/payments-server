@@ -49,25 +49,43 @@ export default async function handleFundsCaptured(
 
   const isPaymentIntentCanceled = paymentIntent.status === 'canceled';
 
-  if (!isPaymentIntentCanceled) {
-    await stripe.paymentIntents.cancel(paymentIntent.id);
+  try {
+    if (!isPaymentIntentCanceled) {
+      await stripe.paymentIntents.cancel(paymentIntent.id);
+    }
+  } catch (error) {
+    const err = error as Error;
+    logger.error(
+      `[OBJECT STORAGE] Unexpected error while attempting to cancel the verification payment intent for user ${customer.id}. Error: ${err.message}`,
+    );
+
+    throw error;
   }
 
-  const { type } = await paymentsService.getUserSubscription(customer.id, UserType.ObjectStorage);
-  const isSubscriptionActivated = type === 'subscription';
+  try {
+    const { type } = await paymentsService.getUserSubscription(customer.id, UserType.ObjectStorage);
+    const isSubscriptionActivated = type === 'subscription';
 
-  if (!isSubscriptionActivated) {
-    await paymentsService.createSubscription({
-      customerId: customer.id,
-      priceId: paymentIntent.metadata.priceId,
-      additionalOptions: {
-        default_payment_method: paymentIntent.payment_method as string,
-        off_session: true,
-        automatic_tax: {
-          enabled: true,
+    if (!isSubscriptionActivated) {
+      await paymentsService.createSubscription({
+        customerId: customer.id,
+        priceId: paymentIntent.metadata.priceId,
+        additionalOptions: {
+          default_payment_method: paymentIntent.payment_method as string,
+          off_session: true,
+          automatic_tax: {
+            enabled: true,
+          },
         },
-      },
-    });
+      });
+    }
+  } catch (error) {
+    const err = error as Error;
+    logger.error(
+      `[OBJECT STORAGE] Unexpected error while attempting to create a user subscription for user ${customer.id}. Error: ${err.message}`,
+    );
+
+    throw error;
   }
 
   try {
@@ -80,7 +98,7 @@ export default async function handleFundsCaptured(
       const { status, data } = error.response;
 
       if (status === 409) {
-        logger.info('The user already has an Object Storage account activated');
+        logger.error('The user already has an Object Storage account activated');
         throw new ConflictError(error.message);
       }
 
