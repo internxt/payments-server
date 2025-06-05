@@ -1837,6 +1837,10 @@ export class PaymentService {
     }
   }
 
+  async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
+    return this.provider.charges.retrieve(chargeId);
+  }
+
   async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
     const res = await this.provider.paymentMethods.list({
       customer: customerId,
