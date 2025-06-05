@@ -18,8 +18,9 @@ async function findObjectStorageLineItem(
   for (const line of invoice.lines.data) {
     const price = line.price;
     if (!price?.product) continue;
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
 
-    const product = await paymentService.getProduct(price.product as string);
+    const product = await paymentService.getProduct(productId);
     if (isProduct(product)) return line;
   }
 
