@@ -205,9 +205,12 @@ describe('Determining Lifetime conditions', () => {
       const mockedCharge = getCharge();
       const mockedInvoices = getInvoices(2, [
         { customer: mockedCustomer.id, status: 'paid', charge: mockedCharge.id, paid: true },
-        { customer: mockedCustomer.id, paid: true, status: 'paid', paid_out_of_band: true },
+        { customer: mockedCustomer.id, paid: true, status: 'paid', paid_out_of_band: true, metadata: {} },
       ]);
-      mockedInvoices.forEach((i) => (i.lines.data[0].price!.metadata!.planType = 'one_time'));
+      mockedInvoices.forEach((i) => {
+        i.lines.data[0].price!.metadata!.planType = 'one_time';
+        i.lines.data[0].price!.product = 'prod_id';
+      });
 
       const totalSpaceBytes = mockedInvoices.reduce(
         (accum, current) => accum + parseInt(current.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'),
