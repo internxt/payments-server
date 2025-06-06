@@ -37,12 +37,6 @@ let determineLifetimeConditions: DetermineLifetimeConditions;
 beforeAll(() => {
   tiersRepository = testFactory.getTiersRepository();
   usersRepository = testFactory.getUsersRepositoryForTest();
-  paymentsService = new PaymentService(
-    new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-    productsRepository,
-    bit2MeService,
-  );
-  usersRepository = testFactory.getUsersRepositoryForTest();
   displayBillingRepository = {} as DisplayBillingRepository;
   couponsRepository = testFactory.getCouponsRepositoryForTest();
   usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
@@ -176,11 +170,7 @@ describe('Determining Lifetime conditions', () => {
         { customer: mockedCustomer.id, status: 'paid', charge: mockedCharge.id, paid: true },
         { customer: mockedCustomer.id, status: 'paid', charge: mockedCharge.id, paid: true },
       ]);
-      mockedInvoices.forEach((invoice) => {
-        if (invoice.lines.data[0].price?.metadata) {
-          invoice.lines.data[0].price.metadata.planType = 'one_time';
-        }
-      });
+      mockedInvoices.forEach((i) => (i.lines.data[0].price!.metadata!.planType = 'one_time'));
 
       const totalSpaceBytes = mockedInvoices.reduce(
         (accum, current) => accum + parseInt(current.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'),
@@ -204,6 +194,43 @@ describe('Determining Lifetime conditions', () => {
       expect(maxSpaceBytes).toStrictEqual(totalSpaceBytes);
       expect(tier).toStrictEqual(mockedTier);
     });
+
+    it('When the user already has a lifetime and has lifetimes paid out of band, then the storage should be stacked', async () => {
+      const mockedUser = getUser({
+        lifetime: true,
+      });
+      const mockedCustomer = getCustomer({
+        id: mockedUser.customerId,
+      });
+      const mockedCharge = getCharge();
+      const mockedInvoices = getInvoices(2, [
+        { customer: mockedCustomer.id, status: 'paid', charge: mockedCharge.id, paid: true },
+        { customer: mockedCustomer.id, paid: true, status: 'paid', paid_out_of_band: true },
+      ]);
+      mockedInvoices.forEach((i) => (i.lines.data[0].price!.metadata!.planType = 'one_time'));
+
+      const totalSpaceBytes = mockedInvoices.reduce(
+        (accum, current) => accum + parseInt(current.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'),
+        0,
+      );
+
+      const mockedTier = newTier({
+        billingType: 'lifetime',
+      });
+
+      jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([mockedCustomer]);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+      jest.spyOn(paymentService, 'retrieveCustomerChargeByChargeId').mockResolvedValue(mockedCharge);
+      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
+
+      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(mockedUser, mockedTier.productId);
+
+      expect(maxSpaceBytes).toStrictEqual(totalSpaceBytes);
+      expect(tier).toStrictEqual(mockedTier);
+    });
   });
 
   it('When the customer is deleted, an error indicating so is thrown', async () => {
@@ -218,18 +245,7 @@ describe('Determining Lifetime conditions', () => {
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({
       deleted: true,
-      id: mockedUser.customerId,
-      object: 'customer',
-    } as Stripe.DeletedCustomer & {
-      lastResponse: {
-        headers: { [key: string]: string };
-        requestId: string;
-        statusCode: number;
-        apiVersion?: string;
-        idempotencyKey?: string;
-        stripeAccount?: string;
-      };
-    });
+    } as Stripe.Response<Stripe.DeletedCustomer>);
 
     await expect(determineLifetimeConditions.determine(mockedUser, mockedTier.productId)).rejects.toThrow(Error);
   });

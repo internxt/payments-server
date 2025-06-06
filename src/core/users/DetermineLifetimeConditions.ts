@@ -23,7 +23,7 @@ export class DetermineLifetimeConditions {
    * - The user already has a lifetime -> stacking
    * @param user
    * @param productId
-   * @returns
+   * @returns the total max space bytes and the higher tier
    */
   async determine(user: User, productId: string): Promise<{ tier: Tier; maxSpaceBytes: number }> {
     const isLifetime = user.lifetime;
@@ -65,7 +65,7 @@ export class DetermineLifetimeConditions {
    * **THE ACTUAL CRITERIA IS: The higher tier and the sum of all the paid
    * maxSpaceBytes**
    * @param user The user to stack
-   * @returns
+   * @returns the total max space bytes and the higher tier
    */
   private async handleStackingLifetime(user: User): Promise<{
     maxSpaceBytes: number;
