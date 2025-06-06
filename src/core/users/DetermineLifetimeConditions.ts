@@ -4,14 +4,7 @@ import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
-
-export class OldProductError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, OldProductError.prototype);
-  }
-}
+import { BadRequestError } from '../../errors/Errors';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -42,12 +35,14 @@ export class DetermineLifetimeConditions {
       if (err instanceof TierNotFoundError) {
         return null;
       }
+
+      throw err;
     });
 
     const oldProduct = !tier;
 
     if (oldProduct) {
-      throw new OldProductError(`Old product ${productId} found for user with id: ${user.uuid}`);
+      throw new BadRequestError(`Old product ${productId} found for user with id: ${user.uuid}`);
     }
 
     if (isFree) {
@@ -96,7 +91,9 @@ export class DetermineLifetimeConditions {
       const filteredPaidInvoices = await this.getPaidInvoices(customer, invoices);
 
       filteredPaidInvoices.forEach((invoice) => {
-        productIds.push((invoice.lines.data[0].price?.product as string) || '');
+        const price = invoice.lines.data[0].price;
+        const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
+        productIds.push(productId ?? '');
       });
 
       totalMaxSpaceBytes += filteredPaidInvoices.reduce(
@@ -132,7 +129,7 @@ export class DetermineLifetimeConditions {
         const line = invoice.lines.data[0];
 
         if (!line?.price?.metadata) {
-          console.warn(`⚠️ Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+          console.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
 
@@ -152,12 +149,6 @@ export class DetermineLifetimeConditions {
           if (isLifetime && isPaid && isOutOfBand) {
             return invoice;
           }
-          return null;
-        }
-
-        if (!chargeId && line.price.metadata.type === 'one_time' && invoice.paid && invoice.paid_out_of_band) {
-          return invoice;
-        } else if (!chargeId) {
           return null;
         }
 
