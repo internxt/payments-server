@@ -3,9 +3,9 @@ import { randomUUID } from 'crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { User, UserType } from '../../src/core/users/User';
+import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import Stripe from 'stripe';
-import { PaymentIntent, PromotionCode, SubscriptionCreated } from '../../src/services/payment.service';
+import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
@@ -546,6 +546,47 @@ export const getCreatedSubscription = (
     ...params,
   };
 };
+
+export function getSubscription({
+  type = 'subscription',
+  userType = UserType.Individual,
+  seats,
+}: {
+  type: 'free' | 'subscription' | 'lifetime';
+  userType?: UserType;
+  seats?: { minimumSeats: number; maximumSeats: number };
+}): UserSubscription {
+  return {
+    type,
+    subscriptionId: `sub_${randomDataGenerator.string({ length: 14 })}`,
+    amount: 11988,
+    currency: 'eur',
+    interval: 'year',
+    nextPayment: 1774631776,
+    amountAfterCoupon: 0,
+    priceId: `price_${randomDataGenerator.string({ length: 12 })}`,
+    productId: `prod_${randomDataGenerator.string({ length: 8 })}`,
+    userType,
+    plan: {
+      simpleName: 'Essential',
+      status: 'active',
+      planId: `price_${randomDataGenerator.string({ length: 12 })}`,
+      productId: `prod_${randomDataGenerator.string({ length: 10 })}`,
+      name: 'Essential',
+      type: userType,
+      price: 119.88,
+      monthlyPrice: 9.99,
+      currency: 'eur',
+      isTeam: false,
+      paymentInterval: '',
+      isLifetime: false,
+      renewalPeriod: RenewalPeriod.Annually,
+      storageLimit: 1099511627776,
+      amountOfSeats: 1,
+      seats,
+    },
+  };
+}
 
 export const getActiveSubscriptions = (
   count: number = 1,

@@ -7,6 +7,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { UserType } from '../../../src/core/users/User';
 import {
+  getCharge,
   getCoupon,
   getCreatedSubscription,
   getCreateSubscriptionResponse,
@@ -694,6 +695,18 @@ describe('Payments Service tests', () => {
         amount: 100,
         metadata,
       });
+    });
+  });
+
+  describe('Retrieve an specific charge', () => {
+    it('When a charge is requested, then the correct charge object is returned', async () => {
+      const mockedCharge = getCharge();
+
+      jest.spyOn(stripe.charges, 'retrieve').mockResolvedValue(mockedCharge as Stripe.Response<Stripe.Charge>);
+
+      const charge = await paymentService.retrieveCustomerChargeByChargeId(mockedCharge.id);
+
+      expect(charge).toStrictEqual(mockedCharge);
     });
   });
 });
