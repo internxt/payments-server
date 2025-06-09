@@ -1709,6 +1709,10 @@ export class PaymentService {
     });
   }
 
+  async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
+    return this.provider.charges.retrieve(chargeId);
+  }
+
   getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {
     const map: Record<string, Stripe.TaxIdCreateParams.Type[]> = {
       AD: ['ad_nrt'],
