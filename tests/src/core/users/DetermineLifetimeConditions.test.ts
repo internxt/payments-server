@@ -149,55 +149,28 @@ describe('Determining Lifetime conditions', () => {
 
   describe('The user already has a lifetime plan', () => {
     it('When the user already has a lifetime, then the storage should be stacked', async () => {
+      const totalMaxSpaceBytes = 3;
+
       const mockedUser = getUser({ lifetime: true });
       const mockedTier = newTier();
       const mockedPrice = getPrice();
-      const totalMaxSpaceBytes = 6;
 
-      const mockedInvoices = getInvoices(3, [
-        {
-          lines: {
-            data: [
-              {
-                price: {
-                  ...mockedPrice,
-                  metadata: {
-                    maxSpaceBytes: '1',
-                  },
+      const baseLineItem = {
+        lines: {
+          data: [
+            {
+              price: {
+                ...mockedPrice,
+                metadata: {
+                  maxSpaceBytes: '1',
                 },
               },
-            ],
-          },
+            },
+          ],
         },
-        {
-          lines: {
-            data: [
-              {
-                price: {
-                  ...mockedPrice,
-                  metadata: {
-                    maxSpaceBytes: '2',
-                  },
-                },
-              },
-            ],
-          },
-        },
-        {
-          lines: {
-            data: [
-              {
-                price: {
-                  ...mockedPrice,
-                  metadata: {
-                    maxSpaceBytes: '3',
-                  },
-                },
-              },
-            ],
-          },
-        },
-      ]);
+      };
+
+      const mockedInvoices = getInvoices(3, [{ ...baseLineItem }, { ...baseLineItem }, { ...baseLineItem }]);
 
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
