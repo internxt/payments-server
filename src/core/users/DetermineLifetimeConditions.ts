@@ -110,7 +110,6 @@ export class DetermineLifetimeConditions {
       return null;
     });
 
-    // Get user higher tier depending on the lifetimes he purchased
     const userFinalTier = await this.getHigherTier(productIds, userTier);
 
     if (!userFinalTier) {
