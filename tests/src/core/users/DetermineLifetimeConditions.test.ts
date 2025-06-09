@@ -152,6 +152,38 @@ describe('Determining Lifetime conditions', () => {
 
       expect(result).toEqual([invoice]);
     });
+
+    it('When the invoice is paid but it has been refunded, then the invoice is returned', async () => {
+      const customer = getCustomer();
+      const invoice = getInvoice();
+      invoice.metadata = { chargeId: 'ch_123' };
+      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
+      invoice.paid = true;
+
+      jest
+        .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
+        .mockResolvedValue({ refunded: true, disputed: false } as any);
+
+      const result = await determineConditions.getPaidInvoices(customer, [invoice]);
+
+      expect(result).toStrictEqual([]);
+    });
+
+    it('When the invoice is paid and it has has been disputed, then the invoice is returned', async () => {
+      const customer = getCustomer();
+      const invoice = getInvoice();
+      invoice.metadata = { chargeId: 'ch_123' };
+      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
+      invoice.paid = true;
+
+      jest
+        .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
+        .mockResolvedValue({ refunded: false, disputed: true } as any);
+
+      const result = await determineConditions.getPaidInvoices(customer, [invoice]);
+
+      expect(result).toStrictEqual([]);
+    });
   });
 
   describe('Get higher tier', () => {
