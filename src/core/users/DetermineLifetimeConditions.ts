@@ -2,14 +2,61 @@ import Stripe from 'stripe';
 import { PaymentService } from '../../services/payment.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import { Service, Tier } from './Tier';
-import { User } from './User';
+import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
+import { BadRequestError } from '../../errors/Errors';
 
 export class DetermineLifetimeConditions {
   constructor(
     private readonly paymentsService: PaymentService,
     private readonly tiersService: TiersService,
   ) {}
+
+  /**
+   * For a given user that bought a lifetime, determines
+   * which tier and maxSpaceBytes corresponds to it, taking into
+   * consideration different situations.
+   *
+   * Possible cases:
+   * - The user is free -> new customer
+   * - The user already has a sub -> cancelling the subscription
+   * - The user already has a lifetime -> stacking
+   * @param user
+   * @param productId
+   * @returns the total max space bytes and the higher tier
+   */
+  async determine(user: User, productId: string): Promise<{ tier: Tier; maxSpaceBytes: number }> {
+    const isLifetime = user.lifetime;
+    const subscription = await this.paymentsService.getUserSubscription(user.customerId, UserType.Individual);
+    const isSubscriber = subscription.type === 'subscription';
+    const isFree = !isLifetime && !isSubscriber;
+
+    const tier = await this.tiersService.getTierProductsByProductsId(productId, 'lifetime').catch((err) => {
+      if (err instanceof TierNotFoundError) {
+        return null;
+      }
+
+      throw err;
+    });
+
+    const oldProduct = !tier;
+
+    if (oldProduct) {
+      throw new BadRequestError(`Old product ${productId} found for user with id: ${user.uuid}`);
+    }
+
+    if (isFree) {
+      return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
+    } else if (isSubscriber) {
+      await this.paymentsService.cancelSubscription(subscription.subscriptionId);
+
+      return { tier, maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes };
+    } else if (isLifetime) {
+      return this.handleStackingLifetime(user);
+    } else {
+      throw new Error(`Unknown user ${user.uuid} status for product ${productId}`);
+    }
+  }
 
   /**
    * Retrieves all the payment's processor customers with the user's email
