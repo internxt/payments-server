@@ -15,7 +15,7 @@ import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../../src/core/users/DetermineLifetimeConditions';
-import { getUser, newTier, getCustomer, getInvoice, getSubscription, getInvoices } from '../../fixtures';
+import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice, getInvoices } from '../../fixtures';
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
 
@@ -151,12 +151,53 @@ describe('Determining Lifetime conditions', () => {
     it('When the user already has a lifetime, then the storage should be stacked', async () => {
       const mockedUser = getUser({ lifetime: true });
       const mockedTier = newTier();
-      const mockedInvoices = getInvoices();
-      mockedInvoices.forEach((invoice) => (invoice.lines.data[0].price!.metadata!.maxSpaceBytes = '1000000'));
-      const totalMaxSpaceBytes = mockedInvoices.reduce(
-        (acc, invoice) => acc + parseInt(invoice.lines.data[0].price!.metadata!.maxSpaceBytes ?? '0'),
-        0,
-      );
+      const mockedPrice = getPrice();
+      const totalMaxSpaceBytes = 6;
+
+      const mockedInvoices = getInvoices(3, [
+        {
+          lines: {
+            data: [
+              {
+                price: {
+                  ...mockedPrice,
+                  metadata: {
+                    maxSpaceBytes: '1',
+                  },
+                },
+              },
+            ],
+          },
+        },
+        {
+          lines: {
+            data: [
+              {
+                price: {
+                  ...mockedPrice,
+                  metadata: {
+                    maxSpaceBytes: '2',
+                  },
+                },
+              },
+            ],
+          },
+        },
+        {
+          lines: {
+            data: [
+              {
+                price: {
+                  ...mockedPrice,
+                  metadata: {
+                    maxSpaceBytes: '3',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ]);
 
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);

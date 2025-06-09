@@ -12,6 +12,12 @@ import { Tier } from '../../src/core/users/Tier';
 
 const randomDataGenerator = new Chance();
 
+type DeepPartial<T> = T extends object
+  ? {
+      [P in keyof T]?: DeepPartial<T[P]>;
+    }
+  : T;
+
 export const getUser = (params?: Partial<User>): User => ({
   id: randomDataGenerator.string({ length: 12 }),
   uuid: randomUUID(),
@@ -933,10 +939,10 @@ export const getInvoice = (
   };
 };
 
-export function getInvoices(count = 2, paramsArray: Partial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
+export function getInvoices(count = 2, paramsArray: DeepPartial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
   return Array.from({ length: count }, (_, index) => ({
     ...getInvoice(),
-    ...paramsArray[index],
+    ...(paramsArray[index] as any),
   }));
 }
 
