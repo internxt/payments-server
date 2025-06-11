@@ -9,7 +9,7 @@ import {
   NotFoundPlanByIdError,
   PaymentService,
 } from '../services/payment.service';
-import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { ForbiddenError, InternalServerError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 
@@ -226,5 +226,39 @@ export default function (paymentService: PaymentService) {
         }
       },
     );
+
+    fastify.get('/invoices', async (req, res) => {
+      const { customerId } = req.user;
+
+      if (!customerId) {
+        throw new UnauthorizedError('Customer ID is required');
+      }
+
+      const userInvoices = await paymentService.getInvoicesFromUser(customerId, {}).catch((err) => {
+        req.log.error(`[ERROR FETCHING INVOICES]: ${err.message}`);
+        throw new InternalServerError('Failed to fetch invoices');
+      });
+
+      const productPromises = userInvoices
+        .map((invoice) => invoice.lines.data[0]?.price?.product)
+        .filter(Boolean)
+        .map((productId) => paymentService.getProduct(productId as string));
+
+      const productDetails = await Promise.all(productPromises);
+
+      const objectStorageProduct = productDetails.find((product) => product.metadata?.type === 'object-storage');
+
+      const objectStorageInvoices = userInvoices
+        .filter((invoice) => invoice.lines.data[0].price?.product === objectStorageProduct?.id)
+        .map((invoice) => ({
+          id: invoice.id,
+          created: invoice.created,
+          pdf: invoice.invoice_pdf,
+          total: invoice.total,
+          product: invoice.lines.data[0].price?.product,
+        }));
+
+      return res.status(200).send(objectStorageInvoices);
+    });
   };
 }
