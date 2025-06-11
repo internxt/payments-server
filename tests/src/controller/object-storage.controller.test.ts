@@ -1,9 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getCreateSubscriptionResponse, getCustomer, getUser, getValidUserToken, voidPromise } from '../fixtures';
+import {
+  getCreateSubscriptionResponse,
+  getCustomer,
+  getInvoices,
+  getProduct,
+  getUser,
+  getValidUserToken,
+  voidPromise,
+} from '../fixtures';
 import { CustomerNotFoundError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
+import Stripe from 'stripe';
 
 let app: FastifyInstance;
 
@@ -251,6 +260,112 @@ describe('Object Storage controller', () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe('Get invoices', () => {
+    it('When the user has object storage invoices, then the invoices are returned', async () => {
+      const mockedUser = getUser();
+      const token = getValidUserToken(mockedUser.customerId);
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedInvoices = getInvoices(4, [
+        {
+          customer: mockedUser.customerId,
+          lines: {
+            data: [
+              {
+                price: {
+                  product: mockedProduct.id,
+                },
+              },
+            ],
+          },
+        },
+        {
+          customer: mockedUser.customerId,
+          lines: {
+            data: [
+              {
+                price: {
+                  product: mockedProduct.id,
+                },
+              },
+            ],
+          },
+        },
+        {
+          customer: mockedUser.customerId,
+        },
+        {
+          customer: mockedUser.customerId,
+        },
+      ]);
+
+      const getInvoicesSpy = jest
+        .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
+        .mockResolvedValue(mockedInvoices);
+      jest
+        .spyOn(PaymentService.prototype, 'getProduct')
+        .mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+
+      const response = await app.inject({
+        method: 'GET',
+        path: '/object-storage/invoices',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(getInvoicesSpy).toHaveBeenCalledWith(mockedUser.customerId, {});
+      expect(responseBody).toHaveLength(2);
+      expect(responseBody[0].product).toBe(mockedProduct.id);
+    });
+
+    it('When the user has no object invoices invoices, then no invoices are returned', async () => {
+      const mockedUser = getUser();
+      const token = getValidUserToken(mockedUser.customerId);
+      const mockedProduct = getProduct({});
+      const mockedInvoices = getInvoices(3, [
+        {
+          customer: mockedUser.customerId,
+        },
+        {
+          customer: mockedUser.customerId,
+        },
+        {
+          customer: mockedUser.customerId,
+        },
+      ]);
+
+      const getInvoicesSpy = jest
+        .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
+        .mockResolvedValue(mockedInvoices);
+      jest
+        .spyOn(PaymentService.prototype, 'getProduct')
+        .mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+
+      const response = await app.inject({
+        method: 'GET',
+        path: '/object-storage/invoices',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(getInvoicesSpy).toHaveBeenCalledWith(mockedUser.customerId, {});
+      expect(responseBody).toHaveLength(0);
     });
   });
 });
