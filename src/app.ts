@@ -3,6 +3,7 @@ import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
 import { AppConfig } from './config';
 import controller from './controller/payments.controller';
+import objStorageController from './controller/object-storage.controller';
 import businessController from './controller/business.controller';
 import productsController from './controller/products.controller';
 import checkoutController from './controller/checkout.controller';
@@ -51,6 +52,7 @@ export async function buildApp(
   registerErrorHandler(fastify);
 
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
+  fastify.register(objStorageController(paymentService), { prefix: '/object-storage' });
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(productsController(tiersService, usersService, productsService, config), { prefix: '/products' });
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
