@@ -21,18 +21,37 @@ beforeEach(() => {
 
 describe('Object Storage controller', () => {
   describe('Get invoices', () => {
-    it('When there is no customer Id, then an error indicating so is thrown', async () => {
-      const token = getValidAuthToken('invalid-customer-id');
+    describe('Handling errors', () => {
+      it('When there is no customer Id, then an error indicating so is thrown', async () => {
+        const token = getValidAuthToken('invalid-customer-id');
 
-      const response = await app.inject({
-        method: 'GET',
-        path: '/object-storage/invoices',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        const response = await app.inject({
+          method: 'GET',
+          path: '/object-storage/invoices',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(401);
       });
 
-      expect(response.statusCode).toBe(401);
+      it('When something goes wrong while fetching invoices, then an error indicating so is thrown', async () => {
+        const unexpectedError = new Error('Unexpected error');
+        const mockedUser = getUser();
+        const token = getValidUserToken(mockedUser.customerId);
+        jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockRejectedValue(unexpectedError);
+
+        const response = await app.inject({
+          method: 'GET',
+          path: '/object-storage/invoices',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(500);
+      });
     });
 
     it('When the user has object storage invoices, then the invoices are returned', async () => {
