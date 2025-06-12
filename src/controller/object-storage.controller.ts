@@ -239,6 +239,10 @@ export default function (paymentService: PaymentService) {
         throw new InternalServerError('Failed to fetch invoices');
       });
 
+      if (userInvoices.length === 0) {
+        return res.status(200).send([]);
+      }
+
       const productPromises = userInvoices
         .map((invoice) => invoice.lines.data[0]?.price?.product)
         .filter(Boolean)

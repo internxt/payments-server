@@ -54,6 +54,25 @@ describe('Object Storage controller', () => {
       });
     });
 
+    it('When the user has no invoices, then an empty array is returned', async () => {
+      const mockedUser = getUser();
+      const token = getValidUserToken(mockedUser.customerId);
+      jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockResolvedValue([]);
+
+      const response = await app.inject({
+        method: 'GET',
+        path: '/object-storage/invoices',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual([]);
+    });
+
     it('When the user has object storage invoices, then the invoices are returned', async () => {
       const mockedUser = getUser();
       const token = getValidUserToken(mockedUser.customerId);
