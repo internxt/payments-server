@@ -9,7 +9,7 @@ import {
   NotFoundPlanByIdError,
   PaymentService,
 } from '../services/payment.service';
-import { ForbiddenError, InternalServerError, UnauthorizedError } from '../errors/Errors';
+import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 
@@ -234,10 +234,7 @@ export default function (paymentService: PaymentService) {
         throw new UnauthorizedError('Customer ID is required');
       }
 
-      const userInvoices = await paymentService.getInvoicesFromUser(customerId, {}).catch((err) => {
-        req.log.error(`[ERROR FETCHING INVOICES]: ${err.message}`);
-        throw new InternalServerError('Failed to fetch invoices');
-      });
+      const userInvoices = await paymentService.getInvoicesFromUser(customerId, {});
 
       if (userInvoices.length === 0) {
         return res.status(200).send([]);
