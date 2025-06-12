@@ -89,7 +89,13 @@ export const getPromotionCodeResponse = (params?: Partial<PromotionCode>): Promo
   };
 };
 
-export const getProduct = ({ params, userType }: { params?: Stripe.Product; userType?: UserType }): Stripe.Product => {
+export const getProduct = ({
+  params,
+  userType,
+}: {
+  params?: Partial<Stripe.Product>;
+  userType?: UserType;
+}): Stripe.Product => {
   return {
     id: `prod_${randomDataGenerator.string({ length: 12 })}`,
     type: 'service',

@@ -49,7 +49,7 @@ describe('Custom error handler', () => {
 
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body)).toEqual({
-      message: 'Something went wrong',
+      message: 'Internal Server Error',
     });
   });
 });
