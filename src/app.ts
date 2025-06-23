@@ -7,6 +7,7 @@ import objStorageController from './controller/object-storage.controller';
 import businessController from './controller/business.controller';
 import productsController from './controller/products.controller';
 import checkoutController from './controller/checkout.controller';
+import customerController from './controller/customer.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -18,6 +19,19 @@ import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
 import { ProductsService } from './services/products.service';
 import { registerErrorHandler } from './plugins/error-handler';
+
+interface AppDependencies {
+  paymentService: PaymentService;
+  storageService: StorageService;
+  usersService: UsersService;
+  cacheService: CacheService;
+  tiersService: TiersService;
+  licenseCodesService: LicenseCodesService;
+  objectStorageService: ObjectStorageService;
+  productsService: ProductsService;
+  stripe: Stripe;
+  config: AppConfig;
+}
 
 const envToLogger = {
   development: {
@@ -33,18 +47,18 @@ const envToLogger = {
   test: false,
 };
 
-export async function buildApp(
-  paymentService: PaymentService,
-  storageService: StorageService,
-  usersService: UsersService,
-  cacheService: CacheService,
-  tiersService: TiersService,
-  licenseCodesService: LicenseCodesService,
-  objectStorageService: ObjectStorageService,
-  productsService: ProductsService,
-  stripe: Stripe,
-  config: AppConfig,
-): Promise<FastifyInstance> {
+export async function buildApp({
+  paymentService,
+  storageService,
+  usersService,
+  cacheService,
+  tiersService,
+  licenseCodesService,
+  objectStorageService,
+  productsService,
+  stripe,
+  config,
+}: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: envToLogger[config.NODE_ENV] ?? true,
   });
@@ -56,6 +70,7 @@ export async function buildApp(
   fastify.register(businessController(paymentService, usersService, config), { prefix: '/business' });
   fastify.register(productsController(tiersService, usersService, productsService, config), { prefix: '/products' });
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
+  fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(

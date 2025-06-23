@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import { type AppConfig } from '../config';
 
 const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
+const USED_COUPON_CODES_EXPIRATION_IN_SECONDS = 6 * 60 * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -15,6 +16,10 @@ export default class CacheService {
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {
     return `subscription-${customerId}-${userType}`;
+  }
+
+  private buildUsedPromoCodesKey(customerId: string): string {
+    return `used-promotion-codes-${customerId}`;
   }
 
   async getSubscription(
@@ -30,11 +35,17 @@ export default class CacheService {
     }
   }
 
-  async setSubscription(
-    customerId: string,
-    userType: UserType,
-    subscription: UserSubscription,
-  ): Promise<void> {
+  async getUsedUserPromoCodes(customerId: string): Promise<String[] | null> {
+    const cachedUsedPromoCodesByUser = await this.redis.get(this.buildUsedPromoCodesKey(customerId));
+
+    if (!cachedUsedPromoCodesByUser) {
+      return null;
+    } else {
+      return JSON.parse(cachedUsedPromoCodesByUser) as string[];
+    }
+  }
+
+  async setSubscription(customerId: string, userType: UserType, subscription: UserSubscription): Promise<void> {
     await this.redis.set(
       this.buildSubscriptionKey(customerId, userType),
       JSON.stringify(subscription),
@@ -43,10 +54,20 @@ export default class CacheService {
     );
   }
 
-  async clearSubscription(
-    customerId: string,
-    userType: UserType = UserType.Individual,
-  ): Promise<void> {
+  async setUsedUserPromoCodes(customerId: string, promoCodes: string[]): Promise<void> {
+    await this.redis.set(
+      this.buildUsedPromoCodesKey(customerId),
+      JSON.stringify(promoCodes),
+      'EX',
+      SUBSCRIPTION_EXPIRATION_IN_SECONDS,
+    );
+  }
+
+  async clearSubscription(customerId: string, userType: UserType = UserType.Individual): Promise<void> {
     await this.redis.del(this.buildSubscriptionKey(customerId, userType));
+  }
+
+  async clearUsedUserPromoCodes(customerId: string): Promise<void> {
+    await this.redis.del(this.buildUsedPromoCodesKey(customerId));
   }
 }
