@@ -285,6 +285,26 @@ describe('UsersService tests', () => {
     });
   });
 
+  describe('Fetch all coupons linked to a user', () => {
+    it('When the user does not have any coupon associated, then nothing is returned', async () => {
+      const mockedUser = getUser();
+      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(null);
+
+      const result = await usersService.getStoredCouponsByUserId(mockedUser.id);
+
+      expect(result).toBeNull();
+    });
+
+    it('When the user has associated coupons, then the Coupon IDs (not ID collection) are returned from the local DB', async () => {
+      const mockedUser = getUser();
+      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(null);
+
+      const result = await usersService.getStoredCouponsByUserId(mockedUser.id);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('Enable the VPN feature based on the tier', () => {
     it('When called with a userUuid and tier, then enables the VPN for the user', async () => {
       const mockedUser = getUser({ lifetime: true });

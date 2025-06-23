@@ -145,6 +145,12 @@ export class UsersService {
     return !!userCouponEntry;
   }
 
+  /**
+   * @description Retrieves the unique coupon codes associated with a given user.
+   *
+   * @param userId - The ID of the user whose coupons are being retrieved.
+   * @returns An array of unique coupon codes associated with the user, or `null` if the user has no coupons.
+   */
   async getStoredCouponsByUserId(userId: User['id']): Promise<Coupon['code'][] | null> {
     const coupons = await this.usersCouponsRepository.findCouponsByUserId(userId);
     if (!coupons) return null;
