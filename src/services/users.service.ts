@@ -10,6 +10,7 @@ import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { VpnFeatures } from '../core/users/Tier';
+import { HttpError } from '../errors/HttpError';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -142,6 +143,21 @@ export class UsersService {
     const userCouponEntry = await this.usersCouponsRepository.findByUserAndCoupon(user.id, coupon.id);
 
     return !!userCouponEntry;
+  }
+
+  async getStoredCouponsByUserId(userId: User['id']): Promise<Coupon['code'][] | null> {
+    const coupons = await this.usersCouponsRepository.findCouponsByUserId(userId);
+    if (!coupons) return null;
+
+    const couponCodeData = await Promise.all(coupons.map((coupon) => this.couponsRepository.findById(coupon.coupon)));
+
+    const codes = couponCodeData
+      .map((coupon) => coupon?.code)
+      .filter((code): code is string => typeof code === 'string');
+
+    const uniqueCodes = [...new Set(codes)];
+
+    return uniqueCodes;
   }
 
   async initializeWorkspace(
@@ -278,4 +294,8 @@ export class UsersService {
   }
 }
 
-export class UserNotFoundError extends Error {}
+export class UserNotFoundError extends HttpError {
+  constructor(message = 'User Not Found') {
+    super(message, 404);
+  }
+}
