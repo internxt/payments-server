@@ -44,6 +44,7 @@ const getUsersCouponsRepositoryForTest = (): UsersCouponsRepository => {
     create: jest.fn(),
     findById: jest.fn(),
     findByUserAndCoupon: jest.fn(),
+    findCouponsByUserId: jest.fn(),
   };
 
   return usersCouponsRepositoryMock;
