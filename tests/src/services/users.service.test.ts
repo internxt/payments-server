@@ -297,11 +297,31 @@ describe('UsersService tests', () => {
 
     it('When the user has associated coupons, then the Coupon IDs (not ID collection) are returned from the local DB', async () => {
       const mockedUser = getUser();
-      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(null);
+      const coupon1 = getCoupon();
+      const coupon2 = getCoupon({ code: 'CoUP0n2' });
+      const mockedUserCoupons = [
+        {
+          id: 'relation-1',
+          coupon: coupon1.id,
+          user: mockedUser.id,
+        },
+        {
+          id: 'relation-2',
+          coupon: coupon2.id,
+          user: mockedUser.id,
+        },
+      ];
+
+      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(mockedUserCoupons);
+      jest.spyOn(couponsRepository, 'findById').mockImplementation(async (id: string) => {
+        if (id === coupon1.id) return coupon1;
+        if (id === coupon2.id) return coupon2;
+        return null;
+      });
 
       const result = await usersService.getStoredCouponsByUserId(mockedUser.id);
 
-      expect(result).toBeNull();
+      expect(result).toStrictEqual([coupon1.code, coupon2.code]);
     });
   });
 
