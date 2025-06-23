@@ -56,7 +56,7 @@ describe('Testing Users-Coupons collection methods', () => {
     });
 
     describe('Fetching all coupons associated to one user', () => {
-      it('When multiple coupons are created for a user, then all should be returned by findCouponsByUserId', async () => {
+      it('When multiple coupons are created for a user, then all should be returned', async () => {
         const { id: userId } = getUser();
         const { id: couponId1 } = getCoupon();
         const { id: couponId2 } = getCoupon();
@@ -76,7 +76,7 @@ describe('Testing Users-Coupons collection methods', () => {
 
         const result = await repository.findCouponsByUserId(userId);
 
-        expect(result).toEqual([]);
+        expect(result).toEqual(null);
       });
     });
   });

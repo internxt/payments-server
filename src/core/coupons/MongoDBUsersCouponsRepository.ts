@@ -51,7 +51,7 @@ export class MongoDBUsersCouponsRepository implements UsersCouponsRepository {
   async findCouponsByUserId(userId: UserCoupon['user']): Promise<UserCoupon[] | null> {
     const userCoupons = await this.collection.find({ user: new ObjectId(userId) }).toArray();
 
-    const toDomainCoupons = userCoupons ? userCoupons.map((coupon) => toDomain(coupon)) : null;
+    const toDomainCoupons = userCoupons.length > 0 ? userCoupons.map((coupon) => toDomain(coupon)) : null;
 
     return toDomainCoupons;
   }
