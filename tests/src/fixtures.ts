@@ -569,6 +569,7 @@ export function getSubscription({
   userType?: UserType;
   seats?: { minimumSeats: number; maximumSeats: number };
 }): UserSubscription {
+  const availableSeats = seats ? seats : undefined;
   return {
     type,
     subscriptionId: `sub_${randomDataGenerator.string({ length: 14 })}`,
@@ -596,7 +597,7 @@ export function getSubscription({
       renewalPeriod: RenewalPeriod.Annually,
       storageLimit: 1099511627776,
       amountOfSeats: 1,
-      seats,
+      ...availableSeats,
     },
   };
 }

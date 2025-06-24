@@ -59,7 +59,7 @@ export default class CacheService {
       this.buildUsedPromoCodesKey(customerId),
       JSON.stringify(promoCodes),
       'EX',
-      SUBSCRIPTION_EXPIRATION_IN_SECONDS,
+      USED_COUPON_CODES_EXPIRATION_IN_SECONDS,
     );
   }
 

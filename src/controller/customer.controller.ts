@@ -42,7 +42,7 @@ export default function (usersService: UsersService, paymentService: PaymentServ
         try {
           const cachedCoupons = await cacheService.getUsedUserPromoCodes(user.customerId);
 
-          if (cachedCoupons && cachedCoupons.length > 0) {
+          if (Array.isArray(cachedCoupons) && cachedCoupons.length > 0) {
             return res.status(200).send({ usedCoupons: cachedCoupons });
           }
         } catch (error) {
@@ -69,6 +69,7 @@ export default function (usersService: UsersService, paymentService: PaymentServ
           return res.status(200).send({ usedCoupons });
         } catch (error) {
           req.log.error(`[CUSTOMER/COUPONS]: Failed to retrieve stored coupons for user ${user.id}: ${error}`);
+
           throw error;
         }
       },
