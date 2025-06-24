@@ -35,7 +35,7 @@ export default class CacheService {
     }
   }
 
-  async getUsedUserPromoCodes(customerId: string): Promise<String[] | null> {
+  async getUsedUserPromoCodes(customerId: string): Promise<string[] | null> {
     const cachedUsedPromoCodesByUser = await this.redis.get(this.buildUsedPromoCodesKey(customerId));
 
     if (!cachedUsedPromoCodesByUser) {
