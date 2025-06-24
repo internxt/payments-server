@@ -175,7 +175,7 @@ export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.C
   };
 };
 
-export const getPromoCode = (params?: Partial<Stripe.PromotionCode>): Stripe.PromotionCode => {
+export const getPromoCode = (params?: DeepPartial<Stripe.PromotionCode>): Stripe.PromotionCode => {
   return {
     id: `promo_${randomDataGenerator.string({ length: 22 })}`,
     object: 'promotion_code',
@@ -210,7 +210,7 @@ export const getPromoCode = (params?: Partial<Stripe.PromotionCode>): Stripe.Pro
       minimum_amount_currency: null,
     },
     times_redeemed: 0,
-    ...params,
+    ...(params as any),
   };
 };
 

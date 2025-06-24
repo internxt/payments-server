@@ -42,7 +42,7 @@ export default function (usersService: UsersService, paymentService: PaymentServ
         try {
           const cachedCoupons = await cacheService.getUsedUserPromoCodes(user.customerId);
 
-          if (cachedCoupons) {
+          if (cachedCoupons && cachedCoupons.length > 0) {
             return res.status(200).send({ usedCoupons: cachedCoupons });
           }
         } catch (error) {
