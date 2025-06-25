@@ -227,6 +227,7 @@ export default async function handleInvoiceCompleted(
 
   try {
     await cacheService.clearSubscription(customer.id);
+    await cacheService.clearUsedUserPromoCodes(customer.id);
     log.info(`Cache for user with uuid: ${user.uuid} and customer Id: ${customer.id} has been cleaned`);
   } catch (err) {
     log.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customer.id} subscription`);

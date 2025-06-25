@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import axios from 'axios';
+import { FastifyBaseLogger } from 'fastify';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { PaymentService } from '../../../src/services/payment.service';
@@ -15,12 +16,10 @@ import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
-import { FastifyBaseLogger } from 'fastify';
 import { TiersService } from '../../../src/services/tiers.service';
 import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 
-jest.mock('../../../src/webhooks/handleLifetimeRefunded');
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   __esModule: true,
   default: jest.fn(),

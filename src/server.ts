@@ -74,7 +74,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
 
   const productsService = new ProductsService(tiersService, usersService);
 
-  const fastify = await buildApp(
+  const fastify = await buildApp({
     paymentService,
     storageService,
     usersService,
@@ -84,8 +84,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     objectStorageService,
     productsService,
     stripe,
-    envVariablesConfig,
-  );
+    config: envVariablesConfig,
+  });
 
   fastify.addHook('onClose', async () => {
     await cacheService['redis'].quit();
