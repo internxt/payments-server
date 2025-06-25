@@ -9,6 +9,7 @@ import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from
 import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
+import { ObjectId } from 'mongodb';
 
 const randomDataGenerator = new Chance();
 
@@ -19,7 +20,7 @@ type DeepPartial<T> = T extends object
   : T;
 
 export const getUser = (params?: Partial<User>): User => ({
-  id: randomDataGenerator.string({ length: 12 }),
+  id: new ObjectId().toString(),
   uuid: randomUUID(),
   customerId: `cus_${randomDataGenerator.string({ length: 20 })}`,
   lifetime: false,
@@ -683,7 +684,7 @@ export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe
 };
 
 export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
-  id: randomUUID(),
+  id: new ObjectId().toString(),
   provider: 'stripe',
   code: 'c0UP0n',
   ...params,

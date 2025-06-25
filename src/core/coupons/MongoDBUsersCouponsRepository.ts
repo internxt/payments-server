@@ -47,4 +47,12 @@ export class MongoDBUsersCouponsRepository implements UsersCouponsRepository {
   async create(payload: Omit<UserCoupon, 'id'>): Promise<void> {
     await this.collection.insertOne(toDocument(payload) as UserCouponDocument);
   }
+
+  async findCouponsByUserId(userId: UserCoupon['user']): Promise<UserCoupon[] | null> {
+    const userCoupons = await this.collection.find({ user: new ObjectId(userId) }).toArray();
+
+    const toDomainCoupons = userCoupons.length > 0 ? userCoupons.map((coupon) => toDomain(coupon)) : null;
+
+    return toDomainCoupons;
+  }
 }
