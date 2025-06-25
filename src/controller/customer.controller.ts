@@ -7,6 +7,7 @@ import { UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
+import Stripe from 'stripe';
 
 export default function (usersService: UsersService, paymentService: PaymentService, cacheService: CacheService) {
   return async function (fastify: FastifyInstance) {
@@ -56,13 +57,26 @@ export default function (usersService: UsersService, paymentService: PaymentServ
             return res.status(200).send({ usedCoupons: [] });
           }
 
-          const promotionalCodes = await Promise.all(
-            storedCoupons.map((coupon) => paymentService.getPromoCode(coupon)),
+          const promoCodeResults = await Promise.allSettled(
+            storedCoupons.map((coupon) => paymentService.getPromoCode({ couponId: coupon })),
           );
 
-          const usedCoupons = promotionalCodes
-            .map((promo) => promo?.code)
-            .filter((code): code is string => Boolean(code));
+          promoCodeResults.forEach((result, index) => {
+            if (result.status === 'rejected') {
+              req.log.warn(
+                `[UUID/${uuid}] Failed to get user promo code for coupon ${storedCoupons[index]}: ${result.reason}`,
+              );
+            }
+          });
+
+          const promotionalCodes = promoCodeResults
+            .filter(
+              (result): result is PromiseFulfilledResult<Stripe.PromotionCode> =>
+                result.status === 'fulfilled' && Boolean(result.value),
+            )
+            .map((result) => result.value);
+
+          const usedCoupons = promotionalCodes.map((promo) => promo?.code);
 
           await cacheService.setUsedUserPromoCodes(user.customerId, usedCoupons);
 

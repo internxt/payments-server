@@ -567,7 +567,7 @@ describe('Payments Service tests', () => {
           object: 'list',
         });
 
-        const promoCode = await paymentService.getPromoCode(mockedPromoCode.code);
+        const promoCode = await paymentService.getPromoCode({ promoCodeName: mockedPromoCode.code });
 
         expect(promoCode).toStrictEqual(mockedPromoCode);
         expect(promoCode.active).toBeTruthy();
@@ -585,7 +585,9 @@ describe('Payments Service tests', () => {
           object: 'list',
         });
 
-        await expect(paymentService.getPromoCode(mockedPromoCode.code)).rejects.toThrow(NotFoundError);
+        await expect(paymentService.getPromoCode({ promoCodeName: mockedPromoCode.code })).rejects.toThrow(
+          NotFoundError,
+        );
       });
 
       it('When there are no promotion codes with the given name, then an error indicating so is thrown', async () => {
@@ -598,7 +600,9 @@ describe('Payments Service tests', () => {
           object: 'list',
         });
 
-        await expect(paymentService.getPromoCode(mockedPromoCode.code)).rejects.toThrow(NotFoundError);
+        await expect(paymentService.getPromoCode({ promoCodeName: mockedPromoCode.code })).rejects.toThrow(
+          NotFoundError,
+        );
       });
     });
 

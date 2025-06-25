@@ -51,9 +51,9 @@ describe('Customer controller', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(CacheService.prototype, 'getUsedUserPromoCodes').mockResolvedValue(null);
       jest.spyOn(UsersService.prototype, 'getStoredCouponsByUserId').mockResolvedValue(mockedCoupons);
-      jest.spyOn(PaymentService.prototype, 'getPromoCode').mockImplementation(async (id: string) => {
-        if (id === mockedCoupon.id) return mockedPromoCode;
-        if (id === mockedCoupon2.id) return mockedPromoCode2;
+      jest.spyOn(PaymentService.prototype, 'getPromoCode').mockImplementation(async ({ couponId, promoCodeName }) => {
+        if (couponId === mockedCoupon.id) return mockedPromoCode;
+        if (couponId === mockedCoupon2.id) return mockedPromoCode2;
         throw new Error('Promo code not found');
       });
       jest.spyOn(CacheService.prototype, 'setUsedUserPromoCodes');

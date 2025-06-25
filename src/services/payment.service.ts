@@ -1324,10 +1324,17 @@ export class PaymentService {
    * @param promoCodeName - The name of the promotion code
    * @returns The ACTIVE promotion code object
    */
-  async getPromoCode(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
+  async getPromoCode({
+    promoCodeName,
+    couponId,
+  }: {
+    promoCodeName?: Stripe.PromotionCode['code'];
+    couponId?: string;
+  }): Promise<Stripe.PromotionCode> {
     const { data: promotionCodes } = await this.provider.promotionCodes.list({
       active: true,
       code: promoCodeName,
+      coupon: couponId,
       expand: ['data.coupon.applies_to'],
     });
 
@@ -1350,7 +1357,7 @@ export class PaymentService {
    * @returns The promotion code object
    */
   async getPromoCodeByName(product: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
-    const promoCode = await this.getPromoCode(promoCodeName);
+    const promoCode = await this.getPromoCode({ promoCodeName });
 
     const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
 
