@@ -3,6 +3,8 @@ name: 'Closing inactive PRs'
 on:
   # schedule:
   # - cron: '30 1 * * *'
+  push:
+    branches: [chore/action-for-inactive-PRs]
   workflow_dispatch:
 
 permissions:
