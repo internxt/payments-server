@@ -20,5 +20,5 @@ jobs:
           stale-pr-message: 'This pull request has been marked as stale due to 30 days of inactivity. It will be closed in 7 days if no further updates are made.'
           close-pr-message: 'This pull request has been automatically closed due to prolonged inactivity.'
           stale-pr-label: 'stalled'
-          exempt-draft-pr: true
+          # exempt-draft-pr: true
           repo-token: ${{ secrets.GITHUB_TOKEN }}
