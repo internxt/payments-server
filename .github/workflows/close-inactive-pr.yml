@@ -1,10 +1,8 @@
 name: 'Closing inactive PRs'
 
 on:
-  # schedule:
-  # - cron: '30 1 * * *'
-  push:
-    branches: [chore/action-for-inactive-PRs]
+  schedule:
+    - cron: '0 7 * * *' # ~8 AM Spanish time (CET/CEST)
   workflow_dispatch:
 
 permissions:
@@ -15,12 +13,20 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - name: Mark/close stale PRs
+        uses: actions/stale@v9
         with:
-          days-before-pr-stale: 0
-          days-before-pr-close: 0
-          stale-pr-message: 'This pull request has been marked as stale due to 30 days of inactivity. It will be closed in 7 days if no further updates are made.'
-          close-pr-message: 'This pull request has been automatically closed due to prolonged inactivity.'
-          stale-pr-label: 'stalled'
-          # exempt-draft-pr: true
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-pr-message: |
+            ⚠️ This pull request has been marked as stale due to 30 days of inactivity. 
+
+            It will be automatically closed in 7 days if no further updates are made.
+          close-pr-message: |
+            ❌ This pull request has been automatically closed due to prolonged inactivity.
+          stale-pr-label: 'stale'
+          close-pr-label: 'auto-closed'
+          exempt-draft-pr: true
+          exempt-pr-labels: 'wip'
+          operations-per-run: 100
           repo-token: ${{ secrets.GITHUB_TOKEN }}
