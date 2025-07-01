@@ -16,8 +16,8 @@ jobs:
       - name: Mark/close stale PRs
         uses: actions/stale@v9
         with:
-          days-before-pr-stale: 30
-          days-before-pr-close: 7
+          days-before-pr-stale: 15
+          days-before-pr-close: 30
           stale-pr-message: |
             ⚠️ This pull request has been marked as stale due to 30 days of inactivity. 
 
@@ -27,6 +27,6 @@ jobs:
           stale-pr-label: 'stale'
           close-pr-label: 'auto-closed'
           exempt-draft-pr: true
-          exempt-pr-labels: 'wip'
-          operations-per-run: 100
+          exempt-pr-labels: 'dependencies,blocked'
+          ascending: true
           repo-token: ${{ secrets.GITHUB_TOKEN }}
