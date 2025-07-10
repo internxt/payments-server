@@ -4,15 +4,15 @@ import XLSX from 'xlsx';
 import Stripe from 'stripe';
 
 import envVariablesConfig from '../config';
-import { LicenseCodesService } from '../services/LicenseCodesService';
-import { PaymentService } from '../services/PaymentService';
-import { UsersService } from '../services/UsersService';
+import { LicenseCodesService } from '../services/licenseCodes.service';
+import { PaymentService } from '../services/payment.service';
+import { UsersService } from '../services/users.service';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
 import { LicenseCode } from '../core/users/LicenseCode';
-import { StorageService } from '../services/StorageService';
+import { StorageService } from '../services/storage.service';
 import {
   DisplayBillingRepository,
   MongoDBDisplayBillingRepository,
@@ -23,6 +23,7 @@ import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsReposito
 import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
+import { Bit2MeService } from '../services/bit2me.service';
 
 const [, , filePath, provider] = process.argv;
 
@@ -65,8 +66,18 @@ async function main() {
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
     const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
-
-    const paymentService = new PaymentService(stripe, productsRepository, usersRepository);
+    const bit2MeService = new Bit2MeService(
+      envVariablesConfig, 
+      axios, 
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY, 
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_KEY, 
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_URL
+    );
+    const paymentService = new PaymentService(
+      stripe, 
+      productsRepository, 
+      bit2MeService,
+    );
     const usersService = new UsersService(
       usersRepository,
       paymentService,
