@@ -253,6 +253,27 @@ describe('TiersService tests', () => {
       );
     });
 
+    it('When a user has a lifetime plan paid out of band, no products are applied', async () => {
+      const mockedUser = getUser({
+        lifetime: true,
+      });
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+        paid_out_of_band: true,
+      });
+
+      const isLifetime = mockedUser.lifetime as boolean;
+
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+
+      const antivirusTier = await tiersService.getProductsTier(mockedUser.customerId, isLifetime);
+
+      expect(antivirusTier).toEqual({
+        featuresPerService: { antivirus: false, backups: false },
+      });
+    });
+
     describe('The user has an old subscription or lifetime product', () => {
       it('When the user has an old subscription, then antivirus is not enabled but backups are', async () => {
         const mockedUser = getUser();
