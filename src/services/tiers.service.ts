@@ -139,6 +139,11 @@ export class TiersService {
         const lineItem = invoice.lines?.data[0];
         const product = lineItem?.price?.product as string | undefined;
 
+        if (invoice.paid_out_of_band) {
+          isLifetimePaidOutOfBand = true;
+          break;
+        }
+
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
           productId = product;
           break;
@@ -147,11 +152,12 @@ export class TiersService {
     }
 
     const hasToolsAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
+    const hasBackupsAccess = (isLifetime && !isLifetimePaidOutOfBand) || hasActiveSubscription;
 
     return {
       featuresPerService: {
         antivirus: hasToolsAccess,
-        backups: isLifetime || hasActiveSubscription,
+        backups: hasBackupsAccess,
       },
     };
   }
