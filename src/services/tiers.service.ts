@@ -117,6 +117,7 @@ export class TiersService {
     isLifetime: boolean,
   ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } }> {
     let productId;
+    let isLifetimePaidOutOfBand = false;
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
     const activeUserSubscription = userSubscriptions.find(
       (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
