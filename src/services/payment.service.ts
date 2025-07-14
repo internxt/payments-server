@@ -520,15 +520,17 @@ export class PaymentService {
         ],
       });
     } else {
-      await this.provider.invoiceItems.create({
-        customer: customerId,
-        price: priceId,
-        description: 'One-time charge',
-      });
       const invoice = await this.provider.invoices.create({
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
+      });
+
+      await this.provider.invoiceItems.create({
+        customer: customerId,
+        price: priceId,
+        description: 'One-time charge',
+        invoice: invoice.id,
       });
 
       await this.provider.invoices.pay(invoice.id, {

@@ -117,6 +117,7 @@ export class TiersService {
     isLifetime: boolean,
   ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } }> {
     let productId;
+    let isLifetimePaidOutOfBand = false;
     const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
     const activeUserSubscription = userSubscriptions.find(
       (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
@@ -139,6 +140,11 @@ export class TiersService {
         const lineItem = invoice.lines?.data[0];
         const product = lineItem?.price?.product as string | undefined;
 
+        if (invoice.paid_out_of_band) {
+          isLifetimePaidOutOfBand = true;
+          break;
+        }
+
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
           productId = product;
           break;
@@ -147,11 +153,12 @@ export class TiersService {
     }
 
     const hasToolsAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
+    const hasBackupsAccess = (isLifetime && !isLifetimePaidOutOfBand) || hasActiveSubscription;
 
     return {
       featuresPerService: {
         antivirus: hasToolsAccess,
-        backups: isLifetime || hasActiveSubscription,
+        backups: hasBackupsAccess,
       },
     };
   }
