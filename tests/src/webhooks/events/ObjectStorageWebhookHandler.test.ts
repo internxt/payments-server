@@ -241,5 +241,111 @@ describe('Object Storage Webhook Handler', () => {
 
       expect(objectStorageServiceSpy).not.toHaveBeenCalled();
     });
+
+    test('When an error occurs while reactivating the account, then an error indicating so is thrown', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(new Error('Reactivation failed'));
+
+      await expect(
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
+      ).rejects.toThrow(Error);
+    });
+
+    test('When the object is not found while reactivating the account, then logs the error and skips to the next process', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+
+      const axiosError = new Error('Not Found') as any;
+      axiosError.response = { status: 404 };
+      axiosError.isAxiosError = true;
+
+      jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(axiosError);
+
+      const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
+
+      await expect(
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
+      ).resolves.not.toThrow();
+
+      isAxiosErrorSpy.mockRestore();
+    });
+
+    test('When an unexpected error occurs while reactivating the account, then an error indicating so is thrown', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+
+      const axiosError = new Error('Internal Server Error') as any;
+      axiosError.response = { status: 500 };
+      axiosError.isAxiosError = true;
+
+      jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(axiosError);
+
+      const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
+
+      await expect(
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
+      ).rejects.toThrow('Internal Server Error');
+
+      isAxiosErrorSpy.mockRestore();
+    });
   });
 });

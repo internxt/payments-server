@@ -72,6 +72,8 @@ export class ObjectStorageWebhookHandler {
         );
         return;
       }
+
+      throw error;
     }
 
     this.log.info(
