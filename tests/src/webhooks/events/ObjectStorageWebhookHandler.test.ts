@@ -17,7 +17,7 @@ import { ObjectStorageWebhookHandler } from '../../../../src/webhooks/events/Obj
 import { TiersService } from '../../../../src/services/tiers.service';
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
-import { getLogger, getProduct } from '../../fixtures';
+import { getCustomer, getInvoice, getLogger, getProduct } from '../../fixtures';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -124,5 +124,33 @@ describe('Object Storage Webhook Handler', () => {
     });
   });
 
-  describe('Reactivate Object Storage Account', () => {});
+  describe('Reactivate Object Storage Account', () => {
+    test('When the invoice is an object storage invoice, then it should reactivate the account if needed', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
+
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(objectStorageServiceSpy).toHaveBeenCalledWith({ customerId: mockedCustomer.id });
+    });
+  });
 });
