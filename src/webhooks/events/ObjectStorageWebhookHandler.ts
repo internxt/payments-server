@@ -52,7 +52,7 @@ export class ObjectStorageWebhookHandler {
     const product = await this.paymentService.getProduct(price.product as string);
 
     if (!this.isObjectStorageProduct(product)) {
-      this.log.info(`Invoice ${invoice.id} for product ${price.product} is not an object-storage product`);
+      this.log.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
       return;
     }
 
