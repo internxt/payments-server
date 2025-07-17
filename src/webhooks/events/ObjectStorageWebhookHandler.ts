@@ -45,7 +45,7 @@ export class ObjectStorageWebhookHandler {
     const { price } = item;
 
     if (!price || !price.product) {
-      this.log.info(`Invoice ${invoice.id} not handled by object-storage handler`);
+      this.log.info(`The price or the product for the invoice with ID ${invoice.id} are null.`);
       return;
     }
 

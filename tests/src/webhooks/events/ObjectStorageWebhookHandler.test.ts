@@ -181,7 +181,13 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Invoice ${mockedInvoice.id} not handled by object-storage handler due to lines length`,
+      );
 
       expect(objectStorageServiceSpy).not.toHaveBeenCalled();
     });
@@ -208,8 +214,13 @@ describe('Object Storage Webhook Handler', () => {
       });
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `The price or the product for the invoice with ID ${mockedInvoice.id} are null.`,
+      );
 
       expect(objectStorageServiceSpy).not.toHaveBeenCalled();
     });
@@ -237,7 +248,13 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Invoice ${mockedInvoice.id} for product ${mockedInvoice.lines.data[0].price?.product} is not an object-storage product`,
+      );
 
       expect(objectStorageServiceSpy).not.toHaveBeenCalled();
     });
@@ -303,9 +320,14 @@ describe('Object Storage Webhook Handler', () => {
 
       const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
 
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+
       await expect(
         objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
       ).resolves.not.toThrow();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Object storage user ${mockedCustomer.email} (customer ${mockedCustomer.id}) was not found while reactivating`,
+      );
 
       isAxiosErrorSpy.mockRestore();
     });
