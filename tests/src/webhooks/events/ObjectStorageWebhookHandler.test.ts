@@ -152,5 +152,94 @@ describe('Object Storage Webhook Handler', () => {
 
       expect(objectStorageServiceSpy).toHaveBeenCalledWith({ customerId: mockedCustomer.id });
     });
+
+    test('When there are more line items in the invoice, then logs the error and skips to the next process', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
+
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(objectStorageServiceSpy).not.toHaveBeenCalled();
+    });
+
+    test('When there is not a product in the line item, then logs the error and skips to the next process', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: undefined,
+              },
+            },
+          ],
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
+
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(objectStorageServiceSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the product is not an object storage product, then logs the error and skips to the next process', async () => {
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'not-object-storage',
+          },
+        },
+      });
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              price: {
+                product: mockedProduct.id,
+              },
+            },
+          ],
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
+
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+
+      expect(objectStorageServiceSpy).not.toHaveBeenCalled();
+    });
   });
 });
