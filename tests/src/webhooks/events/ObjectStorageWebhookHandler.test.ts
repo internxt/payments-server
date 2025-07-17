@@ -286,7 +286,7 @@ describe('Object Storage Webhook Handler', () => {
 
       await expect(
         objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
-      ).rejects.toThrow(Error);
+      ).rejects.toThrow(new Error('Reactivation failed'));
     });
 
     test('When the object is not found while reactivating the account, then logs the error and skips to the next process', async () => {
