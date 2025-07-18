@@ -12,7 +12,7 @@ import { Bit2MeService } from '../../../../../src/services/bit2me.service';
 import CacheService from '../../../../../src/services/cache.service';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import { StorageService } from '../../../../../src/services/storage.service';
-import { UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
+import { CouponNotBeingTrackedError, UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
 import { getCustomer, getInvoice, getLogger, getProduct, getUser, newTier } from '../../../fixtures';
 import { ObjectStorageService } from '../../../../../src/services/objectStorage.service';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
@@ -591,24 +591,124 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, mockedInvoice.discount?.coupon.id);
     });
 
-    test('When no discount exists, then an error indicating so is cought  and the flow continues', async () => {});
+    test('When no discount exists, then the flow continues', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: null,
+      });
+      const mockedInvoiceLineItem = {
+        ...mockedInvoice.lines.data[0],
+        discounts: [],
+      };
 
-    test('When coupon storage fails with other error, then it should log error', async () => {
-      // Mock other error
-      // Verify error is logged
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      const mockHandleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+
+      await mockHandleUserCouponRelationship({
+        userUuid: mockedUser.uuid,
+        invoice: mockedInvoice,
+        invoiceLineItem: mockedInvoiceLineItem,
+        isLifetimePlan: false,
+      });
+
+      expect(storeCouponUsedByUserSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the coupon code is not tracked, then an error is caught and the flow continues without storing the coupon', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: {
+          coupon: {
+            id: 'mocked-coupon',
+          },
+        } as any,
+      });
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest
+        .spyOn(usersService, 'storeCouponUsedByUser')
+        .mockRejectedValue(new CouponNotBeingTrackedError('Coupon not tracked'));
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const mockHandleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+
+      await expect(
+        mockHandleUserCouponRelationship({
+          userUuid: mockedUser.uuid,
+          invoice: mockedInvoice,
+          invoiceLineItem: mockedInvoice.lines.data[0],
+          isLifetimePlan: false,
+        }),
+      ).resolves.not.toThrow();
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
+      expect(loggerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When an unexpected error occurs while storing the coupon, then an error is logged and the flow continues', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: {
+          coupon: {
+            id: 'mocked-coupon',
+          },
+        } as any,
+      });
+
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest
+        .spyOn(usersService, 'storeCouponUsedByUser')
+        .mockRejectedValue(new Error('Random error'));
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const mockHandleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+
+      await expect(
+        mockHandleUserCouponRelationship({
+          userUuid: mockedUser.uuid,
+          invoice: mockedInvoice,
+          invoiceLineItem: mockedInvoice.lines.data[0],
+          isLifetimePlan: false,
+        }),
+      ).resolves.not.toThrow();
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
+      expect(loggerSpy).toHaveBeenCalledWith(`Error while adding user ${mockedUser.uuid} and coupon: Random error`);
     });
   });
 
   describe('Cache Clearing', () => {
     test('When cache clearing succeeds, then it should log success message', async () => {
-      // Mock successful cache clearing
-      // Verify success log message
+      const { customerId, uuid: userUuid } = getUser();
+      const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
+      const clearUsedUserPromoCodesSpy = jest.spyOn(cacheService, 'clearUsedUserPromoCodes').mockResolvedValue();
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'info');
+
+      const mockClearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
+      await mockClearUserRelatedCache(customerId, userUuid);
+
+      expect(clearSubscriptionSpy).toHaveBeenCalledWith(customerId);
+      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(userUuid);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`,
+      );
     });
 
     test('When cache clearing fails, then it should log an error but not throw', async () => {
-      // Mock cache clearing failure
-      // Verify error is logged
-      // Verify processing continues
+      const { customerId, uuid: userUuid } = getUser();
+      const clearSubscriptionSpy = jest
+        .spyOn(cacheService, 'clearSubscription')
+        .mockRejectedValue(new Error('Unexpected error'));
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const mockClearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
+
+      await expect(mockClearUserRelatedCache(customerId, userUuid)).resolves.not.toThrow();
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}`,
+      );
     });
   });
 });

@@ -287,7 +287,7 @@ export class InvoiceCompletedHandler {
     } catch (err) {
       const error = err as Error;
       if (!(err instanceof CouponNotBeingTrackedError)) {
-        this.logger.error(`Error while adding user ${userUuid} and coupon: ${error.stack ?? error.message}`);
+        this.logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
       }
     }
   }
@@ -303,7 +303,9 @@ export class InvoiceCompletedHandler {
       await this.cacheService.clearUsedUserPromoCodes(userUuid);
       this.logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
-      this.logger.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customerId} subscription`);
+      this.logger.error(
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}`,
+      );
     }
   }
 }
