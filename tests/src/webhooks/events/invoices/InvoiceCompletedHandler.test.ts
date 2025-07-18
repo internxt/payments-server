@@ -707,7 +707,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
       await expect(mockClearUserRelatedCache(customerId, userUuid)).resolves.not.toThrow();
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}`,
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: Unexpected error`,
       );
     });
   });

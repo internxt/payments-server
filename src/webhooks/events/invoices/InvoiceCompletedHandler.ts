@@ -303,8 +303,9 @@ export class InvoiceCompletedHandler {
       await this.cacheService.clearUsedUserPromoCodes(userUuid);
       this.logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
+      const error = err as Error;
       this.logger.error(
-        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}`,
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${error.message}`,
       );
     }
   }
