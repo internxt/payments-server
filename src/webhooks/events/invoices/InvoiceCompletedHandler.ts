@@ -1,14 +1,13 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { FastifyBaseLogger } from 'fastify';
-import { PaymentService, PriceMetadata } from '../../../services/payment.service';
-import { User, UserType } from '../../../core/users/User';
+import { PaymentService } from '../../../services/payment.service';
+import { User } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
-import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
-import { CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
+import { TiersService } from '../../../services/tiers.service';
+import { UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
-import { Service, Tier } from '../../../core/users/Tier';
 import CacheService from '../../../services/cache.service';
 
 interface InvoiceData {
@@ -123,8 +122,7 @@ export class InvoiceCompletedHandler {
         lifetime: isLifetimeCurrentSub,
         uuid: userUuid,
       });
-    } catch (error) {
-      // Si no se puede actualizar, crear nuevo usuario
+    } catch {
       await this.usersService.insertUser({
         customerId,
         uuid: userUuid,
@@ -132,5 +130,4 @@ export class InvoiceCompletedHandler {
       });
     }
   }
-
 }
