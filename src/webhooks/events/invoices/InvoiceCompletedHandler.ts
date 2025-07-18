@@ -5,11 +5,11 @@ import { PaymentService } from '../../../services/payment.service';
 import { User } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TiersService } from '../../../services/tiers.service';
-import { UsersService } from '../../../services/users.service';
+import { CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
-import { Tier } from '../../../core/users/Tier';
+import { Service, Tier } from '../../../core/users/Tier';
 
 interface InvoiceData {
   customerId: string;
@@ -214,6 +214,96 @@ export class InvoiceCompletedHandler {
     } catch (error) {
       this.logger.error(`Failed to apply VPN features for user ${user.uuid}`, { error: (error as Error).message });
       throw error;
+    }
+  }
+
+  /**
+   * Updates or inserts a new user-tier relationship in the database.
+   *
+   * @param {object} options - Options to update or insert a user-tier relationship.
+   * @param {number} options.userId - The ID of the user.
+   * @param {number} options.tierId - The ID of the tier.
+   * @param {boolean} options.isBusinessPlan - Whether the user has a business plan.
+   * @returns {Promise<void>} Resolves when the user-tier relationship has been updated or inserted.
+   */
+  private async updateOrInsertUserTier({
+    userId,
+    tierId,
+    isBusinessPlan,
+  }: {
+    userId: User['id'];
+    tierId: Tier['id'];
+    isBusinessPlan: boolean;
+  }): Promise<void> {
+    try {
+      const userTiers = await this.tiersService.getTiersProductsByUserId(userId);
+      const matchingTier = userTiers.find((userTier) => {
+        const hasWorkspaces = userTier.featuresPerService[Service.Drive].workspaces.enabled;
+        return isBusinessPlan ? hasWorkspaces : !hasWorkspaces;
+      });
+      if (matchingTier) {
+        await this.tiersService.updateTierToUser(userId, matchingTier.id, tierId);
+      } else {
+        await this.tiersService.insertTierToUser(userId, tierId);
+      }
+    } catch (error) {
+      this.logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Handle the relationship between the user and the coupon.
+   * If the invoice has a discount that we track internally and the coupon is not the free trial one,
+   * store the coupon id in the user's `usedCoupons` field.
+   * @param userUuid The uuid of the user
+   * @param invoice The invoice where the discount is applied
+   * @param invoiceLineItem The invoice line item which has the discount
+   * @param isLifetimePlan Whether the invoice is for a lifetime plan
+   */
+  private async handleUserCouponRelationship({
+    userUuid,
+    invoice,
+    invoiceLineItem,
+    isLifetimePlan,
+  }: {
+    userUuid: string;
+    invoice: Stripe.Invoice;
+    invoiceLineItem: Stripe.InvoiceLineItem;
+    isLifetimePlan: boolean;
+  }): Promise<void> {
+    try {
+      const userData = await this.usersService.findUserByUuid(userUuid);
+
+      const areDiscounts = isLifetimePlan ? invoiceLineItem.discounts.length > 0 : !!invoice.discount?.coupon;
+      if (areDiscounts) {
+        const coupon = isLifetimePlan
+          ? (invoiceLineItem.discounts[0] as Stripe.Discount).coupon
+          : invoice.discount?.coupon;
+
+        if (coupon) {
+          await this.usersService.storeCouponUsedByUser(userData, coupon.id);
+        }
+      }
+    } catch (err) {
+      const error = err as Error;
+      if (!(err instanceof CouponNotBeingTrackedError)) {
+        this.logger.error(`Error while adding user ${userUuid} and coupon: ${error.stack ?? error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Clears the cache for a user, both the subscription and the used promo codes.
+   * @param customerId The Stripe customer Id
+   * @param userUuid The uuid of the user
+   */
+  private async clearUserRelatedCache(customerId: string, userUuid: string): Promise<void> {
+    try {
+      await this.cacheService.clearSubscription(customerId);
+      await this.cacheService.clearUsedUserPromoCodes(userUuid);
+      this.logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
+    } catch (err) {
+      this.logger.error(`Error in handleCheckoutSessionCompleted after trying to clear ${customerId} subscription`);
     }
   }
 }
