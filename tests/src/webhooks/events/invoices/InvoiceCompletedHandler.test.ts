@@ -202,6 +202,10 @@ describe('Testing the handler when an invoice is completed', () => {
       });
 
       expect(updateUserSpy).toHaveBeenCalledTimes(1);
+      expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        lifetime: mockedUser.lifetime,
+        uuid: mockedUser.uuid,
+      });
       expect(insertUserSpy).not.toHaveBeenCalled();
     });
 
@@ -221,6 +225,11 @@ describe('Testing the handler when an invoice is completed', () => {
 
       expect(updateUserSpy).not.toHaveBeenCalled();
       expect(insertUserSpy).toHaveBeenCalledTimes(1);
+      expect(insertUserSpy).toHaveBeenCalledWith({
+        customerId: mockedUser.customerId,
+        lifetime: mockedUser.lifetime,
+        uuid: mockedUser.uuid,
+      });
     });
   });
 });
