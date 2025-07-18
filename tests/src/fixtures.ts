@@ -733,7 +733,7 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
 };
 
 export const getInvoice = (
-  params?: Partial<Stripe.Invoice>,
+  params?: DeepPartial<Partial<Stripe.Invoice>>,
   userType = UserType.Individual,
   productId?: string,
 ): Stripe.Invoice => {
@@ -943,7 +943,7 @@ export const getInvoice = (
     total_tax_amounts: [],
     transfer_data: null,
     webhooks_delivered_at: randomDataGenerator.natural({ length: 10 }),
-    ...params,
+    ...(params as any),
   };
 };
 
