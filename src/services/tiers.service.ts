@@ -234,6 +234,7 @@ export class TiersService {
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
     log: FastifyBaseLogger,
+    customMaxSpaceBytes?: number,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
@@ -265,7 +266,7 @@ export class TiersService {
       return;
     }
 
-    const maxSpaceBytes = features.maxSpaceBytes;
+    const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
 
     await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
