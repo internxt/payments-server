@@ -13,16 +13,15 @@ import CacheService from '../../../../../src/services/cache.service';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import { StorageService } from '../../../../../src/services/storage.service';
 import { UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
-import { getCustomer, getInvoice, getLogger, getProduct, getUser, newTier } from '../../../fixtures';
+import { getCustomer, getInvoice, getLogger, getUser } from '../../../fixtures';
 import { ObjectStorageService } from '../../../../../src/services/objectStorage.service';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { ObjectStorageWebhookHandler } from '../../../../../src/webhooks/events/ObjectStorageWebhookHandler';
-import { TiersService, UsersTiersError } from '../../../../../src/services/tiers.service';
+import { TiersService } from '../../../../../src/services/tiers.service';
 import config from '../../../../../src/config';
 import testFactory from '../../../utils/factory';
 import { DetermineLifetimeConditions } from '../../../../../src/core/users/DetermineLifetimeConditions';
 import { NotFoundError } from '../../../../../src/errors/Errors';
-import { Service } from '../../../../../src/core/users/Tier';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -223,7 +222,5 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(updateUserSpy).not.toHaveBeenCalled();
       expect(insertUserSpy).toHaveBeenCalledTimes(1);
     });
-  });
-
   });
 });
