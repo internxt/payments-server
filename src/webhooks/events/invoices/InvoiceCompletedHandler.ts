@@ -5,7 +5,7 @@ import { PaymentService } from '../../../services/payment.service';
 import { User } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TiersService } from '../../../services/tiers.service';
-import { UsersService } from '../../../services/users.service';
+import { UserNotFoundError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
@@ -71,7 +71,9 @@ export class InvoiceCompletedHandler {
           return { uuid: userResponse.data.uuid };
         }
       } catch (error) {
-        this.logger.warn(`Failed to find user by email ${customerEmail}. Error: ${error}`);
+        this.logger.warn(
+          `Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`,
+        );
       }
     }
 
@@ -82,10 +84,9 @@ export class InvoiceCompletedHandler {
         return { uuid: userByCustomerId.uuid };
       }
     } catch (error) {
-      this.logger.warn(`Failed to find user by customer ID ${customerId}. Error: ${error}`);
+      this.logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
     }
 
-    this.logger.error(`User not found by email ${customerEmail} or customer ID ${customerId}`);
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
   }
 
@@ -122,12 +123,16 @@ export class InvoiceCompletedHandler {
         lifetime: isLifetimeCurrentSub,
         uuid: userUuid,
       });
-    } catch {
-      await this.usersService.insertUser({
-        customerId,
-        uuid: userUuid,
-        lifetime: isLifetimePlan,
-      });
+    } catch (error) {
+      if (error instanceof UserNotFoundError) {
+        return this.usersService.insertUser({
+          customerId,
+          uuid: userUuid,
+          lifetime: isLifetimePlan,
+        });
+      }
+
+      throw error;
     }
   }
 }
