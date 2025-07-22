@@ -262,34 +262,6 @@ describe('Testing the handler when an invoice is completed', () => {
 
       expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
     });
-
-    test('When an unexpected axios error occurs, then an error with the axios message error is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedMaxSpaceBytes = 100;
-      const axiosError = new Error('Network error') as any;
-      axiosError.isAxiosError = true;
-
-      jest.spyOn(storageService, 'changeStorage').mockRejectedValue(axiosError);
-      const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
-
-      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
-
-      await expect(handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes)).rejects.toThrow('Network error');
-
-      isAxiosErrorSpy.mockRestore();
-    });
-
-    test('When an unexpected error occurs, then all the error is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedMaxSpaceBytes = 100;
-      const unexpectedError = new Error('Network error') as any;
-
-      jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
-
-      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
-
-      await expect(handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes)).rejects.toThrow(unexpectedError);
-    });
   });
 
   describe('Tier Management (New products)', () => {

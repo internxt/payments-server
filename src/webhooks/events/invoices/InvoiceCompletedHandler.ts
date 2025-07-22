@@ -10,7 +10,6 @@ import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Tier } from '../../../core/users/Tier';
-import { isAxiosError } from 'axios';
 
 interface InvoiceData {
   customerId: string;
@@ -145,13 +144,7 @@ export class InvoiceCompletedHandler {
    * @param maxSpaceBytes The new max space bytes
    */
   private handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
-    try {
-      return this.storageService.changeStorage(userUuid, maxSpaceBytes);
-    } catch (error) {
-      if (isAxiosError(error)) throw new Error(error.message);
-
-      throw error;
-    }
+    return this.storageService.changeStorage(userUuid, maxSpaceBytes);
   }
 
   /**
