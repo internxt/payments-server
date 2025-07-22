@@ -257,68 +257,132 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedMaxSpaceBytes = 100;
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
 
-      const mockHandleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
-      await mockHandleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
+      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
+      await handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
 
       expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
+    });
+
+    test('When an unexpected axios error occurs, then an error with the axios message error is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedMaxSpaceBytes = 100;
+      const axiosError = new Error('Network error') as any;
+      axiosError.isAxiosError = true;
+
+      jest.spyOn(storageService, 'changeStorage').mockRejectedValue(axiosError);
+      const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
+
+      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
+
+      await expect(handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes)).rejects.toThrow('Network error');
+
+      isAxiosErrorSpy.mockRestore();
+    });
+
+    test('When an unexpected error occurs, then all the error is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedMaxSpaceBytes = 100;
+      const unexpectedError = new Error('Network error') as any;
+
+      jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
+
+      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
+
+      await expect(handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes)).rejects.toThrow(unexpectedError);
     });
   });
 
   describe('Tier Management (New products)', () => {
-    test('When the user purchases a lifetime, then we determine the max space bytes and the tier and apply the features correctly', async () => {
-      const mockedUser = getUser();
-      const mockedCustomer = getCustomer({
-        email: 'test@inxt.com',
-      });
-      const mockedMaxSpaceBytes = 100;
-      const lifetimeMockedMaxSpaceBytes = mockedMaxSpaceBytes * 5;
-      const mockedIsLifetimePlan = true;
-      const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
-      const mockedTier = newTier();
-      const mockedLifetimeTier = newTier({ billingType: 'lifetime' });
-      const determineLifetimeConditionsSpy = jest.spyOn(determineLifetimeConditions, 'determine').mockResolvedValue({
-        maxSpaceBytes: lifetimeMockedMaxSpaceBytes,
-        tier: mockedLifetimeTier,
-      });
-      const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
-      const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+    describe('The user purchases a lifetime', () => {
+      test('When determining the lifetime conditions, then apply the features correctly', async () => {
+        const mockedUser = getUser();
+        const mockedCustomer = getCustomer({
+          email: 'test@inxt.com',
+        });
+        const mockedMaxSpaceBytes = 100;
+        const lifetimeMockedMaxSpaceBytes = mockedMaxSpaceBytes * 5;
+        const mockedIsLifetimePlan = true;
+        const mockedProductId = getProduct({}).id;
+        const totalQuantity = 1;
+        const mockedTier = newTier();
+        const mockedLifetimeTier = newTier({ billingType: 'lifetime' });
+        const determineLifetimeConditionsSpy = jest.spyOn(determineLifetimeConditions, 'determine').mockResolvedValue({
+          maxSpaceBytes: lifetimeMockedMaxSpaceBytes,
+          tier: mockedLifetimeTier,
+        });
+        const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+        const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
 
-      const mockHandleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
-      await mockHandleNewProduct({
-        user: {
-          ...mockedUser,
-          email: mockedCustomer.email as string,
-        },
-        customer: mockedCustomer,
-        isLifetimePlan: mockedIsLifetimePlan,
-        productId: mockedProductId,
-        totalQuantity,
-        tier: mockedTier,
+        const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+        await handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        });
+
+        expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
+        expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedCustomer,
+          totalQuantity,
+          mockedLifetimeTier,
+          expect.anything(),
+          lifetimeMockedMaxSpaceBytes,
+        );
+        expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedLifetimeTier,
+        );
       });
 
-      expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
-      expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
-        {
-          ...mockedUser,
-          email: mockedCustomer.email as string,
-        },
-        mockedCustomer,
-        totalQuantity,
-        mockedLifetimeTier,
-        expect.anything(),
-        lifetimeMockedMaxSpaceBytes,
-      );
-      expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
-        {
-          ...mockedUser,
-          email: mockedCustomer.email as string,
-        },
-        mockedLifetimeTier,
-      );
+      test('When an error occurs while determining the lifetime conditions, then a log is printed but the flow continues with the default tier', async () => {
+        const unexpectedError = new Error('Unexpected error');
+        const mockedUser = getUser();
+        const mockedCustomer = getCustomer({
+          email: 'test@inxt.com',
+        });
+        const mockedIsLifetimePlan = true;
+        const mockedProductId = getProduct({}).id;
+        const totalQuantity = 1;
+        const mockedTier = newTier();
+        const determineLifetimeConditionsSpy = jest
+          .spyOn(determineLifetimeConditions, 'determine')
+          .mockRejectedValue(unexpectedError);
+        const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+        const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+
+        const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+        await handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        });
+
+        expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
+        expect(applyDriveFeaturesSpy).toHaveBeenCalled();
+        expect(applyVpnFeaturesSpy).toHaveBeenCalled();
+      });
     });
 
-    test('When the user purchases a subscription, then apply the max space bytes and the tier and apply the features correctly', async () => {
+    test('When the user purchases a subscription, then all features are applied correctly', async () => {
       const mockedUser = getUser();
       const mockedCustomer = getCustomer({
         email: 'test@inxt.com',
@@ -331,8 +395,8 @@ describe('Testing the handler when an invoice is completed', () => {
       const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
 
-      const mockHandleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
-      await mockHandleNewProduct({
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+      await handleNewProduct({
         user: {
           ...mockedUser,
           email: mockedCustomer.email as string,
@@ -375,10 +439,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'error');
 
-      const mockHandleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
       await expect(
-        mockHandleNewProduct({
+        handleNewProduct({
           user: {
             ...mockedUser,
             email: mockedCustomer.email as string,
@@ -390,6 +455,12 @@ describe('Testing the handler when an invoice is completed', () => {
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedUser.customerId}`,
+        {
+          error: mockedError.message,
+        },
+      );
     });
 
     test('When something goes wrong while applying VPN features, then an error indicating so is thrown', async () => {
@@ -404,10 +475,12 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
+      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'error');
 
-      const mockHandleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+
       await expect(
-        mockHandleNewProduct({
+        handleNewProduct({
           user: {
             ...mockedUser,
             email: mockedCustomer.email as string,
@@ -419,6 +492,12 @@ describe('Testing the handler when an invoice is completed', () => {
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedUser.customerId}`,
+        {
+          error: mockedError.message,
+        },
+      );
     });
   });
 });

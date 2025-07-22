@@ -10,6 +10,7 @@ import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Tier } from '../../../core/users/Tier';
+import { isAxiosError } from 'axios';
 
 interface InvoiceData {
   customerId: string;
@@ -144,7 +145,13 @@ export class InvoiceCompletedHandler {
    * @param maxSpaceBytes The new max space bytes
    */
   private handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
-    return this.storageService.changeStorage(userUuid, maxSpaceBytes);
+    try {
+      return this.storageService.changeStorage(userUuid, maxSpaceBytes);
+    } catch (error) {
+      if (isAxiosError(error)) throw new Error(error.message);
+
+      throw error;
+    }
   }
 
   /**
@@ -190,9 +197,12 @@ export class InvoiceCompletedHandler {
         tierToApply = lifetimeTier;
         lifetimeMaxSpaceBytesToApply = Number(lifetimeMaxSpaceBytes);
       } catch (error) {
-        this.logger.error(`Failed to determine lifetime conditions for user ${user.uuid}`, {
-          error: (error as Error).message,
-        });
+        this.logger.error(
+          `Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}`,
+          {
+            error: (error as Error).message,
+          },
+        );
       }
     }
 
@@ -206,18 +216,22 @@ export class InvoiceCompletedHandler {
         this.logger,
         lifetimeMaxSpaceBytesToApply,
       );
-      this.logger.info(`Drive features applied for user ${user.uuid}`);
+      this.logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply drive features for user ${user.uuid}`, { error: (error as Error).message });
+      this.logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
+        error: (error as Error).message,
+      });
       throw error;
     }
 
     // Apply VPN features
     try {
       await this.tiersService.applyVpnFeatures(user, tierToApply);
-      this.logger.info(`VPN features applied for user ${user.uuid}`);
+      this.logger.info(`VPN features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply VPN features for user ${user.uuid}`, { error: (error as Error).message });
+      this.logger.error(`Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}`, {
+        error: (error as Error).message,
+      });
       throw error;
     }
   }
