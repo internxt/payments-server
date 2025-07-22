@@ -439,7 +439,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'error');
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
       await expect(
@@ -456,7 +456,7 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(mockedError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedUser.customerId}`,
+        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
         {
           error: mockedError.message,
         },
@@ -475,7 +475,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'error');
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
 
@@ -493,7 +493,7 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(mockedError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedUser.customerId}`,
+        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
         {
           error: mockedError.message,
         },
