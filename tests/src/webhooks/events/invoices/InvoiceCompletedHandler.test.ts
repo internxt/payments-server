@@ -110,8 +110,8 @@ describe('Testing the handler when an invoice is completed', () => {
     test('When we want to extract the invoice data from a valid invoice (contains a customer), then the extracted data should be returned correctly', async () => {
       const mockedInvoice = getInvoice({ status: 'paid' });
 
-      const mockedExtractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
-      const result = mockedExtractInvoiceData(mockedInvoice);
+      const extractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
+      const result = extractInvoiceData(mockedInvoice);
 
       expect(result).toStrictEqual({
         customerId: mockedInvoice.customer,
@@ -127,9 +127,9 @@ describe('Testing the handler when an invoice is completed', () => {
 
     test('When there is no customer when extracting invoice data, then an error indicating so is thrown', async () => {
       const mockedInvoice = getInvoice({ status: 'paid', customer: null });
-      const mockedExtractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
+      const extractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
 
-      expect(() => mockedExtractInvoiceData(mockedInvoice)).toThrow(NotFoundError);
+      expect(() => extractInvoiceData(mockedInvoice)).toThrow(NotFoundError);
     });
   });
 
@@ -148,8 +148,8 @@ describe('Testing the handler when an invoice is completed', () => {
         },
       });
 
-      const mockGetUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
-      const result = await mockGetUserUuid(mockedCustomer.id, mockedCustomer.email as string);
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string);
 
       expect(result).toStrictEqual({
         uuid: mockedUser.uuid,
@@ -165,8 +165,8 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const findByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
 
-      const mockGetUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
-      const result = await mockGetUserUuid(mockedCustomer.id, mockedCustomer.email);
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email);
 
       expect(result).toStrictEqual({
         uuid: mockedUser.uuid,
@@ -180,9 +180,9 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(new Error());
 
-      const mockGetUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
 
-      await expect(mockGetUserUuid(mockedCustomer.id, mockedCustomer.email)).rejects.toThrow(NotFoundError);
+      await expect(getUserUuid(mockedCustomer.id, mockedCustomer.email)).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -193,8 +193,8 @@ describe('Testing the handler when an invoice is completed', () => {
       const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockResolvedValue();
       const insertUserSpy = jest.spyOn(usersService, 'insertUser');
 
-      const mockedUpdateOrInsertUser = invoiceCompletedHandler['updateOrInsertUser'].bind(invoiceCompletedHandler);
-      await mockedUpdateOrInsertUser({
+      const updateOrInsertUser = invoiceCompletedHandler['updateOrInsertUser'].bind(invoiceCompletedHandler);
+      await updateOrInsertUser({
         customerId: mockedUser.customerId,
         userUuid: mockedUser.uuid,
         isBusinessPlan: false,
@@ -215,8 +215,8 @@ describe('Testing the handler when an invoice is completed', () => {
       const updateUserSpy = jest.spyOn(usersService, 'updateUser');
       const insertUserSpy = jest.spyOn(usersService, 'insertUser').mockResolvedValue();
 
-      const mockedUpdateOrInsertUser = invoiceCompletedHandler['updateOrInsertUser'].bind(invoiceCompletedHandler);
-      await mockedUpdateOrInsertUser({
+      const updateOrInsertUser = invoiceCompletedHandler['updateOrInsertUser'].bind(invoiceCompletedHandler);
+      await updateOrInsertUser({
         customerId: mockedUser.customerId,
         userUuid: mockedUser.uuid,
         isBusinessPlan: false,
@@ -230,6 +230,24 @@ describe('Testing the handler when an invoice is completed', () => {
         lifetime: mockedUser.lifetime,
         uuid: mockedUser.uuid,
       });
+    });
+
+    test('When there is an unexpected error while updating the user, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const unexpectedError = new Error('Unexpected error');
+      jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(unexpectedError);
+      const insertUserSpy = jest.spyOn(usersService, 'insertUser').mockResolvedValue();
+
+      const updateOrInsertUser = invoiceCompletedHandler['updateOrInsertUser'].bind(invoiceCompletedHandler);
+      await expect(
+        updateOrInsertUser({
+          customerId: mockedUser.customerId,
+          userUuid: mockedUser.uuid,
+          isBusinessPlan: false,
+          isLifetimePlan: false,
+        }),
+      ).rejects.toThrow(unexpectedError);
+      expect(insertUserSpy).not.toHaveBeenCalled();
     });
   });
 
