@@ -5,7 +5,7 @@ import { PaymentService } from '../../../services/payment.service';
 import { User } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TiersService } from '../../../services/tiers.service';
-import { CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
+import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
@@ -72,7 +72,9 @@ export class InvoiceCompletedHandler {
           return { uuid: userResponse.data.uuid };
         }
       } catch (error) {
-        this.logger.warn(`Failed to find user by email ${customerEmail}. Error: ${error}`);
+        this.logger.warn(
+          `Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`,
+        );
       }
     }
 
@@ -83,10 +85,9 @@ export class InvoiceCompletedHandler {
         return { uuid: userByCustomerId.uuid };
       }
     } catch (error) {
-      this.logger.warn(`Failed to find user by customer ID ${customerId}. Error: ${error}`);
+      this.logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
     }
 
-    this.logger.error(`User not found by email ${customerEmail} or customer ID ${customerId}`);
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
   }
 
@@ -123,12 +124,16 @@ export class InvoiceCompletedHandler {
         lifetime: isLifetimeCurrentSub,
         uuid: userUuid,
       });
-    } catch {
-      await this.usersService.insertUser({
-        customerId,
-        uuid: userUuid,
-        lifetime: isLifetimePlan,
-      });
+    } catch (error) {
+      if (error instanceof UserNotFoundError) {
+        return this.usersService.insertUser({
+          customerId,
+          uuid: userUuid,
+          lifetime: isLifetimePlan,
+        });
+      }
+
+      throw error;
     }
   }
 
@@ -185,9 +190,12 @@ export class InvoiceCompletedHandler {
         tierToApply = lifetimeTier;
         lifetimeMaxSpaceBytesToApply = Number(lifetimeMaxSpaceBytes);
       } catch (error) {
-        this.logger.error(`Failed to determine lifetime conditions for user ${user.uuid}`, {
-          error: (error as Error).message,
-        });
+        this.logger.error(
+          `Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}`,
+          {
+            error: (error as Error).message,
+          },
+        );
       }
     }
 
@@ -201,18 +209,22 @@ export class InvoiceCompletedHandler {
         this.logger,
         lifetimeMaxSpaceBytesToApply,
       );
-      this.logger.info(`Drive features applied for user ${user.uuid}`);
+      this.logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply drive features for user ${user.uuid}`, { error: (error as Error).message });
+      this.logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
+        error: (error as Error).message,
+      });
       throw error;
     }
 
     // Apply VPN features
     try {
       await this.tiersService.applyVpnFeatures(user, tierToApply);
-      this.logger.info(`VPN features applied for user ${user.uuid}`);
+      this.logger.info(`VPN features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply VPN features for user ${user.uuid}`, { error: (error as Error).message });
+      this.logger.error(`Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}`, {
+        error: (error as Error).message,
+      });
       throw error;
     }
   }
