@@ -350,8 +350,24 @@ describe('Testing the handler when an invoice is completed', () => {
         });
 
         expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
-        expect(applyDriveFeaturesSpy).toHaveBeenCalled();
-        expect(applyVpnFeaturesSpy).toHaveBeenCalled();
+        expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedCustomer,
+          totalQuantity,
+          mockedTier,
+          expect.anything(),
+          undefined,
+        );
+        expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedTier,
+        );
       });
     });
 
