@@ -260,6 +260,7 @@ export class InvoiceCompletedHandler {
       }
     } catch (error) {
       this.logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
+      throw error;
     }
   }
 
@@ -300,6 +301,7 @@ export class InvoiceCompletedHandler {
       const error = err as Error;
       if (!(err instanceof CouponNotBeingTrackedError)) {
         this.logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
+        throw error;
       }
     }
   }
@@ -319,6 +321,7 @@ export class InvoiceCompletedHandler {
       this.logger.error(
         `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${error.message}`,
       );
+      throw error;
     }
   }
 }
