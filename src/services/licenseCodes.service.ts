@@ -157,7 +157,7 @@ export class LicenseCodesService {
     return tierProduct;
   }
 
-  private async applyProductFeatures({
+  async applyProductFeatures({
     user,
     customer,
     logger,

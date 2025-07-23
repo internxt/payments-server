@@ -186,7 +186,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes,
+          tierProduct: null,
+        });
 
         expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
       });
@@ -204,7 +210,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
         await expect(
-          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null),
+          licenseCodesService.applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: null,
+          }),
         ).rejects.toThrow(unexpectedError);
       });
     });
@@ -228,14 +240,19 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.id, mockedLogger);
       });
 
       test('When the user does not have any tier, then the tier-user relationship is inserted into the collection after applying the features', async () => {
         const mockedProduct = getProduct({});
-        const mockedLicenseCode = getLicenseCode();
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
@@ -261,7 +278,13 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedUserTier]);
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
       });
@@ -277,6 +300,7 @@ describe('Tests for License Codes service', () => {
         };
         const mockedUserTier = newTier();
         const mockedTier = newTier();
+        const maxSpaceBytes = 100;
 
         jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -286,7 +310,13 @@ describe('Tests for License Codes service', () => {
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser');
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
         expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedUserTier.id, mockedTier.id);
@@ -306,7 +336,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(tiersService, 'applyTier').mockRejectedValue(unexpectedError);
         await expect(
-          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, mockedTier),
+          licenseCodesService.applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: mockedTier,
+          }),
         ).rejects.toThrow(unexpectedError);
       });
     });
