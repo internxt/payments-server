@@ -582,7 +582,8 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(updateTierToUserSpy).not.toHaveBeenCalled();
     });
 
-    test('When an error occurs while updating user tier, then logs the error', async () => {
+    test('When an error occurs while updating user tier, then an error indicating so is thrown', async () => {
+      const usersTiersError = new UsersTiersError('User tiers error');
       const isBusinessPlan = false;
       const mockedUserId = getUser().id;
       const mockedTierId = newTier().id;
@@ -597,18 +598,20 @@ describe('Testing the handler when an invoice is completed', () => {
       });
 
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
-      jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(new UsersTiersError('User tiers error'));
+      jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
 
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const mockUpdateOrInsertUserTier =
         invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
 
-      await mockUpdateOrInsertUserTier({
-        userId: mockedUserId,
-        tierId: mockedTierId,
-        isBusinessPlan,
-      });
+      await expect(
+        mockUpdateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        }),
+      ).rejects.toThrow(usersTiersError);
 
       expect(loggerSpy).toHaveBeenCalledWith(
         `Error while updating or inserting the user-tier relationship. Error: Error: User tiers error`,
@@ -732,7 +735,8 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(loggerSpy).not.toHaveBeenCalled();
     });
 
-    test('When an unexpected error occurs while storing the coupon, then an error is logged and the flow continues', async () => {
+    test('When an unexpected error occurs while storing the coupon, then an error is logged and is thrown', async () => {
+      const randomError = new Error('Random error');
       const mockedUser = getUser();
       const mockedInvoice = getInvoice({
         discount: {
@@ -743,9 +747,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
 
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const storeCouponUsedByUserSpy = jest
-        .spyOn(usersService, 'storeCouponUsedByUser')
-        .mockRejectedValue(new Error('Random error'));
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const mockHandleUserCouponRelationship =
@@ -758,7 +760,7 @@ describe('Testing the handler when an invoice is completed', () => {
           invoiceLineItem: mockedInvoice.lines.data[0],
           isLifetimePlan: false,
         }),
-      ).resolves.not.toThrow();
+      ).rejects.toThrow(randomError);
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
       expect(loggerSpy).toHaveBeenCalledWith(`Error while adding user ${mockedUser.uuid} and coupon: Random error`);
     });
@@ -781,18 +783,17 @@ describe('Testing the handler when an invoice is completed', () => {
       );
     });
 
-    test('When cache clearing fails, then it should log an error but not throw', async () => {
+    test('When cache clearing fails, then it should log an error and throw', async () => {
+      const randomError = new Error('Random error');
       const { customerId, uuid: userUuid } = getUser();
-      const clearSubscriptionSpy = jest
-        .spyOn(cacheService, 'clearSubscription')
-        .mockRejectedValue(new Error('Unexpected error'));
+      jest.spyOn(cacheService, 'clearSubscription').mockRejectedValue(randomError);
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const mockClearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
 
-      await expect(mockClearUserRelatedCache(customerId, userUuid)).resolves.not.toThrow();
+      await expect(mockClearUserRelatedCache(customerId, userUuid)).rejects.toThrow(randomError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: Unexpected error`,
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${randomError.message}`,
       );
     });
   });
