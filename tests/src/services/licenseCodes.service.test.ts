@@ -123,8 +123,7 @@ describe('Tests for License Codes service', () => {
 
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
-      const getTierProduct = licenseCodesService['getTierProduct'].bind(licenseCodesService);
-      const result = await getTierProduct(mockedLicenseCode);
+      const result = await licenseCodesService.getTierProduct(mockedLicenseCode);
 
       expect(result).toStrictEqual(mockedTier);
     });
@@ -139,8 +138,7 @@ describe('Tests for License Codes service', () => {
 
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
-      const getTierProduct = licenseCodesService['getTierProduct'].bind(licenseCodesService);
-      const result = await getTierProduct(mockedLicenseCode);
+      const result = await licenseCodesService.getTierProduct(mockedLicenseCode);
 
       expect(result).toBeNull();
     });
@@ -150,9 +148,8 @@ describe('Tests for License Codes service', () => {
       const mockedLicenseCode = getLicenseCode();
 
       jest.spyOn(paymentService, 'getProduct').mockRejectedValue(unexpectedError);
-      const getTierProduct = licenseCodesService['getTierProduct'].bind(licenseCodesService);
 
-      await expect(getTierProduct(mockedLicenseCode)).rejects.toThrow(unexpectedError);
+      await expect(licenseCodesService.getTierProduct(mockedLicenseCode)).rejects.toThrow(unexpectedError);
     });
 
     test('When an unexpected error occurs while getting the tier, then an error indicating so is thrown', async () => {
@@ -165,9 +162,8 @@ describe('Tests for License Codes service', () => {
 
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(unexpectedError);
-      const getTierProduct = licenseCodesService['getTierProduct'].bind(licenseCodesService);
 
-      await expect(getTierProduct(mockedLicenseCode)).rejects.toThrow(unexpectedError);
+      await expect(licenseCodesService.getTierProduct(mockedLicenseCode)).rejects.toThrow(unexpectedError);
     });
   });
 
@@ -186,9 +182,7 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
-
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null);
+        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null);
 
         expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
       });
@@ -205,15 +199,14 @@ describe('Tests for License Codes service', () => {
         const maxSpaceBytes = 100;
 
         jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await expect(applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null)).rejects.toThrow(
-          unexpectedError,
-        );
+        await expect(
+          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null),
+        ).rejects.toThrow(unexpectedError);
       });
     });
 
     describe('Redeemed code with tier', () => {
-      test('When the user redeems a valid code that match with any tier, then all the features have been applied', async () => {
+      test('When the user redeems a valid code that match with any tier, then the tier is applied', async () => {
         const mockedProduct = getProduct({});
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
@@ -231,8 +224,7 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
 
         expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.id, mockedLogger);
       });
@@ -265,8 +257,7 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedUserTier]);
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
 
         expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
       });
@@ -291,8 +282,7 @@ describe('Tests for License Codes service', () => {
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser');
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
 
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
 
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
         expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedUserTier.id, mockedTier.id);
@@ -311,9 +301,8 @@ describe('Tests for License Codes service', () => {
         const mockedTier = newTier();
 
         jest.spyOn(tiersService, 'applyTier').mockRejectedValue(unexpectedError);
-        const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
         await expect(
-          applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, mockedTier),
+          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, mockedTier),
         ).rejects.toThrow(unexpectedError);
       });
     });
