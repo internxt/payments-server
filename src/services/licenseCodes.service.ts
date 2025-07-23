@@ -142,11 +142,10 @@ export class LicenseCodesService {
     await this.licenseCodesRepository.insert(licenseCode);
   }
 
-  private async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
+  async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
     const product = await this.paymentService.getProduct(licenseCode.priceId);
     const productId = product.id;
 
-    // Get tier by product id
     const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
       if (error instanceof TierNotFoundError) {
         return null;
@@ -166,7 +165,6 @@ export class LicenseCodesService {
     tierProduct,
   }: ApplyProductFeaturesProps): Promise<void> {
     try {
-      // 3a. Apply tier to user and update/insert user-tier relationship
       if (tierProduct) {
         await this.tiersService.applyTier(user, customer, 1, tierProduct.id, logger);
 
@@ -182,7 +180,6 @@ export class LicenseCodesService {
           await this.tiersService.insertTierToUser(userId, tierProduct.id);
         }
       } else {
-        // 3b. Set the storage referenced by the code
         await this.storageService.changeStorage(user.uuid, maxSpaceBytes);
       }
     } catch (error) {
