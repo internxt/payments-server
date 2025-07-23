@@ -13,7 +13,7 @@ import CacheService from '../../../../../src/services/cache.service';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import { StorageService } from '../../../../../src/services/storage.service';
 import { UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
-import { getCustomer, getInvoice, getLogger, getUser } from '../../../fixtures';
+import { getCustomer, getInvoice, getLogger, getProduct, getUser, newTier } from '../../../fixtures';
 import { ObjectStorageService } from '../../../../../src/services/objectStorage.service';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { ObjectStorageWebhookHandler } from '../../../../../src/webhooks/events/ObjectStorageWebhookHandler';
@@ -248,6 +248,244 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(unexpectedError);
       expect(insertUserSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Old Product Management', () => {
+    test('When processing old product, then it should call storage service with correct parameters', async () => {
+      const mockedUser = getUser();
+      const mockedMaxSpaceBytes = 100;
+      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+
+      const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
+      await handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
+
+      expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
+    });
+  });
+
+  describe('Tier Management (New products)', () => {
+    describe('The user purchases a lifetime', () => {
+      test('When determining the lifetime conditions, then apply the features correctly', async () => {
+        const mockedUser = getUser();
+        const mockedCustomer = getCustomer({
+          email: 'test@inxt.com',
+        });
+        const mockedMaxSpaceBytes = 100;
+        const lifetimeMockedMaxSpaceBytes = mockedMaxSpaceBytes * 5;
+        const mockedIsLifetimePlan = true;
+        const mockedProductId = getProduct({}).id;
+        const totalQuantity = 1;
+        const mockedTier = newTier();
+        const mockedLifetimeTier = newTier({ billingType: 'lifetime' });
+        const determineLifetimeConditionsSpy = jest.spyOn(determineLifetimeConditions, 'determine').mockResolvedValue({
+          maxSpaceBytes: lifetimeMockedMaxSpaceBytes,
+          tier: mockedLifetimeTier,
+        });
+        const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+        const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+
+        const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+        await handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        });
+
+        expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
+        expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedCustomer,
+          totalQuantity,
+          mockedLifetimeTier,
+          expect.anything(),
+          lifetimeMockedMaxSpaceBytes,
+        );
+        expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedLifetimeTier,
+        );
+      });
+
+      test('When an error occurs while determining the lifetime conditions, then a log is printed but the flow continues with the default tier', async () => {
+        const unexpectedError = new Error('Unexpected error');
+        const mockedUser = getUser();
+        const mockedCustomer = getCustomer({
+          email: 'test@inxt.com',
+        });
+        const mockedIsLifetimePlan = true;
+        const mockedProductId = getProduct({}).id;
+        const totalQuantity = 1;
+        const mockedTier = newTier();
+        const determineLifetimeConditionsSpy = jest
+          .spyOn(determineLifetimeConditions, 'determine')
+          .mockRejectedValue(unexpectedError);
+        const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+        const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+
+        const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+        await handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        });
+
+        expect(determineLifetimeConditionsSpy).toHaveBeenCalledWith(mockedUser, mockedProductId);
+        expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedCustomer,
+          totalQuantity,
+          mockedTier,
+          expect.anything(),
+          undefined,
+        );
+        expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+          {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          mockedTier,
+        );
+      });
+    });
+
+    test('When the user purchases a subscription, then all features are applied correctly', async () => {
+      const mockedUser = getUser();
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const mockedIsLifetimePlan = false;
+      const mockedProductId = getProduct({}).id;
+      const totalQuantity = 1;
+      const mockedTier = newTier();
+
+      const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+      const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+      await handleNewProduct({
+        user: {
+          ...mockedUser,
+          email: mockedCustomer.email as string,
+        },
+        customer: mockedCustomer,
+        isLifetimePlan: mockedIsLifetimePlan,
+        productId: mockedProductId,
+        totalQuantity,
+        tier: mockedTier,
+      });
+
+      expect(applyDriveFeaturesSpy).toHaveBeenCalledWith(
+        {
+          ...mockedUser,
+          email: mockedCustomer.email as string,
+        },
+        mockedCustomer,
+        totalQuantity,
+        mockedTier,
+        expect.anything(),
+        undefined,
+      );
+      expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+        {
+          ...mockedUser,
+          email: mockedCustomer.email as string,
+        },
+        mockedTier,
+      );
+    });
+
+    test('When something goes wrong while applying Drive features, then an error indicating so is thrown', async () => {
+      const mockedError = new Error('Failed to apply Drive features to user');
+      const mockedUser = getUser();
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const mockedIsLifetimePlan = false;
+      const mockedProductId = getProduct({}).id;
+      const totalQuantity = 1;
+      const mockedTier = newTier();
+      jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+      await expect(
+        handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        }),
+      ).rejects.toThrow(mockedError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
+        {
+          error: mockedError.message,
+        },
+      );
+    });
+
+    test('When something goes wrong while applying VPN features, then an error indicating so is thrown', async () => {
+      const mockedError = new Error('Failed to apply VPN features to user');
+      const mockedUser = getUser();
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const mockedIsLifetimePlan = false;
+      const mockedProductId = getProduct({}).id;
+      const totalQuantity = 1;
+      const mockedTier = newTier();
+      jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
+      jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
+
+      await expect(
+        handleNewProduct({
+          user: {
+            ...mockedUser,
+            email: mockedCustomer.email as string,
+          },
+          customer: mockedCustomer,
+          isLifetimePlan: mockedIsLifetimePlan,
+          productId: mockedProductId,
+          totalQuantity,
+          tier: mockedTier,
+        }),
+      ).rejects.toThrow(mockedError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
+        {
+          error: mockedError.message,
+        },
+      );
     });
   });
 });
