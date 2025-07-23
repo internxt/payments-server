@@ -116,23 +116,19 @@ export class LicenseCodesService {
   }
 
   private async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
-    try {
-      const product = await this.paymentService.getProduct(licenseCode.priceId);
-      const productId = product.id;
+    const product = await this.paymentService.getProduct(licenseCode.priceId);
+    const productId = product.id;
 
-      // Get tier by product id
-      const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
-        if (error instanceof TierNotFoundError) {
-          return null;
-        }
+    // Get tier by product id
+    const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
+      if (error instanceof TierNotFoundError) {
+        return null;
+      }
 
-        throw error;
-      });
-
-      return tierProduct;
-    } catch (error) {
       throw error;
-    }
+    });
+
+    return tierProduct;
   }
 
   private async applyProductFeatures(
