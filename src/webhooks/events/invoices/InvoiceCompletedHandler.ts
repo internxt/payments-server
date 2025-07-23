@@ -249,12 +249,17 @@ export class InvoiceCompletedHandler {
   }): Promise<void> {
     try {
       const userTiers = await this.tiersService.getTiersProductsByUserId(userId);
-      const matchingTier = userTiers.find((userTier) => {
-        const hasWorkspaces = userTier.featuresPerService[Service.Drive].workspaces.enabled;
-        return isBusinessPlan ? hasWorkspaces : !hasWorkspaces;
+      const userAlreadyHasIndividualPlan = userTiers.find((userTier) => {
+        return !userTier.featuresPerService[Service.Drive].workspaces.enabled;
       });
-      if (matchingTier) {
-        await this.tiersService.updateTierToUser(userId, matchingTier.id, tierId);
+      const userAlreadyHasWorkspace = userTiers.find((userTier) => {
+        return userTier.featuresPerService[Service.Drive].workspaces.enabled;
+      });
+
+      const existingTier = isBusinessPlan ? userAlreadyHasWorkspace : userAlreadyHasIndividualPlan;
+
+      if (existingTier) {
+        await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
       } else {
         await this.tiersService.insertTierToUser(userId, tierId);
       }
