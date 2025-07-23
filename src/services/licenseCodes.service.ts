@@ -64,7 +64,6 @@ export class LicenseCodesService {
     },
     code: LicenseCode['code'],
     provider: LicenseCode['provider'],
-    logger: FastifyBaseLogger,
   ): Promise<void> {
     const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
 
@@ -77,45 +76,36 @@ export class LicenseCodesService {
     }
 
     const maybeExistingUser = await this.usersService.findUserByUuid(user.uuid).catch(() => null);
-    let customer: Stripe.Customer;
+    let customerId: string;
 
     // 1. Create or get customer from Stripe
     if (!maybeExistingUser) {
-      customer = await this.paymentService.createCustomer({
-        name: user.name || 'Internxt User',
-        email: user.email,
-      });
+      customerId = (
+        await this.paymentService.createCustomer({
+          name: user.name || 'Internxt User',
+          email: user.email,
+        })
+      ).id;
     } else {
-      customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
+      customerId = (await this.paymentService.getCustomer(maybeExistingUser.customerId)).id;
     }
 
     // 2. Subscribe to the price referenced by the code
-    const productMetadata = await this.paymentService.subscribe(customer.id, licenseCode.priceId);
+    const productMetadata = await this.paymentService.subscribe(customerId, licenseCode.priceId);
 
-    // 3. Update user accordingly
+    // 3. Set the storage referenced by the code
+    await this.storageService.changeStorage(user.uuid, productMetadata.maxSpaceBytes);
+
+    // 4. Update user accordingly
     if (!maybeExistingUser) {
       await this.usersService.insertUser({
-        customerId: customer.id,
+        customerId,
         uuid: user.uuid,
         lifetime: !productMetadata.recurring,
       });
     } else {
       await this.usersService.updateUser(maybeExistingUser.customerId, { lifetime: !productMetadata.recurring });
     }
-
-    // 4. Apply product features
-    const tierProduct = await this.getTierProduct(licenseCode);
-
-    await this.applyProductFeatures(
-      {
-        email: user.email,
-        uuid: user.uuid,
-      },
-      customer,
-      logger,
-      productMetadata.maxSpaceBytes,
-      tierProduct,
-    );
 
     // 5. Mark code as redeemed
     await this.licenseCodesRepository.updateByCode(licenseCode.code, { redeemed: true });
