@@ -74,13 +74,13 @@ describe('Tests for License Codes service', () => {
       storageService,
       config,
     );
-    licenseCodesService = new LicenseCodesService({
+    licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,
       storageService,
       licenseCodesRepository,
       tiersService,
-    });
+    );
   });
 
   describe('Check if license code is available', () => {

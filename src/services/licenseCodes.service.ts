@@ -34,25 +34,13 @@ export class LicenseCodeAlreadyAppliedError extends Error {
 }
 
 export class LicenseCodesService {
-  private readonly paymentService: PaymentService;
-  private readonly usersService: UsersService;
-  private readonly storageService: StorageService;
-  private readonly licenseCodesRepository: LicenseCodesRepository;
-  private readonly tiersService: TiersService;
-
-  constructor({
-    paymentService,
-    usersService,
-    storageService,
-    licenseCodesRepository,
-    tiersService,
-  }: LicenseCodesServiceDeps) {
-    this.paymentService = paymentService;
-    this.usersService = usersService;
-    this.storageService = storageService;
-    this.licenseCodesRepository = licenseCodesRepository;
-    this.tiersService = tiersService;
-  }
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly usersService: UsersService,
+    private readonly storageService: StorageService,
+    private readonly licenseCodesRepository: LicenseCodesRepository,
+    private readonly tiersService: TiersService,
+  ) {}
 
   async isLicenseCodeAvailable(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<boolean> {
     const licenseCode = await this.licenseCodesRepository.findOne(code, provider);

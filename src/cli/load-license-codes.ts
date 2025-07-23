@@ -96,13 +96,13 @@ async function main() {
       storageService,
       envVariablesConfig,
     );
-    const licenseCodesService = new LicenseCodesService({
+    const licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,
       storageService,
       licenseCodesRepository,
       tiersService,
-    });
+    );
 
     for (const licenseCode of loadFromExcel()) {
       await licenseCodesService.insertLicenseCode(licenseCode);
