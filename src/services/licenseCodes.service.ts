@@ -1,9 +1,21 @@
+import Stripe from 'stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { User } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { StorageService } from './storage.service';
+import { TierNotFoundError, TiersService } from './tiers.service';
 import { UsersService } from './users.service';
+import { FastifyBaseLogger } from 'fastify';
+import { Service, Tier } from '../core/users/Tier';
+
+type LicenseCodesServiceDeps = {
+  paymentService: PaymentService;
+  usersService: UsersService;
+  storageService: StorageService;
+  licenseCodesRepository: LicenseCodesRepository;
+  tiersService: TiersService;
+};
 
 export class InvalidLicenseCodeError extends Error {
   constructor() {
@@ -27,6 +39,7 @@ export class LicenseCodesService {
     private readonly usersService: UsersService,
     private readonly storageService: StorageService,
     private readonly licenseCodesRepository: LicenseCodesRepository,
+    private readonly tiersService: TiersService,
   ) {}
 
   async isLicenseCodeAvailable(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<boolean> {
@@ -100,5 +113,52 @@ export class LicenseCodesService {
 
   async insertLicenseCode(licenseCode: LicenseCode): Promise<void> {
     await this.licenseCodesRepository.insert(licenseCode);
+  }
+
+  async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
+    const product = await this.paymentService.getProduct(licenseCode.priceId);
+    const productId = product.id;
+
+    const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
+      if (error instanceof TierNotFoundError) {
+        return null;
+      }
+
+      throw error;
+    });
+
+    return tierProduct;
+  }
+
+  async applyProductFeatures(
+    user: { uuid: string; email: string },
+    customer: Stripe.Customer,
+    logger: FastifyBaseLogger,
+    maxSpaceBytes: number,
+    tierProduct: Tier | null,
+  ) {
+    try {
+      if (tierProduct) {
+        await this.tiersService.applyTier(user, customer, 1, tierProduct.id, logger);
+
+        const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
+        const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId);
+        const existingIndividualTier = existingTiersForUser.find(
+          (tierProduct) => !tierProduct.featuresPerService[Service.Drive].workspaces.enabled,
+        );
+
+        if (existingIndividualTier) {
+          await this.tiersService.updateTierToUser(userId, existingIndividualTier.id, tierProduct.id);
+        } else {
+          await this.tiersService.insertTierToUser(userId, tierProduct.id);
+        }
+      } else {
+        await this.storageService.changeStorage(user.uuid, maxSpaceBytes);
+      }
+    } catch (error) {
+      const err = error as Error;
+      logger.error(`Error while applying the product features to the user: ${user.uuid}. ERROR: ${err.message}`);
+      throw error;
+    }
   }
 }

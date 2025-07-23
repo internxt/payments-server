@@ -24,6 +24,9 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 import { Bit2MeService } from '../services/bit2me.service';
+import { TiersService } from '../services/tiers.service';
+import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
+import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -66,18 +69,16 @@ async function main() {
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
     const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
+    const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
+    const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
     const bit2MeService = new Bit2MeService(
-      envVariablesConfig, 
-      axios, 
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY, 
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_KEY, 
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_URL
+      envVariablesConfig,
+      axios,
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY,
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_KEY,
+      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_URL,
     );
-    const paymentService = new PaymentService(
-      stripe, 
-      productsRepository, 
-      bit2MeService,
-    );
+    const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
     const usersService = new UsersService(
       usersRepository,
       paymentService,
@@ -87,11 +88,20 @@ async function main() {
       envVariablesConfig,
       axios,
     );
+    const tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      envVariablesConfig,
+    );
     const licenseCodesService = new LicenseCodesService(
       paymentService,
       usersService,
       storageService,
       licenseCodesRepository,
+      tiersService,
     );
 
     for (const licenseCode of loadFromExcel()) {
