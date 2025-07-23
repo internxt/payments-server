@@ -74,13 +74,13 @@ describe('Tests for License Codes service', () => {
       storageService,
       config,
     );
-    licenseCodesService = new LicenseCodesService(
+    licenseCodesService = new LicenseCodesService({
       paymentService,
       usersService,
       storageService,
       licenseCodesRepository,
       tiersService,
-    );
+    });
   });
 
   describe('Check if license code is available', () => {
@@ -111,6 +111,10 @@ describe('Tests for License Codes service', () => {
         InvalidLicenseCodeError,
       );
     });
+  });
+
+  describe('Redeem codes', () => {
+    test('When the license code is valid, then it is marked as redeemed', async () => {});
   });
 
   describe('Get Tier product', () => {
@@ -188,7 +192,13 @@ describe('Tests for License Codes service', () => {
         const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
 
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null);
+        await applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes,
+          tierProduct: null,
+        });
 
         expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
       });
@@ -206,9 +216,15 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await expect(applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null)).rejects.toThrow(
-          unexpectedError,
-        );
+        await expect(
+          applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: null,
+          }),
+        ).rejects.toThrow(unexpectedError);
       });
     });
 
@@ -232,7 +248,13 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.id, mockedLogger);
       });
@@ -266,7 +288,13 @@ describe('Tests for License Codes service', () => {
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
       });
@@ -292,7 +320,13 @@ describe('Tests for License Codes service', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
 
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
-        await applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
         expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedUserTier.id, mockedTier.id);
@@ -313,7 +347,13 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'applyTier').mockRejectedValue(unexpectedError);
         const applyProductFeatures = licenseCodesService['applyProductFeatures'].bind(licenseCodesService);
         await expect(
-          applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, mockedTier),
+          applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: mockedTier,
+          }),
         ).rejects.toThrow(unexpectedError);
       });
     });

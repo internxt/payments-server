@@ -64,13 +64,13 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     storageService,
     envVariablesConfig,
   );
-  const licenseCodesService = new LicenseCodesService(
+  const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
     storageService,
     licenseCodesRepository,
     tiersService,
-  );
+  });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
 
   const productsService = new ProductsService(tiersService, usersService);
