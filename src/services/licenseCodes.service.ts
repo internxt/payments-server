@@ -104,7 +104,6 @@ export class LicenseCodesService {
     const maybeExistingUser = await this.usersService.findUserByUuid(user.uuid).catch(() => null);
     let customer: Stripe.Customer;
 
-    // 1. Create or get customer from Stripe
     if (!maybeExistingUser) {
       customer = await this.paymentService.createCustomer({
         name: user.name || 'Internxt User',
@@ -114,10 +113,8 @@ export class LicenseCodesService {
       customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
     }
 
-    // 2. Subscribe to the price referenced by the code
     const productMetadata = await this.paymentService.subscribe(customer.id, licenseCode.priceId);
 
-    // 3. Update user accordingly
     if (!maybeExistingUser) {
       await this.usersService.insertUser({
         customerId: customer.id,
@@ -128,7 +125,6 @@ export class LicenseCodesService {
       await this.usersService.updateUser(maybeExistingUser.customerId, { lifetime: !productMetadata.recurring });
     }
 
-    // 4. Apply features
     const tierProduct = await this.getTierProduct(licenseCode);
 
     await this.applyProductFeatures({
@@ -139,7 +135,6 @@ export class LicenseCodesService {
       tierProduct,
     });
 
-    // 5. Mark code as redeemed
     await this.licenseCodesRepository.updateByCode(licenseCode.code, { redeemed: true });
   }
 
