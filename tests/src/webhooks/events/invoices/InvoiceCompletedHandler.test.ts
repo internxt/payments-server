@@ -503,9 +503,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -537,9 +536,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -559,9 +557,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -590,9 +587,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -624,9 +620,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -647,9 +642,8 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        const mockUpdateOrInsertUserTier =
-          invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-        await mockUpdateOrInsertUserTier({
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
@@ -671,9 +665,8 @@ describe('Testing the handler when an invoice is completed', () => {
       const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
       const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-      const mockUpdateOrInsertUserTier =
-        invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-      await mockUpdateOrInsertUserTier({
+      const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+      await updateOrInsertUserTier({
         userId: mockedUserId,
         tierId: mockedTierId,
         isBusinessPlan,
@@ -703,11 +696,10 @@ describe('Testing the handler when an invoice is completed', () => {
 
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
-      const mockUpdateOrInsertUserTier =
-        invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+      const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
 
       await expect(
-        mockUpdateOrInsertUserTier({
+        updateOrInsertUserTier({
           userId: mockedUserId,
           tierId: mockedTierId,
           isBusinessPlan,
