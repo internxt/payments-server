@@ -114,7 +114,59 @@ describe('Tests for License Codes service', () => {
   });
 
   describe('Redeem codes', () => {
-    test('When the license code is valid, then it is marked as redeemed', async () => {});
+    test('When the license code is valid, then it is marked as redeemed', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode();
+      const mockedTier = newTier();
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockResolvedValue(mockedLicenseCode);
+      const getCustomerSpy = jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
+        maxSpaceBytes: 100,
+        recurring: false,
+      });
+      const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockResolvedValue();
+      const getTierProductSpy = jest.spyOn(licenseCodesService, 'getTierProduct').mockResolvedValue(mockedTier);
+      const applyProductFeaturesSpy = jest.spyOn(licenseCodesService, 'applyProductFeatures').mockResolvedValue();
+      const updateByCodeSpy = jest.spyOn(licenseCodesRepository, 'updateByCode').mockResolvedValue(true);
+
+      await licenseCodesService.redeem({
+        code: mockedLicenseCode.code,
+        provider: mockedLicenseCode.provider,
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+        },
+        logger: mockedLogger,
+      });
+
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
+      expect(getCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId);
+      expect(findUserByUuidSpy).toHaveBeenCalledWith(mockedUser.uuid);
+      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId);
+      expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        lifetime: true,
+      });
+      expect(getTierProductSpy).toHaveBeenCalledWith(mockedLicenseCode);
+      expect(applyProductFeaturesSpy).toHaveBeenCalledWith({
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+        },
+        customer: mockedCustomer,
+        logger: mockedLogger,
+        maxSpaceBytes: 100,
+        tierProduct: mockedTier,
+      });
+      expect(updateByCodeSpy).toHaveBeenCalledWith(mockedLicenseCode.code, { redeemed: true });
+    });
   });
 
   describe('Get Tier product', () => {

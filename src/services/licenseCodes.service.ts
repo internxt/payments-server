@@ -76,16 +76,21 @@ export class LicenseCodesService {
     return true;
   }
 
-  async redeem(
+  async redeem({
+    user,
+    code,
+    provider,
+    logger,
+  }: {
     user: {
       email: string;
       uuid: User['uuid'];
       name?: string;
-    },
-    code: LicenseCode['code'],
-    provider: LicenseCode['provider'],
-    logger: FastifyBaseLogger,
-  ): Promise<void> {
+    };
+    code: LicenseCode['code'];
+    provider: LicenseCode['provider'];
+    logger: FastifyBaseLogger;
+  }): Promise<void> {
     const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
 
     if (licenseCode === null) {
