@@ -18,6 +18,7 @@ import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
 import { ProductsService } from './services/products.service';
+import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
 
 interface AppDependencies {
@@ -33,20 +34,6 @@ interface AppDependencies {
   config: AppConfig;
 }
 
-const envToLogger = {
-  development: {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
-    },
-  },
-  production: true,
-  test: false,
-};
-
 export async function buildApp({
   paymentService,
   storageService,
@@ -60,7 +47,7 @@ export async function buildApp({
   config,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
-    logger: envToLogger[config.NODE_ENV] ?? true,
+    loggerInstance: Logger.getPinoLogger(),
   });
 
   registerErrorHandler(fastify);
