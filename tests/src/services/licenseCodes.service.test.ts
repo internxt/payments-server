@@ -114,7 +114,7 @@ describe('Tests for License Codes service', () => {
   });
 
   describe('Redeem codes', () => {
-    test('When the license code is valid, then it is marked as redeemed', async () => {
+    test('When the license code is valid and the customer exists, then it is marked as redeemed', async () => {
       const mockedCustomer = getCustomer();
       const mockedUser = getUser();
       const mockedLicenseCode = getLicenseCode();
@@ -166,6 +166,56 @@ describe('Tests for License Codes service', () => {
         tierProduct: mockedTier,
       });
       expect(updateByCodeSpy).toHaveBeenCalledWith(mockedLicenseCode.code, { redeemed: true });
+    });
+
+    test('When there is no license code, then an error indicating so is thrown', async () => {
+      const invalidLicenseCodeError = new InvalidLicenseCodeError();
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode();
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockRejectedValue(invalidLicenseCodeError);
+
+      await expect(
+        licenseCodesService.redeem({
+          code: mockedLicenseCode.code,
+          provider: mockedLicenseCode.provider,
+          user: {
+            email: mockedCustomer.email as string,
+            uuid: mockedUser.uuid,
+          },
+          logger: mockedLogger,
+        }),
+      ).rejects.toThrow(invalidLicenseCodeError);
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
+    });
+
+    test('When the license code is already redeemed, then an error indicating so is thrown', async () => {
+      const licenseCodeAlreadyAppliedError = new LicenseCodeAlreadyAppliedError();
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode({ redeemed: true });
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockResolvedValue(mockedLicenseCode);
+
+      await expect(
+        licenseCodesService.redeem({
+          code: mockedLicenseCode.code,
+          provider: mockedLicenseCode.provider,
+          user: {
+            email: mockedCustomer.email as string,
+            uuid: mockedUser.uuid,
+          },
+          logger: mockedLogger,
+        }),
+      ).rejects.toThrow(licenseCodeAlreadyAppliedError);
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
     });
   });
 
