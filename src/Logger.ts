@@ -4,7 +4,7 @@ import { isDevelopment, isTest } from './config';
 
 class Logger {
   private static instance: Logger;
-  private pinoLogger: FastifyBaseLogger;
+  private readonly pinoLogger: FastifyBaseLogger;
 
   private constructor() {
     this.pinoLogger = pino({
