@@ -1246,7 +1246,12 @@ export default function (
         const { code, provider } = req.body;
 
         try {
-          await licenseCodesService.redeem({ email, uuid, name: `${name} ${lastname}` }, code, provider);
+          await licenseCodesService.redeem({
+            user: { email, uuid, name: `${name} ${lastname}` },
+            code,
+            provider,
+            logger: req.log,
+          });
 
           return rep.status(200).send({ message: 'Code redeemed' });
         } catch (error) {

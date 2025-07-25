@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import {
   getCreateSubscriptionResponse,
   getCustomer,
+  getLicenseCode,
+  getLogger,
   getPaymentIntent,
   getPrice,
   getPrices,
@@ -22,6 +24,7 @@ import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
+import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
@@ -687,6 +690,48 @@ describe('Payment controller e2e tests', () => {
       });
 
       expect(response.statusCode).toBe(403);
+    });
+  });
+
+  describe('Redeem license codes', () => {
+    test('When the code and provider are valid, then the code is redeemed', async () => {
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode();
+      const mockedLogger = getLogger();
+      const mockedToken = getValidAuthToken(
+        mockedUser.uuid,
+        { owners: [] },
+        {
+          name: 'John',
+          lastname: 'Doe',
+          email: 'example@inxt.com',
+        },
+      );
+      const licenseCodesServiceSpy = jest.spyOn(LicenseCodesService.prototype, 'redeem').mockResolvedValue();
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/licenses',
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+        body: {
+          code: mockedLicenseCode.code,
+          provider: mockedLicenseCode.provider,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(licenseCodesServiceSpy).toHaveBeenCalledWith({
+        user: {
+          name: 'John Doe',
+          email: 'example@inxt.com',
+          uuid: mockedUser.uuid,
+        },
+        code: mockedLicenseCode.code,
+        provider: mockedLicenseCode.provider,
+        logger: expect.any(Object),
+      });
     });
   });
 });

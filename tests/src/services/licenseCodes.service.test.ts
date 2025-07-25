@@ -9,7 +9,7 @@ import {
 import testFactory from '../utils/factory';
 import { PaymentService } from '../../../src/services/payment.service';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { UsersService } from '../../../src/services/users.service';
+import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { StorageService } from '../../../src/services/storage.service';
 import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
@@ -74,13 +74,13 @@ describe('Tests for License Codes service', () => {
       storageService,
       config,
     );
-    licenseCodesService = new LicenseCodesService(
+    licenseCodesService = new LicenseCodesService({
       paymentService,
       usersService,
       storageService,
       licenseCodesRepository,
       tiersService,
-    );
+    });
   });
 
   describe('Check if license code is available', () => {
@@ -110,6 +110,175 @@ describe('Tests for License Codes service', () => {
       await expect(licenseCodesService.isLicenseCodeAvailable('code', 'provider')).rejects.toThrow(
         InvalidLicenseCodeError,
       );
+    });
+  });
+
+  describe('Redeem codes', () => {
+    test('When the license code is valid and the customer exists, then it is marked as redeemed', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode();
+      const mockedTier = newTier();
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockResolvedValue(mockedLicenseCode);
+      const getCustomerSpy = jest
+        .spyOn(paymentService, 'getCustomer')
+        .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
+        maxSpaceBytes: 100,
+        recurring: false,
+      });
+      const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockResolvedValue();
+      const getTierProductSpy = jest.spyOn(licenseCodesService, 'getTierProduct').mockResolvedValue(mockedTier);
+      const applyProductFeaturesSpy = jest.spyOn(licenseCodesService, 'applyProductFeatures').mockResolvedValue();
+      const updateByCodeSpy = jest.spyOn(licenseCodesRepository, 'updateByCode').mockResolvedValue(true);
+
+      await licenseCodesService.redeem({
+        code: mockedLicenseCode.code,
+        provider: mockedLicenseCode.provider,
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+        },
+        logger: mockedLogger,
+      });
+
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
+      expect(getCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId);
+      expect(findUserByUuidSpy).toHaveBeenCalledWith(mockedUser.uuid);
+      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId);
+      expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        lifetime: true,
+      });
+      expect(getTierProductSpy).toHaveBeenCalledWith(mockedLicenseCode);
+      expect(applyProductFeaturesSpy).toHaveBeenCalledWith({
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+        },
+        customer: mockedCustomer,
+        logger: mockedLogger,
+        maxSpaceBytes: 100,
+        tierProduct: mockedTier,
+      });
+      expect(updateByCodeSpy).toHaveBeenCalledWith(mockedLicenseCode.code, { redeemed: true });
+    });
+
+    test('When the license code is valid and the customer does not exists, then the license code is marked as redeemed and the user is created', async () => {
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser({
+        lifetime: true,
+      });
+      const mockedLicenseCode = getLicenseCode();
+      const mockedTier = newTier();
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockResolvedValue(mockedLicenseCode);
+      const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
+      const createCustomerSpy = jest
+        .spyOn(paymentService, 'createCustomer')
+        .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
+        maxSpaceBytes: 100,
+        recurring: false,
+      });
+      const insertUserSpy = jest.spyOn(usersService, 'insertUser').mockResolvedValue();
+      const getTierProductSpy = jest.spyOn(licenseCodesService, 'getTierProduct').mockResolvedValue(mockedTier);
+      const applyProductFeaturesSpy = jest.spyOn(licenseCodesService, 'applyProductFeatures').mockResolvedValue();
+      const updateByCodeSpy = jest.spyOn(licenseCodesRepository, 'updateByCode').mockResolvedValue(true);
+
+      await licenseCodesService.redeem({
+        code: mockedLicenseCode.code,
+        provider: mockedLicenseCode.provider,
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+          name: mockedCustomer.name as string,
+        },
+        logger: mockedLogger,
+      });
+
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
+      expect(createCustomerSpy).toHaveBeenCalledWith({
+        name: mockedCustomer.name,
+        email: mockedCustomer.email,
+      });
+      expect(findUserByUuidSpy).toHaveBeenCalledWith(mockedUser.uuid);
+      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId);
+      expect(insertUserSpy).toHaveBeenCalledWith({
+        customerId: mockedCustomer.id,
+        uuid: mockedUser.uuid,
+        lifetime: mockedUser.lifetime,
+      });
+      expect(getTierProductSpy).toHaveBeenCalledWith(mockedLicenseCode);
+      expect(applyProductFeaturesSpy).toHaveBeenCalledWith({
+        user: {
+          email: mockedCustomer.email as string,
+          uuid: mockedUser.uuid,
+          name: mockedCustomer.name as string,
+        },
+        customer: mockedCustomer,
+        logger: mockedLogger,
+        maxSpaceBytes: 100,
+        tierProduct: mockedTier,
+      });
+      expect(updateByCodeSpy).toHaveBeenCalledWith(mockedLicenseCode.code, { redeemed: true });
+    });
+
+    test('When there is no license code, then an error indicating so is thrown', async () => {
+      const invalidLicenseCodeError = new InvalidLicenseCodeError();
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode();
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockRejectedValue(invalidLicenseCodeError);
+
+      await expect(
+        licenseCodesService.redeem({
+          code: mockedLicenseCode.code,
+          provider: mockedLicenseCode.provider,
+          user: {
+            email: mockedCustomer.email as string,
+            uuid: mockedUser.uuid,
+          },
+          logger: mockedLogger,
+        }),
+      ).rejects.toThrow(invalidLicenseCodeError);
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
+    });
+
+    test('When the license code is already redeemed, then an error indicating so is thrown', async () => {
+      const licenseCodeAlreadyAppliedError = new LicenseCodeAlreadyAppliedError();
+      const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedLicenseCode = getLicenseCode({ redeemed: true });
+      const mockedLogger = getLogger();
+
+      const findOneLicenseRepositorySpy = jest
+        .spyOn(licenseCodesRepository, 'findOne')
+        .mockResolvedValue(mockedLicenseCode);
+
+      await expect(
+        licenseCodesService.redeem({
+          code: mockedLicenseCode.code,
+          provider: mockedLicenseCode.provider,
+          user: {
+            email: mockedCustomer.email as string,
+            uuid: mockedUser.uuid,
+          },
+          logger: mockedLogger,
+        }),
+      ).rejects.toThrow(licenseCodeAlreadyAppliedError);
+      expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
     });
   });
 
@@ -182,7 +351,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes,
+          tierProduct: null,
+        });
 
         expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
       });
@@ -200,7 +375,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
         await expect(
-          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, null),
+          licenseCodesService.applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: null,
+          }),
         ).rejects.toThrow(unexpectedError);
       });
     });
@@ -224,14 +405,19 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.id, mockedLogger);
       });
 
       test('When the user does not have any tier, then the tier-user relationship is inserted into the collection after applying the features', async () => {
         const mockedProduct = getProduct({});
-        const mockedLicenseCode = getLicenseCode();
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
@@ -257,7 +443,13 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedUserTier]);
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes: 100,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
       });
@@ -273,6 +465,7 @@ describe('Tests for License Codes service', () => {
         };
         const mockedUserTier = newTier();
         const mockedTier = newTier();
+        const maxSpaceBytes = 100;
 
         jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -282,7 +475,13 @@ describe('Tests for License Codes service', () => {
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser');
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
 
-        await licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, 100, mockedTier);
+        await licenseCodesService.applyProductFeatures({
+          user,
+          customer: mockedCustomer,
+          logger: mockedLogger,
+          maxSpaceBytes,
+          tierProduct: mockedTier,
+        });
 
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
         expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedUserTier.id, mockedTier.id);
@@ -302,7 +501,13 @@ describe('Tests for License Codes service', () => {
 
         jest.spyOn(tiersService, 'applyTier').mockRejectedValue(unexpectedError);
         await expect(
-          licenseCodesService.applyProductFeatures(user, mockedCustomer, mockedLogger, maxSpaceBytes, mockedTier),
+          licenseCodesService.applyProductFeatures({
+            user,
+            customer: mockedCustomer,
+            logger: mockedLogger,
+            maxSpaceBytes,
+            tierProduct: mockedTier,
+          }),
         ).rejects.toThrow(unexpectedError);
       });
     });

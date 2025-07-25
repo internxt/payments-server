@@ -43,8 +43,19 @@ export const getValidAuthToken = (
   workspaces?: {
     owners: string[];
   },
+  params?: Partial<{
+    email: string;
+    uuid: string;
+    name: string;
+    lastname: string;
+    username: string;
+    sharedWorkspace: boolean;
+    networkCredentials: {
+      user: string;
+    };
+  }>,
 ): string => {
-  return jwt.sign({ payload: { uuid: userUuid, workspaces } }, config.JWT_SECRET);
+  return jwt.sign({ payload: { uuid: userUuid, workspaces, ...params } }, config.JWT_SECRET);
 };
 
 export const getValidUserToken = (customerId: string): string => {

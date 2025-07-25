@@ -17,6 +17,14 @@ type LicenseCodesServiceDeps = {
   tiersService: TiersService;
 };
 
+interface ApplyProductFeaturesProps {
+  user: { uuid: string; email: string };
+  customer: Stripe.Customer;
+  logger: FastifyBaseLogger;
+  maxSpaceBytes: number;
+  tierProduct: Tier | null;
+}
+
 export class InvalidLicenseCodeError extends Error {
   constructor() {
     super('Invalid code provided');
@@ -34,13 +42,25 @@ export class LicenseCodeAlreadyAppliedError extends Error {
 }
 
 export class LicenseCodesService {
-  constructor(
-    private readonly paymentService: PaymentService,
-    private readonly usersService: UsersService,
-    private readonly storageService: StorageService,
-    private readonly licenseCodesRepository: LicenseCodesRepository,
-    private readonly tiersService: TiersService,
-  ) {}
+  private readonly paymentService: PaymentService;
+  private readonly usersService: UsersService;
+  private readonly storageService: StorageService;
+  private readonly licenseCodesRepository: LicenseCodesRepository;
+  private readonly tiersService: TiersService;
+
+  constructor({
+    paymentService,
+    usersService,
+    storageService,
+    licenseCodesRepository,
+    tiersService,
+  }: LicenseCodesServiceDeps) {
+    this.paymentService = paymentService;
+    this.usersService = usersService;
+    this.storageService = storageService;
+    this.licenseCodesRepository = licenseCodesRepository;
+    this.tiersService = tiersService;
+  }
 
   async isLicenseCodeAvailable(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<boolean> {
     const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
@@ -56,15 +76,21 @@ export class LicenseCodesService {
     return true;
   }
 
-  async redeem(
+  async redeem({
+    user,
+    code,
+    provider,
+    logger,
+  }: {
     user: {
       email: string;
       uuid: User['uuid'];
       name?: string;
-    },
-    code: LicenseCode['code'],
-    provider: LicenseCode['provider'],
-  ): Promise<void> {
+    };
+    code: LicenseCode['code'];
+    provider: LicenseCode['provider'];
+    logger: FastifyBaseLogger;
+  }): Promise<void> {
     const licenseCode = await this.licenseCodesRepository.findOne(code, provider);
 
     if (licenseCode === null) {
@@ -76,30 +102,22 @@ export class LicenseCodesService {
     }
 
     const maybeExistingUser = await this.usersService.findUserByUuid(user.uuid).catch(() => null);
-    let customerId: string;
+    let customer: Stripe.Customer;
 
-    // 1. Create or get customer from Stripe
     if (!maybeExistingUser) {
-      customerId = (
-        await this.paymentService.createCustomer({
-          name: user.name || 'Internxt User',
-          email: user.email,
-        })
-      ).id;
+      customer = await this.paymentService.createCustomer({
+        name: user.name || 'Internxt User',
+        email: user.email,
+      });
     } else {
-      customerId = (await this.paymentService.getCustomer(maybeExistingUser.customerId)).id;
+      customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
     }
 
-    // 2. Subscribe to the price referenced by the code
-    const productMetadata = await this.paymentService.subscribe(customerId, licenseCode.priceId);
+    const productMetadata = await this.paymentService.subscribe(customer.id, licenseCode.priceId);
 
-    // 3. Set the storage referenced by the code
-    await this.storageService.changeStorage(user.uuid, productMetadata.maxSpaceBytes);
-
-    // 4. Update user accordingly
     if (!maybeExistingUser) {
       await this.usersService.insertUser({
-        customerId,
+        customerId: customer.id,
         uuid: user.uuid,
         lifetime: !productMetadata.recurring,
       });
@@ -107,7 +125,16 @@ export class LicenseCodesService {
       await this.usersService.updateUser(maybeExistingUser.customerId, { lifetime: !productMetadata.recurring });
     }
 
-    // 5. Mark code as redeemed
+    const tierProduct = await this.getTierProduct(licenseCode);
+
+    await this.applyProductFeatures({
+      user,
+      customer,
+      logger,
+      maxSpaceBytes: productMetadata.maxSpaceBytes,
+      tierProduct,
+    });
+
     await this.licenseCodesRepository.updateByCode(licenseCode.code, { redeemed: true });
   }
 
@@ -130,13 +157,13 @@ export class LicenseCodesService {
     return tierProduct;
   }
 
-  async applyProductFeatures(
-    user: { uuid: string; email: string },
-    customer: Stripe.Customer,
-    logger: FastifyBaseLogger,
-    maxSpaceBytes: number,
-    tierProduct: Tier | null,
-  ) {
+  async applyProductFeatures({
+    user,
+    customer,
+    logger,
+    maxSpaceBytes,
+    tierProduct,
+  }: ApplyProductFeaturesProps): Promise<void> {
     try {
       if (tierProduct) {
         await this.tiersService.applyTier(user, customer, 1, tierProduct.id, logger);
