@@ -415,7 +415,7 @@ describe('Tests for License Codes service', () => {
           tierProduct: mockedTier,
         });
 
-        expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.id, mockedLogger);
+        expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.productId, mockedLogger);
       });
 
       test('When the user does not have any tier, then the tier-user relationship is inserted into the collection after applying the features', async () => {

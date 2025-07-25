@@ -166,7 +166,7 @@ export class LicenseCodesService {
   }: ApplyProductFeaturesProps): Promise<void> {
     try {
       if (tierProduct) {
-        await this.tiersService.applyTier(user, customer, 1, tierProduct.id, logger);
+        await this.tiersService.applyTier(user, customer, 1, tierProduct.productId, logger);
 
         const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
         const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId);
