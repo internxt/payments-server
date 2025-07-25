@@ -638,7 +638,6 @@ describe('Testing the handler when an invoice is completed', () => {
         const mockedIndividualTier = newTier();
 
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
-
         const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
         const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
@@ -690,14 +689,11 @@ describe('Testing the handler when an invoice is completed', () => {
           },
         } as any,
       });
-
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
       jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
-
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
-
       await expect(
         updateOrInsertUserTier({
           userId: mockedUserId,
@@ -705,7 +701,6 @@ describe('Testing the handler when an invoice is completed', () => {
           isBusinessPlan,
         }),
       ).rejects.toThrow(usersTiersError);
-
       expect(loggerSpy).toHaveBeenCalledWith(
         `Error while updating or inserting the user-tier relationship. Error: Error: User tiers error`,
       );
@@ -781,13 +776,11 @@ describe('Testing the handler when an invoice is completed', () => {
         ...mockedInvoice.lines.data[0],
         discounts: [],
       };
-
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
-
       await handleUserCouponRelationship({
         userUuid: mockedUser.uuid,
         invoice: mockedInvoice,
@@ -815,7 +808,6 @@ describe('Testing the handler when an invoice is completed', () => {
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
-
       await expect(
         handleUserCouponRelationship({
           userUuid: mockedUser.uuid,
@@ -838,14 +830,12 @@ describe('Testing the handler when an invoice is completed', () => {
           },
         } as any,
       });
-
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
       const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
-
       await expect(
         handleUserCouponRelationship({
           userUuid: mockedUser.uuid,
