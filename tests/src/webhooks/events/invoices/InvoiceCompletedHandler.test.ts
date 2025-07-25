@@ -12,16 +12,17 @@ import { Bit2MeService } from '../../../../../src/services/bit2me.service';
 import CacheService from '../../../../../src/services/cache.service';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import { StorageService } from '../../../../../src/services/storage.service';
-import { UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
+import { CouponNotBeingTrackedError, UserNotFoundError, UsersService } from '../../../../../src/services/users.service';
 import { getCustomer, getInvoice, getLogger, getProduct, getUser, newTier } from '../../../fixtures';
 import { ObjectStorageService } from '../../../../../src/services/objectStorage.service';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { ObjectStorageWebhookHandler } from '../../../../../src/webhooks/events/ObjectStorageWebhookHandler';
-import { TiersService } from '../../../../../src/services/tiers.service';
+import { TiersService, UsersTiersError } from '../../../../../src/services/tiers.service';
 import config from '../../../../../src/config';
 import testFactory from '../../../utils/factory';
 import { DetermineLifetimeConditions } from '../../../../../src/core/users/DetermineLifetimeConditions';
 import { NotFoundError } from '../../../../../src/errors/Errors';
+import { Service } from '../../../../../src/core/users/Tier';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -485,6 +486,397 @@ describe('Testing the handler when an invoice is completed', () => {
         {
           error: mockedError.message,
         },
+      );
+    });
+  });
+
+  describe('User-Tier Relationship', () => {
+    describe('Individual plans', () => {
+      test('When matching tier exists for individual plan, then it should update existing tier', async () => {
+        const isBusinessPlan = false;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+        const mockedIndividualTier = newTier();
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
+
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTierId);
+        expect(insertTierToUserSpy).not.toHaveBeenCalled();
+      });
+
+      test('When user with both subscriptions redeems business plan, then existing business tier gets updated', async () => {
+        const isBusinessPlan = false;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+        const mockedIndividualTier = newTier();
+        const mockedBusinessTier = newTier({
+          featuresPerService: {
+            drive: {
+              workspaces: {
+                enabled: true,
+              },
+            },
+          } as any,
+        });
+
+        jest
+          .spyOn(tiersService, 'getTiersProductsByUserId')
+          .mockResolvedValue([mockedIndividualTier, mockedBusinessTier]);
+
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTierId);
+        expect(insertTierToUserSpy).not.toHaveBeenCalled();
+      });
+
+      test('When no matching tier exists (individual), then it should insert new tier', async () => {
+        const isBusinessPlan = false;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
+
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+        expect(updateTierToUserSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Business plans', () => {
+      test('When matching tier exists for business plan, then it should update existing tier', async () => {
+        const isBusinessPlan = true;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+        const mockedBusinessTier = newTier({
+          featuresPerService: {
+            drive: {
+              workspaces: {
+                enabled: true,
+              },
+            },
+          } as any,
+        });
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBusinessTier]);
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTierId);
+        expect(insertTierToUserSpy).not.toHaveBeenCalled();
+      });
+
+      test('When user with both subscriptions redeems business plan, then existing business tier gets updated', async () => {
+        const isBusinessPlan = true;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+        const mockedIndividualTier = newTier();
+        const mockedBusinessTier = newTier({
+          featuresPerService: {
+            drive: {
+              workspaces: {
+                enabled: true,
+              },
+            },
+          } as any,
+        });
+
+        jest
+          .spyOn(tiersService, 'getTiersProductsByUserId')
+          .mockResolvedValue([mockedIndividualTier, mockedBusinessTier]);
+
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTierId);
+        expect(insertTierToUserSpy).not.toHaveBeenCalled();
+      });
+
+      test('When no matching tier exists (business), then it should insert new tier', async () => {
+        const isBusinessPlan = true;
+        const mockedUserId = getUser().id;
+        const mockedTierId = newTier().id;
+        const mockedIndividualTier = newTier();
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
+        const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+        const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        });
+
+        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+        expect(updateTierToUserSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    test('When no matching tier exists (business), then it should insert new tier', async () => {
+      const isBusinessPlan = true;
+      const mockedUserId = getUser().id;
+      const mockedTierId = newTier().id;
+      const mockedIndividualTier = newTier();
+
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
+
+      const updateTierToUserSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+      const insertTierToUserSpy = jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+
+      const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+      await updateOrInsertUserTier({
+        userId: mockedUserId,
+        tierId: mockedTierId,
+        isBusinessPlan,
+      });
+
+      expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+      expect(updateTierToUserSpy).not.toHaveBeenCalled();
+    });
+
+    test('When an error occurs while updating user tier, then an error indicating so is thrown', async () => {
+      const usersTiersError = new UsersTiersError('User tiers error');
+      const isBusinessPlan = false;
+      const mockedUserId = getUser().id;
+      const mockedTierId = newTier().id;
+      const mockedIndividualTier = newTier({
+        featuresPerService: {
+          [Service.Drive]: {
+            workspaces: {
+              enabled: false,
+            },
+          },
+        } as any,
+      });
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
+      jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+      await expect(
+        updateOrInsertUserTier({
+          userId: mockedUserId,
+          tierId: mockedTierId,
+          isBusinessPlan,
+        }),
+      ).rejects.toThrow(usersTiersError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Error while updating or inserting the user-tier relationship. Error: Error: User tiers error`,
+      );
+    });
+  });
+
+  describe('User-Coupon Relationship', () => {
+    test('When lifetime plan has discount, then it should store coupon from line item', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              discounts: [
+                {
+                  coupon: {
+                    id: 'mocked-coupon',
+                  },
+                } as any,
+              ],
+            },
+          ],
+        },
+      });
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      const handleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+      await handleUserCouponRelationship({
+        userUuid: mockedUser.uuid,
+        invoice: mockedInvoice,
+        invoiceLineItem: mockedInvoice.lines.data[0],
+        isLifetimePlan: true,
+      });
+
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(
+        mockedUser,
+        (mockedInvoice.lines.data[0].discounts[0] as Stripe.Discount).coupon.id,
+      );
+    });
+
+    test('When subscription plan has discount, then it should store coupon from invoice', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: {
+          coupon: {
+            id: 'mocked-coupon',
+          },
+        } as any,
+      });
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      const handleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+      await handleUserCouponRelationship({
+        userUuid: mockedUser.uuid,
+        invoice: mockedInvoice,
+        invoiceLineItem: mockedInvoice.lines.data[0],
+        isLifetimePlan: false,
+      });
+
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, mockedInvoice.discount?.coupon.id);
+    });
+
+    test('When no discount exists, then the flow continues', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: null,
+      });
+      const mockedInvoiceLineItem = {
+        ...mockedInvoice.lines.data[0],
+        discounts: [],
+      };
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
+
+      const handleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+      await handleUserCouponRelationship({
+        userUuid: mockedUser.uuid,
+        invoice: mockedInvoice,
+        invoiceLineItem: mockedInvoiceLineItem,
+        isLifetimePlan: false,
+      });
+
+      expect(storeCouponUsedByUserSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the coupon code is not tracked, then an error is caught and the flow continues without storing the coupon', async () => {
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: {
+          coupon: {
+            id: 'mocked-coupon',
+          },
+        } as any,
+      });
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest
+        .spyOn(usersService, 'storeCouponUsedByUser')
+        .mockRejectedValue(new CouponNotBeingTrackedError('Coupon not tracked'));
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const handleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+      await expect(
+        handleUserCouponRelationship({
+          userUuid: mockedUser.uuid,
+          invoice: mockedInvoice,
+          invoiceLineItem: mockedInvoice.lines.data[0],
+          isLifetimePlan: false,
+        }),
+      ).resolves.not.toThrow();
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
+      expect(loggerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When an unexpected error occurs while storing the coupon, then an error is logged and is thrown', async () => {
+      const randomError = new Error('Random error');
+      const mockedUser = getUser();
+      const mockedInvoice = getInvoice({
+        discount: {
+          coupon: {
+            id: 'mocked-coupon',
+          },
+        } as any,
+      });
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const handleUserCouponRelationship =
+        invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
+      await expect(
+        handleUserCouponRelationship({
+          userUuid: mockedUser.uuid,
+          invoice: mockedInvoice,
+          invoiceLineItem: mockedInvoice.lines.data[0],
+          isLifetimePlan: false,
+        }),
+      ).rejects.toThrow(randomError);
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
+      expect(loggerSpy).toHaveBeenCalledWith(`Error while adding user ${mockedUser.uuid} and coupon: Random error`);
+    });
+  });
+
+  describe('Cache Clearing', () => {
+    test('When cache clearing succeeds, then it should log success message', async () => {
+      const { customerId, uuid: userUuid } = getUser();
+      const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
+      const clearUsedUserPromoCodesSpy = jest.spyOn(cacheService, 'clearUsedUserPromoCodes').mockResolvedValue();
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'info');
+
+      const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
+      await clearUserRelatedCache(customerId, userUuid);
+
+      expect(clearSubscriptionSpy).toHaveBeenCalledWith(customerId);
+      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(userUuid);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`,
+      );
+    });
+
+    test('When cache clearing fails, then it should log an error and throw', async () => {
+      const randomError = new Error('Random error');
+      const { customerId, uuid: userUuid } = getUser();
+      jest.spyOn(cacheService, 'clearSubscription').mockRejectedValue(randomError);
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+
+      const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
+
+      await expect(clearUserRelatedCache(customerId, userUuid)).rejects.toThrow(randomError);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${randomError.message}`,
       );
     });
   });
