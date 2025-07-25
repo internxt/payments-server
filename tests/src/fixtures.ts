@@ -10,6 +10,7 @@ import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
+import { LicenseCode } from '../../src/core/users/LicenseCode';
 
 const randomDataGenerator = new Chance();
 
@@ -27,13 +28,34 @@ export const getUser = (params?: Partial<User>): User => ({
   ...params,
 });
 
+export const getLicenseCode = (params?: Partial<LicenseCode>) => {
+  return {
+    priceId: `price_${randomDataGenerator.string({ length: 16 })}`,
+    provider: 'OWN',
+    code: randomDataGenerator.string({ length: 10 }),
+    redeemed: false,
+    ...params,
+  };
+};
+
 export const getValidAuthToken = (
   userUuid: string,
   workspaces?: {
     owners: string[];
   },
+  params?: Partial<{
+    email: string;
+    uuid: string;
+    name: string;
+    lastname: string;
+    username: string;
+    sharedWorkspace: boolean;
+    networkCredentials: {
+      user: string;
+    };
+  }>,
 ): string => {
-  return jwt.sign({ payload: { uuid: userUuid, workspaces } }, config.JWT_SECRET);
+  return jwt.sign({ payload: { uuid: userUuid, workspaces, ...params } }, config.JWT_SECRET);
 };
 
 export const getValidUserToken = (customerId: string): string => {
@@ -219,6 +241,7 @@ export const priceById = ({
   interval,
   type = UserType.Individual,
   businessSeats,
+  product,
 }: {
   bytes: number;
   interval: 'lifetime' | 'year';
@@ -227,6 +250,7 @@ export const priceById = ({
     maxSeats: number;
     minSeats: number;
   };
+  product?: string;
 }) => {
   const mockedPrice = getPrice();
   return {
@@ -237,7 +261,7 @@ export const priceById = ({
     interval,
     decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
     type,
-    product: mockedPrice.product as string,
+    product: product ?? (mockedPrice.product as string),
     ...businessSeats,
   };
 };
@@ -696,7 +720,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
     id: randomDataGenerator.string({ length: 10 }),
     billingType: 'subscription',
     label: 'test-label',
-    productId: randomDataGenerator.string({ length: 15 }),
+    productId: `prod_${randomDataGenerator.string({ length: 15 })}`,
     featuresPerService: {
       mail: { enabled: false, addressesPerUser: randomDataGenerator.integer({ min: 0, max: 5 }) },
       meet: { enabled: false, paxPerCall: randomDataGenerator.integer({ min: 0, max: 5 }) },
