@@ -392,6 +392,7 @@ describe('Tests for License Codes service', () => {
 
     describe('Redeemed code with tier', () => {
       test('When the user redeems a valid code that match with any tier, then the tier is applied', async () => {
+        const tierNotFoundError = new TierNotFoundError('Tier not found');
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
@@ -404,7 +405,7 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
         const applyTierSpy = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
         jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
-        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
 
         await licenseCodesService.applyProductFeatures({
