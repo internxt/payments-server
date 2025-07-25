@@ -169,7 +169,13 @@ export class LicenseCodesService {
         await this.tiersService.applyTier(user, customer, 1, tierProduct.productId, logger);
 
         const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
-        const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId);
+        const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
+          if (error instanceof TierNotFoundError) {
+            return [];
+          }
+
+          throw error;
+        });
         const existingIndividualTier = existingTiersForUser.find(
           (tierProduct) => !tierProduct.featuresPerService[Service.Drive].workspaces.enabled,
         );
