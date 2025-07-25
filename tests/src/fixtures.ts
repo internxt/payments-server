@@ -241,6 +241,7 @@ export const priceById = ({
   interval,
   type = UserType.Individual,
   businessSeats,
+  product,
 }: {
   bytes: number;
   interval: 'lifetime' | 'year';
@@ -249,6 +250,7 @@ export const priceById = ({
     maxSeats: number;
     minSeats: number;
   };
+  product?: string;
 }) => {
   const mockedPrice = getPrice();
   return {
@@ -259,7 +261,7 @@ export const priceById = ({
     interval,
     decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
     type,
-    product: mockedPrice.product as string,
+    product: product ?? (mockedPrice.product as string),
     ...businessSeats,
   };
 };
