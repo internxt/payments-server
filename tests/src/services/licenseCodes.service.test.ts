@@ -291,12 +291,8 @@ describe('Tests for License Codes service', () => {
         interval: 'lifetime',
         product: mockedTier.productId,
       });
-      const mockedProduct = getProduct({
-        params: { id: mockedTier.productId },
-      });
 
       jest.spyOn(paymentService, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
       const result = await licenseCodesService.getTierProduct(mockedLicenseCode);
 
@@ -312,12 +308,8 @@ describe('Tests for License Codes service', () => {
         interval: 'lifetime',
         product: mockedTier.productId,
       });
-      const mockedProduct = getProduct({
-        params: { id: mockedTier.productId },
-      });
 
       jest.spyOn(paymentService, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
       const result = await licenseCodesService.getTierProduct(mockedLicenseCode);
 
@@ -342,12 +334,8 @@ describe('Tests for License Codes service', () => {
         interval: 'lifetime',
         product: mockedTier.productId,
       });
-      const mockedProduct = getProduct({
-        params: { id: mockedTier.productId },
-      });
 
       jest.spyOn(paymentService, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(unexpectedError);
 
       await expect(licenseCodesService.getTierProduct(mockedLicenseCode)).rejects.toThrow(unexpectedError);
@@ -357,7 +345,6 @@ describe('Tests for License Codes service', () => {
   describe('Apply redeemed codes', () => {
     describe('Redeemed code with no tier', () => {
       test('When the user redeems a valid code, then only the storage is updated', async () => {
-        const mockedProduct = getProduct({});
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
@@ -367,7 +354,6 @@ describe('Tests for License Codes service', () => {
         };
         const maxSpaceBytes = 100;
 
-        jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
         await licenseCodesService.applyProductFeatures({
           user,
@@ -406,7 +392,6 @@ describe('Tests for License Codes service', () => {
 
     describe('Redeemed code with tier', () => {
       test('When the user redeems a valid code that match with any tier, then the tier is applied', async () => {
-        const mockedProduct = getProduct({});
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
@@ -416,7 +401,6 @@ describe('Tests for License Codes service', () => {
         };
         const mockedTier = newTier();
 
-        jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
         const applyTierSpy = jest.spyOn(tiersService, 'applyTier').mockResolvedValue();
         jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);

@@ -144,8 +144,7 @@ export class LicenseCodesService {
 
   async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
     const price = await this.paymentService.getPriceById(licenseCode.priceId);
-    const product = await this.paymentService.getProduct(price.product);
-    const productId = product.id;
+    const productId = price.product;
 
     const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
       if (error instanceof TierNotFoundError) {
