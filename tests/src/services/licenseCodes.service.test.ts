@@ -293,10 +293,13 @@ describe('Tests for License Codes service', () => {
       });
 
       jest.spyOn(paymentService, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+      const getTierProductByProductIdSpy = jest
+        .spyOn(tiersService, 'getTierProductsByProductsId')
+        .mockResolvedValue(mockedTier);
       const result = await licenseCodesService.getTierProduct(mockedLicenseCode);
 
       expect(result).toStrictEqual(mockedTier);
+      expect(getTierProductByProductIdSpy).toHaveBeenCalledWith(mockedTier.productId, 'lifetime');
     });
 
     test('When the tier does not exist, then it returns null', async () => {

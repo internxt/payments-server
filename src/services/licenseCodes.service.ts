@@ -146,7 +146,7 @@ export class LicenseCodesService {
     const price = await this.paymentService.getPriceById(licenseCode.priceId);
     const productId = price.product;
 
-    const tierProduct = await this.tiersService.getTierProductsByProductsId(productId).catch((error) => {
+    const tierProduct = await this.tiersService.getTierProductsByProductsId(productId, 'lifetime').catch((error) => {
       if (error instanceof TierNotFoundError) {
         return null;
       }
