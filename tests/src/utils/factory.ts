@@ -1,6 +1,9 @@
 import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
+import { LicenseCodesRepository } from '../../../src/core/users/LicenseCodeRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
+import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
 
@@ -13,6 +16,20 @@ const getUsersRepositoryForTest = (): UsersRepository => {
   };
 
   return usersRepositoryMock;
+};
+
+const getTiersRepository = (): TiersRepository => {
+  return { findByProductId: jest.fn(), findByTierId: jest.fn() } as TiersRepository;
+};
+
+const getUsersTiersRepository = (): UsersTiersRepository => {
+  return {
+    deleteAllUserTiers: jest.fn(),
+    deleteTierFromUser: jest.fn(),
+    findTierIdByUserId: jest.fn(),
+    insertTierToUser: jest.fn(),
+    updateUserTier: jest.fn(),
+  } as UsersTiersRepository;
 };
 
 const getProductsRepositoryForTest = (): ProductsRepository => {
@@ -28,6 +45,7 @@ const getUsersCouponsRepositoryForTest = (): UsersCouponsRepository => {
     create: jest.fn(),
     findById: jest.fn(),
     findByUserAndCoupon: jest.fn(),
+    findCouponsByUserId: jest.fn(),
   };
 
   return usersCouponsRepositoryMock;
@@ -50,12 +68,23 @@ const displayBillingRepositoryForTest = (): DisplayBillingRepository => {
   return displayBillingRepositoryMock;
 };
 
+const getLicenseCodesRepositoryForTest = (): LicenseCodesRepository => {
+  return {
+    findOne: jest.fn(),
+    insert: jest.fn(),
+    updateByCode: jest.fn(),
+  };
+};
+
 const testFactory = {
   getUsersRepositoryForTest,
   getProductsRepositoryForTest,
   getUsersCouponsRepositoryForTest,
   getCouponsRepositoryForTest,
   displayBillingRepositoryForTest,
+  getTiersRepository,
+  getUsersTiersRepository,
+  getLicenseCodesRepositoryForTest,
 };
 
 export default testFactory;

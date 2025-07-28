@@ -3,9 +3,8 @@ import Stripe from 'stripe';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
-import { AllowedCurrencies, Bit2MeService } from './bit2me.service';
-import jwt from 'jsonwebtoken';
-import config from '../config';
+import { Bit2MeService } from './bit2me.service';
+import { BadRequestError, NotFoundError } from '../errors/Errors';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -67,7 +66,7 @@ export interface PaymentIntentCrypto {
   clientSecret?: string;
   id: string;
   payload: {
-    paymentAddress: string,
+    paymentAddress: string;
     url: string;
   };
   invoiceStatus?: string;
@@ -78,7 +77,7 @@ export interface PaymentIntentFiat {
   clientSecret: string;
   id: string;
   payload?: {
-    paymentAddress: string,
+    paymentAddress: string;
     url: string;
   };
   invoiceStatus?: string;
@@ -87,7 +86,7 @@ export interface PaymentIntentFiat {
 export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 
 export type Reason = {
-  name: 'prevent-cancellation';
+  name: 'prevent-cancellation' | 'pc-cloud-25';
 };
 
 const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
@@ -102,6 +101,7 @@ const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCr
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
+  'pc-cloud-25': 6,
 };
 
 export type PriceMetadata = {
@@ -158,7 +158,7 @@ export class PaymentService {
     return customer;
   }
 
-  private async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
+  async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
     try {
       if (country && companyVatId) {
         const taxIds = this.getVatIdFromCountry(country);
@@ -177,6 +177,7 @@ export class PaymentService {
     }
   }
 
+  // TODO: Remove this useless function
   async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
     if (!payload.email) {
       throw new MissingParametersError(['email']);
@@ -200,7 +201,7 @@ export class PaymentService {
     return newCustomer;
   }
 
-  private async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
+  public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
     const hasUserPaidInvoices = userInvoices.some((invoice) => invoice.status === 'paid');
@@ -242,6 +243,30 @@ export class PaymentService {
     };
   }
 
+  async createSubscriptionWithTrial(
+    payload: {
+      customerId: string;
+      priceId: string;
+      seatsForBusinessSubscription?: number;
+      currency?: string;
+      promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+      companyName?: string;
+      companyVatId?: string;
+    },
+    trialReason: Reason,
+  ) {
+    const now = new Date();
+    const trialEnd = Math.floor(now.setMonth(now.getMonth() + reasonFreeMonthsMap[trialReason.name]) / 1000);
+
+    const subscription = await this.createSubscription({
+      ...payload,
+      trialEnd,
+      metadata: { 'why-trial': trialReason.name },
+    });
+
+    return subscription;
+  }
+
   async createSubscription({
     customerId,
     priceId,
@@ -250,6 +275,9 @@ export class PaymentService {
     promoCodeId,
     companyName,
     companyVatId,
+    trialEnd,
+    metadata,
+    additionalOptions,
   }: {
     customerId: string;
     priceId: string;
@@ -258,6 +286,9 @@ export class PaymentService {
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
     companyName?: string;
     companyVatId?: string;
+    trialEnd?: number;
+    metadata?: Stripe.Metadata;
+    additionalOptions?: Partial<Stripe.SubscriptionCreateParams>;
   }): Promise<SubscriptionCreated> {
     const currencyValue = currency ?? 'eur';
     let couponId;
@@ -305,6 +336,7 @@ export class PaymentService {
       metadata: {
         companyName: companyName ?? null,
         companyVatId: companyVatId ?? null,
+        ...metadata,
       },
       payment_behavior: 'default_incomplete',
       payment_settings: {
@@ -312,6 +344,8 @@ export class PaymentService {
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      trial_end: trialEnd ? trialEnd : undefined,
+      ...additionalOptions,
     });
 
     if (subscription.pending_setup_intent !== null) {
@@ -329,6 +363,96 @@ export class PaymentService {
       };
     }
   }
+
+  /**
+   * Creates an invoice to purchase a one time plan.
+   *
+   * @param customerId - The ID of the customer who is purchasing the plan.
+   * @param priceId - The ID of the price associated with the lifetime plan.
+   * @param currency - The currency in which the purchase is made.
+   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
+   *
+   * @returns {PaymentIntent} An object containing:
+   * - `client_secret`: to be used with Stripe Elements,
+   * - `invoice_id`: the ID of the created invoice,
+   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   */
+  async createInvoice({
+    customerId,
+    priceId,
+    currency = 'eur',
+    promoCodeId,
+    additionalInvoiceOptions,
+  }: {
+    customerId: string;
+    priceId: string;
+    currency?: string;
+    promoCodeId?: string;
+    additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
+  }): Promise<PaymentIntent> {
+    let couponId: string | undefined = undefined;
+
+    const invoice = await this.provider.invoices.create({
+      customer: customerId,
+      currency: currency,
+      payment_settings: {
+        payment_method_types: ['card', 'paypal'],
+      },
+      ...additionalInvoiceOptions,
+    });
+
+    if (promoCodeId) {
+      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
+    }
+
+    await this.provider.invoiceItems.create({
+      customer: customerId,
+      invoice: invoice.id,
+      price: priceId,
+      discounts: [
+        {
+          coupon: couponId,
+        },
+      ],
+    });
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+      return {
+        clientSecret: '',
+        id: '',
+        invoiceStatus: finalizedInvoice.status,
+      };
+    }
+
+    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
+      paymentIntentForFinalizedInvoice as string,
+    );
+
+    return {
+      clientSecret: client_secret,
+      id,
+    };
+  }
+
+  /**
+   * @deprecated Use `createInvoice` instead.
+   *
+   * Creates an invoice to purchase a lifetime plan.
+   *
+   * @param customerId - The ID of the customer who is purchasing the plan.
+   * @param priceId - The ID of the price associated with the lifetime plan.
+   * @param currency - The currency in which the purchase is made.
+   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
+   *
+   * @returns {PaymentIntent} An object containing:
+   * - `client_secret`: to be used with Stripe Elements,
+   * - `invoice_id`: the ID of the created invoice,
+   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   */
 
   async createPaymentIntent(
     customerId: CustomerId,
@@ -412,8 +536,8 @@ export class PaymentService {
         payload: {
           paymentAddress: checkoutPayload.paymentAddress,
           url: checkoutPayload.url,
-        }
-      }
+        },
+      };
     }
 
     const { client_secret, id } = await this.provider.paymentIntents.retrieve(
@@ -423,7 +547,7 @@ export class PaymentService {
     return {
       clientSecret: client_secret as string,
       id,
-      type: 'fiat'
+      type: 'fiat',
     };
   }
 
@@ -450,15 +574,17 @@ export class PaymentService {
         ],
       });
     } else {
-      await this.provider.invoiceItems.create({
-        customer: customerId,
-        price: priceId,
-        description: 'One-time charge',
-      });
       const invoice = await this.provider.invoices.create({
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
+      });
+
+      await this.provider.invoiceItems.create({
+        customer: customerId,
+        price: priceId,
+        description: 'One-time charge',
+        invoice: invoice.id,
       });
 
       await this.provider.invoices.pay(invoice.id, {
@@ -759,6 +885,47 @@ export class PaymentService {
     return res.data;
   }
 
+  private invoiceType(invoice: Stripe.Invoice, userType: UserType) {
+    return userType === UserType.Business
+      ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
+      : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+  }
+
+  async getDriveInvoices(
+    customerId: CustomerId,
+    pagination: { limit?: number; startingAfter?: string },
+    userType: UserType = UserType.Individual,
+    subscriptionId?: SubscriptionId,
+  ) {
+    const { limit, startingAfter } = pagination;
+
+    const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId);
+
+    const invoicesMapped = invoices
+      .filter((invoice) =>
+        invoice.created &&
+        invoice.invoice_pdf &&
+        invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
+        invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+        subscriptionId
+          ? true
+          : this.invoiceType(invoice, userType),
+      )
+      .map((invoice) => {
+        return {
+          id: invoice.id,
+          created: invoice.created,
+          pdf: invoice.invoice_pdf,
+          bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+          total: invoice.total,
+          currency: invoice.currency,
+          product: invoice.lines.data[0].price?.product,
+        };
+      });
+
+    return invoicesMapped;
+  }
+
   async isUserElegibleForTrial(user: User, reason: Reason): Promise<HasUserAppliedCouponResponse> {
     const { lifetime, customerId } = user;
 
@@ -811,8 +978,19 @@ export class PaymentService {
    */
   async getDefaultPaymentMethod(
     customerId: CustomerId,
+    isLifetime?: boolean,
     userType: UserType = UserType.Individual,
   ): Promise<PaymentMethod | CustomerSource | null> {
+    if (isLifetime && userType === UserType.Individual) {
+      const { data: userPaymentMethod } = await this.provider.paymentMethods.list({
+        customer: customerId,
+      });
+
+      if (userPaymentMethod.length === 0) return null;
+
+      return userPaymentMethod[0];
+    }
+
     let subscriptions = await this.getActiveSubscriptions(customerId);
     if (subscriptions.length === 0) return null;
 
@@ -912,7 +1090,7 @@ export class PaymentService {
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
-      planId: price?.product as string,
+      productId: price?.product as string,
       userType,
       plan,
     };
@@ -940,6 +1118,7 @@ export class PaymentService {
       .map((price) => {
         return {
           id: price.id,
+          productId: (price.product as Stripe.Product).id,
           currency: currencyValue,
           amount: price.currency_options![currencyValue].unit_amount as number,
           bytes: parseInt(price.metadata.maxSpaceBytes),
@@ -957,8 +1136,9 @@ export class PaymentService {
       expandOptions.push('data.product');
     }
 
+    //!TODO: add metadata["show"]:"1" in query param
     const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
+      query: `active:"true" currency:"${currencyValue}"`,
       expand: expandOptions,
       limit: 100,
     });
@@ -1006,6 +1186,95 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Returns the requested price if exists
+   * @param priceId - The id of the requested price
+   * @param currency - The currency of the requested price
+   * @returns - The selected price if it exists and it is active
+   */
+  async getPriceById(priceId: string, currency = 'eur') {
+    const availablePrices = await this.getPricesRaw(currency);
+
+    const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
+
+    if (!selectedPrice) {
+      throw new NotFoundError('The requested price does not exist');
+    }
+
+    let businessSeats;
+    const { currency_options, recurring, metadata, type, product } = selectedPrice;
+    const isBusinessPrice = metadata?.type === 'business';
+
+    if (isBusinessPrice) {
+      businessSeats = {
+        minimumSeats: Number(metadata.minimumSeats),
+        maximumSeats: Number(metadata.maximumSeats),
+      };
+    }
+
+    return {
+      id: priceId,
+      currency,
+      amount: currency_options![currency].unit_amount as number,
+      bytes: parseInt(metadata?.maxSpaceBytes),
+      interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
+      decimalAmount: (currency_options![currency].unit_amount as number) / 100,
+      type: isBusinessPrice ? UserType.Business : UserType.Individual,
+      product: product as string,
+      ...businessSeats,
+    };
+  }
+
+  /**
+   * Returns the tax for a given price
+   * @param priceId - The Id of the price that we want to calculate the tax for
+   * @param amount - The amount of the price
+   * @param ipAddress - The IP address of the user
+   * @param currency - The currency of the price
+   * @returns - The tax calculation object
+   */
+  async calculateTax(
+    priceId: string,
+    amount: number,
+    ipAddress?: string,
+    currency = 'eur',
+    customerId?: string,
+    postalCode?: string,
+    country?: string,
+  ): Promise<Stripe.Tax.Calculation> {
+    const customerDetails: Stripe.Tax.CalculationCreateParams.CustomerDetails = {};
+
+    if (postalCode && country) {
+      customerDetails.address = {
+        postal_code: postalCode,
+        country: country,
+      };
+      customerDetails.address_source = 'billing';
+    } else {
+      customerDetails.ip_address = ipAddress;
+    }
+
+    return this.provider.tax.calculations.create({
+      customer: customerId,
+      customer_details: customerId ? undefined : customerDetails,
+      line_items: [
+        {
+          amount,
+          reference: priceId,
+          tax_behavior: 'exclusive',
+          quantity: 1,
+        },
+      ],
+      currency,
+    });
+  }
+
+  /**
+   * Deprecated - Use getPriceById instead
+   * @param priceId - Id of the price we want to fetch
+   * @param currency - Currency if needed
+   * @returns - The selected plan and their upsell if needed
+   */
   async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
     let upsellPlan: RequestedPlan['upsellPlan'];
     let businessSeats;
@@ -1081,6 +1350,11 @@ export class PaymentService {
     return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
+  /**
+   * @deprecated Use `getPromoCode` instead
+   * @param promoCodeName - The name of the promotion code
+   * @returns The ACTIVE promotion code object
+   */
   async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
     const { data: promotionCodes } = await this.provider.promotionCodes.list({
       active: true,
@@ -1099,6 +1373,62 @@ export class PaymentService {
     }
 
     return lastActiveCoupon;
+  }
+
+  /**
+   * This function is used to get the promotion code object from Stripe.
+   * @param promoCodeName - The name of the promotion code
+   * @returns The ACTIVE promotion code object
+   */
+  async getPromoCode({
+    promoCodeName,
+    couponId,
+  }: {
+    promoCodeName?: Stripe.PromotionCode['code'];
+    couponId?: string;
+  }): Promise<Stripe.PromotionCode> {
+    const { data: promotionCodes } = await this.provider.promotionCodes.list({
+      active: true,
+      code: promoCodeName,
+      coupon: couponId,
+      expand: ['data.coupon.applies_to'],
+    });
+
+    if (!promotionCodes || promotionCodes.length === 0) {
+      throw new NotFoundError(`The promotion code ${promoCodeName} does not exist`);
+    }
+
+    const [lastActiveCoupon] = promotionCodes;
+    if (!lastActiveCoupon?.active) {
+      throw new NotFoundError(`The promotion code ${promoCodeName} is not active`);
+    }
+
+    return lastActiveCoupon;
+  }
+
+  /**
+   * This function is used to get some information about the promotion code using the code of the Promotion code.
+   * @param product - The id of the product we want to apply the promo code
+   * @param promoCodeName - The name of the promotion code
+   * @returns The promotion code object
+   */
+  async getPromoCodeByName(product: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
+    const promoCode = await this.getPromoCode({ promoCodeName });
+
+    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+
+    const isProductAllowed = promoCodeIsAppliedTo?.find((productId) => productId === product);
+
+    if (promoCodeIsAppliedTo && !isProductAllowed) {
+      throw new BadRequestError(`Promo code ${promoCodeName} is not valid`);
+    }
+
+    return {
+      promoCodeName,
+      codeId: promoCode.id,
+      amountOff: promoCode.coupon.amount_off,
+      percentOff: promoCode.coupon.percent_off,
+    };
   }
 
   async getPromotionCodeByName(priceId: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
@@ -1298,7 +1628,7 @@ export class PaymentService {
 
     await this.provider.invoices.pay(invoiceId, {
       paid_out_of_band: true,
-    })
+    });
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {
@@ -1374,6 +1704,28 @@ export class PaymentService {
     return renewalPeriod;
   }
 
+  /**
+   * @description Creates a payment intent for a given customer, specifying the amount and currency.
+   * @param customerId - The Stripe customer ID for whom the payment intent will be created.
+   * @param currency - The currency in which the payment will be made (e.g., 'usd', 'eur').
+   * @param amount - The total amount to charge, in the smallest currency unit (in cents).
+   * @param additionalOptions - Optional additional parameters to customize the payment intent.
+   * @returns The payment intent object.
+   */
+  async paymentIntent(
+    customerId: string,
+    currency: string,
+    amount: number,
+    additionalOptions?: Partial<Stripe.PaymentIntentCreateParams>,
+  ) {
+    return this.provider.paymentIntents.create({
+      customer: customerId,
+      currency,
+      amount,
+      ...additionalOptions,
+    });
+  }
+
   async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
     const methods = paymentMethodId
       ? [
@@ -1420,6 +1772,10 @@ export class PaymentService {
     });
   }
 
+  async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
+    return this.provider.charges.retrieve(chargeId);
+  }
+
   getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {
     const map: Record<string, Stripe.TaxIdCreateParams.Type[]> = {
       AD: ['ad_nrt'],
@@ -1427,8 +1783,9 @@ export class PaymentService {
       AR: ['ar_cuit'],
       AU: ['au_abn', 'au_arn'],
       AT: ['eu_vat'],
-      BG: ['bg_uic', 'eu_vat'],
+      BG: ['eu_vat', 'bg_uic'],
       BH: ['bh_vat'],
+      BE: ['eu_vat'],
       BO: ['bo_tin'],
       BR: ['br_cnpj', 'br_cpf'],
       CA: ['ca_bn', 'ca_gst_hst', 'ca_pst_bc', 'ca_pst_mb', 'ca_pst_sk', 'ca_qst'],
@@ -1445,15 +1802,15 @@ export class PaymentService {
       EC: ['ec_ruc'],
       EG: ['eg_tin'],
       EE: ['eu_vat'],
-      ES: ['es_cif', 'eu_vat'],
-      EU: ['eu_oss_vat', 'eu_vat'],
+      ES: ['eu_vat', 'es_cif'],
+      EU: ['eu_vat', 'eu_oss_vat'],
       FI: ['eu_vat'],
       FR: ['eu_vat'],
       GE: ['ge_vat'],
       GR: ['eu_vat'],
       HK: ['hk_br'],
       HR: ['eu_vat'],
-      HU: ['hu_tin', 'eu_vat'],
+      HU: ['eu_vat', 'hu_tin'],
       ID: ['id_npwp'],
       IE: ['eu_vat'],
       IL: ['il_vat'],
@@ -1479,12 +1836,12 @@ export class PaymentService {
       PH: ['ph_tin'],
       PL: ['eu_vat'],
       PT: ['eu_vat'],
-      RO: ['ro_tin', 'eu_vat'],
+      RO: ['eu_vat', 'ro_tin'],
       RS: ['rs_pib'],
       RU: ['ru_inn', 'ru_kpp'],
       SA: ['sa_vat'],
       SG: ['sg_gst', 'sg_uen'],
-      SI: ['si_tin', 'eu_vat'],
+      SI: ['eu_vat', 'si_tin'],
       SV: ['sv_nit'],
       SE: ['eu_vat'],
       TH: ['th_vat'],
@@ -1526,10 +1883,12 @@ export class PaymentService {
         type: Stripe.TaxIdCreateParams.Type;
       };
     },
+    additionalOptions?: Partial<Stripe.CustomerUpdateParams>,
   ): Promise<void> {
     if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
       await this.provider.customers.update(customerId, {
         name: updatableAttributes.customer.name,
+        ...additionalOptions,
       });
     }
     if (updatableAttributes.tax) {
@@ -1553,10 +1912,10 @@ export class PaymentService {
     return res.data;
   }
 
-  async getCryptoCurrencies()  {
+  async getCryptoCurrencies() {
     const currencies = await this.bit2MeService.getCurrencies();
 
-    return currencies.filter(c => c.type === 'crypto');
+    return currencies.filter((c) => c.type === 'crypto');
   }
 }
 
@@ -1642,7 +2001,7 @@ export class UserAlreadyExistsError extends Error {
   constructor(email: string) {
     super(`User with email ${email} already exists.`);
 
-    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
+    Object.setPrototypeOf(this, UserAlreadyExistsError.prototype);
   }
 }
 

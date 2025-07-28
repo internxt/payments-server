@@ -14,7 +14,8 @@ export enum UserType {
 }
 
 export type UserSubscription =
-  | { type: 'free' | 'lifetime' }
+  | { type: 'free' }
+  | { type: 'lifetime'; productId?: string }
   | {
       type: 'subscription';
       subscriptionId: string;
@@ -24,7 +25,7 @@ export type UserSubscription =
       interval: 'year' | 'month';
       nextPayment: number;
       priceId: string;
-      planId?: string;
+      productId?: string;
       userType?: UserType;
       plan: PlanSubscription;
     };

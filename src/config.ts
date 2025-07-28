@@ -20,6 +20,8 @@ const mandatoryVariables = [
   'CRYPTO_PAYMENTS_PROCESSOR_API_URL',
   'CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY',
   'CRYPTO_PAYMENTS_PROCESSOR_API_KEY',
+  'VPN_URL',
+  'PC_CLOUD_TRIAL_CODE',
 ] as const;
 
 type BaseConfig = {
@@ -53,5 +55,9 @@ const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.en
 if (undefinedMandatoryVariables.length) {
   throw new Error(`Some mandatory variables are undefined: ${undefinedMandatoryVariables.join(' - ')}.`);
 }
+
+export const isProduction = process.env.NODE_ENV === 'production';
+export const isDevelopment = process.env.NODE_ENV === 'development';
+export const isTest = process.env.NODE_ENV === 'test';
 
 export default process.env as AppConfig;

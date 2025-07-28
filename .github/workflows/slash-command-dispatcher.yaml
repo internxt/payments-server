@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.12.0]
     if: ${{ contains(github.event.issue.labels.*.name, 'deployed') || contains(github.event.issue.labels.*.name, 'preview') }}
     steps:
       - name: Slash Command Dispatch

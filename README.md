@@ -14,14 +14,21 @@
 
 ## Get started
 
+### Requirements
+
+- Node v22.12.0 or newest
+- [Stripe CLI](https://docs.stripe.com/stripe-cli#install)
+
 #### Setting up the project
+
 - Install dependencies: `yarn`
 - Prepare the environment: Rename `.env.template` to `.env` and fill the empty variables
 - Go to '.env' and set STRIPE_SECRET_KEY as the value you can find on Stripe Dashboard in dev mode (Search Bar > Api Keys > Secret Key)
-- Mount the infrastructure: `cd infrastructure && docker-compose up`
+- Mount the infrastructure: `cd infrastructure && docker-compose up` or if you are using the latest docker version: `cd infrastructure && docker compose up`
 - Redirect webhooks to your local server: `stripe listen --forward-to localhost:8003/webhook`
 - Start the project: `yarn run dev`
 
 #### Nice to know
+
 - If you go to `localhost:8082` you'll see a GUI to inspect the mongodb instance
 - Install prettier & eslint vscode extensions for a better dev experience.

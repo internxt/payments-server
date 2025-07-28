@@ -16,7 +16,6 @@ import {
   NotFoundPromoCodeByNameError,
   PaymentService,
   PromoCodeIsNotValidError,
-  UserAlreadyExistsError,
   CustomerNotFoundError,
   InvalidTaxIdError,
 } from '../services/payment.service';
@@ -29,6 +28,11 @@ import {
 } from '../services/licenseCodes.service';
 import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
+import { fetchUserStorage } from '../utils/fetchUserStorage';
+import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { CustomerSyncService } from '../services/customerSync.service';
+import { ForbiddenError } from '../errors/Errors';
+import { VERIFICATION_CHARGE } from '../constants';
 
 type AllowedMethods = 'GET' | 'POST';
 
@@ -42,10 +46,6 @@ const ALLOWED_PATHS: {
   '/plan-by-id': ['GET'],
   '/promo-code-by-name': ['GET'],
   '/promo-code-info': ['GET'],
-  '/object-storage-plan-by-id': ['GET'],
-  '/create-customer-for-object-storage': ['POST'],
-  '/payment-intent-for-object-storage': ['GET'],
-  '/create-subscription-for-object-storage': ['POST'],
 };
 
 export default function (
@@ -54,6 +54,7 @@ export default function (
   config: AppConfig,
   cacheService: CacheService,
   licenseCodesService: LicenseCodesService,
+  tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
@@ -63,88 +64,28 @@ export default function (
     });
     fastify.addHook('onRequest', async (request, reply) => {
       try {
+        const skipAuth = request.routeOptions?.config?.skipAuth;
         const config: { url?: string; method?: AllowedMethods } = {
           url: request.url.split('?')[0],
           method: request.method as AllowedMethods,
         };
+
         if (
-          config.method &&
-          config.url &&
-          ALLOWED_PATHS[config.url] &&
-          ALLOWED_PATHS[config.url].includes(config.method)
+          (config.method &&
+            config.url &&
+            ALLOWED_PATHS[config.url] &&
+            ALLOWED_PATHS[config.url].includes(config.method)) ||
+          skipAuth
         ) {
           return;
         }
+
         await request.jwtVerify();
       } catch (err) {
         request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
         reply.status(401).send();
       }
     });
-
-    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
-      '/create-customer-for-object-storage',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['email', 'name'],
-            properties: {
-              name: { type: 'string' },
-              email: { type: 'string' },
-              country: { type: 'string' },
-              companyVatId: { type: 'string' },
-            },
-          },
-        },
-        config: {
-          rateLimit: {
-            max: 5,
-            timeWindow: '1 hour',
-          },
-        },
-      },
-      async (req, res) => {
-        const { name, email, country, companyVatId } = req.body;
-
-        if (!email) {
-          return res.status(404).send({
-            message: 'Email should be provided',
-          });
-        }
-        try {
-          const { id } = await paymentService.createOrGetCustomer(
-            {
-              name,
-              email,
-            },
-            country,
-            companyVatId,
-          );
-
-          const token = jwt.sign(
-            {
-              customerId: id,
-            },
-            config.JWT_SECRET,
-          );
-
-          return res.send({
-            customerId: id,
-            token,
-          });
-        } catch (err) {
-          const error = err as Error;
-          if (err instanceof UserAlreadyExistsError) {
-            return res.status(409).send(err.message);
-          }
-          req.log.error(`ERROR WHILE CREATING CUSTOMER: ${error.stack ?? error.message}`);
-          return res.status(500).send({
-            message: 'Internal Server Error',
-          });
-        }
-      },
-    );
 
     fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer',
@@ -170,6 +111,7 @@ export default function (
       },
       async (req, res) => {
         const { name, email, country, companyVatId } = req.body;
+        const { uuid } = req.user.payload;
 
         if (!email) {
           return res.status(404).send({
@@ -178,26 +120,22 @@ export default function (
         }
 
         try {
-          const { id } = await paymentService.createOrGetCustomer(
-            {
-              name,
-              email,
-            },
-            country,
-            companyVatId,
-          );
+          const customerSyncService = new CustomerSyncService(usersService, paymentService);
 
-          const token = jwt.sign(
-            {
-              customerId: id,
-            },
-            config.JWT_SECRET,
-          );
+          const existingCustomerId = await customerSyncService.findOrSyncCustomerByUuidOrEmail(uuid, email);
 
-          return res.send({
-            customerId: id,
-            token,
-          });
+          if (existingCustomerId) {
+            const token = jwt.sign({ customerId: existingCustomerId }, config.JWT_SECRET);
+            return res.send({ customerId: existingCustomerId, token });
+          }
+
+          const { id } = await paymentService.createCustomer({ name, email });
+
+          await paymentService.getVatIdAndAttachTaxIdToCustomer(id, country, companyVatId);
+
+          const token = jwt.sign({ customerId: id }, config.JWT_SECRET);
+
+          return res.send({ customerId: id, token });
         } catch (err) {
           const error = err as Error;
 
@@ -326,7 +264,7 @@ export default function (
         }
 
         try {
-          const subscriptionSetUp = await paymentService.createSubscription({
+          const subscriptionSetup = await paymentService.createSubscription({
             customerId,
             priceId,
             seatsForBusinessSubscription: seatsForBusinessSubscription ?? 1,
@@ -334,7 +272,7 @@ export default function (
             promoCodeId,
           });
 
-          return res.send(subscriptionSetUp);
+          return res.send(subscriptionSetup);
         } catch (err) {
           const error = err as Error;
           req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
@@ -363,14 +301,109 @@ export default function (
     fastify.post<{
       Body: {
         customerId: string;
+        token: string;
+        priceId: string;
+        paymentMethod: string;
+        currency?: string;
+      };
+    }>(
+      '/payment-method-verification',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerId', 'token', 'paymentMethod', 'priceId'],
+            properties: {
+              customerId: {
+                type: 'string',
+                description: 'The ID of the customer we want to verify the payment method',
+              },
+              token: {
+                type: 'string',
+                description: 'The user tokens',
+              },
+              priceId: {
+                type: 'string',
+                description: 'The ID of the price we want to subscribe the user',
+              },
+              currency: {
+                type: 'string',
+                description: 'The currency the customer will use (optional)',
+                default: 'eur',
+              },
+              paymentMethod: {
+                type: 'string',
+                description: 'The payment method Id the user wants to verify',
+              },
+            },
+          },
+        },
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, res) => {
+        let tokenCustomerId: string;
+        const { customerId, currency = 'eur', priceId, token, paymentMethod } = req.body;
+
+        try {
+          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
+            customerId: string;
+          };
+          tokenCustomerId = customerId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        if (customerId !== tokenCustomerId) {
+          throw new ForbiddenError();
+        }
+
+        res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
+
+        const paymentIntentVerification = await paymentService.paymentIntent(
+          customerId,
+          currency,
+          VERIFICATION_CHARGE,
+          {
+            metadata: {
+              type: 'object-storage',
+              priceId,
+            },
+            description: 'Card verification charge',
+            capture_method: 'manual',
+            setup_future_usage: 'off_session',
+            payment_method_types: ['card', 'paypal'],
+            payment_method: paymentMethod,
+          },
+        );
+
+        if (paymentIntentVerification.status === 'requires_capture') {
+          return res.status(200).send({
+            intentId: paymentIntentVerification.id,
+            verified: true,
+          });
+        }
+
+        return res.status(200).send({
+          intentId: paymentIntentVerification.id,
+          verified: false,
+          clientSecret: paymentIntentVerification.client_secret,
+        });
+      },
+    );
+
+    fastify.post<{
+      Querystring: { trialToken: string };
+      Body: {
+        customerId: string;
         priceId: string;
         currency: string;
         token: string;
-        companyName: string;
-        companyVatId: string;
+        trialCode: string;
       };
     }>(
-      '/create-subscription-for-object-storage',
+      '/create-subscription-with-trial',
       {
         schema: {
           body: {
@@ -389,10 +422,7 @@ export default function (
               currency: {
                 type: 'string',
               },
-              companyName: {
-                type: 'string',
-              },
-              companyVatId: {
+              trialCode: {
                 type: 'string',
               },
             },
@@ -400,7 +430,7 @@ export default function (
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, companyName, companyVatId } = req.body;
+        const { customerId, priceId, currency, token } = req.body;
 
         if (!customerId || !priceId) {
           throw new MissingParametersError(['customerId', 'priceId']);
@@ -419,29 +449,51 @@ export default function (
           return res.status(403).send();
         }
 
-        try {
-          const subscriptionSetUp = await paymentService.createSubscription({
-            customerId,
-            priceId,
-            currency,
-            companyName,
-            companyVatId,
-          });
+        const { trialToken } = req.query;
 
-          return res.send(subscriptionSetUp);
+        if (!trialToken) {
+          return res.status(403).send('Invalid trial token');
+        }
+
+        try {
+          const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
+          if (!payload.trial || payload.trial !== 'pc-cloud-25') {
+            throw new Error('Invalid trial token');
+          }
+        } catch {
+          return res.status(403).send('Invalid trial token');
+        }
+
+        try {
+          const subscriptionSetup = await paymentService.createSubscriptionWithTrial(
+            {
+              customerId,
+              priceId,
+              currency,
+            },
+            {
+              name: 'pc-cloud-25',
+            },
+          );
+
+          return res.send(subscriptionSetup);
         } catch (err) {
           const error = err as Error;
+          req.log.error(`[ERROR CREATING SUBSCRIPTION WITH TRIAL]: ${error.stack ?? error.message}`);
+
           if (error instanceof MissingParametersError) {
             return res.status(400).send({
               message: error.message,
             });
+          } else if (error instanceof PromoCodeIsNotValidError) {
+            return res
+              .status(422)
+              .send({ message: 'The promotion code is not applicable under the current conditions' });
           } else if (error instanceof ExistingSubscriptionError) {
             return res.status(409).send({
               message: error.message,
             });
           }
-
-          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',
@@ -450,13 +502,26 @@ export default function (
       },
     );
 
+    fastify.get<{
+      Querystring: { code: string };
+    }>('/trial-for-subscription', async (req, rep) => {
+      const { code } = req.query;
+      if (!code || code !== process.env.PC_CLOUD_TRIAL_CODE) {
+        return rep.status(400).send();
+      }
+
+      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET);
+    });
+
     fastify.get('/users/exists', async (req, rep) => {
       await assertUser(req, rep, usersService);
 
       return rep.status(200).send();
     });
 
-    fastify.get<{ Querystring: { limit: number; starting_after?: string; subscription?: string } }>(
+    fastify.get<{
+      Querystring: { limit: number; starting_after?: string; userType?: UserType; subscription?: string };
+    }>(
       '/invoices',
       {
         schema: {
@@ -465,39 +530,28 @@ export default function (
             properties: {
               limit: { type: 'number', default: 10 },
               starting_after: { type: 'string' },
+              userType: { type: 'string', default: UserType.Individual },
               subscription: { type: 'string' },
             },
           },
         },
       },
       async (req, rep) => {
-        const { limit, starting_after: startingAfter, subscription: subscriptionId } = req.query;
+        const { limit, starting_after: startingAfter, userType, subscription: subscriptionId } = req.query;
 
         const user = await assertUser(req, rep, usersService);
 
-        const invoices = await paymentService.getInvoicesFromUser(
+        const userInvoices = await paymentService.getDriveInvoices(
           user.customerId,
-          { limit, startingAfter },
+          {
+            limit,
+            startingAfter,
+          },
+          userType,
           subscriptionId,
         );
 
-        const invoicesMapped = invoices
-          .filter(
-            (invoice) =>
-              invoice.created && invoice.invoice_pdf && invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes,
-          )
-          .map((invoice) => {
-            return {
-              id: invoice.id,
-              created: invoice.created,
-              pdf: invoice.invoice_pdf,
-              bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
-              total: invoice.total,
-              currency: invoice.currency,
-            };
-          });
-
-        return rep.send(invoicesMapped);
+        return rep.send(userInvoices);
       },
     );
 
@@ -597,6 +651,30 @@ export default function (
       },
     );
 
+    fastify.post<{
+      Body: { customerId: string };
+    }>(
+      '/setup-intent',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              trialReason: { type: 'string' },
+            },
+          },
+        },
+      },
+      async (req, rep) => {
+        const { customerId } = req.body;
+        const { client_secret: clientSecret } = await paymentService.getSetupIntent(customerId, {
+          userType: UserType.Individual,
+        });
+
+        return { clientSecret };
+      },
+    );
+
     fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
@@ -605,7 +683,9 @@ export default function (
         schema: {
           querystring: {
             type: 'object',
-            properties: { userType: { type: 'string', enum: ['individual', 'business'] } },
+            properties: {
+              userType: { type: 'string', enum: ['individual', 'business'] },
+            },
           },
         },
       },
@@ -641,6 +721,7 @@ export default function (
         };
       };
     }>('/payment-intent', async (req, res) => {
+      const { uuid, email } = req.user.payload;
       const { customerId, amount, planId, currency, token, promoCodeName } = req.query;
 
       try {
@@ -657,6 +738,19 @@ export default function (
       }
 
       try {
+        const { selectedPlan } = await paymentService.getPlanById(planId);
+        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
+          uuid,
+          email,
+          selectedPlan.bytes.toString(),
+        );
+
+        if (!isStorageUpgradeAllowed) {
+          return res.status(400).send({
+            message: "The user can't stack more storage",
+          });
+        }
+
         const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
           customerId,
           amount,
@@ -687,6 +781,7 @@ export default function (
       }
     });
 
+    // TODO: Remove this useless endpoint
     fastify.get<{
       Querystring: {
         customerId: CustomerId;
@@ -760,9 +855,9 @@ export default function (
         },
       },
       async (req, rep) => {
-        const user = await assertUser(req, rep, usersService);
+        const { customerId, lifetime } = await assertUser(req, rep, usersService);
         const userType = (req.query.userType as UserType) || UserType.Individual;
-        return paymentService.getDefaultPaymentMethod(user.customerId, userType);
+        return paymentService.getDefaultPaymentMethod(customerId, lifetime, userType);
       },
     );
 
@@ -800,7 +895,18 @@ export default function (
         }
 
         if (isLifetimeUser) {
-          response = { type: 'lifetime' };
+          try {
+            const userTier = await tiersService.getTiersProductsByUserId(user.id);
+            const lifetimePlan = userTier.filter((tier) => tier.billingType === 'lifetime');
+
+            response = { type: 'lifetime', productId: lifetimePlan[0].productId };
+          } catch (error) {
+            if (!(error instanceof TierNotFoundError)) {
+              throw error;
+            }
+
+            response = { type: 'lifetime' };
+          }
         } else {
           response = await paymentService.getUserSubscription(user.customerId, userType);
         }
@@ -955,38 +1061,6 @@ export default function (
         }
 
         req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
-
-    fastify.get<{
-      Querystring: { planId: string; currency?: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { planId: { type: 'string' }; currency: { type: 'string' } };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 minute';
-        };
-      };
-    }>('/object-storage-plan-by-id', async (req, rep) => {
-      const { planId, currency } = req.query;
-
-      try {
-        const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
-
-        return rep.status(200).send(planObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send({ message: err.message });
-        }
-
-        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
@@ -1172,7 +1246,12 @@ export default function (
         const { code, provider } = req.body;
 
         try {
-          await licenseCodesService.redeem({ email, uuid, name: `${name} ${lastname}` }, code, provider);
+          await licenseCodesService.redeem({
+            user: { email, uuid, name: `${name} ${lastname}` },
+            code,
+            provider,
+            logger: req.log,
+          });
 
           return rep.status(200).send({ message: 'Code redeemed' });
         } catch (error) {

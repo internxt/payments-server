@@ -26,6 +26,10 @@ import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { Bit2MeService } from './services/bit2me.service';
+import { TiersService } from './services/tiers.service';
+import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
+import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
+import { ProductsService } from './services/products.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -35,6 +39,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
   const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
   const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
+  const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
+  const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
 
   const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
@@ -50,23 +56,37 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     axios,
   );
   const cacheService = new CacheService(envVariablesConfig);
-  const licenseCodesService = new LicenseCodesService(
+  const tiersService = new TiersService(
+    usersService,
+    paymentService,
+    tiersRepository,
+    usersTiersRepository,
+    storageService,
+    envVariablesConfig,
+  );
+  const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
     storageService,
     licenseCodesRepository,
-  );
+    tiersService,
+  });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
-  const fastify = await buildApp(
+
+  const productsService = new ProductsService(tiersService, usersService);
+
+  const fastify = await buildApp({
     paymentService,
     storageService,
     usersService,
     cacheService,
+    tiersService,
     licenseCodesService,
     objectStorageService,
+    productsService,
     stripe,
-    envVariablesConfig,
-  );
+    config: envVariablesConfig,
+  });
 
   fastify.addHook('onClose', async () => {
     await cacheService['redis'].quit();

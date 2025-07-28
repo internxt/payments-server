@@ -12,8 +12,8 @@ import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRe
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import testFactory from '../utils/factory';
-import getMocks from '../mocks';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { getActiveSubscriptions, getCoupon, getUser, newTier } from '../fixtures';
 
 let paymentService: PaymentService;
 let storageService: StorageService;
@@ -24,6 +24,11 @@ let couponsRepository: CouponsRepository;
 let usersCouponsRepository: UsersCouponsRepository;
 let productsRepository: ProductsRepository;
 let bit2MeService: Bit2MeService;
+
+jest.mock('jsonwebtoken', () => ({
+  ...jest.requireActual('jsonwebtoken'),
+  sign: jest.fn(),
+}));
 
 beforeEach(() => {
   usersRepository = testFactory.getUsersRepositoryForTest();
@@ -52,117 +57,152 @@ beforeEach(() => {
 
 const voidPromise = () => Promise.resolve();
 
-const mocks = getMocks();
-
 describe('UsersService tests', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
   });
 
-  describe('Insert User in Mongo DB', () => {
+  describe('Insert the user to the database', () => {
     it('When trying to add a user with the correct params, the user is inserted successfully', async () => {
+      const mockedUser = getUser();
       await usersService.insertUser({
-        customerId: mocks.mockedUser.customerId,
-        uuid: mocks.mockedUser.uuid,
-        lifetime: true,
+        customerId: mockedUser.customerId,
+        uuid: mockedUser.uuid,
+        lifetime: mockedUser.lifetime,
       });
 
       expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
       expect(usersRepository.insertUser).toHaveBeenCalledWith({
-        customerId: mocks.mockedUser.customerId,
-        uuid: mocks.mockedUser.uuid,
-        lifetime: true,
+        customerId: mockedUser.customerId,
+        uuid: mockedUser.uuid,
+        lifetime: mockedUser.lifetime,
       });
     });
   });
 
-  describe('Find customer by Customer ID', () => {
-    it('When looking for a customer by its ID with the correct params, then the customer is found', async () => {
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mocks.mockedUser);
+  describe('Update existent user values', () => {
+    it('When the user is updated successfully, then resolves', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      (usersRepository.updateUser as jest.Mock).mockResolvedValue(true);
 
-      const result = await usersService.findUserByCustomerID(mocks.mockedUser.customerId);
+      await expect(
+        usersService.updateUser(mockedUser.customerId, { lifetime: mockedUser.lifetime }),
+      ).resolves.toBeUndefined();
 
-      expect(result).toStrictEqual(mocks.mockedUser);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledTimes(1);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mocks.mockedUser.customerId);
+      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+      expect(usersRepository.updateUser).toHaveBeenCalledWith(mockedUser.customerId, {
+        lifetime: true,
+      });
     });
 
-    it('when no user is found by customerId, then an UserNotFoundError is thrown', async () => {
+    it('When a user is not found, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      (usersRepository.updateUser as jest.Mock).mockImplementation(() =>
+        Promise.reject(new UserNotFoundError('User not found')),
+      );
+
+      await expect(usersService.updateUser(mockedUser.customerId, { lifetime: mockedUser.lifetime })).rejects.toThrow(
+        UserNotFoundError,
+      );
+
+      expect(usersRepository.updateUser).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Find user by his Customer Id', () => {
+    it('When looking for a customer by its customer ID and exists, then the user is returned', async () => {
+      const mockedUser = getUser();
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
+
+      const result = await usersService.findUserByCustomerID(mockedUser.customerId);
+
+      expect(result).toStrictEqual(mockedUser);
+      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledTimes(1);
+      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedUser.customerId);
+    });
+
+    it('When a user is not found, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(null);
 
-      await expect(usersService.findUserByCustomerID(mocks.mockedUser.customerId)).rejects.toThrow(UserNotFoundError);
+      await expect(usersService.findUserByCustomerID(mockedUser.customerId)).rejects.toThrow(UserNotFoundError);
 
       expect(usersRepository.findUserByCustomerId).toHaveBeenCalledTimes(1);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mocks.mockedUser.customerId);
+      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedUser.customerId);
     });
   });
 
   describe('Find customer by User UUId', () => {
     it('When looking for a customer by UUID with the correct params, then the customer is found', async () => {
-      (usersRepository.findUserByUuid as jest.Mock).mockResolvedValue(mocks.mockedUser);
+      const mockedUser = getUser();
+      (usersRepository.findUserByUuid as jest.Mock).mockResolvedValue(mockedUser);
 
-      const result = await usersService.findUserByUuid(mocks.mockedUser.uuid);
+      const result = await usersService.findUserByUuid(mockedUser.uuid);
 
-      expect(result).toStrictEqual(mocks.mockedUser);
+      expect(result).toStrictEqual(mockedUser);
       expect(usersRepository.findUserByUuid).toHaveBeenCalledTimes(1);
-      expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mocks.mockedUser.uuid);
+      expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mockedUser.uuid);
     });
 
-    it('when no user is found by UUID then should throw UserNotFoundError', async () => {
+    it('When a user is not found, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
       (usersRepository.findUserByUuid as jest.Mock).mockResolvedValue(null);
 
-      await expect(usersService.findUserByUuid(mocks.mockedUser.uuid)).rejects.toThrow(UserNotFoundError);
+      await expect(usersService.findUserByUuid(mockedUser.uuid)).rejects.toThrow(UserNotFoundError);
 
       expect(usersRepository.findUserByUuid).toHaveBeenCalledTimes(1);
-      expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mocks.mockedUser.uuid);
+      expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mockedUser.uuid);
     });
   });
 
-  describe('Cancelling user subscription', () => {
-    describe('Cancel the user individual subscription', () => {
+  describe('Cancel user subscription', () => {
+    describe('Cancel the user Individual subscription', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plan is cancelled and the storage is restored', async () => {
+        const mockedUser = getUser();
+        const mockedSubscriptions = getActiveSubscriptions();
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
           .mockImplementation(() =>
             Promise.resolve(
-              mocks.mockActiveSubscriptions.filter(
-                (sub) => sub.product?.metadata.type !== 'business',
+              mockedSubscriptions.filter(
+                (sub) => (sub.items.data[0].plan.product as Stripe.Product).metadata.type !== 'business',
               ) as unknown as ExtendedSubscription[],
             ),
           );
+
         const cancelSubscriptionSpy = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
         const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
-        await usersService.cancelUserIndividualSubscriptions(mocks.mockedUser.customerId);
-        await storageService.changeStorage(mocks.mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        await usersService.cancelUserIndividualSubscriptions(mockedUser.customerId);
+        await storageService.changeStorage(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
 
-        const individualSubscriptions = mocks.mockActiveSubscriptions.filter(
-          (sub) => sub.product?.metadata.type !== 'business',
+        const individualSubscriptions = mockedSubscriptions.filter(
+          (sub) => (sub.items.data[0].plan.product as Stripe.Product).metadata.type !== 'business',
         );
         expect(cancelSubscriptionSpy).toHaveBeenCalledTimes(individualSubscriptions.length);
 
         expect(changeStorageSpy).toHaveBeenCalledTimes(1);
-        expect(changeStorageSpy).toHaveBeenCalledWith(mocks.mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
       });
     });
 
     describe('Cancel the user B2B subscription', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plans are cancelled', async () => {
+        const mockedUser = getUser();
+        const mockedSubscriptions = getActiveSubscriptions();
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
-          .mockImplementation(() =>
-            Promise.resolve(mocks.mockActiveSubscriptions as unknown as ExtendedSubscription[]),
-          );
+          .mockImplementation(() => Promise.resolve(mockedSubscriptions as unknown as ExtendedSubscription[]));
 
         const cancelSubscriptionSpy = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
         const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
 
-        await usersService.cancelUserB2BSuscriptions(mocks.mockedUser.customerId);
-        await storageService.changeStorage(mocks.mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        await usersService.cancelUserB2BSuscriptions(mockedUser.customerId);
+        await storageService.changeStorage(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
 
-        const b2bSubscriptions = mocks.mockActiveSubscriptions.filter(
-          (sub) => sub.product?.metadata.type === 'business',
+        const b2bSubscriptions = mockedSubscriptions.filter(
+          (sub) => (sub.items.data[0].plan.product as Stripe.Product).metadata.type === 'business',
         );
 
         expect(cancelSubscriptionSpy).toHaveBeenCalledTimes(b2bSubscriptions.length);
@@ -172,73 +212,155 @@ describe('UsersService tests', () => {
         });
 
         expect(changeStorageSpy).toHaveBeenCalledTimes(1);
-        expect(changeStorageSpy).toHaveBeenCalledWith(mocks.mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
       });
     });
   });
 
   describe('Storing coupon user by user', () => {
     it('When the coupon is tracked, then the coupon is stored correctly', async () => {
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
+      const mockedUser = getUser();
+      const mockedCoupon = getCoupon();
+      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mockedCoupon);
 
-      await usersService.storeCouponUsedByUser(mocks.mockedUser, mocks.mockedCoupon.code);
+      await usersService.storeCouponUsedByUser(mockedUser, mockedCoupon.code);
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.mockedCoupon.code);
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
       expect(usersCouponsRepository.create).toHaveBeenCalledWith({
-        coupon: mocks.mockedCoupon.id,
-        user: mocks.mockedUser.id,
+        user: mockedUser.id,
+        coupon: mockedCoupon.id,
       });
     });
-
-    it('when the coupon is not tracked, then the an CouponNotBeingTrackedError is thrown', async () => {
+    it('when the coupon is not tracked, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedCoupon = getCoupon();
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
 
-      await expect(usersService.storeCouponUsedByUser(mocks.mockedUser, mocks.couponName.invalid)).rejects.toThrow(
+      await expect(usersService.storeCouponUsedByUser(mockedUser, mockedCoupon.code)).rejects.toThrow(
         CouponNotBeingTrackedError,
       );
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.couponName.invalid);
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
       expect(usersCouponsRepository.create).not.toHaveBeenCalled();
     });
   });
 
-  describe('isCouponBeingUsedByUser', () => {
+  describe('Verify if the user used a tracked coupon code', () => {
     it('When the coupon is tracked and used by the user, then returns true', async () => {
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
+      const mockedUser = getUser();
+      const mockedCoupon = getCoupon();
+      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mockedCoupon);
       (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue({ id: 'entry1' });
 
-      const result = await usersService.isCouponBeingUsedByUser(mocks.mockedUser, mocks.mockedCoupon.code);
+      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.mockedCoupon.code);
-      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(
-        mocks.mockedUser.id,
-        mocks.mockedCoupon.id,
-      );
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
+      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(mockedUser.id, mockedCoupon.id);
       expect(result).toBe(true);
     });
 
     it('When the coupon is tracked but not used by the user, then returns false', async () => {
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mocks.mockedCoupon);
+      const mockedUser = getUser();
+      const mockedCoupon = getCoupon();
+      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mockedCoupon);
       (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue(null);
 
-      const result = await usersService.isCouponBeingUsedByUser(mocks.mockedUser, mocks.mockedCoupon.code);
+      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.mockedCoupon.code);
-      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(
-        mocks.mockedUser.id,
-        mocks.mockedCoupon.id,
-      );
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
+      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(mockedUser.id, mockedCoupon.id);
       expect(result).toBe(false);
     });
 
     it('When the coupon is not tracked, then returns false', async () => {
+      const mockedUser = getUser();
+      const mockedCoupon = getCoupon();
       (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
 
-      const result = await usersService.isCouponBeingUsedByUser(mocks.mockedUser, mocks.couponName.invalid);
+      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
 
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mocks.couponName.invalid);
+      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
       expect(usersCouponsRepository.findByUserAndCoupon).not.toHaveBeenCalled();
       expect(result).toBe(false);
+    });
+  });
+
+  describe('Fetch all coupons linked to a user', () => {
+    it('When the user does not have any coupon associated, then nothing is returned', async () => {
+      const mockedUser = getUser();
+      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(null);
+
+      const result = await usersService.getStoredCouponsByUserId(mockedUser.id);
+
+      expect(result).toBeNull();
+    });
+
+    it('When the user has associated coupons, then the Coupon IDs (not ID collection) are returned from the local DB', async () => {
+      const mockedUser = getUser();
+      const coupon1 = getCoupon();
+      const coupon2 = getCoupon({ code: 'CoUP0n2' });
+      const mockedUserCoupons = [
+        {
+          id: 'relation-1',
+          coupon: coupon1.id,
+          user: mockedUser.id,
+        },
+        {
+          id: 'relation-2',
+          coupon: coupon2.id,
+          user: mockedUser.id,
+        },
+      ];
+
+      jest.spyOn(usersCouponsRepository, 'findCouponsByUserId').mockResolvedValue(mockedUserCoupons);
+      jest.spyOn(couponsRepository, 'findById').mockImplementation(async (id: string) => {
+        if (id === coupon1.id) return coupon1;
+        if (id === coupon2.id) return coupon2;
+        return null;
+      });
+
+      const result = await usersService.getStoredCouponsByUserId(mockedUser.id);
+
+      expect(result).toStrictEqual([coupon1.code, coupon2.code]);
+    });
+  });
+
+  describe('Enable the VPN feature based on the tier', () => {
+    it('When called with a userUuid and tier, then enables the VPN for the user', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const tier = newTier().featuresPerService['vpn'].featureId;
+
+      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
+
+      await usersService.enableVPNTier(userUuid, tier);
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.VPN_URL}/gateway/users`,
+        { uuid: userUuid, tierId: tier },
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('Disable the VPN feature', () => {
+    it('When called with a userUuid and tier, then disables the VPN for the user', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const featureId = newTier().featuresPerService['vpn'].featureId;
+
+      const axiosPostSpy = jest.spyOn(axios, 'delete').mockResolvedValue({} as any);
+
+      await usersService.disableVPNTier(userUuid, featureId);
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(`${config.VPN_URL}/gateway/users/${userUuid}/tiers/${featureId}`, {
+        headers: {
+          Authorization: 'Bearer undefined',
+          'Content-Type': 'application/json',
+        },
+      });
     });
   });
 });

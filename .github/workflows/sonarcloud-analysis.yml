@@ -12,24 +12,26 @@ jobs:
     environment: test
     strategy:
       matrix:
-        node_version: [20.x]
+        node-version: [22.12.0]
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
-      - name: Set up Node.js ${{ matrix.node_version }}
-        uses: actions/setup-node@v1
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node_version }}
+          node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
-      - run: echo REACT_APP_NODE_ENV=test >> ./.env
+      - run: echo NODE_ENV=test >> ./.env
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
       - run: echo JWT_SECRET=JWT_SECRET >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
+      - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
+      - run: echo PC_CLOUD_TRIAL_CODE=my_code >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
@@ -45,7 +47,7 @@ jobs:
         run: yarn test:cov
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

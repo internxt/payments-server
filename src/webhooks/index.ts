@@ -9,11 +9,13 @@ import { PaymentService } from '../services/payment.service';
 import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
-import handleSetupIntentSucceded from './handleSetupIntentSucceded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
-import handlePaymentIntentSucceeded from './handlePaymentIntentSucceeded';
+import { handleDisputeResult } from './handleDisputeResult';
+import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import { TiersService } from '../services/tiers.service';
+import handleFundsCaptured from './handleFundsCaptured';
 
 export default function (
   stripe: Stripe,
@@ -23,6 +25,7 @@ export default function (
   config: AppConfig,
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
+  tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -48,12 +51,11 @@ export default function (
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(
-            event.data.object as Stripe.Invoice,
-            objectStorageService,
-            paymentService,
-            fastify.log,
-          );
+          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, fastify.log);
+          break;
+
+        case 'payment_intent.amount_capturable_updated':
+          await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe, fastify.log);
           break;
 
         case 'customer.subscription.deleted':
@@ -61,9 +63,10 @@ export default function (
             storageService,
             usersService,
             paymentService,
-            event.data.object as Stripe.Subscription,
+            event.data.object,
             cacheService,
             objectStorageService,
+            tiersService,
             fastify.log,
             config,
           );
@@ -99,8 +102,6 @@ export default function (
               },
             });
           }
-
-          await handlePaymentIntentSucceeded(eventData, paymentService, objectStorageService, fastify.log);
           break;
         }
 
@@ -111,7 +112,8 @@ export default function (
             paymentService,
             fastify.log,
             cacheService,
-            config,
+            tiersService,
+            storageService,
             objectStorageService,
           );
           break;
@@ -129,7 +131,7 @@ export default function (
           break;
 
         case 'setup_intent.succeeded':
-          await handleSetupIntentSucceded(event.data.object as Stripe.SetupIntent, paymentService);
+          await handleSetupIntentSucceeded(event.data.object, paymentService);
           break;
 
         case 'checkout.session.async_payment_succeeded':
@@ -148,15 +150,36 @@ export default function (
           if (event.data.object.metadata.type === 'object-storage') {
             // no op
           } else {
-            await handleLifetimeRefunded(
-              storageService,
-              usersService,
-              event.data.object.customer as string,
-              cacheService,
-              fastify.log,
-              config,
-            );
+            const isFullAmountRefunded = event.data.object.refunded;
+
+            if (isFullAmountRefunded) {
+              await handleLifetimeRefunded(
+                storageService,
+                usersService,
+                event.data.object,
+                cacheService,
+                paymentService,
+                fastify.log,
+                tiersService,
+                config,
+              );
+            }
           }
+          break;
+
+        case 'charge.dispute.closed':
+          const dispute = event.data.object;
+          await handleDisputeResult({
+            dispute,
+            stripe,
+            paymentService,
+            usersService,
+            storageService,
+            cacheService,
+            tiersService,
+            log: fastify.log,
+            config,
+          });
           break;
 
         default:
