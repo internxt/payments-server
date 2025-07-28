@@ -1,11 +1,11 @@
-import { Axios, AxiosError, AxiosRequestConfig } from "axios";
-import { AppConfig } from "../config";
-import { createHmac } from "crypto";
+import { Axios, AxiosError, AxiosRequestConfig } from 'axios';
+import { AppConfig } from '../config';
+import { createHmac } from 'crypto';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
   name: string; // The full name of the currency (e.g., "Bitcoin", "Euro")
-  type: "crypto" | "fiat"; // The type of currency: "crypto" or "fiat"
+  type: 'crypto' | 'fiat'; // The type of currency: "crypto" or "fiat"
   receiveType: boolean; // Indicates if the currency can be received
   networks: { platformId: string; name: string }[]; // Available networks for the currency
   imageUrl: string; // The URL to the currency's icon
@@ -58,11 +58,14 @@ interface RawInvoiceResponse {
   merchant: {
     merchantId: string;
     name: string;
-  },
+  };
   url: string;
 }
 
-type ParsedInvoiceResponse = Omit<RawInvoiceResponse, 'createdAt' | 'updatedAt' | 'expiredAt' | 'priceAmount' | 'underpaidAmount' | 'overpaidAmount'> & {
+type ParsedInvoiceResponse = Omit<
+  RawInvoiceResponse,
+  'createdAt' | 'updatedAt' | 'expiredAt' | 'priceAmount' | 'underpaidAmount' | 'overpaidAmount'
+> & {
   createdAt: Date;
   updatedAt: Date;
   expiredAt: Date;
@@ -100,17 +103,16 @@ export class Bit2MeService {
       'b2m-processing-key': this.apiKey,
       'b2m-secret-key': this.signSecret(payload),
       'Content-Type': 'application/json',
-    }
+    };
   }
 
   isAllowedCurrency(value: string): value is AllowedCurrencies {
     return Object.values(AllowedCurrencies).includes(value as AllowedCurrencies);
   }
-  
 
   /**
    * Creates a new invoice in the Bit2Me system.
-   * 
+   *
    * @param {Object} payload - The data required to create the invoice.
    * @param {string} payload.foreignId - Unique ID for the invoice in your system.
    * @param {string} payload.priceAmount - The amount to be invoiced.
@@ -135,69 +137,65 @@ export class Bit2MeService {
     purchaserEmail: string;
     securityToken: string;
   }): Promise<ParsedCreatedInvoiceResponse> {
-    const payloadReq = { ...payload, priceAmount: payload.priceAmount.toString() }
+    const payloadReq = {
+      ...payload,
+      receiveCurrency: AllowedCurrencies['Bitcoin'],
+      priceAmount: payload.priceAmount.toString(),
+    };
     const params: AxiosRequestConfig = {
       method: 'POST',
       url: `${this.apiUrl}/v3/commerce/invoices`,
       headers: this.getAPIHeaders(payloadReq),
       data: payloadReq,
     };
-  
+
     try {
       const { data } = await this.axios.request<RawCreateInvoiceResponse>(params);
-  
+
       const response: ParsedCreatedInvoiceResponse = {
         ...data,
         createdAt: new Date(data.createdAt),
         updatedAt: new Date(data.updatedAt),
         priceAmount: parseFloat(data.priceAmount),
       };
-    
+
       return response;
     } catch (err: unknown | Error | AxiosError<Bit2MeAPIError>) {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
-  
+
         throw new Error(
-          `Status ${
-            data.statusCode
-          } received -> ${
-            data.message.join(',')
-          } / payload ${
-            JSON.stringify(payloadReq)
-          }
-        `);
+          `Status ${data.statusCode} received -> ${data.message.join(',')} / payload ${JSON.stringify(payloadReq)}
+        `,
+        );
       } else {
         throw err;
       }
     }
   }
-  
+
   /**
    * Activates an invoice for payment processing.
-   * 
+   *
    * @param {string} invoiceId - The unique ID of the invoice to activate.
    * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
    * @throws {Error} If the API call fails or the invoice ID is invalid.
    */
-  async checkoutInvoice(
-    invoiceId: string,
-    currencyId: AllowedCurrencies,
-  ): Promise<ParsedInvoiceResponse> {
+  async checkoutInvoice(invoiceId: string, currencyId: AllowedCurrencies): Promise<ParsedInvoiceResponse> {
     const payload = {
       currencyId,
-      networkId: "networkId",
-    }
+      networkId: 'networkId',
+    };
     const params: AxiosRequestConfig = {
       method: 'PUT',
       url: `${this.apiKey}/v3/commerce/invoices/${invoiceId}/checkout`,
       headers: this.getAPIHeaders(payload),
       data: payload,
-    }
-  
+    };
+
     const { data } = await this.axios.request<RawInvoiceResponse>(params);
-  
+
     const response: ParsedInvoiceResponse = {
       ...data,
       createdAt: new Date(data.createdAt),
@@ -207,16 +205,16 @@ export class Bit2MeService {
       underpaidAmount: parseFloat(data.underpaidAmount),
       overpaidAmount: parseFloat(data.overpaidAmount),
     };
-  
+
     return response;
   }
 
   /**
    * Retrieves a list of all supported currencies in the Bit2Me system.
-   * 
+   *
    * @returns {Promise<Currency[]>} A promise that resolves to an array of currencies.
    * @throws {Error} If the API call fails or returns an unexpected response.
-   * 
+   *
    * @typedef {Object} Currency
    * @property {string} currencyId - The ISO code of the currency (e.g., "BTC", "EUR").
    * @property {string} name - The full name of the currency (e.g., "Bitcoin", "Euro").
@@ -229,9 +227,9 @@ export class Bit2MeService {
     const params: AxiosRequestConfig = {
       method: 'GET',
       url: `${this.apiUrl}/v3/commerce/currencies`,
-      headers: this.getAPIHeaders({})
+      headers: this.getAPIHeaders({}),
     };
-  
+
     try {
       const { data } = await this.axios.request<Currency[]>(params);
       return data;
@@ -246,5 +244,4 @@ export class Bit2MeService {
       }
     }
   }
-
 }

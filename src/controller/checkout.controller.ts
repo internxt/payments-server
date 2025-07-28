@@ -239,7 +239,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
 
         const { clientSecret, id, invoiceStatus } = await paymentsService.createInvoice({
           customerId,
-          priceId,
+          price,
+          userEmail: email,
           currency,
           promoCodeId,
           additionalInvoiceOptions: {

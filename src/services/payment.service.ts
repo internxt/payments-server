@@ -1,10 +1,12 @@
 import Stripe from 'stripe';
+import jwt from 'jsonwebtoken';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
+import config from '../config';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -74,7 +76,7 @@ export interface PaymentIntentCrypto {
 
 export interface PaymentIntentFiat {
   type: 'fiat';
-  clientSecret: string;
+  clientSecret: string | null;
   id: string;
   payload?: {
     paymentAddress: string;
@@ -143,6 +145,19 @@ export interface PromotionCode {
   codeId: Stripe.PromotionCode['id'];
   amountOff: Stripe.PromotionCode['coupon']['amount_off'];
   percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
+export interface PriceByIdResponse {
+  minimumSeats?: number | undefined;
+  maximumSeats?: number | undefined;
+  id: string;
+  currency: string;
+  amount: number;
+  bytes: number;
+  interval: string | undefined;
+  decimalAmount: number;
+  type: UserType;
+  product: string;
 }
 
 export class PaymentService {
@@ -379,18 +394,21 @@ export class PaymentService {
    */
   async createInvoice({
     customerId,
-    priceId,
+    price,
+    userEmail,
     currency = 'eur',
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
-    priceId: string;
+    price: PriceByIdResponse;
+    userEmail: string;
     currency?: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
+    const priceId = price.id;
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
@@ -405,7 +423,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    await this.provider.invoiceItems.create({
+    const invoiceItem = await this.provider.invoiceItems.create({
       customer: customerId,
       invoice: invoice.id,
       price: priceId,
@@ -424,7 +442,40 @@ export class PaymentService {
       return {
         clientSecret: '',
         id: '',
+        type: 'fiat',
         invoiceStatus: finalizedInvoice.status,
+      };
+    }
+
+    const isLifetime = invoiceItem.price?.type === 'one_time';
+
+    if (isLifetime && this.bit2MeService.isAllowedCurrency(currency)) {
+      const invoice = await this.bit2MeService.createInvoice({
+        description: `Payment for lifetime product ${priceId}`,
+        priceAmount: invoiceItem.amount,
+        priceCurrency: currency,
+        title: `Invoice from Stripe ${finalizedInvoice.id}`,
+        securityToken: jwt.sign(
+          {
+            invoiceId: finalizedInvoice.id,
+          },
+          config.JWT_SECRET,
+        ),
+        foreignId: finalizedInvoice.id,
+        cancelUrl: 'https://drive.internxt.com/cancel',
+        successUrl: 'https://drive.internxt.com/success',
+        purchaserEmail: userEmail || 'hello@internxt.com',
+      });
+
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currency);
+
+      return {
+        id: checkoutPayload.invoiceId,
+        type: 'crypto',
+        payload: {
+          paymentAddress: checkoutPayload.paymentAddress,
+          url: checkoutPayload.url,
+        },
       };
     }
 
@@ -434,6 +485,7 @@ export class PaymentService {
 
     return {
       clientSecret: client_secret,
+      type: 'fiat',
       id,
     };
   }
@@ -460,7 +512,7 @@ export class PaymentService {
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<PaymentIntent> {
+  ): Promise<PaymentIntentFiat> {
     let couponId;
     const currencyValue = currency ?? 'eur';
 
@@ -482,7 +534,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    const invoiceItem = await this.provider.invoiceItems.create({
+    await this.provider.invoiceItems.create({
       customer: customerId,
       price: price.id,
       invoice: invoice.id,
@@ -500,43 +552,9 @@ export class PaymentService {
     if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
       return {
         clientSecret: '',
-        type: 'fiat',
         id: '',
+        type: 'fiat',
         invoiceStatus: finalizedInvoice.status,
-      };
-    }
-
-    const isLifetime = price.type === 'one_time';
-
-    if (isLifetime && this.bit2MeService.isAllowedCurrency(currencyValue)) {
-      const customer = await this.provider.customers.retrieve(customerId);
-
-      const invoice = await this.bit2MeService.createInvoice({
-        description: `Payment for lifetime product ${price.id.toString()}`,
-        priceAmount: invoiceItem.amount,
-        priceCurrency: currencyValue,
-        title: `Invoice from Stripe ${finalizedInvoice.id}`,
-        securityToken: jwt.sign(
-          {
-            invoiceId: finalizedInvoice.id,
-          },
-          config.JWT_SECRET,
-        ),
-        foreignId: finalizedInvoice.id,
-        cancelUrl: 'https://drive.internxt.com/cancel',
-        successUrl: 'https://drive.internxt.com/success',
-        purchaserEmail: (customer as Customer).email || 'hello@internxt.com',
-      });
-
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currencyValue);
-
-      return {
-        id: checkoutPayload.invoiceId,
-        type: 'crypto',
-        payload: {
-          paymentAddress: checkoutPayload.paymentAddress,
-          url: checkoutPayload.url,
-        },
       };
     }
 
@@ -545,9 +563,9 @@ export class PaymentService {
     );
 
     return {
-      clientSecret: client_secret as string,
-      id,
+      clientSecret: client_secret,
       type: 'fiat',
+      id,
     };
   }
 
@@ -1192,7 +1210,7 @@ export class PaymentService {
    * @param currency - The currency of the requested price
    * @returns - The selected price if it exists and it is active
    */
-  async getPriceById(priceId: string, currency = 'eur') {
+  async getPriceById(priceId: string, currency = 'eur'): Promise<PriceByIdResponse> {
     const availablePrices = await this.getPricesRaw(currency);
 
     const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
