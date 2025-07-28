@@ -664,7 +664,7 @@ export function getPaymentIntentResponse(params: Partial<PaymentIntent>): Paymen
   return {
     id: params.id ?? 'fiat-id',
     type: 'fiat',
-    clientSecret: params.clientSecret ?? 'mock-client-secret',
+    clientSecret: params.clientSecret ?? 'client_secret',
     invoiceStatus: params.invoiceStatus ?? 'open',
     payload: params.payload,
   };
