@@ -816,6 +816,25 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
   return rawResponse;
 };
 
+export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
+  currencyId: AllowedCurrencies['Bitcoin'],
+  name: 'Bitcoin',
+  type: 'crypto',
+  receiveType: true,
+  networks: [
+    {
+      platformId: 'bitcoin-mainnet',
+      name: 'Bitcoin Network',
+    },
+    {
+      platformId: 'lightning',
+      name: 'Lightning Network',
+    },
+  ],
+  imageUrl: 'https://example.com/icons/btc.svg',
+  ...params,
+});
+
 export const getInvoice = (
   params?: DeepPartial<Partial<Stripe.Invoice>>,
   userType = UserType.Individual,

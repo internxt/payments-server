@@ -2,7 +2,6 @@ import { Axios, AxiosError, AxiosRequestConfig } from 'axios';
 import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
-import Logger from '../Logger';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -171,7 +170,6 @@ export class Bit2MeService {
         const message = `Status ${data.statusCode} received -> ${data.message.join(',')} / payload ${JSON.stringify(payloadReq)}
         `;
 
-        Logger.error(message);
         throw new HttpError(message, data.statusCode);
       } else {
         throw err;
@@ -187,9 +185,10 @@ export class Bit2MeService {
    * @throws {Error} If the API call fails or the invoice ID is invalid.
    */
   async checkoutInvoice(invoiceId: string, currencyId: AllowedCurrencies): Promise<ParsedInvoiceResponse> {
+    const currencyInfo = await this.getCurrencyByCurrencyId(currencyId);
     const payload = {
       currencyId,
-      networkId: 'networkId',
+      networkId: currencyInfo.networks[0].platformId,
     };
     const params: AxiosRequestConfig = {
       method: 'PUT',
@@ -237,12 +236,35 @@ export class Bit2MeService {
     try {
       const { data } = await this.axios.request<Currency[]>(params);
       return data;
-    } catch (err: unknown | Error | AxiosError<Bit2MeAPIError>) {
+    } catch (err: unknown) {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
 
         throw new Error(`Status ${data.statusCode} received -> ${data.message.join(',')}`);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  async getCurrencyByCurrencyId(currencyId: Currency['currencyId']): Promise<Currency> {
+    const params: AxiosRequestConfig = {
+      method: 'GET',
+      url: `${this.apiUrl}/v3/currencies/${currencyId}`,
+      headers: this.getAPIHeaders({}),
+    };
+
+    try {
+      const { data } = await this.axios.request<Currency>(params);
+      return data;
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        const data = response?.data as Bit2MeAPIError;
+        const errorMessage = `Status ${data.statusCode} received -> ${data.message.join(',')}`;
+
+        throw new HttpError(errorMessage, data.statusCode);
       } else {
         throw err;
       }
