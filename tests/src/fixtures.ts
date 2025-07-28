@@ -7,7 +7,7 @@ import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import Stripe from 'stripe';
 import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
-import { Currency } from '../../src/services/bit2me.service';
+import { AllowedCurrencies, CreateCryptoInvoicePayload, Currency } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
@@ -754,6 +754,25 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
     silent: jest.fn(),
     child: jest.fn(),
   };
+};
+
+export const getPayloadForCryptoInvoice = (
+  params?: Partial<CreateCryptoInvoicePayload>,
+): CreateCryptoInvoicePayload => {
+  const payload = {
+    foreignId: 'invoice-123',
+    priceAmount: 100,
+    priceCurrency: AllowedCurrencies['Bitcoin'],
+    title: 'Test Invoice',
+    description: 'Payment for product',
+    successUrl: 'https://success.url',
+    cancelUrl: 'https://cancel.url',
+    purchaserEmail: 'test@internxt.com',
+    securityToken: 'secure-token',
+    ...params,
+  };
+
+  return payload;
 };
 
 export const getInvoice = (
