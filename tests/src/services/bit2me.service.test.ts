@@ -1,8 +1,8 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getCurrencies, getPayloadForCryptoInvoice } from '../fixtures';
+import { AllowedCurrencies, Bit2MeService } from '../../../src/services/bit2me.service';
+import { getCurrencies, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
 
 let bit2MeService: Bit2MeService;
@@ -115,6 +115,39 @@ describe('Bit2Me Service tests', () => {
       jest.spyOn(axios, 'request').mockRejectedValue(unexpectedError);
 
       await expect(bit2MeService.createCryptoInvoice(mockPayload)).rejects.toThrowError('Unexpected failure');
+    });
+  });
+
+  describe('Activating an invoice', () => {
+    test('When the invoice is activated, then the invoice is activated and returned to allow the user to pay it', async () => {
+      const rawResponse = getRawCryptoInvoiceResponse();
+      const invoiceId = rawResponse.invoiceId;
+      const currencyId = AllowedCurrencies['Bitcoin'];
+
+      jest.spyOn(axios, 'request').mockResolvedValue({ data: rawResponse });
+
+      const expectedResponse = {
+        ...rawResponse,
+        createdAt: new Date(rawResponse.createdAt),
+        updatedAt: new Date(rawResponse.updatedAt),
+        expiredAt: new Date(rawResponse.expiredAt),
+        priceAmount: parseFloat(rawResponse.priceAmount),
+        underpaidAmount: parseFloat(rawResponse.underpaidAmount),
+        overpaidAmount: parseFloat(rawResponse.overpaidAmount),
+      };
+
+      // Act
+      const result = await bit2MeService.checkoutInvoice(invoiceId, currencyId);
+
+      // Assert
+      expect(result).toStrictEqual(expectedResponse);
+      expect(axios.request).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'PUT',
+          url: expect.stringContaining(`/v3/commerce/invoices/${invoiceId}/checkout`),
+          data: expect.objectContaining({ currencyId }),
+        }),
+      );
     });
   });
 });

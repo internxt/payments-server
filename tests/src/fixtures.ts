@@ -7,7 +7,12 @@ import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import Stripe from 'stripe';
 import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
-import { AllowedCurrencies, CreateCryptoInvoicePayload, Currency } from '../../src/services/bit2me.service';
+import {
+  AllowedCurrencies,
+  CreateCryptoInvoicePayload,
+  Currency,
+  RawInvoiceResponse,
+} from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
@@ -773,6 +778,42 @@ export const getPayloadForCryptoInvoice = (
   };
 
   return payload;
+};
+
+export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>): RawInvoiceResponse => {
+  const now = new Date();
+
+  const rawResponse = {
+    invoiceId: 'invoice-123',
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    expiredAt: new Date(now.getTime() + 100000).toISOString(),
+    paidAt: null,
+    foreignId: 'foreign-123',
+    priceAmount: '99.99',
+    priceCurrency: 'EUR',
+    status: 'waitingPayment',
+    customerEmail: 'test@example.com',
+    receiveCurrencyName: 'BTC',
+    title: 'Test Invoice',
+    description: 'Test invoice description',
+    successUrl: 'https://example.com/success',
+    cancelUrl: 'https://example.com/cancel',
+    underpaidAmount: '0.00',
+    overpaidAmount: '0.00',
+    paymentAddress: 'bc1address',
+    paymentRequestUri: 'bitcoin:bc1address?amount=0.001',
+    payAmount: 0.001,
+    payCurrency: 'BTC',
+    merchant: {
+      merchantId: 'merchant-1',
+      name: 'Internxt',
+    },
+    url: 'https://bit2me.com/checkout-url',
+    ...params,
+  };
+
+  return rawResponse;
 };
 
 export const getInvoice = (
