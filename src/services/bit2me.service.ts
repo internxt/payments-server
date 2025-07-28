@@ -164,7 +164,7 @@ export class Bit2MeService {
       };
 
       return response;
-    } catch (err: unknown | Error | AxiosError<Bit2MeAPIError>) {
+    } catch (err: unknown) {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
