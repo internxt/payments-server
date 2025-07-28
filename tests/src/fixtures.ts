@@ -5,7 +5,14 @@ import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import Stripe from 'stripe';
-import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
+import {
+  PaymentIntent,
+  PaymentIntentCrypto,
+  PaymentIntentFiat,
+  PromotionCode,
+  RenewalPeriod,
+  SubscriptionCreated,
+} from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import { Currency } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
@@ -636,14 +643,32 @@ export const getActiveSubscriptions = (
   }));
 };
 
-export const getPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
+export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): PaymentIntentFiat;
+export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
+export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
+  const type = params.type ?? 'fiat';
+
+  if (type === 'crypto') {
+    return {
+      id: params.id ?? 'crypto-id',
+      type: 'crypto',
+      payload: params.payload ?? {
+        paymentAddress: 'mock-address',
+        url: 'https://mock.crypto.url',
+      },
+      invoiceStatus: params.invoiceStatus,
+      clientSecret: params.clientSecret ?? undefined,
+    };
+  }
+
   return {
-    id: `pi_${randomDataGenerator.string({ length: 10 })}`,
-    clientSecret: 'client_secret',
-    invoiceStatus: 'open',
-    ...params,
+    id: params.id ?? 'fiat-id',
+    type: 'fiat',
+    clientSecret: params.clientSecret ?? 'mock-client-secret',
+    invoiceStatus: params.invoiceStatus ?? 'open',
+    payload: params.payload,
   };
-};
+}
 
 export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe.PaymentIntent => {
   return {

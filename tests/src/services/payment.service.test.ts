@@ -109,29 +109,31 @@ describe('Payments Service tests', () => {
 
   describe('Creating an invoice', () => {
     it('When trying to create an invoice with the correct params, then it is successfully created', async () => {
-      const mockedPaymentIntent = getPaymentIntentResponse();
-      const mockedCreateSubscription = getCreatedSubscription();
+      const mockedPaymentIntent = getPaymentIntentResponse({ type: 'fiat' });
+      const mockedInvoice = getInvoice({
+        discounts: [
+          {
+            promotion_code: {
+              code: 'mockedPromoCode',
+            },
+          },
+        ],
+      });
+
+      const paymentIntentPayload = {
+        customerId: mockedInvoice.customer as string,
+        priceId: mockedInvoice.lines.data[0].price?.id as string,
+        currency: mockedInvoice.lines.data[0].price?.currency,
+        promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
+        userEmail: mockedInvoice.customer_email as string,
+      };
 
       const paymentIntentSpy = jest
         .spyOn(paymentService, 'createInvoice')
         .mockImplementation(() => Promise.resolve(mockedPaymentIntent));
 
-      const paymentIntent = await paymentService.createInvoice({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        currency: mockedCreateSubscription.items.data[0].price.currency,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
-      });
-      expect(paymentIntentSpy).toHaveBeenCalledWith({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        currency: mockedCreateSubscription.items.data[0].price.currency,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
-      });
+      const paymentIntent = await paymentService.createInvoice(paymentIntentPayload);
+      expect(paymentIntentSpy).toHaveBeenCalledWith(paymentIntentPayload);
       expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
     });
   });
@@ -139,7 +141,9 @@ describe('Payments Service tests', () => {
   describe('Obtain the paymentIntent customer secret', () => {
     it('When fetching the Payment Intent customer with the correct payload, then returns the client secret', async () => {
       const mockedInvoice = getInvoice();
-      const mockedPaymentIntent = getPaymentIntentResponse();
+      const mockedPaymentIntent = getPaymentIntentResponse({
+        type: 'fiat',
+      });
 
       jest
         .spyOn(stripe.invoices, 'create')
@@ -152,18 +156,20 @@ describe('Payments Service tests', () => {
         .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValue({
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
-        client_secret: mockedPaymentIntent.clientSecret,
+        client_secret: mockedPaymentIntent.clientSecret as string,
       });
 
       const paymentIntent = await paymentService.createInvoice({
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
         currency: mockedInvoice.lines.data[0].price?.currency,
+        userEmail: mockedInvoice.customer_email as string,
       });
 
       expect(paymentIntent).toStrictEqual({
         clientSecret: mockedPaymentIntent.clientSecret,
         id: mockedPaymentIntent.id,
+        type: 'fiat',
       });
     });
 
@@ -194,9 +200,10 @@ describe('Payments Service tests', () => {
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
         currency: mockedInvoice.lines.data[0].price?.currency,
+        userEmail: mockedInvoice.customer_email as string,
       });
 
-      expect(paymentIntent).toStrictEqual(mockedPaymentIntent);
+      expect(paymentIntent).toEqual(mockedPaymentIntent);
     });
   });
 

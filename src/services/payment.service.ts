@@ -87,6 +87,13 @@ export interface PaymentIntentFiat {
 
 export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 
+export interface OldPaymentIntent {
+  clientSecret: string | null;
+  id: string;
+
+  invoiceStatus?: string;
+}
+
 export type Reason = {
   name: 'prevent-cancellation' | 'pc-cloud-25';
 };
@@ -391,24 +398,24 @@ export class PaymentService {
    * - `client_secret`: to be used with Stripe Elements,
    * - `invoice_id`: the ID of the created invoice,
    * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   * - `type`: the type of payment intent (e.g., `fiat`, `crypto`).
    */
   async createInvoice({
     customerId,
-    price,
+    priceId,
     userEmail,
     currency = 'eur',
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
-    price: PriceByIdResponse;
+    priceId: string;
     userEmail: string;
     currency?: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
-    const priceId = price.id;
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
@@ -450,7 +457,7 @@ export class PaymentService {
     const isLifetime = invoiceItem.price?.type === 'one_time';
 
     if (isLifetime && this.bit2MeService.isAllowedCurrency(currency)) {
-      const invoice = await this.bit2MeService.createInvoice({
+      const invoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
         priceAmount: invoiceItem.amount,
         priceCurrency: currency,
@@ -512,7 +519,7 @@ export class PaymentService {
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<PaymentIntentFiat> {
+  ): Promise<OldPaymentIntent> {
     let couponId;
     const currencyValue = currency ?? 'eur';
 
@@ -553,7 +560,6 @@ export class PaymentService {
       return {
         clientSecret: '',
         id: '',
-        type: 'fiat',
         invoiceStatus: finalizedInvoice.status,
       };
     }
@@ -564,7 +570,6 @@ export class PaymentService {
 
     return {
       clientSecret: client_secret,
-      type: 'fiat',
       id,
     };
   }

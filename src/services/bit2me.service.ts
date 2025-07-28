@@ -126,7 +126,7 @@ export class Bit2MeService {
    * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
    * @throws {Error} If the API call fails or the payload is invalid.
    */
-  async createInvoice(payload: {
+  async createCryptoInvoice(payload: {
     foreignId: string;
     priceAmount: number;
     priceCurrency: AllowedCurrencies;

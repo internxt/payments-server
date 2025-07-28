@@ -13,7 +13,7 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
-import { PaymentService } from '../../../src/services/payment.service';
+import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 
@@ -298,10 +298,11 @@ describe('Checkout controller', () => {
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken(mockedUser.customerId);
-      const mockedPaymentIntent = {
-        clientSecret: 'client_secret',
+      const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
-      };
+        clientSecret: 'client_secret',
+        type: 'fiat',
+      } as const;
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
@@ -323,6 +324,8 @@ describe('Checkout controller', () => {
       });
 
       const responseBody = response.json();
+
+      console.log('RESPONSE BODY WHILE FETCHING LIFETIME: ', responseBody);
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
