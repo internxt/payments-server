@@ -275,7 +275,7 @@ describe('Payments Service tests', () => {
           id: mockedParsedInvoiceResponse.invoiceId,
           type: 'crypto',
           payload: {
-            paymentAddressUri: mockedParsedInvoiceResponse.paymentRequestUri,
+            paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
             url: mockedParsedInvoiceResponse.url,
             qrUrl: generateQrCodeUrl({ data: mockedParsedInvoiceResponse.paymentRequestUri }),
           },

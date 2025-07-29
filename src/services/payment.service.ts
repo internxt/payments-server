@@ -69,7 +69,7 @@ export interface PaymentIntentCrypto {
   clientSecret?: string;
   id: string;
   payload: {
-    paymentAddressUri: string;
+    paymentRequestUri: string;
     url: string;
     qrUrl: string;
   };
@@ -479,7 +479,7 @@ export class PaymentService {
         id: checkoutPayload.invoiceId,
         type: 'crypto',
         payload: {
-          paymentAddressUri: checkoutPayload.paymentRequestUri,
+          paymentRequestUri: checkoutPayload.paymentRequestUri,
           url: checkoutPayload.url,
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },

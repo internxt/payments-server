@@ -661,7 +661,7 @@ export function getPaymentIntentResponse(params: Partial<PaymentIntent>): Paymen
       id: params.id ?? 'crypto-id',
       type: 'crypto',
       payload: {
-        paymentAddressUri: 'mock-address',
+        paymentRequestUri: 'mock-address',
         url: 'https://mock.crypto.url',
         qrUrl: 'https://mock.qr.url',
       },
