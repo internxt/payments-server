@@ -468,9 +468,9 @@ export class PaymentService {
           config.JWT_SECRET,
         ),
         foreignId: finalizedInvoice.id,
-        cancelUrl: 'https://drive.internxt.com/cancel',
-        successUrl: 'https://drive.internxt.com/success',
-        purchaserEmail: userEmail || 'hello@internxt.com',
+        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+        purchaserEmail: userEmail,
       });
 
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currency);

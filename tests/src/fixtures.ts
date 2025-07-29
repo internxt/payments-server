@@ -692,8 +692,8 @@ export function getRawCreateInvoiceResponse(params: Partial<RawCreateInvoiceResp
     receiveCurrencyName: 'Bitcoin',
     title: randomDataGenerator.sentence({ words: 4 }),
     description: randomDataGenerator.sentence(),
-    successUrl: 'https://drive.internxt.com/success',
-    cancelUrl: 'https://drive.internxt.com/cancel',
+    successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+    cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
     paymentAddress: randomDataGenerator.hash({ length: 34 }),
     paymentRequestUri: `bitcoin:${randomDataGenerator.hash({ length: 34 })}?amount=${randomDataGenerator.floating({
       min: 5,
