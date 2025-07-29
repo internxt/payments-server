@@ -22,6 +22,7 @@ const mandatoryVariables = [
   'CRYPTO_PAYMENTS_PROCESSOR_API_KEY',
   'VPN_URL',
   'PC_CLOUD_TRIAL_CODE',
+  'CHART_API_URL',
 ] as const;
 
 type BaseConfig = {

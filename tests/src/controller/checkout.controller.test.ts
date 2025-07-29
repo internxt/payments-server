@@ -325,8 +325,6 @@ describe('Checkout controller', () => {
 
       const responseBody = response.json();
 
-      console.log('RESPONSE BODY WHILE FETCHING LIFETIME: ', responseBody);
-
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
     });
