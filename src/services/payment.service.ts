@@ -7,6 +7,7 @@ import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
+import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -68,8 +69,9 @@ export interface PaymentIntentCrypto {
   clientSecret?: string;
   id: string;
   payload: {
-    paymentAddress: string;
+    paymentAddressUri: string;
     url: string;
+    qrUrl: string;
   };
   invoiceStatus?: string;
 }
@@ -78,10 +80,6 @@ export interface PaymentIntentFiat {
   type: 'fiat';
   clientSecret: string | null;
   id: string;
-  payload?: {
-    paymentAddress: string;
-    url: string;
-  };
   invoiceStatus?: string;
 }
 
@@ -464,7 +462,8 @@ export class PaymentService {
         title: `Invoice from Stripe ${finalizedInvoice.id}`,
         securityToken: jwt.sign(
           {
-            invoiceId: finalizedInvoice.id,
+            stripeInvoiceId: finalizedInvoice.id,
+            customerId: customerId,
           },
           config.JWT_SECRET,
         ),
@@ -480,8 +479,9 @@ export class PaymentService {
         id: checkoutPayload.invoiceId,
         type: 'crypto',
         payload: {
-          paymentAddress: checkoutPayload.paymentAddress,
+          paymentAddressUri: checkoutPayload.paymentRequestUri,
           url: checkoutPayload.url,
+          qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },
       };
     }
