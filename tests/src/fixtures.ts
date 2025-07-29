@@ -14,7 +14,12 @@ import {
   SubscriptionCreated,
 } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
-import { Currency } from '../../src/services/bit2me.service';
+import {
+  AllowedCurrencies,
+  CreateCryptoInvoicePayload,
+  Currency,
+  RawInvoiceResponse,
+} from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
@@ -780,6 +785,80 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
     child: jest.fn(),
   };
 };
+
+export const getPayloadForCryptoInvoice = (
+  params?: Partial<CreateCryptoInvoicePayload>,
+): CreateCryptoInvoicePayload => {
+  const payload = {
+    foreignId: 'invoice-123',
+    priceAmount: 100,
+    priceCurrency: AllowedCurrencies['Bitcoin'],
+    title: 'Test Invoice',
+    description: 'Payment for product',
+    successUrl: 'https://success.url',
+    cancelUrl: 'https://cancel.url',
+    purchaserEmail: 'test@internxt.com',
+    securityToken: 'secure-token',
+    ...params,
+  };
+
+  return payload;
+};
+
+export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>): RawInvoiceResponse => {
+  const now = new Date();
+
+  const rawResponse = {
+    invoiceId: 'invoice-123',
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    expiredAt: new Date(now.getTime() + 100000).toISOString(),
+    paidAt: null,
+    foreignId: 'foreign-123',
+    priceAmount: '99.99',
+    priceCurrency: 'EUR',
+    status: 'waitingPayment',
+    customerEmail: 'test@example.com',
+    receiveCurrencyName: 'BTC',
+    title: 'Test Invoice',
+    description: 'Test invoice description',
+    successUrl: 'https://example.com/success',
+    cancelUrl: 'https://example.com/cancel',
+    underpaidAmount: '0.00',
+    overpaidAmount: '0.00',
+    paymentAddress: 'bc1address',
+    paymentRequestUri: 'bitcoin:bc1address?amount=0.001',
+    payAmount: 0.001,
+    payCurrency: 'BTC',
+    merchant: {
+      merchantId: 'merchant-1',
+      name: 'Internxt',
+    },
+    url: 'https://bit2me.com/checkout-url',
+    ...params,
+  };
+
+  return rawResponse;
+};
+
+export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
+  currencyId: AllowedCurrencies['Bitcoin'],
+  name: 'Bitcoin',
+  type: 'crypto',
+  receiveType: true,
+  networks: [
+    {
+      platformId: 'bitcoin-mainnet',
+      name: 'Bitcoin Network',
+    },
+    {
+      platformId: 'lightning',
+      name: 'Lightning Network',
+    },
+  ],
+  imageUrl: 'https://example.com/icons/btc.svg',
+  ...params,
+});
 
 export const getInvoice = (
   params?: DeepPartial<Partial<Stripe.Invoice>>,
