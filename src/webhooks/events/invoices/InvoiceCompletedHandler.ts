@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
+import { FastifyBaseLogger } from 'fastify';
 import { PaymentService, PriceMetadata } from '../../../services/payment.service';
 import { User, UserType } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
@@ -19,6 +20,7 @@ interface InvoiceData {
 
 export class InvoiceCompletedHandler {
   constructor(
+    private readonly logger: FastifyBaseLogger,
     private readonly payload: InvoiceData,
     private readonly determineLifetimeConditions: DetermineLifetimeConditions,
     private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler,
@@ -279,6 +281,7 @@ export class InvoiceCompletedHandler {
         customer,
         totalQuantity,
         tierToApply,
+        this.logger,
         lifetimeMaxSpaceBytesToApply,
       );
       Logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);

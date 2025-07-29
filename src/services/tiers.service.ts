@@ -8,8 +8,8 @@ import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FastifyBaseLogger } from 'fastify';
 import axios from 'axios';
-import Logger from '../Logger';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -168,6 +168,7 @@ export class TiersService {
     customer: Stripe.Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
+    log: FastifyBaseLogger,
     alreadyEnabledServices?: Service[],
   ): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
@@ -185,7 +186,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier);
+          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier, log);
           break;
         case Service.Vpn:
           await this.applyVpnFeatures(userWithEmail, tier);
@@ -198,7 +199,7 @@ export class TiersService {
     }
   }
 
-  async removeTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
+  async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
 
@@ -215,7 +216,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.removeDriveFeatures(userUuid, tier);
+          await this.removeDriveFeatures(userUuid, tier, log);
           break;
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
@@ -232,6 +233,7 @@ export class TiersService {
     customer: Stripe.Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
+    log: FastifyBaseLogger,
     customMaxSpaceBytes?: number,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
@@ -246,9 +248,9 @@ export class TiersService {
 
       try {
         await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
-        Logger.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
+        log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
       } catch (err) {
-        Logger.info(
+        log.info(
           `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${
             customer.email
           } does not have a workspace. Creating a new one...`,
@@ -270,7 +272,7 @@ export class TiersService {
     await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
-  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier): Promise<void> {
+  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
@@ -280,12 +282,12 @@ export class TiersService {
       } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
           const { status, data } = error.response;
-          Logger.error(
+          log.error(
             `Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${JSON.stringify(data)}`,
           );
           throw data;
         } else {
-          Logger.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
+          log.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
           throw error;
         }
       }
@@ -294,7 +296,7 @@ export class TiersService {
     try {
       await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
     } catch (error) {
-      Logger.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
+      log.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
     }
 
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);

@@ -95,6 +95,7 @@ describe('Testing the handler when an invoice is completed', () => {
     objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService, getLogger());
     determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
     invoiceCompletedHandler = new InvoiceCompletedHandler(
+      getLogger(),
       {
         customer: getCustomer(),
         invoiceId: getInvoice().id,
@@ -406,7 +407,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
       await expect(
@@ -442,7 +443,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
 
@@ -669,7 +670,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
       jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
       await expect(
@@ -782,7 +783,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const storeCouponUsedByUserSpy = jest
         .spyOn(usersService, 'storeCouponUsedByUser')
         .mockRejectedValue(new CouponNotBeingTrackedError('Coupon not tracked'));
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
@@ -810,7 +811,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
@@ -848,7 +849,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const randomError = new Error('Random error');
       const { customerId, uuid: userUuid } = getUser();
       jest.spyOn(cacheService, 'clearSubscription').mockRejectedValue(randomError);
-      const loggerSpy = jest.spyOn(Logger, 'info');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
 
