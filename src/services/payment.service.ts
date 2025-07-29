@@ -153,8 +153,8 @@ export interface PromotionCode {
 }
 
 export interface PriceByIdResponse {
-  minimumSeats?: number | undefined;
-  maximumSeats?: number | undefined;
+  minimumSeats?: number;
+  maximumSeats?: number;
   id: string;
   currency: string;
   amount: number;
