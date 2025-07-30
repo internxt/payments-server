@@ -6,6 +6,7 @@ import { UsersService } from '../services/users.service';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/payment.service';
+import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
@@ -15,9 +16,6 @@ import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 import { TiersService } from '../services/tiers.service';
 import handleFundsCaptured from './handleFundsCaptured';
-import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
-import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
 
 export default function (
   stripe: Stripe,
@@ -107,30 +105,18 @@ export default function (
           break;
         }
 
-        case 'invoice.payment_succeeded': {
-          const invoice = event.data.object as Stripe.Invoice;
-
-          const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
-          const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
-          const handler = new InvoiceCompletedHandler({
-            logger: fastify.log,
-            determineLifetimeConditions,
-            objectStorageWebhookHandler,
-            paymentService,
-            storageService,
-            tiersService,
+        case 'invoice.payment_succeeded':
+          await handleInvoiceCompleted(
+            event.data.object,
             usersService,
+            paymentService,
+            fastify.log,
             cacheService,
-          });
-
-          await handler.run({
-            invoice,
-            customer: invoice.customer as Stripe.Customer,
-            status: invoice.status as string,
-          });
-
+            tiersService,
+            storageService,
+            objectStorageService,
+          );
           break;
-        }
 
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
