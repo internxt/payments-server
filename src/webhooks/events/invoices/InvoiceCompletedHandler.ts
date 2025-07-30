@@ -1,53 +1,145 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { FastifyBaseLogger } from 'fastify';
-import { PaymentService } from '../../../services/payment.service';
-import { User } from '../../../core/users/User';
+import { PaymentService, PriceMetadata } from '../../../services/payment.service';
+import { User, UserType } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
-import { TiersService } from '../../../services/tiers.service';
+import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
 import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
+import Logger from '../../../Logger';
 
 interface InvoiceData {
-  customerId: string;
-  customerEmail: string | null;
-  invoiceId: string;
+  customer: Stripe.Customer;
   status: string;
 }
 
-export class InvoiceCompletedHandler {
-  constructor(
-    private readonly logger: FastifyBaseLogger,
-    private readonly determineLifetimeConditions: DetermineLifetimeConditions,
-    private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler,
-    private readonly paymentService: PaymentService,
-    private readonly storageService: StorageService,
-    private readonly tiersService: TiersService,
-    private readonly usersService: UsersService,
-    private readonly cacheService: CacheService,
-  ) {}
+interface InvoiceCompletedHandlerPayload extends InvoiceData {
+  invoice: Stripe.Invoice;
+}
 
-  /**
-   * Extracts invoice data from a Stripe.Invoice object.
-   *
-   * @param invoice The Stripe invoice object from which to extract data.
-   * @returns An InvoiceData object containing the customer ID, customer email, invoice ID, and status.
-   * @throws NotFoundError if the invoice does not contain a customer.
-   */
-  private extractInvoiceData(invoice: Stripe.Invoice): InvoiceData {
-    if (!invoice.customer) {
-      throw new NotFoundError('There is no customer in the invoice');
+export class InvoiceCompletedHandler {
+  private readonly logger: FastifyBaseLogger;
+  private readonly determineLifetimeConditions: DetermineLifetimeConditions;
+  private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler;
+  private readonly paymentService: PaymentService;
+  private readonly storageService: StorageService;
+  private readonly tiersService: TiersService;
+  private readonly usersService: UsersService;
+  private readonly cacheService: CacheService;
+
+  constructor({
+    logger,
+    determineLifetimeConditions,
+    objectStorageWebhookHandler,
+    paymentService,
+    storageService,
+    tiersService,
+    usersService,
+    cacheService,
+  }: {
+    logger: FastifyBaseLogger;
+    determineLifetimeConditions: DetermineLifetimeConditions;
+    objectStorageWebhookHandler: ObjectStorageWebhookHandler;
+    paymentService: PaymentService;
+    storageService: StorageService;
+    tiersService: TiersService;
+    usersService: UsersService;
+    cacheService: CacheService;
+  }) {
+    this.logger = logger;
+    this.determineLifetimeConditions = determineLifetimeConditions;
+    this.objectStorageWebhookHandler = objectStorageWebhookHandler;
+    this.paymentService = paymentService;
+    this.storageService = storageService;
+    this.tiersService = tiersService;
+    this.usersService = usersService;
+    this.cacheService = cacheService;
+  }
+
+  async run(payload: InvoiceCompletedHandlerPayload): Promise<void> {
+    const { customer, invoice, status: invoiceStatus } = payload;
+    const invoiceId = invoice.id;
+    const customerId = customer.id;
+    const customerEmail = customer.email;
+    const isInvoicePaid = invoiceStatus === 'paid';
+
+    if (!isInvoicePaid) {
+      Logger.info(`Invoice ${invoiceId} not paid, skipping processing`);
+      return;
     }
 
-    return {
-      customerId: invoice.customer as string,
-      customerEmail: invoice.customer_email,
-      invoiceId: invoice.id,
-      status: invoice.status || '',
-    };
+    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
+    const totalQuantity = items.data[0].quantity ?? 1;
+    const price = items.data?.[0].price;
+
+    if (!price) {
+      throw new NotFoundError(`There is no price in the invoice ${invoiceId}. Customer ID: ${customerId}`);
+    }
+
+    const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(price);
+
+    const isLifetimePlan = planType === 'one_time';
+    const isBusinessPlan = productType === UserType.Business;
+    const isObjStoragePlan = productType === UserType.ObjectStorage;
+
+    if (isObjStoragePlan) {
+      return this.objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
+    }
+
+    const tierBillingType = isLifetimePlan ? 'lifetime' : 'subscription';
+    const tier = await this.tiersService.getTierProductsByProductsId(productId, tierBillingType).catch((err) => {
+      if (err instanceof TierNotFoundError) {
+        return null;
+      }
+
+      throw err;
+    });
+
+    const isOldProduct = !tier;
+    const email = customer.email ?? customerEmail;
+
+    const { uuid: userUuid } = await this.getUserUuid(customerId, email);
+
+    await this.updateOrInsertUser({ customerId: customer.id, userUuid, isLifetimePlan, isBusinessPlan });
+
+    if (isOldProduct) {
+      await this.handleOldProduct(userUuid, Number(maxSpaceBytes));
+    } else {
+      const localUser = await this.usersService.findUserByUuid(userUuid);
+
+      await this.handleNewProduct({
+        user: { ...localUser, email: email as string },
+        isLifetimePlan,
+        productId,
+        customer,
+        tier,
+        totalQuantity: totalQuantity,
+      });
+
+      // Update/insert user-tier relationship
+      await this.updateOrInsertUserTier({
+        isBusinessPlan,
+        userId: localUser.id,
+        tierId: tier.id,
+      });
+    }
+
+    // Check for user-coupon relationship
+    await this.handleUserCouponRelationship({
+      userUuid,
+      invoice,
+      invoiceLineItem: items.data[0],
+      isLifetimePlan,
+    });
+
+    // Clear subscription-user promo codes cache
+    await this.clearUserRelatedCache(customerId, userUuid);
+
+    Logger.info(`Invoice ${invoiceId} processed successfully for user ${userUuid}`);
   }
 
   /**
@@ -72,9 +164,7 @@ export class InvoiceCompletedHandler {
           return { uuid: userResponse.data.uuid };
         }
       } catch (error) {
-        this.logger.warn(
-          `Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`,
-        );
+        Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
       }
     }
 
@@ -85,10 +175,29 @@ export class InvoiceCompletedHandler {
         return { uuid: userByCustomerId.uuid };
       }
     } catch (error) {
-      this.logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
+      Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
     }
 
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
+  }
+
+  private getPriceData(price: Stripe.Price): {
+    productId: string;
+    productType: string;
+    planType: string;
+    maxSpaceBytes: string;
+  } {
+    const product = price?.product as Stripe.Product;
+    const productId = product.id;
+    const productType = product.metadata?.type;
+    const { planType, maxSpaceBytes } = price.metadata as PriceMetadata;
+
+    return {
+      productId,
+      productType,
+      planType,
+      maxSpaceBytes,
+    };
   }
 
   /**
@@ -104,7 +213,6 @@ export class InvoiceCompletedHandler {
    * based on the type of plan. If no user is found, a new user is inserted with the
    * provided details.
    */
-
   private async updateOrInsertUser({
     customerId,
     userUuid,
@@ -190,12 +298,9 @@ export class InvoiceCompletedHandler {
         tierToApply = lifetimeTier;
         lifetimeMaxSpaceBytesToApply = Number(lifetimeMaxSpaceBytes);
       } catch (error) {
-        this.logger.error(
-          `Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}`,
-          {
-            error: (error as Error).message,
-          },
-        );
+        Logger.error(`Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}`, {
+          error: (error as Error).message,
+        });
       }
     }
 
@@ -209,9 +314,9 @@ export class InvoiceCompletedHandler {
         this.logger,
         lifetimeMaxSpaceBytesToApply,
       );
-      this.logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
+      Logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
+      Logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
         error: (error as Error).message,
       });
       throw error;
@@ -220,9 +325,9 @@ export class InvoiceCompletedHandler {
     // Apply VPN features
     try {
       await this.tiersService.applyVpnFeatures(user, tierToApply);
-      this.logger.info(`VPN features applied for user ${user.uuid} with customerId ${customer.id}`);
+      Logger.info(`VPN features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      this.logger.error(`Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}`, {
+      Logger.error(`Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}`, {
         error: (error as Error).message,
       });
       throw error;
@@ -264,7 +369,7 @@ export class InvoiceCompletedHandler {
         await this.tiersService.insertTierToUser(userId, tierId);
       }
     } catch (error) {
-      this.logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
+      Logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
       throw error;
     }
   }
@@ -305,7 +410,7 @@ export class InvoiceCompletedHandler {
     } catch (err) {
       const error = err as Error;
       if (!(err instanceof CouponNotBeingTrackedError)) {
-        this.logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
+        Logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
         throw error;
       }
     }
@@ -320,10 +425,10 @@ export class InvoiceCompletedHandler {
     try {
       await this.cacheService.clearSubscription(customerId);
       await this.cacheService.clearUsedUserPromoCodes(userUuid);
-      this.logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
+      Logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
       const error = err as Error;
-      this.logger.error(
+      Logger.error(
         `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${error.message}`,
       );
       throw error;

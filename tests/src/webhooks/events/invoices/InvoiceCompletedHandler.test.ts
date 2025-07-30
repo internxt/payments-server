@@ -23,6 +23,7 @@ import testFactory from '../../../utils/factory';
 import { DetermineLifetimeConditions } from '../../../../../src/core/users/DetermineLifetimeConditions';
 import { NotFoundError } from '../../../../../src/errors/Errors';
 import { Service } from '../../../../../src/core/users/Tier';
+import Logger from '../../../../../src/Logger';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -91,10 +92,10 @@ describe('Testing the handler when an invoice is completed', () => {
     );
 
     objectStorageService = new ObjectStorageService(paymentService, config, axios);
-    objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService, getLogger());
+    objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
     determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
-    invoiceCompletedHandler = new InvoiceCompletedHandler(
-      getLogger(),
+    invoiceCompletedHandler = new InvoiceCompletedHandler({
+      logger: getLogger(),
       determineLifetimeConditions,
       objectStorageWebhookHandler,
       paymentService,
@@ -102,37 +103,10 @@ describe('Testing the handler when an invoice is completed', () => {
       tiersService,
       usersService,
       cacheService,
-    );
+    });
   });
 
   afterEach(() => jest.restoreAllMocks());
-
-  describe('Invoice Data Extraction', () => {
-    test('When we want to extract the invoice data from a valid invoice (contains a customer), then the extracted data should be returned correctly', async () => {
-      const mockedInvoice = getInvoice({ status: 'paid' });
-
-      const extractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
-      const result = extractInvoiceData(mockedInvoice);
-
-      expect(result).toStrictEqual({
-        customerId: mockedInvoice.customer,
-        customerEmail: mockedInvoice.customer_email,
-        invoiceId: mockedInvoice.id,
-        status: mockedInvoice.status,
-      });
-      expect(typeof result.customerId).toBe('string');
-      expect(typeof result.invoiceId).toBe('string');
-      expect(typeof result.status).toBe('string');
-      expect(result.customerEmail).toBe(mockedInvoice.customer_email);
-    });
-
-    test('When there is no customer when extracting invoice data, then an error indicating so is thrown', async () => {
-      const mockedInvoice = getInvoice({ status: 'paid', customer: null });
-      const extractInvoiceData = invoiceCompletedHandler['extractInvoiceData'].bind(invoiceCompletedHandler);
-
-      expect(() => extractInvoiceData(mockedInvoice)).toThrow(NotFoundError);
-    });
-  });
 
   describe('User Data Processing', () => {
     test('When user is found by email, then it should return user unique Id', async () => {
@@ -428,7 +402,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
       await expect(
@@ -464,7 +438,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
 
@@ -691,7 +665,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
       jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
       await expect(
@@ -804,7 +778,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const storeCouponUsedByUserSpy = jest
         .spyOn(usersService, 'storeCouponUsedByUser')
         .mockRejectedValue(new CouponNotBeingTrackedError('Coupon not tracked'));
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
@@ -832,7 +806,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const handleUserCouponRelationship =
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
@@ -854,7 +828,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const { customerId, uuid: userUuid } = getUser();
       const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
       const clearUsedUserPromoCodesSpy = jest.spyOn(cacheService, 'clearUsedUserPromoCodes').mockResolvedValue();
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'info');
+      const loggerSpy = jest.spyOn(Logger, 'info');
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
       await clearUserRelatedCache(customerId, userUuid);
@@ -870,7 +844,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const randomError = new Error('Random error');
       const { customerId, uuid: userUuid } = getUser();
       jest.spyOn(cacheService, 'clearSubscription').mockRejectedValue(randomError);
-      const loggerSpy = jest.spyOn(invoiceCompletedHandler['logger'], 'error');
+      const loggerSpy = jest.spyOn(Logger, 'error');
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
 

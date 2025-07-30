@@ -1,14 +1,13 @@
 import Stripe from 'stripe';
 import { ObjectStorageService } from '../../services/objectStorage.service';
 import { PaymentService } from '../../services/payment.service';
-import { FastifyBaseLogger } from 'fastify';
 import { AxiosError, isAxiosError } from 'axios';
+import Logger from '../../Logger';
 
 export class ObjectStorageWebhookHandler {
   constructor(
     private readonly objectStorageService: ObjectStorageService,
     private readonly paymentService: PaymentService,
-    private readonly log: FastifyBaseLogger,
   ) {}
 
   /**
@@ -36,7 +35,7 @@ export class ObjectStorageWebhookHandler {
    */
   async reactivateObjectStorageAccount(customer: Stripe.Customer, invoice: Stripe.Invoice): Promise<void> {
     if (invoice.lines.data.length !== 1) {
-      this.log.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
+      Logger.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
       return;
     }
 
@@ -45,14 +44,14 @@ export class ObjectStorageWebhookHandler {
     const { price } = item;
 
     if (!price || !price.product) {
-      this.log.info(`The price or the product for the invoice with ID ${invoice.id} are null.`);
+      Logger.info(`The price or the product for the invoice with ID ${invoice.id} are null.`);
       return;
     }
 
     const product = await this.paymentService.getProduct(price.product as string);
 
     if (!this.isObjectStorageProduct(product)) {
-      this.log.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
+      Logger.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
       return;
     }
 
@@ -67,16 +66,14 @@ export class ObjectStorageWebhookHandler {
           throw error;
         }
 
-        this.log.info(
-          `Object storage user ${customer_email} (customer ${customer.id}) was not found while reactivating`,
-        );
+        Logger.info(`Object storage user ${customer_email} (customer ${customer.id}) was not found while reactivating`);
         return;
       }
 
       throw error;
     }
 
-    this.log.info(
+    Logger.info(
       `Object Storage user ${customer_email} (customer ${customer.id}) has been reactivated (if it was suspended)`,
     );
   }
