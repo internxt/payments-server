@@ -177,7 +177,7 @@ describe('Test fixtures', () => {
 
   describe('Payment intent fixture', () => {
     it('When generating a payment intent, then it should have a client secret', () => {
-      const intent = getPaymentIntentResponse();
+      const intent = getPaymentIntentResponse({ type: 'fiat' });
 
       expect(intent.clientSecret).toBe('client_secret');
     });

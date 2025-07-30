@@ -1,10 +1,13 @@
 import Stripe from 'stripe';
+import jwt from 'jsonwebtoken';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
+import config from '../config';
+import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -61,9 +64,31 @@ export interface SubscriptionCreated {
   paymentIntentId?: string;
 }
 
-export interface PaymentIntent {
+export interface PaymentIntentCrypto {
+  type: 'crypto';
+  clientSecret?: string;
+  id: string;
+  payload: {
+    paymentRequestUri: string;
+    url: string;
+    qrUrl: string;
+  };
+  invoiceStatus?: string;
+}
+
+export interface PaymentIntentFiat {
+  type: 'fiat';
   clientSecret: string | null;
   id: string;
+  invoiceStatus?: string;
+}
+
+export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
+
+export interface OldPaymentIntent {
+  clientSecret: string | null;
+  id: string;
+
   invoiceStatus?: string;
 }
 
@@ -125,6 +150,19 @@ export interface PromotionCode {
   codeId: Stripe.PromotionCode['id'];
   amountOff: Stripe.PromotionCode['coupon']['amount_off'];
   percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+}
+
+export interface PriceByIdResponse {
+  minimumSeats?: number;
+  maximumSeats?: number;
+  id: string;
+  currency: string;
+  amount: number;
+  bytes: number;
+  interval: string | undefined;
+  decimalAmount: number;
+  type: UserType;
+  product: string;
 }
 
 export class PaymentService {
@@ -358,16 +396,19 @@ export class PaymentService {
    * - `client_secret`: to be used with Stripe Elements,
    * - `invoice_id`: the ID of the created invoice,
    * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
+   * - `type`: the type of payment intent (e.g., `fiat`, `crypto`).
    */
   async createInvoice({
     customerId,
     priceId,
+    userEmail,
     currency = 'eur',
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
     priceId: string;
+    userEmail: string;
     currency?: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
@@ -387,7 +428,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    await this.provider.invoiceItems.create({
+    const invoiceItem = await this.provider.invoiceItems.create({
       customer: customerId,
       invoice: invoice.id,
       price: priceId,
@@ -406,7 +447,43 @@ export class PaymentService {
       return {
         clientSecret: '',
         id: '',
+        type: 'fiat',
         invoiceStatus: finalizedInvoice.status,
+      };
+    }
+
+    const isLifetime = invoiceItem.price?.type === 'one_time';
+
+    if (isLifetime && this.bit2MeService.isAllowedCurrency(currency)) {
+      const invoice = await this.bit2MeService.createCryptoInvoice({
+        description: `Payment for lifetime product ${priceId}`,
+        priceAmount: invoiceItem.amount,
+        priceCurrency: currency,
+        title: `Invoice from Stripe ${finalizedInvoice.id}`,
+        securityToken: jwt.sign(
+          {
+            invoiceId: finalizedInvoice.id,
+            customerId: customerId,
+            provider: 'stripe',
+          },
+          config.JWT_SECRET,
+        ),
+        foreignId: finalizedInvoice.id,
+        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+        purchaserEmail: userEmail,
+      });
+
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currency);
+
+      return {
+        id: checkoutPayload.invoiceId,
+        type: 'crypto',
+        payload: {
+          paymentRequestUri: checkoutPayload.paymentRequestUri,
+          url: checkoutPayload.url,
+          qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
+        },
       };
     }
 
@@ -416,6 +493,7 @@ export class PaymentService {
 
     return {
       clientSecret: client_secret,
+      type: 'fiat',
       id,
     };
   }
@@ -442,7 +520,7 @@ export class PaymentService {
     priceId: string,
     currency?: string,
     promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<PaymentIntent> {
+  ): Promise<OldPaymentIntent> {
     let couponId;
     const currencyValue = currency ?? 'eur';
 
@@ -450,7 +528,7 @@ export class PaymentService {
       throw new MissingParametersError(['customerId', 'amount', 'priceId']);
     }
 
-    const product = await this.provider.prices.retrieve(priceId);
+    const price = await this.provider.prices.retrieve(priceId);
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
@@ -466,7 +544,7 @@ export class PaymentService {
 
     await this.provider.invoiceItems.create({
       customer: customerId,
-      price: product.id,
+      price: price.id,
       invoice: invoice.id,
       discounts: [
         {
@@ -1138,7 +1216,7 @@ export class PaymentService {
    * @param currency - The currency of the requested price
    * @returns - The selected price if it exists and it is active
    */
-  async getPriceById(priceId: string, currency = 'eur') {
+  async getPriceById(priceId: string, currency = 'eur'): Promise<PriceByIdResponse> {
     const availablePrices = await this.getPricesRaw(currency);
 
     const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
