@@ -194,6 +194,29 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(getTierProductsByProductIdsSpy).not.toHaveBeenCalled();
     });
 
+    test('When an unexpected error occurs while fetching the tier product, then an error indicating so is thrown', async () => {
+      const unexpectedError = new Error('Unexpected error');
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({
+        customer: mockedCustomer.id,
+        status: 'paid',
+      });
+      const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
+        customer: mockedCustomer,
+        invoice: mockedInvoice,
+        status: mockedInvoice.status as string,
+      };
+
+      jest
+        .spyOn(paymentService, 'getInvoiceLineItems')
+        .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
+      const getTierProductsByProductIdsSpy = jest
+        .spyOn(tiersService, 'getTierProductsByProductsId')
+        .mockRejectedValue(unexpectedError);
+
+      await expect(invoiceCompletedHandler.run(invoiceCompletedHandlerPayload)).rejects.toThrow(unexpectedError);
+    });
+
     test('When the user purchases an old product, then only the storage is updated', async () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({
