@@ -17,7 +17,7 @@ interface InvoiceData {
   status: string;
 }
 
-interface InvoiceCompletedHandlerPayload extends InvoiceData {
+export interface InvoiceCompletedHandlerPayload extends InvoiceData {
   invoice: Stripe.Invoice;
 }
 
@@ -190,7 +190,9 @@ export class InvoiceCompletedHandler {
     const product = price?.product as Stripe.Product;
     const productId = product.id;
     const productType = product.metadata?.type;
-    const { planType, maxSpaceBytes } = price.metadata as PriceMetadata;
+    const metadata = price.metadata as PriceMetadata;
+    const planType = metadata?.planType;
+    const maxSpaceBytes = metadata?.maxSpaceBytes;
 
     return {
       productId,
