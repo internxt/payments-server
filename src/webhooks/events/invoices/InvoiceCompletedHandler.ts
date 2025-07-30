@@ -12,13 +12,10 @@ import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
 
-interface InvoiceData {
+export interface InvoiceCompletedHandlerPayload {
   customer: Stripe.Customer;
-  status: string;
-}
-
-export interface InvoiceCompletedHandlerPayload extends InvoiceData {
   invoice: Stripe.Invoice;
+  status: string;
 }
 
 export class InvoiceCompletedHandler {
