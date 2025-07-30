@@ -219,6 +219,7 @@ describe('Payments Service tests', () => {
           lines: {
             data: [
               {
+                amount: 1000,
                 price: {
                   currency: 'BTC',
                   type: 'one_time',
@@ -240,8 +241,9 @@ describe('Payments Service tests', () => {
 
         const mockedSecurityToken = jwt.sign(
           {
-            stripeInvoiceId: mockedInvoice.id,
+            invoiceId: mockedInvoice.id,
             customerId: mockedInvoice.customer as string,
+            provider: 'stripe',
           },
           config.JWT_SECRET,
         );
@@ -283,7 +285,7 @@ describe('Payments Service tests', () => {
 
         expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
           description: expect.any(String),
-          priceAmount: mockedInvoice.lines.data[0].price?.unit_amount as number,
+          priceAmount: mockedInvoice.lines.data[0].amount as number,
           priceCurrency: mockedCurrency,
           title: expect.any(String),
           securityToken: mockedSecurityToken,

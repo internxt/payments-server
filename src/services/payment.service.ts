@@ -462,8 +462,9 @@ export class PaymentService {
         title: `Invoice from Stripe ${finalizedInvoice.id}`,
         securityToken: jwt.sign(
           {
-            stripeInvoiceId: finalizedInvoice.id,
+            invoiceId: finalizedInvoice.id,
             customerId: customerId,
+            provider: 'stripe',
           },
           config.JWT_SECRET,
         ),

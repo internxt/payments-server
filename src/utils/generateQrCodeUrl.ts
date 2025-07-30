@@ -6,7 +6,7 @@ interface GenerateQrCodePayload {
   encoding?: 'utf-8' | 'UTF-8';
 }
 
-export function generateQrCodeUrl({ data, size = 150, encoding = 'UTF-8' }: GenerateQrCodePayload): string {
+export function generateQrCodeUrl({ data, size = 150 }: GenerateQrCodePayload): string {
   const encodedData = encodeURIComponent(data);
-  return `${config.CHART_API_URL}?chs=${size}x${size}&cht=qr&chl=${encodedData}&choe=${encoding}`;
+  return `${config.CHART_API_URL}?text=${encodedData}&size=${size}`;
 }
