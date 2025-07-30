@@ -57,6 +57,12 @@ export class InvoiceCompletedHandler {
     this.cacheService = cacheService;
   }
 
+  /**
+   * Process a completed invoice.
+   *
+   * @param payload - The webhook payload, with the customer, invoice, and status.
+   * @returns A promise that resolves when the invoice has been processed.
+   */
   async run(payload: InvoiceCompletedHandlerPayload): Promise<void> {
     const { customer, invoice, status: invoiceStatus } = payload;
     const invoiceId = invoice.id;
@@ -84,6 +90,7 @@ export class InvoiceCompletedHandler {
     const isObjStoragePlan = productType === UserType.ObjectStorage;
 
     if (isObjStoragePlan) {
+      Logger.info(`Invoice ${invoiceId} is for object storage, reactivating account if needed...`);
       return this.objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
     }
 
@@ -105,6 +112,9 @@ export class InvoiceCompletedHandler {
 
     if (isOldProduct) {
       await this.handleOldProduct(userUuid, Number(maxSpaceBytes));
+      Logger.info(
+        `Old product handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}. Storage of ${maxSpaceBytes} applied`,
+      );
     } else {
       const localUser = await this.usersService.findUserByUuid(userUuid);
 
@@ -122,6 +132,10 @@ export class InvoiceCompletedHandler {
         userId: localUser.id,
         tierId: tier.id,
       });
+
+      Logger.info(
+        `New tier and product with ID ${tier.productId} handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}`,
+      );
     }
 
     await this.handleUserCouponRelationship({
