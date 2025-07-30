@@ -5,12 +5,22 @@ import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import Stripe from 'stripe';
-import { PaymentIntent, PromotionCode, RenewalPeriod, SubscriptionCreated } from '../../src/services/payment.service';
+import {
+  PaymentIntent,
+  PaymentIntentCrypto,
+  PaymentIntentFiat,
+  PromotionCode,
+  RenewalPeriod,
+  SubscriptionCreated,
+} from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
   AllowedCurrencies,
   CreateCryptoInvoicePayload,
   Currency,
+  ParsedCreatedInvoiceResponse,
+  ParsedInvoiceResponse,
+  RawCreateInvoiceResponse,
   RawInvoiceResponse,
 } from '../../src/services/bit2me.service';
 import { Tier } from '../../src/core/users/Tier';
@@ -641,14 +651,112 @@ export const getActiveSubscriptions = (
   }));
 };
 
-export const getPaymentIntentResponse = (params?: Partial<PaymentIntent>): PaymentIntent => {
+export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): PaymentIntentFiat;
+export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
+export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
+  const type = params.type ?? 'fiat';
+
+  if (type === 'crypto') {
+    return {
+      id: params.id ?? 'crypto-id',
+      type: 'crypto',
+      payload: {
+        paymentRequestUri: 'mock-address',
+        url: 'https://mock.crypto.url',
+        qrUrl: 'https://mock.qr.url',
+      },
+      invoiceStatus: params.invoiceStatus,
+      clientSecret: params.clientSecret ?? undefined,
+    };
+  }
+
   return {
-    id: `pi_${randomDataGenerator.string({ length: 10 })}`,
-    clientSecret: 'client_secret',
-    invoiceStatus: 'open',
+    id: params.id ?? 'fiat-id',
+    type: 'fiat',
+    clientSecret: params.clientSecret ?? 'client_secret',
+    invoiceStatus: params.invoiceStatus ?? 'open',
+  };
+}
+
+export function getRawCreateInvoiceResponse(params: Partial<RawCreateInvoiceResponse> = {}): RawCreateInvoiceResponse {
+  return {
+    invoiceId: randomDataGenerator.guid(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    paidAt: null,
+    foreignId: randomDataGenerator.string({ length: 16 }),
+    priceAmount: randomDataGenerator.floating({ min: 5, max: 100, fixed: 2 }).toString(),
+    priceCurrency: 'EUR',
+    status: 'pending',
+    customerEmail: randomDataGenerator.email(),
+    receiveCurrencyName: 'Bitcoin',
+    title: randomDataGenerator.sentence({ words: 4 }),
+    description: randomDataGenerator.sentence(),
+    successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+    cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+    paymentAddress: randomDataGenerator.hash({ length: 34 }),
+    paymentRequestUri: `bitcoin:${randomDataGenerator.hash({ length: 34 })}?amount=${randomDataGenerator.floating({
+      min: 5,
+      max: 100,
+      fixed: 2,
+    })}`,
+    payAmount: randomDataGenerator.floating({ min: 5, max: 100, fixed: 2 }),
+    payCurrency: 'BTC',
+    merchant: {
+      merchantId: randomDataGenerator.guid(),
+      name: 'Internxt',
+    },
+    url: `https://checkout.internxt.com/invoice/${randomDataGenerator.guid()}`,
     ...params,
   };
-};
+}
+
+export function getParsedInvoiceResponse(params: Partial<ParsedInvoiceResponse> = {}): ParsedInvoiceResponse {
+  return {
+    invoiceId: randomDataGenerator.guid(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    expiredAt: new Date(Date.now() + 3600000),
+    paidAt: null,
+    foreignId: randomDataGenerator.string({ length: 16 }),
+    priceAmount: randomDataGenerator.floating({ min: 10, max: 100 }),
+    underpaidAmount: 0,
+    overpaidAmount: 0,
+    priceCurrency: 'EUR',
+    status: 'pending',
+    customerEmail: randomDataGenerator.email(),
+    receiveCurrencyName: 'Bitcoin',
+    title: 'Mock Invoice',
+    description: 'Mock description',
+    successUrl: 'https://mock/success',
+    cancelUrl: 'https://mock/cancel',
+    paymentAddress: randomDataGenerator.hash({ length: 34 }),
+    paymentRequestUri: 'bitcoin:address?amount=0.01',
+    payAmount: 0.01,
+    payCurrency: 'BTC',
+    merchant: {
+      merchantId: randomDataGenerator.guid(),
+      name: 'Internxt',
+    },
+    url: 'https://mock.crypto.url',
+    ...params,
+  };
+}
+
+export function getParsedCreatedInvoiceResponse(
+  params: Partial<ParsedCreatedInvoiceResponse> = {},
+  rawInvoiceResponse?: RawInvoiceResponse,
+): ParsedCreatedInvoiceResponse {
+  const raw = rawInvoiceResponse ?? getRawCreateInvoiceResponse();
+
+  return {
+    ...raw,
+    createdAt: new Date(raw.createdAt),
+    updatedAt: new Date(raw.updatedAt),
+    priceAmount: parseFloat(raw.priceAmount),
+    ...params,
+  };
+}
 
 export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe.PaymentIntent => {
   return {
