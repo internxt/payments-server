@@ -117,7 +117,6 @@ export class InvoiceCompletedHandler {
         totalQuantity: totalQuantity,
       });
 
-      // Update/insert user-tier relationship
       await this.updateOrInsertUserTier({
         isBusinessPlan,
         userId: localUser.id,
@@ -125,7 +124,6 @@ export class InvoiceCompletedHandler {
       });
     }
 
-    // Check for user-coupon relationship
     await this.handleUserCouponRelationship({
       userUuid,
       invoice,
@@ -133,7 +131,6 @@ export class InvoiceCompletedHandler {
       isLifetimePlan,
     });
 
-    // Clear subscription-user promo codes cache
     await this.clearUserRelatedCache(customerId, userUuid);
 
     Logger.info(`Invoice ${invoiceId} processed successfully for user ${userUuid}`);
