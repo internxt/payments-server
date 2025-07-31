@@ -12,28 +12,60 @@ import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
 
-interface InvoiceData {
+export interface InvoiceCompletedHandlerPayload {
   customer: Stripe.Customer;
-  invoiceId: string;
+  invoice: Stripe.Invoice;
   status: string;
 }
 
 export class InvoiceCompletedHandler {
-  constructor(
-    private readonly logger: FastifyBaseLogger,
-    private readonly payload: InvoiceData,
-    private readonly determineLifetimeConditions: DetermineLifetimeConditions,
-    private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler,
-    private readonly paymentService: PaymentService,
-    private readonly storageService: StorageService,
-    private readonly tiersService: TiersService,
-    private readonly usersService: UsersService,
-    private readonly cacheService: CacheService,
-  ) {}
+  private readonly logger: FastifyBaseLogger;
+  private readonly determineLifetimeConditions: DetermineLifetimeConditions;
+  private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler;
+  private readonly paymentService: PaymentService;
+  private readonly storageService: StorageService;
+  private readonly tiersService: TiersService;
+  private readonly usersService: UsersService;
+  private readonly cacheService: CacheService;
 
-  async run(invoice: Stripe.Invoice): Promise<void> {
-    // Extract all necessary data from the invoice
-    const { customer, invoiceId, status: invoiceStatus } = this.payload;
+  constructor({
+    logger,
+    determineLifetimeConditions,
+    objectStorageWebhookHandler,
+    paymentService,
+    storageService,
+    tiersService,
+    usersService,
+    cacheService,
+  }: {
+    logger: FastifyBaseLogger;
+    determineLifetimeConditions: DetermineLifetimeConditions;
+    objectStorageWebhookHandler: ObjectStorageWebhookHandler;
+    paymentService: PaymentService;
+    storageService: StorageService;
+    tiersService: TiersService;
+    usersService: UsersService;
+    cacheService: CacheService;
+  }) {
+    this.logger = logger;
+    this.determineLifetimeConditions = determineLifetimeConditions;
+    this.objectStorageWebhookHandler = objectStorageWebhookHandler;
+    this.paymentService = paymentService;
+    this.storageService = storageService;
+    this.tiersService = tiersService;
+    this.usersService = usersService;
+    this.cacheService = cacheService;
+  }
+
+  /**
+   * Process a completed invoice.
+   *
+   * @param payload - The webhook payload, with the customer, invoice, and status.
+   * @returns A promise that resolves when the invoice has been processed.
+   */
+  async run(payload: InvoiceCompletedHandlerPayload): Promise<void> {
+    const { customer, invoice, status: invoiceStatus } = payload;
+    const invoiceId = invoice.id;
     const customerId = customer.id;
     const customerEmail = customer.email;
     const isInvoicePaid = invoiceStatus === 'paid';
@@ -46,6 +78,7 @@ export class InvoiceCompletedHandler {
     const items = await this.paymentService.getInvoiceLineItems(invoiceId);
     const totalQuantity = items.data[0].quantity ?? 1;
     const price = items.data?.[0].price;
+
     if (!price) {
       throw new NotFoundError(`There is no price in the invoice ${invoiceId}. Customer ID: ${customerId}`);
     }
@@ -57,6 +90,7 @@ export class InvoiceCompletedHandler {
     const isObjStoragePlan = productType === UserType.ObjectStorage;
 
     if (isObjStoragePlan) {
+      Logger.info(`Invoice ${invoiceId} is for object storage, reactivating account if needed...`);
       return this.objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
     }
 
@@ -78,6 +112,9 @@ export class InvoiceCompletedHandler {
 
     if (isOldProduct) {
       await this.handleOldProduct(userUuid, Number(maxSpaceBytes));
+      Logger.info(
+        `Old product handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}. Storage of ${maxSpaceBytes} applied`,
+      );
     } else {
       const localUser = await this.usersService.findUserByUuid(userUuid);
 
@@ -90,15 +127,17 @@ export class InvoiceCompletedHandler {
         totalQuantity: totalQuantity,
       });
 
-      // Update/insert user-tier relationship
       await this.updateOrInsertUserTier({
         isBusinessPlan,
         userId: localUser.id,
-        tierId: tier.id,
+        newTier: tier,
       });
+
+      Logger.info(
+        `New tier with ID ${tier.id} and product with ID ${tier.productId} handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}`,
+      );
     }
 
-    // Check for user-coupon relationship
     await this.handleUserCouponRelationship({
       userUuid,
       invoice,
@@ -106,7 +145,6 @@ export class InvoiceCompletedHandler {
       isLifetimePlan,
     });
 
-    // Clear subscription-user promo codes cache
     await this.clearUserRelatedCache(customerId, userUuid);
 
     Logger.info(`Invoice ${invoiceId} processed successfully for user ${userUuid}`);
@@ -160,7 +198,9 @@ export class InvoiceCompletedHandler {
     const product = price?.product as Stripe.Product;
     const productId = product.id;
     const productType = product.metadata?.type;
-    const { planType, maxSpaceBytes } = price.metadata as PriceMetadata;
+    const metadata = price.metadata as PriceMetadata;
+    const planType = metadata?.planType;
+    const maxSpaceBytes = metadata?.maxSpaceBytes;
 
     return {
       productId,
@@ -315,15 +355,27 @@ export class InvoiceCompletedHandler {
    */
   private async updateOrInsertUserTier({
     userId,
-    tierId,
+    newTier,
     isBusinessPlan,
   }: {
     userId: User['id'];
-    tierId: Tier['id'];
+    newTier: Tier;
     isBusinessPlan: boolean;
   }): Promise<void> {
+    const { id: tierId, billingType: newBillingType } = newTier;
     try {
-      const userTiers = await this.tiersService.getTiersProductsByUserId(userId);
+      let userTiers: Tier[];
+
+      try {
+        userTiers = await this.tiersService.getTiersProductsByUserId(userId);
+      } catch (error) {
+        if (error instanceof TierNotFoundError) {
+          userTiers = [];
+        } else {
+          throw error;
+        }
+      }
+
       const userAlreadyHasIndividualPlan = userTiers.find((userTier) => {
         return !userTier.featuresPerService[Service.Drive].workspaces.enabled;
       });
@@ -333,11 +385,31 @@ export class InvoiceCompletedHandler {
 
       const existingTier = isBusinessPlan ? userAlreadyHasWorkspace : userAlreadyHasIndividualPlan;
 
-      if (existingTier) {
-        await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
-      } else {
+      if (!existingTier) {
         await this.tiersService.insertTierToUser(userId, tierId);
+        return;
       }
+
+      const existingBillingType = existingTier.billingType;
+      const isBillingTypeDifferent = existingBillingType !== newBillingType;
+
+      const existingMaxSpace = Number(existingTier.featuresPerService[Service.Drive].maxSpaceBytes ?? 0);
+      const newMaxSpace = Number(newTier.featuresPerService[Service.Drive].maxSpaceBytes ?? 0);
+
+      const isLifetimePlan = newBillingType === 'lifetime' && existingTier.billingType === 'lifetime';
+      const isADifferentTier = existingTier.id !== tierId;
+
+      const shouldUpdateUserTier =
+        isBillingTypeDifferent ||
+        (isLifetimePlan && isADifferentTier && newMaxSpace > existingMaxSpace) ||
+        (!isLifetimePlan && isADifferentTier);
+
+      if (shouldUpdateUserTier) {
+        await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
+        return;
+      }
+
+      Logger.debug(`User ${userId} already has tier ${tierId}. No update required.`);
     } catch (error) {
       Logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
       throw error;

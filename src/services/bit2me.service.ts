@@ -75,7 +75,7 @@ export interface RawInvoiceResponse {
   url: string;
 }
 
-type ParsedInvoiceResponse = Omit<
+export type ParsedInvoiceResponse = Omit<
   RawInvoiceResponse,
   'createdAt' | 'updatedAt' | 'expiredAt' | 'priceAmount' | 'underpaidAmount' | 'overpaidAmount'
 > & {
@@ -87,8 +87,8 @@ type ParsedInvoiceResponse = Omit<
   overpaidAmount: number;
 };
 
-type RawCreateInvoiceResponse = Omit<RawInvoiceResponse, 'expiredAt' | 'underpaidAmount' | 'overpaidAmount'>;
-type ParsedCreatedInvoiceResponse = Omit<RawCreateInvoiceResponse, 'createdAt' | 'updatedAt' | 'priceAmount'> & {
+export type RawCreateInvoiceResponse = Omit<RawInvoiceResponse, 'expiredAt' | 'underpaidAmount' | 'overpaidAmount'>;
+export type ParsedCreatedInvoiceResponse = Omit<RawCreateInvoiceResponse, 'createdAt' | 'updatedAt' | 'priceAmount'> & {
   createdAt: Date;
   updatedAt: Date;
   priceAmount: number;
