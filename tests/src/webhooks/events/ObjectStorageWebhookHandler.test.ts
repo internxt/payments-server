@@ -17,7 +17,8 @@ import { ObjectStorageWebhookHandler } from '../../../../src/webhooks/events/Obj
 import { TiersService } from '../../../../src/services/tiers.service';
 import testFactory from '../../utils/factory';
 import config from '../../../../src/config';
-import { getCustomer, getInvoice, getLogger, getProduct } from '../../fixtures';
+import { getCustomer, getInvoice, getProduct } from '../../fixtures';
+import Logger from '../../../../src/Logger';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -84,7 +85,7 @@ describe('Object Storage Webhook Handler', () => {
     );
 
     objectStorageService = new ObjectStorageService(paymentService, config, axios);
-    objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService, getLogger());
+    objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -181,7 +182,7 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+      const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
 
@@ -214,7 +215,7 @@ describe('Object Storage Webhook Handler', () => {
       });
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+      const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
 
@@ -248,7 +249,7 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+      const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
 
@@ -317,10 +318,8 @@ describe('Object Storage Webhook Handler', () => {
       axiosError.isAxiosError = true;
 
       jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(axiosError);
-
       const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
-
-      const loggerSpy = jest.spyOn(objectStorageWebhookHandler['log'], 'info');
+      const loggerSpy = jest.spyOn(Logger, 'info');
 
       await expect(
         objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
