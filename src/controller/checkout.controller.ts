@@ -345,5 +345,22 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         });
       },
     );
+
+    fastify.get(
+      '/currencies/crypto',
+      {
+        config: {
+          skipAuth: true,
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const cryptoCurrencies = await paymentsService.getCryptoCurrencies();
+        return res.status(200).send(cryptoCurrencies);
+      },
+    );
   };
 }
