@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import Stripe from 'stripe';
 
 import testFactory from '../utils/factory';
@@ -565,11 +565,15 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      const updateWorkspaceError = new Error('Workspace does not exist');
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(updateWorkspaceError));
-      const initializeWorkspace = jest
-        .spyOn(usersService, 'initializeWorkspace')
-        .mockImplementation(() => Promise.resolve());
+      const axiosError404 = {
+        isAxiosError: true,
+        response: { status: 404 },
+        toJSON: () => ({}),
+      } as AxiosError;
+
+      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(axiosError404));
+
+      const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
@@ -579,6 +583,25 @@ describe('TiersService tests', () => {
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
       });
+    });
+
+    it('When an unexpected error occurs while initializing the workspace, then an error indicating so is thrown', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
+      const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const amountOfSeats = 5;
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const unexpectedError = new Error('Unexpected error');
+
+      jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
+
+      await expect(
+        tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
+      ).rejects.toThrow(unexpectedError);
     });
 
     it('When workspaces is not enabled, then individual is initialized', async () => {
