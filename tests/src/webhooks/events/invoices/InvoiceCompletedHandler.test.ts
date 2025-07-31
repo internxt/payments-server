@@ -25,8 +25,8 @@ import config from '../../../../../src/config';
 import testFactory from '../../../utils/factory';
 import { DetermineLifetimeConditions } from '../../../../../src/core/users/DetermineLifetimeConditions';
 import { NotFoundError } from '../../../../../src/errors/Errors';
-import { Service } from '../../../../../src/core/users/Tier';
 import Logger from '../../../../../src/Logger';
+import { Service } from '../../../../../src/core/users/Tier';
 
 jest.mock('ioredis', () => {
   const mockRedis = {
@@ -210,9 +210,7 @@ describe('Testing the handler when an invoice is completed', () => {
       jest
         .spyOn(paymentService, 'getInvoiceLineItems')
         .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
-      const getTierProductsByProductIdsSpy = jest
-        .spyOn(tiersService, 'getTierProductsByProductsId')
-        .mockRejectedValue(unexpectedError);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(unexpectedError);
 
       await expect(invoiceCompletedHandler.run(invoiceCompletedHandlerPayload)).rejects.toThrow(unexpectedError);
     });
@@ -308,7 +306,7 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(updateOrInsertUserTierSpy).toHaveBeenCalledWith({
         isBusinessPlan: false,
         userId: mockedUser.id,
-        tierId: mockedTier.id,
+        newTier: mockedTier,
       });
     });
   });
@@ -674,7 +672,7 @@ describe('Testing the handler when an invoice is completed', () => {
       test('When matching tier exists for individual plan, then it should update existing tier', async () => {
         const isBusinessPlan = false;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
         const mockedIndividualTier = newTier();
 
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
@@ -685,18 +683,18 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTierId);
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTier.id);
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
       });
 
       test('When user with both subscriptions redeems business plan, then existing business tier gets updated', async () => {
         const isBusinessPlan = false;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
         const mockedIndividualTier = newTier();
         const mockedBusinessTier = newTier({
           featuresPerService: {
@@ -718,18 +716,80 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTierId);
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedIndividualTier.id, mockedTier.id);
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
+      });
+
+      test('When billing the billing type for the new tier is different, then the tier is updated', async () => {
+        const userId = getUser().id;
+        const currentTier = newTier({ billingType: 'subscription' });
+        const newTierInstance = newTier({ billingType: 'lifetime' });
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([currentTier]);
+        const updateSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({ userId, newTier: newTierInstance, isBusinessPlan: false });
+
+        expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
+      });
+
+      test('When the new tier is lifetime, then the tier is updated accordingly the greater tier that has more space bytes', async () => {
+        const userId = getUser().id;
+        const currentTier = newTier({
+          id: 'tier-1',
+          billingType: 'lifetime',
+          featuresPerService: {
+            [Service.Drive]: { maxSpaceBytes: 100, workspaces: { enabled: false } },
+          } as any,
+        });
+
+        const newTierInstance = newTier({
+          id: 'tier-2',
+          billingType: 'lifetime',
+          featuresPerService: {
+            [Service.Drive]: { maxSpaceBytes: 500, workspaces: { enabled: false } },
+          } as any,
+        });
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([currentTier]);
+        const updateSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({ userId, newTier: newTierInstance, isBusinessPlan: false });
+
+        expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
+      });
+
+      test('When the new tier is lifetime but it previously had a subscription, then the tier is updated accordingly', async () => {
+        const userId = getUser().id;
+        const currentTier = newTier({
+          id: 'tier-1',
+          billingType: 'subscription',
+        });
+
+        const newTierInstance = newTier({
+          id: 'tier-2',
+          billingType: 'lifetime',
+        });
+
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([currentTier]);
+        const updateSpy = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
+
+        const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
+        await updateOrInsertUserTier({ userId, newTier: newTierInstance, isBusinessPlan: false });
+
+        expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
       });
 
       test('When no matching tier exists (individual), then it should insert new tier', async () => {
         const isBusinessPlan = false;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
 
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
 
@@ -739,11 +799,11 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTier.id);
         expect(updateTierToUserSpy).not.toHaveBeenCalled();
       });
     });
@@ -752,7 +812,7 @@ describe('Testing the handler when an invoice is completed', () => {
       test('When matching tier exists for business plan, then it should update existing tier', async () => {
         const isBusinessPlan = true;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
         const mockedBusinessTier = newTier({
           featuresPerService: {
             drive: {
@@ -769,18 +829,18 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTierId);
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTier.id);
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
       });
 
       test('When user with both subscriptions redeems business plan, then existing business tier gets updated', async () => {
         const isBusinessPlan = true;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
         const mockedIndividualTier = newTier();
         const mockedBusinessTier = newTier({
           featuresPerService: {
@@ -802,18 +862,18 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTierId);
+        expect(updateTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedBusinessTier.id, mockedTier.id);
         expect(insertTierToUserSpy).not.toHaveBeenCalled();
       });
 
       test('When no matching tier exists (business), then it should insert new tier', async () => {
         const isBusinessPlan = true;
         const mockedUserId = getUser().id;
-        const mockedTierId = newTier().id;
+        const mockedTier = newTier();
         const mockedIndividualTier = newTier();
 
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
@@ -823,11 +883,11 @@ describe('Testing the handler when an invoice is completed', () => {
         const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
         await updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         });
 
-        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+        expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTier.id);
         expect(updateTierToUserSpy).not.toHaveBeenCalled();
       });
     });
@@ -835,7 +895,7 @@ describe('Testing the handler when an invoice is completed', () => {
     test('When no matching tier exists (business), then it should insert new tier', async () => {
       const isBusinessPlan = true;
       const mockedUserId = getUser().id;
-      const mockedTierId = newTier().id;
+      const mockedTier = newTier();
       const mockedIndividualTier = newTier();
 
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
@@ -846,11 +906,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const updateOrInsertUserTier = invoiceCompletedHandler['updateOrInsertUserTier'].bind(invoiceCompletedHandler);
       await updateOrInsertUserTier({
         userId: mockedUserId,
-        tierId: mockedTierId,
+        newTier: mockedTier,
         isBusinessPlan,
       });
 
-      expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTierId);
+      expect(insertTierToUserSpy).toHaveBeenCalledWith(mockedUserId, mockedTier.id);
       expect(updateTierToUserSpy).not.toHaveBeenCalled();
     });
 
@@ -858,15 +918,13 @@ describe('Testing the handler when an invoice is completed', () => {
       const usersTiersError = new UsersTiersError('User tiers error');
       const isBusinessPlan = false;
       const mockedUserId = getUser().id;
-      const mockedTierId = newTier().id;
+      const mockedTier = newTier({
+        billingType: 'subscription',
+        id: 'tier-1',
+      });
       const mockedIndividualTier = newTier({
-        featuresPerService: {
-          [Service.Drive]: {
-            workspaces: {
-              enabled: false,
-            },
-          },
-        } as any,
+        billingType: 'subscription',
+        id: 'tier-2',
       });
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedIndividualTier]);
       jest.spyOn(tiersService, 'updateTierToUser').mockRejectedValue(usersTiersError);
@@ -876,7 +934,7 @@ describe('Testing the handler when an invoice is completed', () => {
       await expect(
         updateOrInsertUserTier({
           userId: mockedUserId,
-          tierId: mockedTierId,
+          newTier: mockedTier,
           isBusinessPlan,
         }),
       ).rejects.toThrow(usersTiersError);

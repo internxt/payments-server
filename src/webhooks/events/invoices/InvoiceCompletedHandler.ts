@@ -130,7 +130,7 @@ export class InvoiceCompletedHandler {
       await this.updateOrInsertUserTier({
         isBusinessPlan,
         userId: localUser.id,
-        tierId: tier.id,
+        newTier: tier,
       });
 
       Logger.info(
@@ -355,15 +355,21 @@ export class InvoiceCompletedHandler {
    */
   private async updateOrInsertUserTier({
     userId,
-    tierId,
+    newTier,
     isBusinessPlan,
   }: {
     userId: User['id'];
-    tierId: Tier['id'];
+    newTier: Tier;
     isBusinessPlan: boolean;
   }): Promise<void> {
     try {
-      const userTiers = await this.tiersService.getTiersProductsByUserId(userId);
+      const userTiers = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
+        if (error instanceof TierNotFoundError) {
+          return [];
+        }
+        throw error;
+      });
+
       const userAlreadyHasIndividualPlan = userTiers.find((userTier) => {
         return !userTier.featuresPerService[Service.Drive].workspaces.enabled;
       });
@@ -373,11 +379,30 @@ export class InvoiceCompletedHandler {
 
       const existingTier = isBusinessPlan ? userAlreadyHasWorkspace : userAlreadyHasIndividualPlan;
 
-      if (existingTier) {
-        await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
-      } else {
+      if (!existingTier) {
         await this.tiersService.insertTierToUser(userId, tierId);
+        return;
       }
+
+      const existingBillingType = existingTier.billingType;
+      const isBillingTypeDifferent = existingBillingType !== newBillingType;
+
+      const existingMaxSpace = Number(existingTier.featuresPerService[Service.Drive].maxSpaceBytes ?? 0);
+      const newMaxSpace = Number(newTier.featuresPerService[Service.Drive].maxSpaceBytes ?? 0);
+
+      const isLifetimePlan = newBillingType === 'lifetime' && existingTier.billingType === 'lifetime';
+
+      const shouldUpdateUserTier =
+        isBillingTypeDifferent ||
+        (isLifetimePlan && existingTier.id !== tierId && newMaxSpace > existingMaxSpace) ||
+        (!isLifetimePlan && existingTier.id !== tierId);
+
+      if (shouldUpdateUserTier) {
+        await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
+        return;
+      }
+
+      Logger.debug(`User ${userId} already has tier ${tierId}. No update required.`);
     } catch (error) {
       Logger.error(`Error while updating or inserting the user-tier relationship. Error: ${error}`);
       throw error;
