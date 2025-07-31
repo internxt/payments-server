@@ -32,7 +32,10 @@ export default function (
 
     fastify.get(
       '/',
-      async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
+      async (
+        req,
+        res,
+      ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean; cleaner: boolean } } | Error> => {
         let user: User;
         const userUuid = req.user.payload.uuid;
 
@@ -52,6 +55,7 @@ export default function (
               featuresPerService: {
                 antivirus: false,
                 backups: false,
+                cleaner: false,
               },
             });
           }
@@ -64,26 +68,14 @@ export default function (
       },
     );
 
-    fastify.get<{
-      Querystring: { subscriptionType?: 'individual' | 'business' };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: {
-            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
-          };
-        };
-      };
-    }>('/tier', async (req, rep): Promise<Tier | Error> => {
+    fastify.get('/tier', async (req, rep): Promise<Tier | Error> => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces?.owners ?? [];
-      const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
 
       try {
         const higherTier = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
-          subscriptionType,
         });
 
         return rep.status(200).send(higherTier);
