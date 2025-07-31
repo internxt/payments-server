@@ -9,7 +9,7 @@ import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository'
 import Stripe from 'stripe';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import { FastifyBaseLogger } from 'fastify';
-import axios, { AxiosError, isAxiosError } from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -250,27 +250,19 @@ export class TiersService {
         await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
         log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
       } catch (err) {
-        if (isAxiosError(err)) {
-          const error = err as AxiosError;
-          const statusCode = error.response?.status;
-
-          if (statusCode === 404) {
-            log.info(
-              `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${
-                customer.email
-              } does not have a workspace. Creating a new one...`,
-            );
-            await this.usersService.initializeWorkspace(userWithEmail.uuid, {
-              newStorageBytes: Number(maxSpaceBytes),
-              seats: subscriptionSeats,
-              address,
-              phoneNumber,
-            });
-            return;
-          }
+        if (isAxiosError(err) && err.response?.status === 404) {
+          log.info(
+            `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${customer.email} does not have a workspace. Creating a new one...`,
+          );
+          await this.usersService.initializeWorkspace(userWithEmail.uuid, {
+            newStorageBytes: Number(maxSpaceBytes),
+            seats: subscriptionSeats,
+            address,
+            phoneNumber,
+          });
+        } else {
+          throw err;
         }
-
-        throw err;
       }
 
       return;

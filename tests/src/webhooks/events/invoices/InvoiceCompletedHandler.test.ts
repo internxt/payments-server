@@ -552,7 +552,7 @@ describe('Testing the handler when an invoice is completed', () => {
         expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
       });
 
-      test('When the new tier is lifetime, then the tier is updated accordingly the greater tier that has more space bytes', async () => {
+      test('When the new tier is lifetime and the user already had one, then the remaining tier should be the one that has more space bytes', async () => {
         const userId = getUser().id;
         const currentTier = newTier({
           id: 'tier-1',
@@ -579,7 +579,7 @@ describe('Testing the handler when an invoice is completed', () => {
         expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
       });
 
-      test('When the new tier is lifetime but it previously had a subscription, then the tier is updated accordingly', async () => {
+      test('When the user previously had a subscription and the new tier is lifetime, then the user-tier relationship is updated to the lifetime tier', async () => {
         const userId = getUser().id;
         const currentTier = newTier({
           id: 'tier-1',

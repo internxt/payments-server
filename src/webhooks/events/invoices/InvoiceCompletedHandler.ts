@@ -271,12 +271,17 @@ export class InvoiceCompletedHandler {
   }): Promise<void> {
     const { id: tierId, billingType: newBillingType } = newTier;
     try {
-      const userTiers = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
+      let userTiers: Tier[];
+
+      try {
+        userTiers = await this.tiersService.getTiersProductsByUserId(userId);
+      } catch (error) {
         if (error instanceof TierNotFoundError) {
-          return [];
+          userTiers = [];
+        } else {
+          throw error;
         }
-        throw error;
-      });
+      }
 
       const userAlreadyHasIndividualPlan = userTiers.find((userTier) => {
         return !userTier.featuresPerService[Service.Drive].workspaces.enabled;
@@ -299,11 +304,12 @@ export class InvoiceCompletedHandler {
       const newMaxSpace = Number(newTier.featuresPerService[Service.Drive].maxSpaceBytes ?? 0);
 
       const isLifetimePlan = newBillingType === 'lifetime' && existingTier.billingType === 'lifetime';
+      const isADifferentTier = existingTier.id !== tierId;
 
       const shouldUpdateUserTier =
         isBillingTypeDifferent ||
-        (isLifetimePlan && existingTier.id !== tierId && newMaxSpace > existingMaxSpace) ||
-        (!isLifetimePlan && existingTier.id !== tierId);
+        (isLifetimePlan && isADifferentTier && newMaxSpace > existingMaxSpace) ||
+        (!isLifetimePlan && isADifferentTier);
 
       if (shouldUpdateUserTier) {
         await this.tiersService.updateTierToUser(userId, existingTier.id, tierId);
