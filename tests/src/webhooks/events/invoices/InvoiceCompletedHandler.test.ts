@@ -161,6 +161,23 @@ describe('Testing the handler when an invoice is completed', () => {
     });
   });
 
+  describe('Get price data', () => {
+    test('When the price data is required, then the needed data is returned', () => {
+      const mockedInvoice = getInvoice();
+      const mockedPrice = mockedInvoice.lines.data[0].price as Stripe.Price;
+
+      const getPriceData = invoiceCompletedHandler['getPriceData'].bind(invoiceCompletedHandler);
+      const result = getPriceData(mockedPrice);
+
+      expect(result).toStrictEqual({
+        productId: (mockedPrice.product as Stripe.Product).id,
+        productType: (mockedPrice.product as Stripe.Product).metadata.type,
+        planType: mockedPrice.metadata.planType,
+        maxSpaceBytes: mockedPrice.metadata.maxSpaceBytes,
+      });
+    });
+  });
+
   describe('Update or Insert User', () => {
     test('When user exists, then it should update existing user', async () => {
       const mockedUser = getUser();
