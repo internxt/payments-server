@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { FastifyBaseLogger } from 'fastify';
 import { PaymentService, PriceMetadata } from '../../../services/payment.service';
-import { User } from '../../../core/users/User';
+import { User, UserType } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
 import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
@@ -55,6 +55,99 @@ export class InvoiceCompletedHandler {
     this.tiersService = tiersService;
     this.usersService = usersService;
     this.cacheService = cacheService;
+  }
+
+  /**
+   * Process a completed invoice.
+   *
+   * @param payload - The webhook payload, with the customer, invoice, and status.
+   * @returns A promise that resolves when the invoice has been processed.
+   */
+  async run(payload: InvoiceCompletedHandlerPayload): Promise<void> {
+    const { customer, invoice, status: invoiceStatus } = payload;
+    const invoiceId = invoice.id;
+    const customerId = customer.id;
+    const customerEmail = customer.email;
+    const isInvoicePaid = invoiceStatus === 'paid';
+
+    if (!isInvoicePaid) {
+      Logger.info(`Invoice ${invoiceId} not paid, skipping processing`);
+      return;
+    }
+
+    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
+    const totalQuantity = items.data[0].quantity ?? 1;
+    const price = items.data?.[0].price;
+
+    if (!price) {
+      throw new NotFoundError(`There is no price in the invoice ${invoiceId}. Customer ID: ${customerId}`);
+    }
+
+    const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(price);
+
+    const isLifetimePlan = planType === 'one_time';
+    const isBusinessPlan = productType === UserType.Business;
+    const isObjStoragePlan = productType === UserType.ObjectStorage;
+
+    if (isObjStoragePlan) {
+      Logger.info(`Invoice ${invoiceId} is for object storage, reactivating account if needed...`);
+      return this.objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
+    }
+
+    const tierBillingType = isLifetimePlan ? 'lifetime' : 'subscription';
+    const tier = await this.tiersService.getTierProductsByProductsId(productId, tierBillingType).catch((err) => {
+      if (err instanceof TierNotFoundError) {
+        return null;
+      }
+
+      throw err;
+    });
+
+    const isOldProduct = !tier;
+    const email = customer.email ?? customerEmail;
+
+    const { uuid: userUuid } = await this.getUserUuid(customerId, email);
+
+    await this.updateOrInsertUser({ customerId: customer.id, userUuid, isLifetimePlan, isBusinessPlan });
+
+    if (isOldProduct) {
+      await this.handleOldProduct(userUuid, Number(maxSpaceBytes));
+      Logger.info(
+        `Old product handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}. Storage of ${maxSpaceBytes} applied`,
+      );
+    } else {
+      const localUser = await this.usersService.findUserByUuid(userUuid);
+
+      await this.handleNewProduct({
+        user: { ...localUser, email: email as string },
+        isLifetimePlan,
+        productId,
+        customer,
+        tier,
+        totalQuantity: totalQuantity,
+      });
+
+      await this.updateOrInsertUserTier({
+        isBusinessPlan,
+        userId: localUser.id,
+        newTier: tier,
+      });
+
+      Logger.info(
+        `New tier with ID ${tier.id} and product with ID ${tier.productId} handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}`,
+      );
+    }
+
+    await this.handleUserCouponRelationship({
+      userUuid,
+      invoice,
+      invoiceLineItem: items.data[0],
+      isLifetimePlan,
+    });
+
+    await this.clearUserRelatedCache(customerId, userUuid);
+
+    Logger.info(`Invoice ${invoiceId} processed successfully for user ${userUuid}`);
   }
 
   /**
