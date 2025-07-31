@@ -362,6 +362,7 @@ export class InvoiceCompletedHandler {
     newTier: Tier;
     isBusinessPlan: boolean;
   }): Promise<void> {
+    const { id: tierId, billingType: newBillingType } = newTier;
     try {
       const userTiers = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
         if (error instanceof TierNotFoundError) {
