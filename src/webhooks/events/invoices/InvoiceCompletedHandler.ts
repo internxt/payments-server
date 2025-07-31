@@ -134,7 +134,7 @@ export class InvoiceCompletedHandler {
       });
 
       Logger.info(
-        `New tier and product with ID ${tier.productId} handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}`,
+        `New tier with ID ${tier.id} and product with ID ${tier.productId} handled successfully for user with customer Id: ${customerId} and uuid: ${userUuid}`,
       );
     }
 
