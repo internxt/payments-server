@@ -364,6 +364,23 @@ describe('Testing the handler when an invoice is completed', () => {
     });
   });
 
+  describe('Get price data', () => {
+    test('When the price data is required, then the needed data is returned', () => {
+      const mockedInvoice = getInvoice();
+      const mockedPrice = mockedInvoice.lines.data[0].price as Stripe.Price;
+
+      const getPriceData = invoiceCompletedHandler['getPriceData'].bind(invoiceCompletedHandler);
+      const result = getPriceData(mockedPrice);
+
+      expect(result).toStrictEqual({
+        productId: (mockedPrice.product as Stripe.Product).id,
+        productType: (mockedPrice.product as Stripe.Product).metadata.type,
+        planType: mockedPrice.metadata.planType,
+        maxSpaceBytes: mockedPrice.metadata.maxSpaceBytes,
+      });
+    });
+  });
+
   describe('Update or Insert User', () => {
     test('When user exists, then it should update existing user', async () => {
       const mockedUser = getUser();
@@ -738,7 +755,7 @@ describe('Testing the handler when an invoice is completed', () => {
         expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
       });
 
-      test('When the new tier is lifetime, then the tier is updated accordingly the greater tier that has more space bytes', async () => {
+      test('When the new tier is lifetime and the user already had one, then the remaining tier should be the one that has more space bytes', async () => {
         const userId = getUser().id;
         const currentTier = newTier({
           id: 'tier-1',
@@ -765,7 +782,7 @@ describe('Testing the handler when an invoice is completed', () => {
         expect(updateSpy).toHaveBeenCalledWith(userId, currentTier.id, newTierInstance.id);
       });
 
-      test('When the new tier is lifetime but it previously had a subscription, then the tier is updated accordingly', async () => {
+      test('When the user previously had a subscription and the new tier is lifetime, then the user-tier relationship is updated to the lifetime tier', async () => {
         const userId = getUser().id;
         const currentTier = newTier({
           id: 'tier-1',
