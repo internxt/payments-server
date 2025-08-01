@@ -1617,6 +1617,10 @@ export class PaymentService {
     return this.provider.customers.retrieve(customerId);
   }
 
+  getInvoice(invoiceId: Stripe.Invoice['id']) {
+    return this.provider.invoices.retrieve(invoiceId);
+  }
+
   getProduct(productId: Stripe.Product['id']) {
     return this.provider.products.retrieve(productId);
   }

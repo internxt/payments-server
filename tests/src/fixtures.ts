@@ -26,6 +26,7 @@ import {
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
+import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
 
 const randomDataGenerator = new Chance();
 
@@ -49,6 +50,31 @@ export const getLicenseCode = (params?: Partial<LicenseCode>) => {
     provider: 'OWN',
     code: randomDataGenerator.string({ length: 10 }),
     redeemed: false,
+    ...params,
+  };
+};
+
+export const getCryptoInvoiceWebhook = (params?: Partial<Bit2MePaymentStatusCallback>): Bit2MePaymentStatusCallback => {
+  return {
+    id: randomDataGenerator.string({ length: 16 }),
+    foreignId: `inv_${randomDataGenerator.string({ length: 16 })}`,
+    cryptoAddress: {
+      currency: AllowedCurrencies['Bitcoin'],
+      address: randomDataGenerator.hash({ length: 34 }),
+    },
+    currencySent: {
+      currency: AllowedCurrencies['Bitcoin'],
+      amount: '0.01',
+      remainingAmount: '0',
+    },
+    currencyReceived: {
+      currency: AllowedCurrencies['Bitcoin'],
+    },
+    token: 'mocked-token',
+    transactions: [],
+    fees: [],
+    error: [],
+    status: 'paid',
     ...params,
   };
 };

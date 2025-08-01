@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 
 import { StorageService } from '../../../services/storage.service';
@@ -9,11 +8,20 @@ import { AppConfig } from '../../../config';
 import CacheService from '../../../services/cache.service';
 import { ObjectStorageService } from '../../../services/objectStorage.service';
 import { TiersService } from '../../../services/tiers.service';
-import { Bit2MeService } from '../../../services/bit2me.service';
 import { BadRequestError } from '../../../errors/Errors';
 import { InvoiceCompletedHandler } from '../../events/invoices/InvoiceCompletedHandler';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
+
+export interface CryptoWebhookDependencies {
+  storageService: StorageService;
+  cacheService: CacheService;
+  config: AppConfig;
+  objectStorageService: ObjectStorageService;
+  paymentService: PaymentService;
+  tiersService: TiersService;
+  usersService: UsersService;
+}
 
 export interface Bit2MePaymentStatusCallback {
   id: string;
@@ -37,17 +45,15 @@ export interface Bit2MePaymentStatusCallback {
   status: 'new' | 'pending' | 'confirming' | 'paid' | 'expired' | 'paid_after_expired';
 }
 
-export default function (
-  stripe: Stripe,
-  bit2MeService: Bit2MeService,
-  storageService: StorageService,
-  usersService: UsersService,
-  paymentService: PaymentService,
-  config: AppConfig,
-  cacheService: CacheService,
-  objectStorageService: ObjectStorageService,
-  tiersService: TiersService,
-) {
+export default function ({
+  storageService,
+  cacheService,
+  config,
+  objectStorageService,
+  paymentService,
+  tiersService,
+  usersService,
+}: CryptoWebhookDependencies) {
   return async function (fastify: FastifyInstance) {
     const decryptToken = async (token: string) => {
       return jwt.verify(token, config.JWT_SECRET) as {
@@ -63,7 +69,15 @@ export default function (
       const { customerId, invoiceId, provider } = await decryptToken(token);
 
       if (invoiceId !== foreignId) {
-        throw new BadRequestError('Stripe invoice id does not match');
+        throw new BadRequestError(
+          `Stripe invoice with id ${invoiceId} and invoice foreign id ${foreignId} does not match for customer ${customerId}`,
+        );
+      }
+
+      if (provider !== 'stripe') {
+        throw new BadRequestError(
+          `The provider for the invoice with ID ${invoiceId} and foreign Id ${foreignId} for customer Id ${customerId} is not Stripe.`,
+        );
       }
 
       if (status !== 'paid') {
@@ -75,7 +89,7 @@ export default function (
         throw new BadRequestError(`Customer with ID ${customerId} is deleted`);
       }
 
-      const invoice = await stripe.invoices.retrieve(invoiceId);
+      const invoice = await paymentService.getInvoice(invoiceId);
 
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
       const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
