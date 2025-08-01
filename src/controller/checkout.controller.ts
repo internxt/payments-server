@@ -211,6 +211,12 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             },
           },
         },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
       },
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
