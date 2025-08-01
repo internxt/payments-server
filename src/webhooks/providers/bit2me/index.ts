@@ -66,7 +66,7 @@ export default function ({
     };
 
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
-      const { id: paymentId, token, foreignId, status, cryptoAddress } = req.body;
+      const { id: paymentId, token, foreignId, status } = req.body;
 
       const { customerId, invoiceId, provider } = await decodeToken(token);
 
