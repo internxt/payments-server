@@ -5,7 +5,7 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { PaymentService } from '../services/payment.service';
+import { PaymentIntent, PaymentService } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
@@ -212,7 +212,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           },
         },
       },
-      async (req, res) => {
+      async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
