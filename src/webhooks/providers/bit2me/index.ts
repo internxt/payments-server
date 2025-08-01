@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 
 import { StorageService } from '../../../services/storage.service';
-import { UserNotFoundError, UsersService } from '../../../services/users.service';
+import { UsersService } from '../../../services/users.service';
 import { PaymentService } from '../../../services/payment.service';
 import { AppConfig } from '../../../config';
 import CacheService from '../../../services/cache.service';
@@ -11,6 +11,9 @@ import { ObjectStorageService } from '../../../services/objectStorage.service';
 import { TiersService } from '../../../services/tiers.service';
 import { Bit2MeService } from '../../../services/bit2me.service';
 import { BadRequestError } from '../../../errors/Errors';
+import { InvoiceCompletedHandler } from '../../events/invoices/InvoiceCompletedHandler';
+import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
+import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
 
 export interface Bit2MePaymentStatusCallback {
   id: string;
@@ -48,7 +51,8 @@ export default function (
   return async function (fastify: FastifyInstance) {
     const decryptToken = async (token: string) => {
       return jwt.verify(token, config.JWT_SECRET) as {
-        stripeInvoiceId: string;
+        invoiceId: string;
+        provider: string;
         customerId: string;
       };
     };
@@ -56,9 +60,9 @@ export default function (
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
       const { token, foreignId, status } = req.body;
 
-      const { customerId, stripeInvoiceId } = await decryptToken(token);
+      const { customerId, invoiceId, provider } = await decryptToken(token);
 
-      if (stripeInvoiceId !== foreignId) {
+      if (invoiceId !== foreignId) {
         throw new BadRequestError('Stripe invoice id does not match');
       }
 
@@ -66,48 +70,31 @@ export default function (
         return rep.status(200).send();
       }
 
-      // Get user uuid and all necessary info to complete the following steps
       const customer = await paymentService.getCustomer(customerId);
       if (customer.deleted) {
         throw new BadRequestError(`Customer with ID ${customerId} is deleted`);
       }
 
-      const customerEmail = customer.email;
+      const invoice = await stripe.invoices.retrieve(invoiceId);
 
-      const invoiceLineItem = await paymentService.getInvoiceLineItems(stripeInvoiceId);
-      const isLifetime = invoiceLineItem.data[0].price?.type === 'one_time';
+      const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+      const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
+      const handler = new InvoiceCompletedHandler({
+        logger: fastify.log,
+        determineLifetimeConditions,
+        objectStorageWebhookHandler,
+        paymentService,
+        cacheService,
+        tiersService,
+        storageService,
+        usersService,
+      });
 
-      if (!customerEmail) {
-        throw new BadRequestError(`Customer email not found for customer ID ${customerId}`);
-      }
-
-      const {
-        data: { uuid: userUuid },
-      } = await usersService.findUserByEmail(customerEmail.toLowerCase());
-
-      // insert/update user
-      try {
-        await usersService.updateUser(customerId, {
-          lifetime: isLifetime,
-          uuid: userUuid,
-        });
-      } catch (error) {
-        if (error instanceof UserNotFoundError) {
-          await usersService.insertUser({
-            customerId,
-            uuid: userUuid,
-            lifetime: isLifetime,
-          });
-        }
-
-        throw error;
-      }
-
-      // Apply features (old/new products)
-
-      // insert/update user-tier relationship
-
-      // Clear cache (subscription and used codes)
+      await handler.run({
+        invoice,
+        customer,
+        status: invoice.status as string,
+      });
     });
   };
 }
