@@ -23,7 +23,7 @@ describe('Handling webhook for crypto payments', () => {
     const mockedInvoice = getInvoice();
     const mockedForeignId = 'inv_other';
 
-    const encryptedToken = jwt.sign(
+    const decodedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
         customerId: mockedInvoice.customer,
@@ -33,7 +33,7 @@ describe('Handling webhook for crypto payments', () => {
     );
     const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedForeignId,
-      token: encryptedToken,
+      token: decodedToken,
     });
 
     const response = await app.inject({
@@ -52,7 +52,7 @@ describe('Handling webhook for crypto payments', () => {
 
   test('When the provider is not stripe, then an error indicating so is thrown', async () => {
     const mockedInvoice = getInvoice();
-    const encryptedToken = jwt.sign(
+    const decodedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
         customerId: mockedInvoice.customer,
@@ -62,7 +62,7 @@ describe('Handling webhook for crypto payments', () => {
     );
     const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedInvoice.id,
-      token: encryptedToken,
+      token: decodedToken,
     });
 
     const response = await app.inject({
@@ -79,7 +79,7 @@ describe('Handling webhook for crypto payments', () => {
 
   test('When the status of the invoice is different to paid, then nothing happens and a 200 is returned', async () => {
     const mockedInvoice = getInvoice();
-    const encryptedToken = jwt.sign(
+    const decodedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
         customerId: mockedInvoice.customer,
@@ -89,7 +89,7 @@ describe('Handling webhook for crypto payments', () => {
     );
     const mockedInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedInvoice.id,
-      token: encryptedToken,
+      token: decodedToken,
       status: 'pending',
     });
 
@@ -107,7 +107,7 @@ describe('Handling webhook for crypto payments', () => {
     const mockedInvoice = getInvoice({
       customer: mockedCustomer.id,
     });
-    const encryptedToken = jwt.sign(
+    const decodedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
         customerId: mockedInvoice.customer,
@@ -117,7 +117,7 @@ describe('Handling webhook for crypto payments', () => {
     );
     const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedInvoice.id,
-      token: encryptedToken,
+      token: decodedToken,
     });
     jest.spyOn(PaymentService.prototype, 'getCustomer').mockResolvedValue({
       deleted: true,
@@ -140,7 +140,7 @@ describe('Handling webhook for crypto payments', () => {
       status: 'paid',
       customer: mockedCustomer.id,
     });
-    const encryptedToken = jwt.sign(
+    const decodedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
         customerId: mockedInvoice.customer,
@@ -150,7 +150,7 @@ describe('Handling webhook for crypto payments', () => {
     );
     const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedInvoice.id,
-      token: encryptedToken,
+      token: decodedToken,
     });
 
     jest

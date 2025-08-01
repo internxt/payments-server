@@ -61,14 +61,14 @@ export default function ({
   usersService,
 }: CryptoWebhookDependencies) {
   return async function (fastify: FastifyInstance) {
-    const decryptToken = async (token: string): Promise<CryptoWebhookTokenPayload> => {
+    const decodeToken = async (token: string): Promise<CryptoWebhookTokenPayload> => {
       return jwt.verify(token, config.JWT_SECRET) as CryptoWebhookTokenPayload;
     };
 
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
-      const { token, foreignId, status } = req.body;
+      const { id: paymentId, token, foreignId, status, cryptoAddress } = req.body;
 
-      const { customerId, invoiceId, provider } = await decryptToken(token);
+      const { customerId, invoiceId, provider } = await decodeToken(token);
 
       if (invoiceId !== foreignId) {
         throw new BadRequestError(
@@ -115,6 +115,7 @@ export default function ({
       await paymentService.updateInvoice(invoiceId, {
         metadata: {
           provider: 'bit2me',
+          paymentId,
         },
         description: 'Invoice paid using crypto currencies.',
       });
