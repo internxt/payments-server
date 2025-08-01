@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import {
   getCreatedSubscription,
   getCreateSubscriptionResponse,
+  getCryptoCurrency,
   getCustomer,
   getInvoice,
   getTaxes,
@@ -16,6 +17,7 @@ import { UserNotFoundError, UsersService } from '../../../src/services/users.ser
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
+import { AllowedCurrencies } from '../../../src/services/bit2me.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -632,6 +634,28 @@ describe('Checkout controller', () => {
           },
         });
       });
+    });
+  });
+
+  describe('Get crypto currencies', () => {
+    test('When the currencies are requested, then the available currencies are returned', async () => {
+      const mockedCurrencies = [
+        getCryptoCurrency(),
+        getCryptoCurrency({
+          name: AllowedCurrencies['Ethereum'],
+        }),
+      ];
+      jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);
+
+      const response = await app.inject({
+        path: '/checkout/currencies/crypto',
+        method: 'GET',
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedCurrencies);
     });
   });
 });
