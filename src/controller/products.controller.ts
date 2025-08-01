@@ -4,8 +4,8 @@ import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { User, UserType } from '../core/users/User';
+import { TiersService } from '../services/tiers.service';
+import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import { Tier } from '../core/users/Tier';
 
@@ -32,10 +32,7 @@ export default function (
 
     fastify.get(
       '/',
-      async (
-        req,
-        res,
-      ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean; cleaner: boolean } } | Error> => {
+      async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
         let user: User;
         const userUuid = req.user.payload.uuid;
 
@@ -55,7 +52,6 @@ export default function (
               featuresPerService: {
                 antivirus: false,
                 backups: false,
-                cleaner: false,
               },
             });
           }
@@ -81,11 +77,6 @@ export default function (
         return rep.status(200).send(higherTier);
       } catch (error) {
         req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
-        if (error instanceof UserNotFoundError || error instanceof TierNotFoundError) {
-          const freeTier = await tiersService.getTierProductsByProductsId('free');
-          return rep.status(200).send(freeTier);
-        }
-
         return rep.status(500).send({ message: 'Internal server error' });
       }
     });

@@ -9,7 +9,7 @@ import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import { StorageService } from '../../../src/services/storage.service';
-import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
+import { TiersService } from '../../../src/services/tiers.service';
 import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
 import { getUser, newTier } from '../fixtures';
 import testFactory from '../utils/factory';
@@ -79,17 +79,23 @@ describe('Products Service Tests', () => {
   });
 
   describe('Finding the applicable tier for a user (feature merging approach)', () => {
-    it('When the user has no tiers, then an error is thrown', async () => {
+    it('When the user has no tiers, then the free tier is returned', async () => {
       const mockedUser = getUser();
+      const freeTier = newTier({
+        id: 'free',
+        label: 'free',
+        productId: 'free',
+      });
 
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(freeTier);
 
-      await expect(
-        productsService.getApplicableTierForUser({
-          userUuid: mockedUser.uuid,
-        }),
-      ).rejects.toThrow(TierNotFoundError);
+      const result = await productsService.getApplicableTierForUser({
+        userUuid: mockedUser.uuid,
+      });
+
+      expect(result).toStrictEqual(freeTier);
     });
 
     it('When the user has a lifetime subscription, the lifetime tier is returned', async () => {

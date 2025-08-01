@@ -134,98 +134,70 @@ describe('Testing products endpoints', () => {
       expect(response.statusCode).toBe(500);
     });
 
-    describe('When the subscription type is individual', () => {
-      it('When the user is not found, then the free tier is returned successfully', async () => {
-        const mockedUser = getUser();
-        const mockedFreeTier = newTier({
-          id: 'free',
-          label: 'free',
-          productId: 'free',
-        });
-        const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-        jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError('User not found'));
-        jest.spyOn(TiersService.prototype, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+    it('When the user has no tiers, then the free tier is returned successfully', async () => {
+      const mockedUser = getUser();
+      const mockedFreeTier = newTier({
+        id: 'free',
+        label: 'free',
+        productId: 'free',
+      });
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([]);
+      jest.spyOn(TiersService.prototype, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
 
-        const response = await app.inject({
-          path: `/products/tier`,
-          method: 'GET',
-          headers: { Authorization: `Bearer ${mockedUserToken}` },
-        });
-
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toStrictEqual(mockedFreeTier);
+      const response = await app.inject({
+        path: `/products/tier`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
 
-      it('When the user is found and has a valid subscription, then individual tier is returned successfully', async () => {
-        const mockedUser = getUser();
-        const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-        const mockedTier = newTier();
-        jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+      const responseBody = response.json();
 
-        const response = await app.inject({
-          path: `/products/tier`,
-          method: 'GET',
-          headers: { Authorization: `Bearer ${mockedUserToken}` },
-        });
-
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toStrictEqual(mockedTier);
-      });
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedFreeTier);
     });
 
-    describe('When the subscription type is business', () => {
-      it('When the user does not have any associated workspaces, then the free tier is returned successfully', async () => {
-        const mockedUser = getUser();
-        const mockedUserToken = getValidAuthToken(mockedUser.uuid, {
-          owners: [],
-        });
-        const mockedFreeTier = newTier({
-          id: 'free',
-          label: 'free',
-          productId: 'free',
-        });
+    it('When the user has a valid subscription, then the best tier is returned successfully', async () => {
+      const mockedUser = getUser();
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
+      const mockedTier = newTier();
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
-        jest.spyOn(TiersService.prototype, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
-
-        const response = await app.inject({
-          path: `/products/tier?subscriptionType=business`,
-          method: 'GET',
-          headers: { Authorization: `Bearer ${mockedUserToken}` },
-        });
-
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toStrictEqual(mockedFreeTier);
+      const response = await app.inject({
+        path: `/products/tier`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
 
-      it('When the user has associated workspaces, then the highest tier is returned successfully', async () => {
-        const mockedUser = getUser();
-        const mockedUserToken = getValidAuthToken(mockedUser.uuid, {
-          owners: [mockedUser.uuid],
-        });
-        const mockedTier = newTier();
-        mockedTier.featuresPerService.drive.workspaces.enabled = true;
+      const responseBody = response.json();
 
-        jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedTier);
+    });
 
-        const response = await app.inject({
-          path: `/products/tier?subscriptionType=business`,
-          method: 'GET',
-          headers: { Authorization: `Bearer ${mockedUserToken}` },
-        });
-
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toStrictEqual(mockedTier);
+    it('When the user has workspace access, then the business tier is returned successfully', async () => {
+      const mockedUser = getUser();
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid, {
+        owners: [mockedUser.uuid],
       });
+      const mockedTier = newTier();
+      mockedTier.featuresPerService.drive.workspaces.enabled = true;
+
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+
+      const response = await app.inject({
+        path: `/products/tier`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${mockedUserToken}` },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedTier);
     });
   });
 });

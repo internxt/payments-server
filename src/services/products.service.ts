@@ -1,6 +1,6 @@
 import { Service, Tier } from '../core/users/Tier';
-import { UserType } from '../core/users/User';
-import { TierNotFoundError, TiersService } from './tiers.service';
+import { NotFoundError } from '../errors/Errors';
+import { TiersService } from './tiers.service';
 import { UserNotFoundError, UsersService } from './users.service';
 
 interface MergedTierFeatures {
@@ -24,6 +24,10 @@ interface MergedTierFeatures {
     sourceTierId?: string;
   };
   backups: {
+    enabled: boolean;
+    sourceTierId?: string;
+  };
+  cleaner: {
     enabled: boolean;
     sourceTierId?: string;
   };
@@ -67,7 +71,7 @@ export class ProductsService {
       }, individualTiers[0]);
     }
 
-    throw new TierNotFoundError('No drive tiers available');
+    throw new NotFoundError('No drive tiers available');
   }
 
   private mergeNonDriveFeatures(tiers: Tier[], mergedFeatures: MergedTierFeatures): void {
@@ -77,6 +81,7 @@ export class ProductsService {
       this.mergeVpnFeatures(tier, mergedFeatures);
       this.mergeAntivirusFeatures(tier, mergedFeatures);
       this.mergeBackupsFeatures(tier, mergedFeatures);
+      this.mergeCleanerFeatures(tier, mergedFeatures);
     }
   }
 
@@ -135,6 +140,16 @@ export class ProductsService {
     }
   }
 
+  private mergeCleanerFeatures(tier: Tier, mergedFeatures: MergedTierFeatures): void {
+    const cleanerFeatures = tier.featuresPerService[Service.Cleaner];
+    if (cleanerFeatures.enabled && !mergedFeatures.cleaner.enabled) {
+      mergedFeatures.cleaner = {
+        enabled: true,
+        sourceTierId: tier.id,
+      };
+    }
+  }
+
   private mergeFeatures(tiers: Tier[]): MergedTierFeatures {
     const mergedFeatures: MergedTierFeatures = {
       mail: { enabled: false, addressesPerUser: 0 },
@@ -142,6 +157,7 @@ export class ProductsService {
       vpn: { enabled: false, featureId: '' },
       antivirus: { enabled: false },
       backups: { enabled: false },
+      cleaner: { enabled: false },
       drive: { tier: tiers[0] },
     };
 
@@ -176,7 +192,6 @@ export class ProductsService {
 
       const ownerTiersArrays = await Promise.all(ownerTierPromises);
       const businessTiers = ownerTiersArrays.flat();
-      console.log('businessTiers', businessTiers);
       availableTiers.push(...businessTiers);
     }
 
@@ -189,7 +204,7 @@ export class ProductsService {
     const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
 
     if (availableTiers.length === 0) {
-      throw new TierNotFoundError(`No tiers found for user uuid ${userUuid}`);
+      return await this.tiersService.getTierProductsByProductsId('free');
     }
 
     const user = await this.usersService.findUserByUuid(userUuid);
@@ -202,78 +217,5 @@ export class ProductsService {
 
     const mergedFeatures = this.mergeFeatures(availableTiers);
     return mergedFeatures.drive.tier;
-  }
-
-  async getMergedFeaturesForUser({
-    userUuid,
-    ownersId,
-  }: {
-    userUuid: string;
-    ownersId?: string[];
-  }): Promise<MergedTierFeatures> {
-    const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
-
-    if (availableTiers.length === 0) {
-      throw new TierNotFoundError(`No tiers found for user uuid ${userUuid}`);
-    }
-
-    return this.mergeFeatures(availableTiers);
-  }
-
-  async getFeatureSourceBreakdown({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<{
-    mergedFeatures: MergedTierFeatures;
-    availableTiers: Tier[];
-    breakdown: {
-      mail: string | null;
-      meet: string | null;
-      vpn: string | null;
-      antivirus: string | null;
-      backups: string | null;
-      drive: string;
-    };
-  }> {
-    const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
-
-    if (availableTiers.length === 0) {
-      throw new TierNotFoundError(`No tiers found for user uuid ${userUuid}`);
-    }
-
-    const mergedFeatures = this.mergeFeatures(availableTiers);
-
-    const breakdown = {
-      mail: mergedFeatures.mail.enabled
-        ? `${mergedFeatures.mail.addressesPerUser} addresses from tier ${mergedFeatures.mail.sourceTierId}`
-        : null,
-      meet: mergedFeatures.meet.enabled
-        ? `${mergedFeatures.meet.paxPerCall} participants from tier ${mergedFeatures.meet.sourceTierId}`
-        : null,
-      vpn: mergedFeatures.vpn.enabled ? `VPN access from tier ${mergedFeatures.vpn.sourceTierId}` : null,
-      antivirus: mergedFeatures.antivirus.enabled
-        ? `Antivirus from tier ${mergedFeatures.antivirus.sourceTierId}`
-        : null,
-      backups: mergedFeatures.backups.enabled ? `Backups from tier ${mergedFeatures.backups.sourceTierId}` : null,
-      drive: `Drive features from tier ${mergedFeatures.drive.tier.id} (${mergedFeatures.drive.tier.label})`,
-    };
-
-    return { mergedFeatures, availableTiers, breakdown };
-  }
-
-  async getAllVpnFeatures({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<AllVpnFeatures> {
-    const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
-
-    const vpnOptions = availableTiers
-      .filter((tier) => tier.featuresPerService[Service.Vpn].enabled)
-      .map((tier) => ({
-        featureId: tier.featuresPerService[Service.Vpn].featureId,
-        sourceTierId: tier.id,
-        tierLabel: tier.label,
-      }));
-
-    return { vpnOptions };
-  }
-
-  async hasVpnAccess({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<boolean> {
-    const vpnFeatures = await this.getAllVpnFeatures({ userUuid, ownersId });
-    return vpnFeatures.vpnOptions.length > 0;
   }
 }
