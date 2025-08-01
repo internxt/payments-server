@@ -58,7 +58,7 @@ describe('Handling webhook for crypto payments', () => {
     );
   });
 
-  test('When provider is not stripe, then an error indicating so is thrown', async () => {
+  test('When the provider is not stripe, then an error indicating so is thrown', async () => {
     const mockedInvoice = getInvoice();
     const encryptedToken = jwt.sign(
       {
@@ -85,7 +85,7 @@ describe('Handling webhook for crypto payments', () => {
     );
   });
 
-  test('When the status of the invoice is different to paid, then returns nothing happens and a 200 is returned', async () => {
+  test('When the status of the invoice is different to paid, then nothing happens and a 200 is returned', async () => {
     const mockedInvoice = getInvoice();
     const encryptedToken = jwt.sign(
       {
