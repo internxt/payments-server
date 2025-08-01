@@ -1,7 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../../../utils/initializeServer';
-import { Bit2MePaymentStatusCallback } from '../../../../../src/webhooks/providers/bit2me/index';
 import { getCryptoInvoiceWebhook, getCustomer, getInvoice } from '../../../fixtures';
 import jwt from 'jsonwebtoken';
 import config from '../../../../../src/config';
@@ -23,6 +22,7 @@ describe('Handling webhook for crypto payments', () => {
   test('When the foreignId does not match with the invoiceId we get from the encrypted token, then an error indicating so is thrown', async () => {
     const mockedInvoice = getInvoice();
     const mockedForeignId = 'inv_other';
+
     const encryptedToken = jwt.sign(
       {
         invoiceId: mockedInvoice.id,
@@ -31,23 +31,15 @@ describe('Handling webhook for crypto payments', () => {
       },
       config.JWT_SECRET,
     );
-    const payload: Bit2MePaymentStatusCallback = {
-      id: '1',
+    const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
       foreignId: mockedForeignId,
-      cryptoAddress: { currency: 'BTC', address: '1abc' },
-      currencySent: { currency: 'BTC', amount: '0.01', remainingAmount: '0' },
-      currencyReceived: { currency: 'BTC' },
       token: encryptedToken,
-      transactions: [],
-      fees: [],
-      error: [],
-      status: 'paid',
-    };
+    });
 
     const response = await app.inject({
       method: 'POST',
       path: '/webhook/crypto',
-      body: payload,
+      body: mockedCryptoInvoiceWebhook,
     });
 
     expect(response.statusCode).toBe(400);
