@@ -5,7 +5,7 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { PaymentService } from '../services/payment.service';
+import { PaymentIntent, PaymentService } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
@@ -211,8 +211,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             },
           },
         },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
       },
-      async (req, res) => {
+      async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
@@ -237,12 +243,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
-        const {
-          clientSecret,
-          id,
-          invoiceStatus,
-          type: paymentIntentType,
-        } = await paymentsService.createInvoice({
+        const result = await paymentsService.createInvoice({
           customerId,
           priceId,
           userEmail: email,
@@ -255,7 +256,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           },
         });
 
-        return res.status(200).send({ clientSecret, id, invoiceStatus, type: paymentIntentType });
+        return res.status(200).send(result);
       },
     );
 
