@@ -1651,12 +1651,16 @@ export class PaymentService {
     const validInvoiceId = this.validateInvoiceId(invoiceId);
 
     if (!validInvoiceId) {
-      throw new Error(`Invalid invoice id ${invoiceId}`);
+      throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
     }
 
     await this.provider.invoices.pay(invoiceId, {
       paid_out_of_band: true,
     });
+  }
+
+  async updateInvoice(invoiceId: Invoice['id'], data: Stripe.InvoiceUpdateParams) {
+    return this.provider.invoices.update(invoiceId, data);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

@@ -111,6 +111,17 @@ export default function ({
         customer,
         status: invoice.status as string,
       });
+
+      await paymentService.updateInvoice(invoiceId, {
+        metadata: {
+          provider: 'bit2me',
+        },
+        description: 'Invoice paid using crypto currencies.',
+      });
+
+      await paymentService.markInvoiceAsPaid(invoiceId);
+
+      return rep.status(200).send();
     });
   };
 }

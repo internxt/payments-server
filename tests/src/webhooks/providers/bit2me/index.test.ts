@@ -159,6 +159,10 @@ describe('Handling webhook for crypto payments', () => {
     jest
       .spyOn(PaymentService.prototype, 'getInvoice')
       .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+    jest
+      .spyOn(PaymentService.prototype, 'updateInvoice')
+      .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+    jest.spyOn(PaymentService.prototype, 'markInvoiceAsPaid').mockResolvedValue();
 
     const runSpy = jest.spyOn(InvoiceCompletedHandler.prototype, 'run').mockResolvedValue();
 
