@@ -237,12 +237,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
-        const {
-          clientSecret,
-          id,
-          invoiceStatus,
-          type: paymentIntentType,
-        } = await paymentsService.createInvoice({
+        const result = await paymentsService.createInvoice({
           customerId,
           priceId,
           userEmail: email,
@@ -255,7 +250,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           },
         });
 
-        return res.status(200).send({ clientSecret, id, invoiceStatus, type: paymentIntentType });
+        return res.status(200).send(result);
       },
     );
 
