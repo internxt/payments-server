@@ -155,7 +155,10 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedFreeTier);
+      expect(responseBody.drive).toBeDefined();
+      expect(responseBody.drive.sourceTierId).toBe('free');
+      expect(responseBody.mail).toBeDefined();
+      expect(responseBody.vpn).toBeDefined();
     });
 
     it('When the user has a valid subscription, then the best tier is returned successfully', async () => {
@@ -174,7 +177,9 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedTier);
+      expect(responseBody.drive).toBeDefined();
+      expect(responseBody.mail).toBeDefined();
+      expect(responseBody.drive.sourceTierId).toBeDefined();
     });
 
     it('When the user has workspace access, then the business tier is returned successfully', async () => {
@@ -197,7 +202,9 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedTier);
+      expect(responseBody.drive).toBeDefined();
+      expect(responseBody.drive.workspaces.enabled).toBe(true);
+      expect(responseBody.drive.sourceTierId).toBeDefined();
     });
   });
 });

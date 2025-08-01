@@ -32,7 +32,15 @@ interface MergedTierFeatures {
     sourceTierId?: string;
   };
   drive: {
-    tier: Tier;
+    enabled: boolean;
+    maxSpaceBytes: number;
+    workspaces: {
+      enabled: boolean;
+      minimumSeats: number;
+      maximumSeats: number;
+      maxSpaceBytesPerSeat: number;
+    };
+    sourceTierId?: string;
   };
 }
 
@@ -50,25 +58,38 @@ export class ProductsService {
     private readonly usersService: UsersService,
   ) {}
 
-  private selectBestDriveTier(businessTiers: Tier[], individualTiers: Tier[]): Tier {
+  private selectBestDriveFeatures(
+    businessTiers: Tier[],
+    individualTiers: Tier[],
+  ): { driveFeatures: any; sourceTierId: string } {
     if (businessTiers.length > 0) {
-      return businessTiers.reduce((best, current) => {
+      const bestBusinessTier = businessTiers.reduce((best, current) => {
         const bestStorage = best.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
         const currentStorage = current.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
 
         const isCurrentTierBetter = currentStorage > bestStorage;
         return isCurrentTierBetter ? current : best;
       }, businessTiers[0]);
+
+      return {
+        driveFeatures: bestBusinessTier.featuresPerService[Service.Drive],
+        sourceTierId: bestBusinessTier.id,
+      };
     }
 
     if (individualTiers.length > 0) {
-      return individualTiers.reduce((best, current) => {
+      const bestIndividualTier = individualTiers.reduce((best, current) => {
         const bestStorage = best.featuresPerService[Service.Drive].maxSpaceBytes;
         const currentStorage = current.featuresPerService[Service.Drive].maxSpaceBytes;
 
         const isCurrentTierBetter = currentStorage > bestStorage;
         return isCurrentTierBetter ? current : best;
       }, individualTiers[0]);
+
+      return {
+        driveFeatures: bestIndividualTier.featuresPerService[Service.Drive],
+        sourceTierId: bestIndividualTier.id,
+      };
     }
 
     throw new NotFoundError('No drive tiers available');
@@ -158,13 +179,26 @@ export class ProductsService {
       antivirus: { enabled: false },
       backups: { enabled: false },
       cleaner: { enabled: false },
-      drive: { tier: tiers[0] },
+      drive: {
+        enabled: false,
+        maxSpaceBytes: 0,
+        workspaces: {
+          enabled: false,
+          minimumSeats: 0,
+          maximumSeats: 0,
+          maxSpaceBytesPerSeat: 0,
+        },
+      },
     };
 
     const businessTiers = tiers.filter((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled);
     const individualTiers = tiers.filter((tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled);
 
-    mergedFeatures.drive.tier = this.selectBestDriveTier(businessTiers, individualTiers);
+    const { driveFeatures, sourceTierId } = this.selectBestDriveFeatures(businessTiers, individualTiers);
+    mergedFeatures.drive = {
+      ...driveFeatures,
+      sourceTierId,
+    };
 
     this.mergeNonDriveFeatures(tiers, mergedFeatures);
 
@@ -200,22 +234,78 @@ export class ProductsService {
     return uniqueTiers;
   }
 
-  async getApplicableTierForUser({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<Tier> {
+  async getApplicableTierForUser({
+    userUuid,
+    ownersId,
+  }: {
+    userUuid: string;
+    ownersId?: string[];
+  }): Promise<MergedTierFeatures> {
     const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
 
     if (availableTiers.length === 0) {
-      return await this.tiersService.getTierProductsByProductsId('free');
+      const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+      return {
+        mail: {
+          enabled: freeTier.featuresPerService[Service.Mail].enabled,
+          addressesPerUser: freeTier.featuresPerService[Service.Mail].addressesPerUser,
+        },
+        meet: {
+          enabled: freeTier.featuresPerService[Service.Meet].enabled,
+          paxPerCall: freeTier.featuresPerService[Service.Meet].paxPerCall,
+        },
+        vpn: {
+          enabled: freeTier.featuresPerService[Service.Vpn].enabled,
+          featureId: freeTier.featuresPerService[Service.Vpn].featureId,
+        },
+        antivirus: { enabled: freeTier.featuresPerService[Service.Antivirus].enabled },
+        backups: { enabled: freeTier.featuresPerService[Service.Backups].enabled },
+        cleaner: { enabled: freeTier.featuresPerService[Service.Cleaner].enabled },
+        drive: {
+          enabled: freeTier.featuresPerService[Service.Drive].enabled,
+          maxSpaceBytes: freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+          workspaces: freeTier.featuresPerService[Service.Drive].workspaces,
+          sourceTierId: freeTier.id,
+        },
+      };
     }
 
     const user = await this.usersService.findUserByUuid(userUuid);
     if (user.lifetime) {
       const lifetimeTier = availableTiers.find((tier) => tier.billingType === 'lifetime');
       if (lifetimeTier) {
-        return lifetimeTier;
+        return {
+          mail: {
+            enabled: lifetimeTier.featuresPerService[Service.Mail].enabled,
+            addressesPerUser: lifetimeTier.featuresPerService[Service.Mail].addressesPerUser,
+            sourceTierId: lifetimeTier.id,
+          },
+          meet: {
+            enabled: lifetimeTier.featuresPerService[Service.Meet].enabled,
+            paxPerCall: lifetimeTier.featuresPerService[Service.Meet].paxPerCall,
+            sourceTierId: lifetimeTier.id,
+          },
+          vpn: {
+            enabled: lifetimeTier.featuresPerService[Service.Vpn].enabled,
+            featureId: lifetimeTier.featuresPerService[Service.Vpn].featureId,
+            sourceTierId: lifetimeTier.id,
+          },
+          antivirus: {
+            enabled: lifetimeTier.featuresPerService[Service.Antivirus].enabled,
+            sourceTierId: lifetimeTier.id,
+          },
+          backups: { enabled: lifetimeTier.featuresPerService[Service.Backups].enabled, sourceTierId: lifetimeTier.id },
+          cleaner: { enabled: lifetimeTier.featuresPerService[Service.Cleaner].enabled, sourceTierId: lifetimeTier.id },
+          drive: {
+            enabled: lifetimeTier.featuresPerService[Service.Drive].enabled,
+            maxSpaceBytes: lifetimeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+            workspaces: lifetimeTier.featuresPerService[Service.Drive].workspaces,
+            sourceTierId: lifetimeTier.id,
+          },
+        };
       }
     }
 
-    const mergedFeatures = this.mergeFeatures(availableTiers);
-    return mergedFeatures.drive.tier;
+    return this.mergeFeatures(availableTiers);
   }
 }

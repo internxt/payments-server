@@ -95,7 +95,10 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(result).toStrictEqual(freeTier);
+      expect(result.drive.enabled).toBe(false);
+      expect(result.drive.sourceTierId).toBe('free');
+      expect(result.mail.enabled).toBe(false);
+      expect(result.vpn.enabled).toBe(false);
     });
 
     it('When the user has a lifetime subscription, the lifetime tier is returned', async () => {
@@ -110,8 +113,9 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(result).toStrictEqual(lifetimeTier);
-      expect(result.billingType).toStrictEqual('lifetime');
+      expect(result.drive.sourceTierId).toStrictEqual(lifetimeTier.id);
+      expect(result.mail.sourceTierId).toStrictEqual(lifetimeTier.id);
+      expect(result.vpn.sourceTierId).toStrictEqual(lifetimeTier.id);
     });
 
     it('When the user has only individual tiers, the best individual tier is returned', async () => {
@@ -154,7 +158,9 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(result).toStrictEqual(premiumTier);
+      expect(result.drive.maxSpaceBytes).toBe(5000000);
+      expect(result.drive.workspaces.enabled).toBe(false);
+      expect(result.drive.sourceTierId).toBeDefined();
     });
 
     it('When the user has both individual and business tiers, the business tier is preferred for drive', async () => {
@@ -197,7 +203,9 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(result).toStrictEqual(businessTier);
+      expect(result.drive.workspaces.enabled).toBe(true);
+      expect(result.drive.workspaces.maxSpaceBytesPerSeat).toBe(2000000);
+      expect(result.drive.sourceTierId).toBeDefined();
     });
 
     it('When the user has access to multiple business tiers via ownersId, the highest workspace tier is returned', async () => {
@@ -250,7 +258,9 @@ describe('Products Service Tests', () => {
         ownersId: [mockedUser.uuid, mockedOwner.uuid],
       });
 
-      expect(result).toStrictEqual(businessTier2);
+      expect(result.drive.workspaces.enabled).toBe(true);
+      expect(result.drive.workspaces.maxSpaceBytesPerSeat).toBe(2000000);
+      expect(result.drive.sourceTierId).toBeDefined();
     });
   });
 
@@ -538,7 +548,10 @@ describe('Products Service Tests', () => {
 
         const mergedFeatures = (productsService as any).mergeFeatures([individualTier, businessTier1, businessTier2]);
 
-        expect(mergedFeatures.drive.tier).toStrictEqual(businessTier2);
+        expect(mergedFeatures.drive.enabled).toBe(true);
+        expect(mergedFeatures.drive.workspaces.enabled).toBe(true);
+        expect(mergedFeatures.drive.workspaces.maxSpaceBytesPerSeat).toBe(5 * 1024 * 1024 * 1024);
+        expect(mergedFeatures.drive.sourceTierId).toBe('business-premium');
       });
 
       it('When only individual tiers are available, should select the one with highest storage', () => {
@@ -577,7 +590,10 @@ describe('Products Service Tests', () => {
 
         const mergedFeatures = (productsService as any).mergeFeatures([basicTier, premiumTier]);
 
-        expect(mergedFeatures.drive.tier).toStrictEqual(premiumTier);
+        expect(mergedFeatures.drive.enabled).toBe(true);
+        expect(mergedFeatures.drive.maxSpaceBytes).toBe(10 * 1024 * 1024 * 1024);
+        expect(mergedFeatures.drive.workspaces.enabled).toBe(false);
+        expect(mergedFeatures.drive.sourceTierId).toBe('individual-premium');
       });
     });
 
@@ -670,7 +686,10 @@ describe('Products Service Tests', () => {
         expect(mergedFeatures.cleaner.sourceTierId).toBe('business-workspace');
 
         // Drive from businessTier (business preferred)
-        expect(mergedFeatures.drive.tier).toStrictEqual(businessTier);
+        expect(mergedFeatures.drive.enabled).toBe(true);
+        expect(mergedFeatures.drive.workspaces.enabled).toBe(true);
+        expect(mergedFeatures.drive.workspaces.maxSpaceBytesPerSeat).toBe(3 * 1024 * 1024 * 1024);
+        expect(mergedFeatures.drive.sourceTierId).toBe('business-workspace');
       });
     });
   });

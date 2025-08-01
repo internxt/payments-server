@@ -64,17 +64,17 @@ export default function (
       },
     );
 
-    fastify.get('/tier', async (req, rep): Promise<Tier | Error> => {
+    fastify.get('/tier', async (req, rep) => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces?.owners ?? [];
 
       try {
-        const higherTier = await productsService.getApplicableTierForUser({
+        const mergedFeatures = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
         });
 
-        return rep.status(200).send(higherTier);
+        return rep.status(200).send(mergedFeatures);
       } catch (error) {
         req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
         return rep.status(500).send({ message: 'Internal server error' });
