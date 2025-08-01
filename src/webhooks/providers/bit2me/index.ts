@@ -23,6 +23,12 @@ export interface CryptoWebhookDependencies {
   usersService: UsersService;
 }
 
+export interface CryptoWebhookTokenPayload {
+  invoiceId: string;
+  provider: string;
+  customerId: string;
+}
+
 export interface Bit2MePaymentStatusCallback {
   id: string;
   foreignId: string;
@@ -55,12 +61,8 @@ export default function ({
   usersService,
 }: CryptoWebhookDependencies) {
   return async function (fastify: FastifyInstance) {
-    const decryptToken = async (token: string) => {
-      return jwt.verify(token, config.JWT_SECRET) as {
-        invoiceId: string;
-        provider: string;
-        customerId: string;
-      };
+    const decryptToken = async (token: string): Promise<CryptoWebhookTokenPayload> => {
+      return jwt.verify(token, config.JWT_SECRET) as CryptoWebhookTokenPayload;
     };
 
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
