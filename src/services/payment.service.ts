@@ -88,7 +88,6 @@ export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 export interface OldPaymentIntent {
   clientSecret: string | null;
   id: string;
-
   invoiceStatus?: string;
 }
 
@@ -455,7 +454,7 @@ export class PaymentService {
     const isLifetime = invoiceItem.price?.type === 'one_time';
 
     if (isLifetime && this.bit2MeService.isAllowedCurrency(currency)) {
-      const invoice = await this.bit2MeService.createCryptoInvoice({
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
         priceAmount: invoiceItem.amount,
         priceCurrency: currency,
@@ -474,10 +473,10 @@ export class PaymentService {
         purchaserEmail: userEmail,
       });
 
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currency);
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(cryptoInvoice.invoiceId, currency);
 
       return {
-        id: checkoutPayload.invoiceId,
+        id: finalizedInvoice.payment_intent as string,
         type: 'crypto',
         payload: {
           paymentRequestUri: checkoutPayload.paymentRequestUri,
