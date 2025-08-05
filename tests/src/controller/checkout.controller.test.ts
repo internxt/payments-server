@@ -331,7 +331,7 @@ describe('Checkout controller', () => {
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
     });
 
-    it('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload to allow the user to pay is returned', async () => {
+    it('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
       const mockedPrice = priceById({
@@ -375,6 +375,7 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
+      expect(responseBody.payload.qrUrl).toBeDefined();
     });
 
     it('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
