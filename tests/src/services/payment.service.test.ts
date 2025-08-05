@@ -274,7 +274,7 @@ describe('Payments Service tests', () => {
         });
 
         expect(paymentIntent).toStrictEqual({
-          id: mockedParsedInvoiceResponse.invoiceId,
+          id: mockedInvoice.payment_intent as string,
           type: 'crypto',
           payload: {
             paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
