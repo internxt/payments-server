@@ -27,7 +27,7 @@ export enum AllowedCurrencies {
 
 interface Bit2MeAPIError {
   // Contains all the errors
-  message: string[];
+  message: string;
   // HTTP Error
   error: string[];
   // HTTP Status code
@@ -37,7 +37,7 @@ interface Bit2MeAPIError {
 export interface CreateCryptoInvoicePayload {
   foreignId: string;
   priceAmount: number;
-  priceCurrency: AllowedCurrencies;
+  priceCurrency: string;
   title: string;
   description: string;
   successUrl: string;
@@ -120,7 +120,7 @@ export class Bit2MeService {
   }
 
   isAllowedCurrency(value: string): value is AllowedCurrencies {
-    return Object.values(AllowedCurrencies).includes(value as AllowedCurrencies);
+    return Object.values(AllowedCurrencies).includes(value.toUpperCase() as AllowedCurrencies);
   }
 
   /**
@@ -167,7 +167,7 @@ export class Bit2MeService {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
-        const message = `Status ${data.statusCode} received -> ${data.message.join(',')} / payload ${JSON.stringify(payloadReq)}
+        const message = `Status ${data.statusCode} received -> ${data.message} / payload ${JSON.stringify(payloadReq)}
         `;
 
         throw new HttpError(message, data.statusCode);
@@ -190,26 +190,40 @@ export class Bit2MeService {
       currencyId,
       networkId: currencyInfo.networks[0].platformId,
     };
+
     const params: AxiosRequestConfig = {
       method: 'PUT',
-      url: `${this.apiKey}/v3/commerce/invoices/${invoiceId}/checkout`,
+      url: `${this.apiUrl}/v3/commerce/invoices/${invoiceId}/checkout`,
       headers: this.getAPIHeaders(payload),
       data: payload,
     };
 
-    const { data } = await this.axios.request<RawInvoiceResponse>(params);
+    try {
+      const { data } = await this.axios.request<RawInvoiceResponse>(params);
 
-    const response: ParsedInvoiceResponse = {
-      ...data,
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-      expiredAt: new Date(data.expiredAt),
-      priceAmount: parseFloat(data.priceAmount),
-      underpaidAmount: parseFloat(data.underpaidAmount),
-      overpaidAmount: parseFloat(data.overpaidAmount),
-    };
+      const response: ParsedInvoiceResponse = {
+        ...data,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt),
+        expiredAt: new Date(data.expiredAt),
+        priceAmount: parseFloat(data.priceAmount),
+        underpaidAmount: parseFloat(data.underpaidAmount),
+        overpaidAmount: parseFloat(data.overpaidAmount),
+      };
 
-    return response;
+      return response;
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        const data = response?.data as Bit2MeAPIError;
+        const message = `Status ${data.statusCode} received -> ${data.message} / payload ${JSON.stringify(payload)}
+        `;
+
+        throw new HttpError(message, data.statusCode);
+      } else {
+        throw err;
+      }
+    }
   }
 
   /**
@@ -241,7 +255,7 @@ export class Bit2MeService {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
 
-        throw new Error(`Status ${data.statusCode} received -> ${data.message.join(',')}`);
+        throw new Error(`Status ${data.statusCode} received -> ${data.message}`);
       } else {
         throw err;
       }
@@ -249,9 +263,10 @@ export class Bit2MeService {
   }
 
   async getCurrencyByCurrencyId(currencyId: Currency['currencyId']): Promise<Currency> {
+    const upperCaseCurrency = currencyId.toUpperCase();
     const params: AxiosRequestConfig = {
       method: 'GET',
-      url: `${this.apiUrl}/v3/currencies/${currencyId}`,
+      url: `${this.apiUrl}/v3/commerce/currencies/${upperCaseCurrency}`,
       headers: this.getAPIHeaders({}),
     };
 
@@ -261,8 +276,9 @@ export class Bit2MeService {
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
         const { response } = err;
+        console.log(`ERROR: ${response?.data}`);
         const data = response?.data as Bit2MeAPIError;
-        const errorMessage = `Status ${data.statusCode} received -> ${data.message.join(',')}`;
+        const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
 
         throw new HttpError(errorMessage, data.statusCode);
       } else {
