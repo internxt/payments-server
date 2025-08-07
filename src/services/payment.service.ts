@@ -8,6 +8,7 @@ import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
+import { AllowedCryptoCurrencies, CurrencyAdapter } from './currencyAdapter.service';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -66,14 +67,16 @@ export interface SubscriptionCreated {
 
 export interface PaymentIntentCrypto {
   type: 'crypto';
-  clientSecret?: string;
   id: string;
   payload: {
     paymentRequestUri: string;
+    payAmount: number;
+    payCurrency: string;
+    invoiceId: string;
+    paymentAddress: string;
     url: string;
     qrUrl: string;
   };
-  invoiceStatus?: string;
 }
 
 export interface PaymentIntentFiat {
@@ -88,7 +91,6 @@ export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 export interface OldPaymentIntent {
   clientSecret: string | null;
   id: string;
-
   invoiceStatus?: string;
 }
 
@@ -415,9 +417,16 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
 
+    if (!CurrencyAdapter.isValidCurrency(currency)) {
+      throw new BadRequestError(`Unsupported currency: ${currency}`);
+    }
+
+    const isCryptoCurrency = CurrencyAdapter.isCryptoCurrency(currency);
+    const currencyForStripeInvoice = CurrencyAdapter.normalizeForStripe(currency);
+
     const invoice = await this.provider.invoices.create({
       customer: customerId,
-      currency: currency,
+      currency: currencyForStripeInvoice,
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
       },
@@ -440,7 +449,6 @@ export class PaymentService {
     });
 
     const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
 
     if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
@@ -453,12 +461,11 @@ export class PaymentService {
     }
 
     const isLifetime = invoiceItem.price?.type === 'one_time';
-
-    if (isLifetime && this.bit2MeService.isAllowedCurrency(currency)) {
-      const invoice = await this.bit2MeService.createCryptoInvoice({
+    if (isLifetime && isCryptoCurrency) {
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
-        priceAmount: invoiceItem.amount,
-        priceCurrency: currency,
+        priceAmount: finalizedInvoice.total / 100,
+        priceCurrency: 'EUR',
         title: `Invoice from Stripe ${finalizedInvoice.id}`,
         securityToken: jwt.sign(
           {
@@ -474,13 +481,21 @@ export class PaymentService {
         purchaserEmail: userEmail,
       });
 
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(invoice.invoiceId, currency);
+      const normalizedCurrencyForBit2Me = CurrencyAdapter.normalizeForBit2Me(currency);
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(
+        cryptoInvoice.invoiceId,
+        normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
+      );
 
       return {
-        id: checkoutPayload.invoiceId,
+        id: finalizedInvoice.payment_intent as string,
         type: 'crypto',
         payload: {
           paymentRequestUri: checkoutPayload.paymentRequestUri,
+          payAmount: checkoutPayload.payAmount,
+          payCurrency: checkoutPayload.payCurrency,
+          paymentAddress: checkoutPayload.paymentAddress,
+          invoiceId: checkoutPayload.invoiceId,
           url: checkoutPayload.url,
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },
