@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
-import { AllowedCurrencies, Bit2MeService } from './bit2me.service';
+import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
@@ -476,9 +476,7 @@ export class PaymentService {
         successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
         purchaserEmail: userEmail,
       });
-
-      const currencyToUpperCase = currency.toUpperCase() as AllowedCurrencies;
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(cryptoInvoice.invoiceId, currencyToUpperCase);
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(cryptoInvoice.invoiceId, currency);
 
       return {
         id: finalizedInvoice.payment_intent as string,
