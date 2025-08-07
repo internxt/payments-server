@@ -237,6 +237,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         }
 
         const price = await paymentsService.getPriceById(priceId);
+
+        if (price.interval !== 'lifetime') {
+          throw new BadRequestError('Only lifetime plans are supported');
+        }
+
         const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
 
         if (!isStorageUpgradeAllowed) {
