@@ -348,7 +348,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     );
 
     fastify.get(
-      '/currencies/crypto',
+      '/crypto/currencies',
       {
         config: {
           skipAuth: true,
@@ -361,6 +361,37 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res) => {
         const cryptoCurrencies = await paymentsService.getCryptoCurrencies();
         return res.status(200).send(cryptoCurrencies);
+      },
+    );
+
+    fastify.get<{
+      Params: {
+        invoiceId: string;
+      };
+    }>(
+      '/crypto/verify/:invoiceId',
+      {
+        schema: {
+          params: {
+            type: 'object',
+            required: ['invoiceId'],
+            properties: {
+              invoiceId: { type: 'string', description: 'The ID of the invoice we want to verify' },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 3,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const { invoiceId } = req.params;
+
+        const result = await paymentsService.verifyCryptoPayment(invoiceId);
+        return res.status(200).send(result);
       },
     );
   };
