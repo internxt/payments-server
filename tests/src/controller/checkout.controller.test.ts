@@ -698,7 +698,7 @@ describe('Checkout controller', () => {
       jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);
 
       const response = await app.inject({
-        path: '/checkout/currencies/crypto',
+        path: '/checkout/crypto/currencies',
         method: 'GET',
       });
 
