@@ -655,29 +655,29 @@ export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): Pa
 export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
 export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
   if (params.type === 'crypto') {
+    const cryptoParams = params as Partial<PaymentIntentCrypto>;
     return {
-      id: params.id ?? 'crypto-id',
+      id: cryptoParams.id ?? 'crypto-id',
       type: 'crypto',
       payload: {
         paymentRequestUri: 'mock-address',
         url: 'https://mock.crypto.url',
         qrUrl: 'https://mock.qr.url',
-        invoiceId: params.payload?.invoiceId ?? 'invoice-id',
-        payAmount: params.payload?.payAmount ?? 0.01,
-        payCurrency: params.payload?.payCurrency ?? 'BTC',
-        paymentAddress: params.payload?.paymentAddress ?? 'mock-address',
+        invoiceId: cryptoParams.payload?.invoiceId ?? 'invoice-id',
+        payAmount: cryptoParams.payload?.payAmount ?? 0.01,
+        payCurrency: cryptoParams.payload?.payCurrency ?? 'BTC',
+        paymentAddress: cryptoParams.payload?.paymentAddress ?? 'mock-address',
       },
-    };
-  } else if (params.type === 'fiat') {
-    return {
-      id: params.id ?? 'fiat-id',
-      type: 'fiat',
-      clientSecret: params.clientSecret ?? 'client_secret',
-      invoiceStatus: params.invoiceStatus ?? 'open',
     };
   }
 
-  throw new Error('Invalid payment intent type');
+  const fiatParams = params as Partial<PaymentIntentFiat>;
+  return {
+    id: fiatParams.id ?? 'fiat-id',
+    type: 'fiat',
+    clientSecret: fiatParams.clientSecret ?? 'client_secret',
+    invoiceStatus: fiatParams.invoiceStatus ?? 'open',
+  };
 }
 
 export function getRawCreateInvoiceResponse(params: Partial<RawCreateInvoiceResponse> = {}): RawCreateInvoiceResponse {
