@@ -364,15 +364,15 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
     );
 
-    fastify.post<{
-      Body: {
+    fastify.get<{
+      Params: {
         invoiceId: string;
       };
     }>(
-      '/crypto/verify-payment',
+      '/crypto/verify/:invoiceId',
       {
         schema: {
-          body: {
+          params: {
             type: 'object',
             required: ['invoiceId'],
             properties: {
@@ -388,7 +388,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
-        const { invoiceId } = req.body;
+        const { invoiceId } = req.params;
+
         const result = await paymentsService.verifyCryptoPayment(invoiceId);
         return res.status(200).send(result);
       },
