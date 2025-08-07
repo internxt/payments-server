@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { AllowedCurrencies, Bit2MeService } from '../../../src/services/bit2me.service';
+import { AllowedCurrencies, Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
 
@@ -148,6 +148,50 @@ describe('Bit2Me Service tests', () => {
           data: expect.objectContaining({ currencyId }),
         }),
       );
+    });
+
+    test('When an axios error occurs, then an HttpError is thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const currencyId = AllowedCurrencies['Bitcoin'];
+      const mockedCurrency = getCryptoCurrency();
+
+      const mockErrorData: Bit2MeAPIError = {
+        statusCode: 400,
+        message: 'Invalid currency or network',
+        error: ['Bad Request'],
+      };
+
+      const axiosError = new AxiosError('Request failed with status code 400', 'ECONNABORTED', undefined, undefined, {
+        status: 400,
+        data: mockErrorData,
+        headers: {},
+        config: {} as any,
+        statusText: 'Bad Request',
+      });
+
+      jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
+      jest.spyOn(axios, 'request').mockRejectedValue(axiosError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(HttpError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(
+        'Status 400 received -> Invalid currency or network / payload',
+      );
+    });
+
+    test('When a non-axios error occurs, then the original error is re-thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const currencyId = AllowedCurrencies['Bitcoin'];
+      const mockedCurrency = getCryptoCurrency();
+
+      const genericError = new Error('Network connection failed');
+
+      jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
+      jest.spyOn(axios, 'request').mockRejectedValue(genericError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow('Network connection failed');
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(Error);
     });
   });
 

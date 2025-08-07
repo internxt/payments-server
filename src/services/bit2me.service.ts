@@ -25,7 +25,7 @@ export enum AllowedCurrencies {
   BinanceCoin = 'BNB',
 }
 
-interface Bit2MeAPIError {
+export interface Bit2MeAPIError {
   // Contains all the errors
   message: string;
   // HTTP Error
@@ -276,7 +276,6 @@ export class Bit2MeService {
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
         const { response } = err;
-        console.log(`ERROR: ${response?.data}`);
         const data = response?.data as Bit2MeAPIError;
         const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
 
