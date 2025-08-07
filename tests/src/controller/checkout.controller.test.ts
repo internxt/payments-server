@@ -342,12 +342,15 @@ describe('Checkout controller', () => {
       const userToken = getValidUserToken(mockedUser.customerId);
       const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
-        clientSecret: 'client_secret',
         type: 'crypto',
         payload: {
           paymentRequestUri: 'payment_request_uri',
           qrUrl: 'qr_url',
           url: 'url',
+          invoiceId: 'invoice_id',
+          payAmount: 0.01,
+          payCurrency: 'BTC',
+          paymentAddress: 'payment_address',
         },
       } as const;
 

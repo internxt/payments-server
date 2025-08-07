@@ -654,27 +654,29 @@ export const getActiveSubscriptions = (
 export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): PaymentIntentFiat;
 export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
 export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
-  const type = params.type ?? 'fiat';
-
-  if (type === 'crypto') {
+  if (params.type === 'crypto') {
+    const cryptoParams = params as Partial<PaymentIntentCrypto>;
     return {
-      id: params.id ?? 'crypto-id',
+      id: cryptoParams.id ?? 'crypto-id',
       type: 'crypto',
       payload: {
         paymentRequestUri: 'mock-address',
         url: 'https://mock.crypto.url',
         qrUrl: 'https://mock.qr.url',
+        invoiceId: cryptoParams.payload?.invoiceId ?? 'invoice-id',
+        payAmount: cryptoParams.payload?.payAmount ?? 0.01,
+        payCurrency: cryptoParams.payload?.payCurrency ?? 'BTC',
+        paymentAddress: cryptoParams.payload?.paymentAddress ?? 'mock-address',
       },
-      invoiceStatus: params.invoiceStatus,
-      clientSecret: params.clientSecret ?? undefined,
     };
   }
 
+  const fiatParams = params as Partial<PaymentIntentFiat>;
   return {
-    id: params.id ?? 'fiat-id',
+    id: fiatParams.id ?? 'fiat-id',
     type: 'fiat',
-    clientSecret: params.clientSecret ?? 'client_secret',
-    invoiceStatus: params.invoiceStatus ?? 'open',
+    clientSecret: fiatParams.clientSecret ?? 'client_secret',
+    invoiceStatus: fiatParams.invoiceStatus ?? 'open',
   };
 }
 
