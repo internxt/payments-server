@@ -1949,6 +1949,12 @@ export class PaymentService {
 
     return currencies.filter((c) => c.type === 'crypto');
   }
+
+  async verifyCryptoPayment(invoiceId: string) {
+    const invoice = await this.bit2MeService.getInvoice(invoiceId);
+
+    return invoice.status === 'paid';
+  }
 }
 
 export class NotFoundSubscriptionError extends Error {

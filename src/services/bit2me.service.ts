@@ -286,4 +286,28 @@ export class Bit2MeService {
       }
     }
   }
+
+  async getInvoice(invoiceId: string) {
+    const params: AxiosRequestConfig = {
+      method: 'GET',
+      url: `${this.apiUrl}/v3/commerce/invoices/${invoiceId}`,
+      headers: this.getAPIHeaders({}),
+    };
+
+    try {
+      const { data } = await this.axios.request<RawInvoiceResponse>(params);
+      return data;
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        console.log(`ERROR: ${response?.data}`);
+        const data = response?.data as Bit2MeAPIError;
+        const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
+
+        throw new HttpError(errorMessage, data.statusCode);
+      } else {
+        throw err;
+      }
+    }
+  }
 }
