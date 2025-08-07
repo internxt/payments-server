@@ -242,4 +242,45 @@ describe('Bit2Me Service tests', () => {
       );
     });
   });
+
+  describe('Get an invoice by Its ID', () => {
+    test('When an invoice is requested by its ID, then the invoice is returned', async () => {
+      const rawResponse = getRawCryptoInvoiceResponse();
+
+      jest.spyOn(axios, 'request').mockResolvedValue({ data: rawResponse });
+
+      const invoice = await bit2MeService.getInvoice(rawResponse.invoiceId);
+
+      expect(invoice).toStrictEqual(rawResponse);
+    });
+
+    test('When an axios error occurs, then an HttpError is thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const mockErrorData: Bit2MeAPIError = {
+        statusCode: 400,
+        message: 'Invalid invoice ID',
+        error: ['Bad Request'],
+      };
+      const axiosError = new AxiosError('Request failed with status code 400', 'ECONNABORTED', undefined, undefined, {
+        status: 400,
+        data: mockErrorData,
+        headers: {},
+        config: {} as any,
+        statusText: 'Bad Request',
+      });
+
+      jest.spyOn(axios, 'request').mockRejectedValue(axiosError);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(HttpError);
+    });
+
+    test('When a non-axios error occurs, then the original error is re-thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const genericError = new Error('Network connection failed');
+
+      jest.spyOn(axios, 'request').mockRejectedValue(genericError);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(Error);
+    });
+  });
 });
