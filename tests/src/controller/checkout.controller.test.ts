@@ -5,6 +5,7 @@ import {
   getCryptoCurrency,
   getCustomer,
   getInvoice,
+  getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
   getValidAuthToken,
@@ -17,7 +18,7 @@ import { UserNotFoundError, UsersService } from '../../../src/services/users.ser
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
-import { AllowedCurrencies } from '../../../src/services/bit2me.service';
+import { AllowedCurrencies, Bit2MeService } from '../../../src/services/bit2me.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -706,6 +707,54 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedCurrencies);
+    });
+  });
+
+  describe('Verify the crypto payment', () => {
+    test('When the crypto payment invoice has an status of paid, then true is returned indicating the invoice has been paid', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const mockedInvoice = getRawCryptoInvoiceResponse({
+        status: 'paid',
+      });
+
+      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
+
+      const response = await app.inject({
+        path: `/checkout/crypto/verify/${mockedInvoice.invoiceId}`,
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toBeTruthy();
+    });
+
+    test('When the crypto payment invoice has another status than paid, then false is returned indicating the invoice has not been paid', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const mockedInvoice = getRawCryptoInvoiceResponse({
+        status: 'pending',
+      });
+
+      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
+
+      const response = await app.inject({
+        path: `/checkout/crypto/verify/${mockedInvoice.invoiceId}`,
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toBeFalsy();
     });
   });
 });
