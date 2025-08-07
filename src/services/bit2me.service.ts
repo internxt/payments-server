@@ -3,6 +3,7 @@ import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
 import { BadRequestError } from '../errors/Errors';
+import { AllowedCryptoCurrencies } from './currencyAdapter.service';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -11,19 +12,6 @@ export interface Currency {
   receiveType: boolean; // Indicates if the currency can be received
   networks: { platformId: string; name: string }[]; // Available networks for the currency
   imageUrl: string; // The URL to the currency's icon
-}
-
-export enum AllowedCurrencies {
-  Bitcoin = 'BTC',
-  Ethereum = 'ETH',
-  Litecoin = 'LTC',
-  BitcoinCash = 'BCH',
-  Ripple = 'XRP',
-  Tether = 'USDT',
-  USDC = 'USDC',
-  Tron = 'TRX',
-  Cardano = 'ADA',
-  BinanceCoin = 'BNB',
 }
 
 export interface Bit2MeAPIError {
@@ -120,9 +108,9 @@ export class Bit2MeService {
     };
   }
 
-  isAllowedCurrency(value: string): value is AllowedCurrencies {
-    const normalizedValue = value.toUpperCase().trim() as AllowedCurrencies;
-    return Object.values(AllowedCurrencies).includes(normalizedValue);
+  isAllowedCurrency(value: string): value is AllowedCryptoCurrencies {
+    const normalizedValue = value.toUpperCase().trim() as AllowedCryptoCurrencies;
+    return Object.values(AllowedCryptoCurrencies).includes(normalizedValue);
   }
 
   /**
@@ -144,7 +132,7 @@ export class Bit2MeService {
   async createCryptoInvoice(payload: CreateCryptoInvoicePayload): Promise<ParsedCreatedInvoiceResponse> {
     const payloadReq = {
       ...payload,
-      receiveCurrency: AllowedCurrencies['Bitcoin'],
+      receiveCurrency: AllowedCryptoCurrencies['Bitcoin'],
       priceAmount: payload.priceAmount.toString(),
     };
     const params: AxiosRequestConfig = {
@@ -186,7 +174,7 @@ export class Bit2MeService {
    * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
    * @throws {Error} If the API call fails or the invoice ID is invalid.
    */
-  async checkoutInvoice(invoiceId: string, currencyId: AllowedCurrencies): Promise<ParsedInvoiceResponse> {
+  async checkoutInvoice(invoiceId: string, currencyId: AllowedCryptoCurrencies): Promise<ParsedInvoiceResponse> {
     const currencyInfo = await this.getCurrencyByCurrencyId(currencyId);
     const payload = {
       currencyId,

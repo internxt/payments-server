@@ -17,7 +17,7 @@ import { UserNotFoundError, UsersService } from '../../../src/services/users.ser
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
-import { AllowedCurrencies } from '../../../src/services/bit2me.service';
+import { AllowedCryptoCurrencies } from '../../../src/services/currencyAdapter.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -367,7 +367,7 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
-          currency: AllowedCurrencies['Bitcoin'],
+          currency: AllowedCryptoCurrencies['Bitcoin'],
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -692,7 +692,7 @@ describe('Checkout controller', () => {
       const mockedCurrencies = [
         getCryptoCurrency(),
         getCryptoCurrency({
-          name: AllowedCurrencies['Ethereum'],
+          name: AllowedCryptoCurrencies['Ethereum'],
         }),
       ];
       jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);

@@ -15,7 +15,6 @@ import {
 } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
-  AllowedCurrencies,
   CreateCryptoInvoicePayload,
   Currency,
   ParsedCreatedInvoiceResponse,
@@ -26,6 +25,7 @@ import {
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
+import { AllowedCryptoCurrencies } from '../../src/services/currencyAdapter.service';
 
 const randomDataGenerator = new Chance();
 
@@ -877,7 +877,7 @@ export const getPayloadForCryptoInvoice = (
   const payload = {
     foreignId: 'invoice-123',
     priceAmount: 100,
-    priceCurrency: AllowedCurrencies['Bitcoin'],
+    priceCurrency: AllowedCryptoCurrencies['Bitcoin'],
     title: 'Test Invoice',
     description: 'Payment for product',
     successUrl: 'https://success.url',
@@ -927,7 +927,7 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
 };
 
 export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
-  currencyId: AllowedCurrencies['Bitcoin'],
+  currencyId: AllowedCryptoCurrencies['Bitcoin'],
   name: 'Bitcoin',
   type: 'crypto',
   receiveType: true,
