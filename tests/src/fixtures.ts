@@ -25,7 +25,7 @@ import {
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
-import { AllowedCryptoCurrencies } from '../../src/services/currencyAdapter.service';
+import { AllowedCryptoCurrencies } from '../../src/utils/currency';
 
 const randomDataGenerator = new Chance();
 

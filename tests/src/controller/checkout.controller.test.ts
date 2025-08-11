@@ -17,7 +17,7 @@ import { UserNotFoundError, UsersService } from '../../../src/services/users.ser
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
-import { AllowedCryptoCurrencies } from '../../../src/services/currencyAdapter.service';
+import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 

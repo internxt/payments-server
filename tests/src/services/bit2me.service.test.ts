@@ -4,7 +4,7 @@ import envVariablesConfig from '../../../src/config';
 import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
-import { AllowedCryptoCurrencies } from '../../../src/services/currencyAdapter.service';
+import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 
 let bit2MeService: Bit2MeService;
 
