@@ -59,16 +59,16 @@ export const getCryptoInvoiceWebhook = (params?: Partial<Bit2MePaymentStatusCall
     id: randomDataGenerator.string({ length: 16 }),
     foreignId: `inv_${randomDataGenerator.string({ length: 16 })}`,
     cryptoAddress: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
       address: randomDataGenerator.hash({ length: 34 }),
     },
     currencySent: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
       amount: '0.01',
       remainingAmount: '0',
     },
     currencyReceived: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
     },
     token: 'mocked-token',
     transactions: [],
