@@ -813,4 +813,16 @@ describe('Payments Service tests', () => {
       expect(charge).toStrictEqual(mockedCharge);
     });
   });
+
+  describe('Retrieve an invoice given its ID', () => {
+    it('When an invoice is requested, then the correct invoice object is returned', async () => {
+      const mockedInvoice = getInvoice();
+
+      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const invoice = await paymentService.getInvoice(mockedInvoice.id);
+
+      expect(invoice).toStrictEqual(mockedInvoice);
+    });
+  });
 });
