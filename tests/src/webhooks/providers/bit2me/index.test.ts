@@ -19,7 +19,7 @@ afterAll(async () => {
 });
 
 describe('Handling webhook for crypto payments', () => {
-  test('When the foreignId does not match with the invoiceId we get from the encrypted token, then an error indicating so is thrown', async () => {
+  test('When the foreignId does not match with the invoiceId we get from the encoded token, then an error indicating so is thrown', async () => {
     const mockedInvoice = getInvoice();
     const mockedForeignId = 'inv_other';
 
