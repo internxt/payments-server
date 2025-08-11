@@ -1,3 +1,4 @@
+import { BadRequestError } from '../../../src/errors/Errors';
 import {
   AllowedCryptoCurrencies,
   AllowedFiatCurrencies,
@@ -25,7 +26,7 @@ describe('Currency Adapter Service', () => {
     });
 
     test('When an unsupported currency is provided, then it throws an error', () => {
-      expect(() => CurrencyAdapter.normalizeForStripe('INVALID')).toThrow('Currency INVALID is not supported');
+      expect(() => CurrencyAdapter.normalizeForStripe('INVALID')).toThrow(BadRequestError);
     });
 
     test('When currency has whitespace, then it normalizes correctly', () => {
@@ -37,7 +38,7 @@ describe('Currency Adapter Service', () => {
 
   describe('Normalize currency for Bit2Me', () => {
     test('When a fiat currency is provided, then an error indicating that Bit2Me does not support these currencies is thrown', () => {
-      expect(() => CurrencyAdapter.normalizeForBit2Me('EUR')).toThrow('Currency EUR is not supported by Bit2Me');
+      expect(() => CurrencyAdapter.normalizeForBit2Me('EUR')).toThrow(BadRequestError);
     });
 
     test('When a valid cryptocurrency is provided, then it returns uppercase format', () => {
