@@ -8,7 +8,7 @@ import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
-import { isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
+import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -458,10 +458,12 @@ export class PaymentService {
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+      const priceAmount = finalizedInvoice.total / 100;
+
       const invoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
-        priceAmount: finalizedInvoice.total / 100,
-        priceCurrency: 'EUR',
+        priceAmount,
+        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
         title: `Invoice from Stripe ${finalizedInvoice.id}`,
         securityToken: jwt.sign(
           {
@@ -479,7 +481,7 @@ export class PaymentService {
 
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
         invoice.invoiceId,
-        normalizedCurrencyForBit2Me as AllowedCurrencies,
+        normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
       );
 
       return {

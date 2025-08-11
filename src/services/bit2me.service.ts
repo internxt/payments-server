@@ -3,7 +3,7 @@ import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
 import { BadRequestError } from '../errors/Errors';
-import { AllowedCryptoCurrencies } from './currencyAdapter.service';
+import { AllowedCryptoCurrencies, getAllowedCurrencies, isCryptoCurrency } from '../utils/currency';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -250,8 +250,10 @@ export class Bit2MeService {
   async getCurrencyByCurrencyId(currencyId: Currency['currencyId']): Promise<Currency> {
     const normalizedCurrencyId = currencyId.toUpperCase();
 
-    if (!this.isAllowedCurrency(normalizedCurrencyId)) {
-      throw new BadRequestError(`Currency ${normalizedCurrencyId} is not allowed`);
+    if (!isCryptoCurrency(normalizedCurrencyId)) {
+      throw new BadRequestError(
+        `Currency ${normalizedCurrencyId} is not allowed. The allowed crypto currencies are: ${getAllowedCurrencies().filter(isCryptoCurrency).join(', ')}`,
+      );
     }
 
     const params: AxiosRequestConfig = {
