@@ -52,18 +52,6 @@ describe('Bit2Me Service tests', () => {
     });
   });
 
-  describe('Check if the currency is allowed', () => {
-    test('When the currency is allowed, then true is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('BTC');
-      expect(result).toBeTruthy();
-    });
-
-    test('When the currency is not allowed, then false is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('EUR');
-      expect(result).toBeFalsy();
-    });
-  });
-
   describe('Creating a Crypto Invoice', () => {
     test('When creating the invoice, then the invoice is created', async () => {
       const mockPayload = getPayloadForCryptoInvoice();

@@ -119,10 +119,6 @@ export class Bit2MeService {
     };
   }
 
-  isAllowedCurrency(value: string): value is AllowedCurrencies {
-    return Object.values(AllowedCurrencies).includes(value as AllowedCurrencies);
-  }
-
   /**
    * Creates a new invoice in the Bit2Me system.
    *

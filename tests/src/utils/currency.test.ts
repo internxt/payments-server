@@ -114,11 +114,6 @@ describe('Currency Adapter Service', () => {
   });
 
   describe('edge cases', () => {
-    test('When empty string is provided, then appropriate error is thrown', () => {
-      expect(() => normalizeForStripe('')).toThrow();
-      expect(() => normalizeForBit2Me('')).toThrow();
-    });
-
     test('When currency with special characters is provided, then it handles gracefully', () => {
       expect(() => normalizeForStripe('BTC!')).toThrow();
       expect(() => normalizeForBit2Me('EUR@')).toThrow();

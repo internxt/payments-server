@@ -275,6 +275,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: userToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -319,6 +320,7 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
+          currency: 'eur',
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -365,6 +367,47 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling errors', () => {
+      test('When the currency is not provided, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getValidUserToken(mockedUser.customerId),
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      test('When the currency is invalid, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getValidUserToken(mockedUser.customerId),
+            currency: 'gbp',
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
       it('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
@@ -432,6 +475,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: invalidUserToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -453,6 +497,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: userToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,

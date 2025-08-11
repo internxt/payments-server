@@ -23,13 +23,11 @@ const FIAT_CURRENCIES = new Set(Object.values(AllowedFiatCurrencies));
 const ALL_CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES];
 
 export function normalizeForStripe(currency: string): string {
-  const upperCurrency = currency.toUpperCase().trim();
-
-  if (CRYPTO_CURRENCIES.has(upperCurrency as AllowedCryptoCurrencies)) {
+  if (isCryptoCurrency(currency)) {
     return 'eur';
   }
 
-  if (FIAT_CURRENCIES.has(upperCurrency as AllowedFiatCurrencies)) {
+  if (isFiatCurrency(currency)) {
     return currency.toLowerCase().trim();
   }
 
@@ -39,7 +37,7 @@ export function normalizeForStripe(currency: string): string {
 export function normalizeForBit2Me(currency: string): string {
   const upperCurrency = currency.toUpperCase().trim();
 
-  if (CRYPTO_CURRENCIES.has(upperCurrency as AllowedCryptoCurrencies)) {
+  if (isCryptoCurrency(currency)) {
     return upperCurrency;
   }
 
