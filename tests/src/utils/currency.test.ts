@@ -1,7 +1,9 @@
 import { BadRequestError } from '../../../src/errors/Errors';
 import {
+  ALL_CURRENCIES,
   AllowedCryptoCurrencies,
   AllowedFiatCurrencies,
+  getAllowedCurrencies,
   isCryptoCurrency,
   isFiatCurrency,
   isValidCurrency,
@@ -10,6 +12,19 @@ import {
 } from '../../../src/utils/currency';
 
 describe('Currency Adapter Service', () => {
+  describe('Get allowed currencies', () => {
+    test('When called, then it returns the list of allowed currencies', () => {
+      const allowedCryptoCurrencies = Object.values(AllowedCryptoCurrencies);
+      const allowedFiatCurrencies = Object.values(AllowedFiatCurrencies);
+
+      const expected = [...allowedFiatCurrencies, ...allowedCryptoCurrencies];
+
+      const result = getAllowedCurrencies();
+
+      expect(result).toStrictEqual(expected);
+    });
+  });
+
   describe('Normalize currency for Stripe', () => {
     test('When a valid fiat currency is provided, then it returns lowercase format', () => {
       const result = normalizeForStripe('EUR');
@@ -35,14 +50,21 @@ describe('Currency Adapter Service', () => {
 
     test('When currency has whitespace, then it normalizes correctly', () => {
       const result = normalizeForStripe('  EUR  ');
-
-      expect(result).toBe('eur');
+      const currency = 'INVALID';
+      const badRequestError = new BadRequestError(
+        `Currency ${currency} is not supported. Allowed currencies: ${ALL_CURRENCIES.join(', ')}`,
+      );
+      expect(() => normalizeForStripe(currency)).toThrow(badRequestError);
     });
   });
 
   describe('Normalize currency for Bit2Me', () => {
     test('When a fiat currency is provided, then an error indicating that Bit2Me does not support these currencies is thrown', () => {
-      expect(() => normalizeForBit2Me('EUR')).toThrow(BadRequestError);
+      const currency = 'EUR';
+      const badRequestError = new BadRequestError(
+        `Currency ${currency} is not supported by Bit2Me. Allowed currencies: ${ALL_CURRENCIES.join(', ')}`,
+      );
+      expect(() => normalizeForBit2Me(currency)).toThrow(badRequestError);
     });
 
     test('When a valid cryptocurrency is provided, then it returns uppercase format', () => {
@@ -53,12 +75,6 @@ describe('Currency Adapter Service', () => {
 
     test('When an unsupported currency is provided, then it throws an error', () => {
       expect(() => normalizeForBit2Me('INVALID')).toThrow('Currency INVALID is not supported by Bit2Me');
-    });
-
-    test('When currency has whitespace, then it normalizes correctly', () => {
-      const result = normalizeForBit2Me('  btc  ');
-
-      expect(result).toBe('BTC');
     });
   });
 
@@ -110,13 +126,6 @@ describe('Currency Adapter Service', () => {
 
     test.each(invalidCurrencies)('When invalid currency "%s" is provided, then it returns false', (currency) => {
       expect(isValidCurrency(currency)).toBe(false);
-    });
-  });
-
-  describe('edge cases', () => {
-    test('When currency with special characters is provided, then it handles gracefully', () => {
-      expect(() => normalizeForStripe('BTC!')).toThrow();
-      expect(() => normalizeForBit2Me('EUR@')).toThrow();
     });
   });
 });

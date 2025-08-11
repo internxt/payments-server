@@ -9,7 +9,7 @@ import { PaymentService } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
-import { isValidCurrency } from '../utils/currency';
+import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -219,7 +219,10 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
 
         if (!isValidCurrency(currency)) {
-          throw new BadRequestError('Invalid currency');
+          const allowedCurrencies = getAllowedCurrencies().join(', ');
+          throw new BadRequestError(
+            'Invalid currency. The currency must be one of the following: ' + allowedCurrencies,
+          );
         }
 
         try {
@@ -251,7 +254,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           customerId,
           priceId,
           userEmail: email,
-          currency,
+          currency: currency.trim(),
           promoCodeId,
           additionalInvoiceOptions: {
             automatic_tax: {

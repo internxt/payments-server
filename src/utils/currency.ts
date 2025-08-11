@@ -20,7 +20,11 @@ export enum AllowedFiatCurrencies {
 
 const CRYPTO_CURRENCIES = new Set(Object.values(AllowedCryptoCurrencies));
 const FIAT_CURRENCIES = new Set(Object.values(AllowedFiatCurrencies));
-const ALL_CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES];
+export const ALL_CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES];
+
+export function getAllowedCurrencies(): string[] {
+  return ALL_CURRENCIES;
+}
 
 export function normalizeForStripe(currency: string): string {
   if (isCryptoCurrency(currency)) {
@@ -28,14 +32,14 @@ export function normalizeForStripe(currency: string): string {
   }
 
   if (isFiatCurrency(currency)) {
-    return currency.toLowerCase().trim();
+    return currency.toLowerCase();
   }
 
   throw new BadRequestError(`Currency ${currency} is not supported. Allowed currencies: ${ALL_CURRENCIES.join(', ')}`);
 }
 
 export function normalizeForBit2Me(currency: string): string {
-  const upperCurrency = currency.toUpperCase().trim();
+  const upperCurrency = currency.toUpperCase();
 
   if (isCryptoCurrency(currency)) {
     return upperCurrency;
