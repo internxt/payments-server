@@ -128,7 +128,7 @@ describe('Payments Service tests', () => {
       const paymentIntentPayload = {
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
         userEmail: mockedInvoice.customer_email as string,
       };
@@ -167,7 +167,7 @@ describe('Payments Service tests', () => {
       const paymentIntent = await paymentService.createInvoice({
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         userEmail: mockedInvoice.customer_email as string,
       });
 
@@ -205,7 +205,7 @@ describe('Payments Service tests', () => {
       const paymentIntent = await paymentService.createInvoice({
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         userEmail: mockedInvoice.customer_email as string,
       });
 

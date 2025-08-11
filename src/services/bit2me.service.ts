@@ -108,11 +108,6 @@ export class Bit2MeService {
     };
   }
 
-  isAllowedCurrency(value: string): value is AllowedCryptoCurrencies {
-    const normalizedValue = value.toUpperCase().trim() as AllowedCryptoCurrencies;
-    return Object.values(AllowedCryptoCurrencies).includes(normalizedValue);
-  }
-
   /**
    * Creates a new invoice in the Bit2Me system.
    *

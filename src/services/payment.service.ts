@@ -8,7 +8,7 @@ import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
-import { AllowedCryptoCurrencies, CurrencyAdapter } from './currencyAdapter.service';
+import { isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -404,29 +404,23 @@ export class PaymentService {
     customerId,
     priceId,
     userEmail,
-    currency = 'eur',
+    currency,
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
     priceId: string;
     userEmail: string;
-    currency?: string;
+    currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
-
-    if (!CurrencyAdapter.isValidCurrency(currency)) {
-      throw new BadRequestError(`Unsupported currency: ${currency}`);
-    }
-
-    const isCryptoCurrency = CurrencyAdapter.isCryptoCurrency(currency);
-    const currencyForStripeInvoice = CurrencyAdapter.normalizeForStripe(currency);
+    const normalizedCurrencyForStripe = normalizeForStripe(currency);
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
-      currency: currencyForStripeInvoice,
+      currency: normalizedCurrencyForStripe,
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
       },
@@ -461,8 +455,10 @@ export class PaymentService {
     }
 
     const isLifetime = invoiceItem.price?.type === 'one_time';
-    if (isLifetime && isCryptoCurrency) {
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
+
+    if (isLifetime && isCryptoCurrency(currency)) {
+      const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+      const invoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
         priceAmount: finalizedInvoice.total / 100,
         priceCurrency: 'EUR',
@@ -481,10 +477,9 @@ export class PaymentService {
         purchaserEmail: userEmail,
       });
 
-      const normalizedCurrencyForBit2Me = CurrencyAdapter.normalizeForBit2Me(currency);
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
-        cryptoInvoice.invoiceId,
-        normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
+        invoice.invoiceId,
+        normalizedCurrencyForBit2Me as AllowedCurrencies,
       );
 
       return {
