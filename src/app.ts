@@ -14,6 +14,7 @@ import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
 import webhook from './webhooks';
+import cryptoWebhook from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
@@ -71,6 +72,18 @@ export async function buildApp({
       objectStorageService,
       tiersService,
     ),
+  );
+
+  fastify.register(
+    cryptoWebhook({
+      storageService,
+      usersService,
+      paymentService,
+      config,
+      cacheService,
+      objectStorageService,
+      tiersService,
+    }),
   );
 
   fastify.register(fastifyCors, {
