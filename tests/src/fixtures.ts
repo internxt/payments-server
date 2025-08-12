@@ -15,7 +15,6 @@ import {
 } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
-  AllowedCurrencies,
   CreateCryptoInvoicePayload,
   Currency,
   ParsedCreatedInvoiceResponse,
@@ -26,6 +25,8 @@ import {
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
+import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
+import { AllowedCryptoCurrencies } from '../../src/utils/currency';
 
 const randomDataGenerator = new Chance();
 
@@ -49,6 +50,31 @@ export const getLicenseCode = (params?: Partial<LicenseCode>) => {
     provider: 'OWN',
     code: randomDataGenerator.string({ length: 10 }),
     redeemed: false,
+    ...params,
+  };
+};
+
+export const getCryptoInvoiceWebhook = (params?: Partial<Bit2MePaymentStatusCallback>): Bit2MePaymentStatusCallback => {
+  return {
+    id: randomDataGenerator.string({ length: 16 }),
+    foreignId: `inv_${randomDataGenerator.string({ length: 16 })}`,
+    cryptoAddress: {
+      currency: AllowedCryptoCurrencies['Bitcoin'],
+      address: randomDataGenerator.hash({ length: 34 }),
+    },
+    currencySent: {
+      currency: AllowedCryptoCurrencies['Bitcoin'],
+      amount: '0.01',
+      remainingAmount: '0',
+    },
+    currencyReceived: {
+      currency: AllowedCryptoCurrencies['Bitcoin'],
+    },
+    token: 'mocked-token',
+    transactions: [],
+    fees: [],
+    error: [],
+    status: 'paid',
     ...params,
   };
 };
@@ -877,7 +903,7 @@ export const getPayloadForCryptoInvoice = (
   const payload = {
     foreignId: 'invoice-123',
     priceAmount: 100,
-    priceCurrency: AllowedCurrencies['Bitcoin'],
+    priceCurrency: AllowedCryptoCurrencies['Bitcoin'],
     title: 'Test Invoice',
     description: 'Payment for product',
     successUrl: 'https://success.url',
@@ -927,7 +953,7 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
 };
 
 export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
-  currencyId: AllowedCurrencies['Bitcoin'],
+  currencyId: AllowedCryptoCurrencies['Bitcoin'],
   name: 'Bitcoin',
   type: 'crypto',
   receiveType: true,

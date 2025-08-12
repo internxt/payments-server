@@ -8,6 +8,7 @@ import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
+import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -403,24 +404,23 @@ export class PaymentService {
     customerId,
     priceId,
     userEmail,
-    currency = 'eur',
+    currency,
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
     priceId: string;
     userEmail: string;
-    currency?: string;
+    currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
-    const isCryptoCurrency = this.bit2MeService.isAllowedCurrency(currency);
-    const currencyForStripeInvoice = isCryptoCurrency ? 'eur' : currency;
+    const normalizedCurrencyForStripe = normalizeForStripe(currency);
 
     const invoice = await this.provider.invoices.create({
       customer: customerId,
-      currency: currencyForStripeInvoice,
+      currency: normalizedCurrencyForStripe,
       payment_settings: {
         payment_method_types: ['card', 'paypal'],
       },
@@ -443,7 +443,6 @@ export class PaymentService {
     });
 
     const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-
     const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
 
     if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
@@ -457,11 +456,14 @@ export class PaymentService {
 
     const isLifetime = invoiceItem.price?.type === 'one_time';
 
-    if (isLifetime && isCryptoCurrency) {
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
+    if (isLifetime && isCryptoCurrency(currency)) {
+      const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+      const priceAmount = finalizedInvoice.total / 100;
+
+      const invoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
-        priceAmount: finalizedInvoice.total / 100,
-        priceCurrency: 'EUR',
+        priceAmount,
+        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
         title: `Invoice from Stripe ${finalizedInvoice.id}`,
         securityToken: jwt.sign(
           {
@@ -476,7 +478,11 @@ export class PaymentService {
         successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
         purchaserEmail: userEmail,
       });
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(cryptoInvoice.invoiceId, currency);
+
+      const checkoutPayload = await this.bit2MeService.checkoutInvoice(
+        invoice.invoiceId,
+        normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
+      );
 
       return {
         id: finalizedInvoice.payment_intent as string,
@@ -1623,6 +1629,10 @@ export class PaymentService {
     return this.provider.customers.retrieve(customerId);
   }
 
+  getInvoice(invoiceId: Stripe.Invoice['id']) {
+    return this.provider.invoices.retrieve(invoiceId);
+  }
+
   getProduct(productId: Stripe.Product['id']) {
     return this.provider.products.retrieve(productId);
   }
@@ -1653,12 +1663,16 @@ export class PaymentService {
     const validInvoiceId = this.validateInvoiceId(invoiceId);
 
     if (!validInvoiceId) {
-      throw new Error(`Invalid invoice id ${invoiceId}`);
+      throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
     }
 
     await this.provider.invoices.pay(invoiceId, {
       paid_out_of_band: true,
     });
+  }
+
+  async updateInvoice(invoiceId: Invoice['id'], data: Stripe.InvoiceUpdateParams) {
+    return this.provider.invoices.update(invoiceId, data);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

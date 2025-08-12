@@ -128,7 +128,7 @@ describe('Payments Service tests', () => {
       const paymentIntentPayload = {
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
         userEmail: mockedInvoice.customer_email as string,
       };
@@ -167,7 +167,7 @@ describe('Payments Service tests', () => {
       const paymentIntent = await paymentService.createInvoice({
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         userEmail: mockedInvoice.customer_email as string,
       });
 
@@ -205,7 +205,7 @@ describe('Payments Service tests', () => {
       const paymentIntent = await paymentService.createInvoice({
         customerId: mockedInvoice.customer as string,
         priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency,
+        currency: mockedInvoice.lines.data[0].price?.currency as string,
         userEmail: mockedInvoice.customer_email as string,
       });
 
@@ -825,6 +825,18 @@ describe('Payments Service tests', () => {
       const charge = await paymentService.retrieveCustomerChargeByChargeId(mockedCharge.id);
 
       expect(charge).toStrictEqual(mockedCharge);
+    });
+  });
+
+  describe('Retrieve an invoice given its ID', () => {
+    it('When an invoice is requested, then the correct invoice object is returned', async () => {
+      const mockedInvoice = getInvoice();
+
+      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const invoice = await paymentService.getInvoice(mockedInvoice.id);
+
+      expect(invoice).toStrictEqual(mockedInvoice);
     });
   });
 });

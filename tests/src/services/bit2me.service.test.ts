@@ -1,9 +1,10 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { AllowedCurrencies, Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
+import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
+import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 
 let bit2MeService: Bit2MeService;
 
@@ -49,18 +50,6 @@ describe('Bit2Me Service tests', () => {
       jest.spyOn(axios, 'request').mockRejectedValue(error);
 
       await expect(bit2MeService.getCurrencies()).rejects.toThrow(error);
-    });
-  });
-
-  describe('Check if the currency is allowed', () => {
-    test('When the currency is allowed, then true is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('BTC');
-      expect(result).toBeTruthy();
-    });
-
-    test('When the currency is not allowed, then false is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('EUR');
-      expect(result).toBeFalsy();
     });
   });
 
@@ -123,7 +112,7 @@ describe('Bit2Me Service tests', () => {
       const rawResponse = getRawCryptoInvoiceResponse();
       const mockedCurrency = getCryptoCurrency();
       const invoiceId = rawResponse.invoiceId;
-      const currencyId = AllowedCurrencies['Bitcoin'];
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
 
       jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
       jest.spyOn(axios, 'request').mockResolvedValue({ data: rawResponse });
@@ -152,7 +141,7 @@ describe('Bit2Me Service tests', () => {
 
     test('When an axios error occurs, then an HttpError is thrown', async () => {
       const invoiceId = 'test_invoice_123';
-      const currencyId = AllowedCurrencies['Bitcoin'];
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
       const mockedCurrency = getCryptoCurrency();
 
       const mockErrorData: Bit2MeAPIError = {
@@ -181,7 +170,7 @@ describe('Bit2Me Service tests', () => {
 
     test('When a non-axios error occurs, then the original error is re-thrown', async () => {
       const invoiceId = 'test_invoice_123';
-      const currencyId = AllowedCurrencies['Bitcoin'];
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
       const mockedCurrency = getCryptoCurrency();
 
       const genericError = new Error('Network connection failed');

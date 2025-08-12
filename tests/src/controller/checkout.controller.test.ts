@@ -18,7 +18,7 @@ import { UserNotFoundError, UsersService } from '../../../src/services/users.ser
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
-import { AllowedCurrencies, Bit2MeService } from '../../../src/services/bit2me.service';
+import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -276,6 +276,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: userToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -320,6 +321,7 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
+          currency: 'eur',
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -332,7 +334,7 @@ describe('Checkout controller', () => {
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
     });
 
-    it('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
+    test('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
       const mockedPrice = priceById({
@@ -368,7 +370,7 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
-          currency: AllowedCurrencies['Bitcoin'],
+          currency: AllowedCryptoCurrencies['Bitcoin'],
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -380,6 +382,33 @@ describe('Checkout controller', () => {
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
       expect(responseBody.payload.qrUrl).toBeDefined();
+    });
+
+    test('When the user wants to pay a subscription plan creating an invoice, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedPrice = priceById({
+        bytes: 123456789,
+        interval: 'year',
+      });
+      const authToken = getValidAuthToken(mockedUser.uuid);
+      const userToken = getValidUserToken(mockedUser.customerId);
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+
+      const response = await app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: mockedPrice.id,
+          token: userToken,
+          currency: AllowedCryptoCurrencies['Bitcoin'],
+        },
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
 
     it('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
@@ -416,6 +445,47 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling errors', () => {
+      test('When the currency is not provided, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getValidUserToken(mockedUser.customerId),
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
+      test('When the currency is invalid, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getValidUserToken(mockedUser.customerId),
+            currency: 'gbp',
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
       it('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
@@ -483,6 +553,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: invalidUserToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -504,6 +575,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: userToken,
+            currency: 'eur',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -693,7 +765,7 @@ describe('Checkout controller', () => {
       const mockedCurrencies = [
         getCryptoCurrency(),
         getCryptoCurrency({
-          name: AllowedCurrencies['Ethereum'],
+          name: AllowedCryptoCurrencies['Ethereum'],
         }),
       ];
       jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);

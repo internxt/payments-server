@@ -9,6 +9,7 @@ import { PaymentIntent, PaymentService } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
+import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -182,7 +183,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         customerId: string;
         priceId: string;
         token: string;
-        currency?: string;
+        currency: string;
         promoCodeId?: string;
       };
     }>(
@@ -191,7 +192,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token'],
+            required: ['customerId', 'priceId', 'token', 'currency'],
             properties: {
               customerId: {
                 type: 'string',
@@ -223,6 +224,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const { uuid, email } = req.user.payload;
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
 
+        if (!isValidCurrency(currency)) {
+          const allowedCurrencies = getAllowedCurrencies().join(', ');
+          throw new BadRequestError(
+            'Invalid currency. The currency must be one of the following: ' + allowedCurrencies,
+          );
+        }
+
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
             customerId: string;
@@ -237,6 +245,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         }
 
         const price = await paymentsService.getPriceById(priceId);
+
+        if (price.interval !== 'lifetime') {
+          throw new BadRequestError('Only lifetime plans are supported');
+        }
+
         const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
 
         if (!isStorageUpgradeAllowed) {
@@ -247,7 +260,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           customerId,
           priceId,
           userEmail: email,
-          currency,
+          currency: currency.trim(),
           promoCodeId,
           additionalInvoiceOptions: {
             automatic_tax: {
