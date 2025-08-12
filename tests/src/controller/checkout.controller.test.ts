@@ -19,6 +19,7 @@ import { PaymentIntent, PaymentService } from '../../../src/services/payment.ser
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
