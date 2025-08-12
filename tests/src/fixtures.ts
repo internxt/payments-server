@@ -920,7 +920,7 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
   const now = new Date();
 
   const rawResponse = {
-    invoiceId: 'invoice-123',
+    invoiceId: randomUUID(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     expiredAt: new Date(now.getTime() + 100000).toISOString(),
