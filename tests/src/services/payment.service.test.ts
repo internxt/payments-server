@@ -186,6 +186,7 @@ describe('Payments Service tests', () => {
         clientSecret: '',
         id: '',
         invoiceStatus: 'paid',
+        type: 'fiat',
       });
 
       jest
@@ -213,15 +214,27 @@ describe('Payments Service tests', () => {
 
     describe('Crypto payments', () => {
       test('When trying to purchase a product using a crypto currency, then the QR code link is returned', async () => {
+        const mockInvoiceTotal = 1000;
+        const mockPriceId = 'price_test_123';
+        const mockInvoiceId = 'in_test_456';
+        const mockCustomerId = 'cus_test_789';
+        const mockUserEmail = 'test@example.com';
+        const mockCurrency = 'BTC';
+
         const mockedInvoice = getInvoice({
+          id: mockInvoiceId,
+          customer: mockCustomerId,
+          customer_email: mockUserEmail,
           status: 'open',
           payment_intent: 'payment_intent_id',
+          total: mockInvoiceTotal,
           lines: {
             data: [
               {
-                amount: 1000,
+                amount: mockInvoiceTotal,
                 price: {
-                  currency: 'BTC',
+                  id: mockPriceId,
+                  currency: 'eur',
                   type: 'one_time',
                 },
               },
@@ -229,20 +242,15 @@ describe('Payments Service tests', () => {
           },
         });
 
-        const mockedInvoiceId = mockedInvoice.id;
-        const userEmail = mockedInvoice.customer_email as string;
-        const mockedCurrency = 'BTC';
-
         const mockedParsedInvoiceResponse = getParsedInvoiceResponse();
         const mockedParsedCreatedInvoiceResponse = getParsedCreatedInvoiceResponse({
           status: 'new',
         });
-        const mockedCryptoInvoiceId = mockedParsedCreatedInvoiceResponse.invoiceId;
 
-        const mockedSecurityToken = jwt.sign(
+        const expectedSecurityToken = jwt.sign(
           {
-            invoiceId: mockedInvoice.id,
-            customerId: mockedInvoice.customer as string,
+            invoiceId: mockInvoiceId,
+            customerId: mockCustomerId,
             provider: 'stripe',
           },
           config.JWT_SECRET,
@@ -261,41 +269,47 @@ describe('Payments Service tests', () => {
         const createCryptoInvoiceSpy = jest
           .spyOn(bit2MeService, 'createCryptoInvoice')
           .mockResolvedValue(mockedParsedCreatedInvoiceResponse);
-
         const checkoutInvoiceSpy = jest
           .spyOn(bit2MeService, 'checkoutInvoice')
           .mockResolvedValue(mockedParsedInvoiceResponse);
 
         const paymentIntent = await paymentService.createInvoice({
-          customerId: mockedInvoice.customer as string,
-          priceId: mockedInvoice.lines.data[0].price?.id as string,
-          currency: mockedCurrency,
-          userEmail: userEmail,
+          customerId: mockCustomerId,
+          priceId: mockPriceId,
+          currency: mockCurrency,
+          userEmail: mockUserEmail,
         });
 
         expect(paymentIntent).toStrictEqual({
-          id: mockedParsedInvoiceResponse.invoiceId,
+          id: mockedInvoice.payment_intent as string,
           type: 'crypto',
           payload: {
             paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
             url: mockedParsedInvoiceResponse.url,
             qrUrl: generateQrCodeUrl({ data: mockedParsedInvoiceResponse.paymentRequestUri }),
+            invoiceId: mockedParsedInvoiceResponse.invoiceId,
+            payAmount: mockedParsedInvoiceResponse.payAmount,
+            payCurrency: mockedParsedInvoiceResponse.payCurrency,
+            paymentAddress: mockedParsedInvoiceResponse.paymentAddress,
           },
         });
 
         expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
-          description: expect.any(String),
-          priceAmount: mockedInvoice.lines.data[0].amount as number,
-          priceCurrency: mockedCurrency,
-          title: expect.any(String),
-          securityToken: mockedSecurityToken,
-          foreignId: mockedInvoiceId,
-          cancelUrl: expect.any(String),
-          successUrl: expect.any(String),
-          purchaserEmail: userEmail,
+          description: `Payment for lifetime product ${mockPriceId}`,
+          priceAmount: mockInvoiceTotal / 100,
+          priceCurrency: 'EUR',
+          title: `Invoice from Stripe ${mockInvoiceId}`,
+          securityToken: expectedSecurityToken,
+          foreignId: mockInvoiceId,
+          cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+          successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+          purchaserEmail: mockUserEmail,
         });
 
-        expect(checkoutInvoiceSpy).toHaveBeenCalledWith(mockedCryptoInvoiceId, mockedCurrency);
+        expect(checkoutInvoiceSpy).toHaveBeenCalledWith(
+          mockedParsedCreatedInvoiceResponse.invoiceId,
+          mockCurrency.toUpperCase(),
+        );
       });
     });
   });

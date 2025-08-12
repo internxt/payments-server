@@ -15,7 +15,6 @@ import {
 } from '../../src/services/payment.service';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
-  AllowedCurrencies,
   CreateCryptoInvoicePayload,
   Currency,
   ParsedCreatedInvoiceResponse,
@@ -27,6 +26,7 @@ import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
 import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
+import { AllowedCryptoCurrencies } from '../../src/utils/currency';
 
 const randomDataGenerator = new Chance();
 
@@ -59,16 +59,16 @@ export const getCryptoInvoiceWebhook = (params?: Partial<Bit2MePaymentStatusCall
     id: randomDataGenerator.string({ length: 16 }),
     foreignId: `inv_${randomDataGenerator.string({ length: 16 })}`,
     cryptoAddress: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
       address: randomDataGenerator.hash({ length: 34 }),
     },
     currencySent: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
       amount: '0.01',
       remainingAmount: '0',
     },
     currencyReceived: {
-      currency: AllowedCurrencies['Bitcoin'],
+      currency: AllowedCryptoCurrencies['Bitcoin'],
     },
     token: 'mocked-token',
     transactions: [],
@@ -680,27 +680,29 @@ export const getActiveSubscriptions = (
 export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): PaymentIntentFiat;
 export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
 export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
-  const type = params.type ?? 'fiat';
-
-  if (type === 'crypto') {
+  if (params.type === 'crypto') {
+    const cryptoParams = params as Partial<PaymentIntentCrypto>;
     return {
-      id: params.id ?? 'crypto-id',
+      id: cryptoParams.id ?? 'crypto-id',
       type: 'crypto',
       payload: {
         paymentRequestUri: 'mock-address',
         url: 'https://mock.crypto.url',
         qrUrl: 'https://mock.qr.url',
+        invoiceId: cryptoParams.payload?.invoiceId ?? 'invoice-id',
+        payAmount: cryptoParams.payload?.payAmount ?? 0.01,
+        payCurrency: cryptoParams.payload?.payCurrency ?? 'BTC',
+        paymentAddress: cryptoParams.payload?.paymentAddress ?? 'mock-address',
       },
-      invoiceStatus: params.invoiceStatus,
-      clientSecret: params.clientSecret ?? undefined,
     };
   }
 
+  const fiatParams = params as Partial<PaymentIntentFiat>;
   return {
-    id: params.id ?? 'fiat-id',
+    id: fiatParams.id ?? 'fiat-id',
     type: 'fiat',
-    clientSecret: params.clientSecret ?? 'client_secret',
-    invoiceStatus: params.invoiceStatus ?? 'open',
+    clientSecret: fiatParams.clientSecret ?? 'client_secret',
+    invoiceStatus: fiatParams.invoiceStatus ?? 'open',
   };
 }
 
@@ -901,7 +903,7 @@ export const getPayloadForCryptoInvoice = (
   const payload = {
     foreignId: 'invoice-123',
     priceAmount: 100,
-    priceCurrency: AllowedCurrencies['Bitcoin'],
+    priceCurrency: AllowedCryptoCurrencies['Bitcoin'],
     title: 'Test Invoice',
     description: 'Payment for product',
     successUrl: 'https://success.url',
@@ -951,7 +953,7 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
 };
 
 export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
-  currencyId: AllowedCurrencies['Bitcoin'],
+  currencyId: AllowedCryptoCurrencies['Bitcoin'],
   name: 'Bitcoin',
   type: 'crypto',
   receiveType: true,

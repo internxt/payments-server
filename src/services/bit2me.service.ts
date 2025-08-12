@@ -2,6 +2,7 @@ import { Axios, AxiosError, AxiosRequestConfig } from 'axios';
 import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
+import { AllowedCryptoCurrencies } from '../utils/currency';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -12,22 +13,9 @@ export interface Currency {
   imageUrl: string; // The URL to the currency's icon
 }
 
-export enum AllowedCurrencies {
-  Bitcoin = 'BTC',
-  Ethereum = 'ETH',
-  Litecoin = 'LTC',
-  BitcoinCash = 'BCH',
-  Ripple = 'XRP',
-  Tether = 'USDT',
-  USDC = 'USDC',
-  Tron = 'TRX',
-  Cardano = 'ADA',
-  BinanceCoin = 'BNB',
-}
-
-interface Bit2MeAPIError {
+export interface Bit2MeAPIError {
   // Contains all the errors
-  message: string[];
+  message: string;
   // HTTP Error
   error: string[];
   // HTTP Status code
@@ -37,7 +25,7 @@ interface Bit2MeAPIError {
 export interface CreateCryptoInvoicePayload {
   foreignId: string;
   priceAmount: number;
-  priceCurrency: AllowedCurrencies;
+  priceCurrency: string;
   title: string;
   description: string;
   successUrl: string;
@@ -138,7 +126,7 @@ export class Bit2MeService {
   async createCryptoInvoice(payload: CreateCryptoInvoicePayload): Promise<ParsedCreatedInvoiceResponse> {
     const payloadReq = {
       ...payload,
-      receiveCurrency: AllowedCurrencies['Bitcoin'],
+      receiveCurrency: AllowedCryptoCurrencies['Bitcoin'],
       priceAmount: payload.priceAmount.toString(),
     };
     const params: AxiosRequestConfig = {
@@ -163,7 +151,7 @@ export class Bit2MeService {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
-        const message = `Status ${data.statusCode} received -> ${data.message.join(',')} / payload ${JSON.stringify(payloadReq)}
+        const message = `Status ${data.statusCode} received -> ${data.message} / payload ${JSON.stringify(payloadReq)}
         `;
 
         throw new HttpError(message, data.statusCode);
@@ -180,32 +168,46 @@ export class Bit2MeService {
    * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
    * @throws {Error} If the API call fails or the invoice ID is invalid.
    */
-  async checkoutInvoice(invoiceId: string, currencyId: AllowedCurrencies): Promise<ParsedInvoiceResponse> {
+  async checkoutInvoice(invoiceId: string, currencyId: AllowedCryptoCurrencies): Promise<ParsedInvoiceResponse> {
     const currencyInfo = await this.getCurrencyByCurrencyId(currencyId);
     const payload = {
       currencyId,
       networkId: currencyInfo.networks[0].platformId,
     };
+
     const params: AxiosRequestConfig = {
       method: 'PUT',
-      url: `${this.apiKey}/v3/commerce/invoices/${invoiceId}/checkout`,
+      url: `${this.apiUrl}/v3/commerce/invoices/${invoiceId}/checkout`,
       headers: this.getAPIHeaders(payload),
       data: payload,
     };
 
-    const { data } = await this.axios.request<RawInvoiceResponse>(params);
+    try {
+      const { data } = await this.axios.request<RawInvoiceResponse>(params);
 
-    const response: ParsedInvoiceResponse = {
-      ...data,
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
-      expiredAt: new Date(data.expiredAt),
-      priceAmount: parseFloat(data.priceAmount),
-      underpaidAmount: parseFloat(data.underpaidAmount),
-      overpaidAmount: parseFloat(data.overpaidAmount),
-    };
+      const response: ParsedInvoiceResponse = {
+        ...data,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt),
+        expiredAt: new Date(data.expiredAt),
+        priceAmount: parseFloat(data.priceAmount),
+        underpaidAmount: parseFloat(data.underpaidAmount),
+        overpaidAmount: parseFloat(data.overpaidAmount),
+      };
 
-    return response;
+      return response;
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        const data = response?.data as Bit2MeAPIError;
+        const message = `Status ${data.statusCode} received -> ${data.message} / payload ${JSON.stringify(payload)}
+        `;
+
+        throw new HttpError(message, data.statusCode);
+      } else {
+        throw err;
+      }
+    }
   }
 
   /**
@@ -237,7 +239,7 @@ export class Bit2MeService {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
 
-        throw new Error(`Status ${data.statusCode} received -> ${data.message.join(',')}`);
+        throw new Error(`Status ${data.statusCode} received -> ${data.message}`);
       } else {
         throw err;
       }
@@ -247,7 +249,7 @@ export class Bit2MeService {
   async getCurrencyByCurrencyId(currencyId: Currency['currencyId']): Promise<Currency> {
     const params: AxiosRequestConfig = {
       method: 'GET',
-      url: `${this.apiUrl}/v3/currencies/${currencyId}`,
+      url: `${this.apiUrl}/v3/commerce/currencies/${currencyId}`,
       headers: this.getAPIHeaders({}),
     };
 
@@ -258,7 +260,7 @@ export class Bit2MeService {
       if (err instanceof AxiosError) {
         const { response } = err;
         const data = response?.data as Bit2MeAPIError;
-        const errorMessage = `Status ${data.statusCode} received -> ${data.message.join(',')}`;
+        const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
 
         throw new HttpError(errorMessage, data.statusCode);
       } else {
