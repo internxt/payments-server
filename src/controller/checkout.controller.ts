@@ -10,10 +10,7 @@ import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Er
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
-
-function signUserToken(customerId: string) {
-  return jwt.sign({ customerId }, config.JWT_SECRET);
-}
+import { signUserToken } from '../utils/signUserToken';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -101,7 +98,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
-        return res.send({ customerId, token: signUserToken(customerId) });
+        return res.send({ customerId, token: signUserToken({ customerId }) });
       },
     );
 
@@ -361,7 +358,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     );
 
     fastify.get(
-      '/currencies/crypto',
+      '/crypto/currencies',
       {
         config: {
           skipAuth: true,
@@ -374,6 +371,50 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res) => {
         const cryptoCurrencies = await paymentsService.getCryptoCurrencies();
         return res.status(200).send(cryptoCurrencies);
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        token: string;
+      };
+    }>(
+      '/crypto/verify/payment',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['token'],
+            properties: {
+              token: {
+                type: 'string',
+                description: 'The user token generated when creating the payment intent that contains the invoice id',
+              },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 3,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        let decodedInvoiceId: string;
+        const { token } = req.body;
+
+        try {
+          const { invoiceId } = jwt.verify(token, config.JWT_SECRET) as {
+            invoiceId: string;
+          };
+          decodedInvoiceId = invoiceId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        const result = await paymentsService.verifyCryptoPayment(decodedInvoiceId);
+        return res.status(200).send(result);
       },
     );
   };

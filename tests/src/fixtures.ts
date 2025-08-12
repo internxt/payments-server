@@ -99,8 +99,8 @@ export const getValidAuthToken = (
   return jwt.sign({ payload: { uuid: userUuid, workspaces, ...params } }, config.JWT_SECRET);
 };
 
-export const getValidUserToken = (customerId: string): string => {
-  return jwt.sign({ customerId }, config.JWT_SECRET);
+export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
+  return jwt.sign(payload, config.JWT_SECRET);
 };
 
 export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
@@ -685,11 +685,11 @@ export function getPaymentIntentResponse(params: Partial<PaymentIntent>): Paymen
     return {
       id: cryptoParams.id ?? 'crypto-id',
       type: 'crypto',
+      token: 'encoded-invoice-id',
       payload: {
         paymentRequestUri: 'mock-address',
         url: 'https://mock.crypto.url',
         qrUrl: 'https://mock.qr.url',
-        invoiceId: cryptoParams.payload?.invoiceId ?? 'invoice-id',
         payAmount: cryptoParams.payload?.payAmount ?? 0.01,
         payCurrency: cryptoParams.payload?.payCurrency ?? 'BTC',
         paymentAddress: cryptoParams.payload?.paymentAddress ?? 'mock-address',
@@ -920,7 +920,7 @@ export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>
   const now = new Date();
 
   const rawResponse = {
-    invoiceId: 'invoice-123',
+    invoiceId: randomUUID(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     expiredAt: new Date(now.getTime() + 100000).toISOString(),

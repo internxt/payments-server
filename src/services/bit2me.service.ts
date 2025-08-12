@@ -3,6 +3,8 @@ import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
 import { AllowedCryptoCurrencies } from '../utils/currency';
+import { validate as validateUUID } from 'uuid';
+import { BadRequestError } from '../errors/Errors';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -255,6 +257,37 @@ export class Bit2MeService {
 
     try {
       const { data } = await this.axios.request<Currency>(params);
+      return data;
+    } catch (err: unknown) {
+      if (err instanceof AxiosError) {
+        const { response } = err;
+        const data = response?.data as Bit2MeAPIError;
+        const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
+
+        throw new HttpError(errorMessage, data.statusCode);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  async getInvoice(invoiceId: string) {
+    const isUUID = validateUUID(invoiceId);
+
+    if (!isUUID) {
+      throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
+    }
+
+    const safeInvoiceId = encodeURIComponent(invoiceId);
+
+    const params: AxiosRequestConfig = {
+      method: 'GET',
+      url: `${this.apiUrl}/v3/commerce/invoices/${safeInvoiceId}`,
+      headers: this.getAPIHeaders({}),
+    };
+
+    try {
+      const { data } = await this.axios.request<RawInvoiceResponse>(params);
       return data;
     } catch (err: unknown) {
       if (err instanceof AxiosError) {

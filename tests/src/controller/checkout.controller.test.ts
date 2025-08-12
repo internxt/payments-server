@@ -5,6 +5,7 @@ import {
   getCryptoCurrency,
   getCustomer,
   getInvoice,
+  getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
   getValidAuthToken,
@@ -18,6 +19,7 @@ import { PaymentIntent, PaymentService } from '../../../src/services/payment.ser
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -55,7 +57,7 @@ describe('Checkout controller', () => {
     it('When the user exists in Users collection, then the customer Id associated to the user is returned', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
@@ -90,7 +92,7 @@ describe('Checkout controller', () => {
         },
       });
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedCustomer.id);
+      const userToken = getValidUserToken({ customerId: mockedCustomer.id });
 
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(UserNotFoundError);
       jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
@@ -122,7 +124,7 @@ describe('Checkout controller', () => {
 
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       const attachCustomerAndVatIdToCustomerSpy = jest
         .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
@@ -161,7 +163,7 @@ describe('Checkout controller', () => {
       const mockedSubscriptionResponse = getCreateSubscriptionResponse();
 
       const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
 
@@ -266,7 +268,7 @@ describe('Checkout controller', () => {
       it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
-        const userToken = getValidUserToken('invalid_customer_id');
+        const userToken = getValidUserToken({ customerId: 'invalid_customer_id' });
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -300,7 +302,7 @@ describe('Checkout controller', () => {
         interval: 'lifetime',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
         clientSecret: 'client_secret',
@@ -341,7 +343,8 @@ describe('Checkout controller', () => {
         interval: 'lifetime',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
+
       const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
         type: 'crypto',
@@ -349,11 +352,11 @@ describe('Checkout controller', () => {
           paymentRequestUri: 'payment_request_uri',
           qrUrl: 'qr_url',
           url: 'url',
-          invoiceId: 'invoice_id',
           payAmount: 0.01,
           payCurrency: 'BTC',
           paymentAddress: 'payment_address',
         },
+        token: getValidUserToken({ invoiceId: 'invoice_id' }),
       } as const;
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
@@ -390,7 +393,7 @@ describe('Checkout controller', () => {
         interval: 'year',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
       const response = await app.inject({
@@ -418,7 +421,7 @@ describe('Checkout controller', () => {
         interval: 'lifetime',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken(mockedUser.customerId);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
@@ -454,7 +457,7 @@ describe('Checkout controller', () => {
           body: {
             customerId: mockedUser.customerId,
             priceId: 'price_id',
-            token: getValidUserToken(mockedUser.customerId),
+            token: getValidUserToken({ customerId: mockedUser.customerId }),
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -474,7 +477,7 @@ describe('Checkout controller', () => {
           body: {
             customerId: mockedUser.customerId,
             priceId: 'price_id',
-            token: getValidUserToken(mockedUser.customerId),
+            token: getValidUserToken({ customerId: mockedUser.customerId }),
             currency: 'gbp',
           },
           headers: {
@@ -565,7 +568,7 @@ describe('Checkout controller', () => {
       it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
-        const userToken = getValidUserToken('invalid_customer_id');
+        const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -770,7 +773,7 @@ describe('Checkout controller', () => {
       jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);
 
       const response = await app.inject({
-        path: '/checkout/currencies/crypto',
+        path: '/checkout/crypto/currencies',
         method: 'GET',
       });
 
@@ -778,6 +781,62 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedCurrencies);
+    });
+  });
+
+  describe('Verify the crypto payment', () => {
+    test('When the crypto payment invoice has an status of paid, then true is returned indicating the invoice has been paid', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const mockedInvoice = getRawCryptoInvoiceResponse({
+        status: 'paid',
+      });
+      const invoiceToken = getValidUserToken({ invoiceId: mockedInvoice.invoiceId });
+
+      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
+
+      const response = await app.inject({
+        path: `/checkout/crypto/verify/payment`,
+        method: 'POST',
+        body: {
+          token: invoiceToken,
+        },
+        headers: {
+          authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toBeTruthy();
+    });
+
+    test('When the crypto payment invoice has another status than paid, then false is returned indicating the invoice has not been paid', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const mockedInvoice = getRawCryptoInvoiceResponse({
+        status: 'pending',
+      });
+      const invoiceToken = getValidUserToken({ invoiceId: mockedInvoice.invoiceId });
+
+      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
+
+      const response = await app.inject({
+        path: `/checkout/crypto/verify/payment`,
+        method: 'POST',
+        body: {
+          token: invoiceToken,
+        },
+        headers: {
+          authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toBeFalsy();
     });
   });
 });
