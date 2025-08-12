@@ -10,10 +10,7 @@ import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Er
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
-
-function signUserToken(customerId: string) {
-  return jwt.sign({ customerId }, config.JWT_SECRET);
-}
+import { signUserToken } from '../utils/signUserToken';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -101,7 +98,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
-        return res.send({ customerId, token: signUserToken(customerId) });
+        return res.send({ customerId, token: signUserToken({ customerId }) });
       },
     );
 
@@ -377,19 +374,22 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
     );
 
-    fastify.get<{
-      Params: {
-        invoiceId: string;
+    fastify.post<{
+      Body: {
+        token: string;
       };
     }>(
-      '/crypto/verify/:invoiceId',
+      '/crypto/verify/payment',
       {
         schema: {
-          params: {
+          body: {
             type: 'object',
-            required: ['invoiceId'],
+            required: ['token'],
             properties: {
-              invoiceId: { type: 'string', description: 'The ID of the invoice we want to verify' },
+              token: {
+                type: 'string',
+                description: 'The user token generated when creating the payment intent that contains the invoice id',
+              },
             },
           },
         },
@@ -401,9 +401,19 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
-        const { invoiceId } = req.params;
+        let decodedInvoiceId: string;
+        const { token } = req.body;
 
-        const result = await paymentsService.verifyCryptoPayment(invoiceId);
+        try {
+          const { invoiceId } = jwt.verify(token, config.JWT_SECRET) as {
+            invoiceId: string;
+          };
+          decodedInvoiceId = invoiceId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        const result = await paymentsService.verifyCryptoPayment(decodedInvoiceId);
         return res.status(200).send(result);
       },
     );

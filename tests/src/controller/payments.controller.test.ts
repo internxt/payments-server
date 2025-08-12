@@ -475,7 +475,7 @@ describe('Payment controller e2e tests', () => {
     describe('Create subscription', () => {
       it('When the user wants to create a sub for object storage, then the subscription is created successfully with the additional taxes', async () => {
         const mockedUser = getUser();
-        const token = getValidUserToken(mockedUser.customerId);
+        const token = getValidUserToken({ customerId: mockedUser.customerId });
         const subResponse = getCreateSubscriptionResponse();
 
         const createSubscriptionSpy = jest
@@ -511,7 +511,7 @@ describe('Payment controller e2e tests', () => {
 
       it('When the user wants to create a subscription with promotional code, then the promotional code is applied', async () => {
         const mockedUser = getUser();
-        const token = getValidUserToken(mockedUser.customerId);
+        const token = getValidUserToken({ customerId: mockedUser.customerId });
         const promoCodeName = 'obj-sotrage-promo-code-name';
         const subResponse = getCreateSubscriptionResponse();
 

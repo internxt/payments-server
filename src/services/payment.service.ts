@@ -9,6 +9,7 @@ import { BadRequestError, NotFoundError } from '../errors/Errors';
 import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
+import { signUserToken } from '../utils/signUserToken';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -68,11 +69,11 @@ export interface SubscriptionCreated {
 export interface PaymentIntentCrypto {
   type: 'crypto';
   id: string;
+  token: string;
   payload: {
     paymentRequestUri: string;
     payAmount: number;
     payCurrency: string;
-    invoiceId: string;
     paymentAddress: string;
     url: string;
     qrUrl: string;
@@ -484,15 +485,19 @@ export class PaymentService {
         normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
       );
 
+      const secureToken = signUserToken({
+        invoiceId: checkoutPayload.invoiceId,
+      });
+
       return {
         id: finalizedInvoice.payment_intent as string,
         type: 'crypto',
+        token: secureToken,
         payload: {
           paymentRequestUri: checkoutPayload.paymentRequestUri,
           payAmount: checkoutPayload.payAmount,
           payCurrency: checkoutPayload.payCurrency,
           paymentAddress: checkoutPayload.paymentAddress,
-          invoiceId: checkoutPayload.invoiceId,
           url: checkoutPayload.url,
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },

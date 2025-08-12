@@ -280,8 +280,9 @@ export class Bit2MeService {
 
     const params: AxiosRequestConfig = {
       method: 'GET',
-      url: `${this.apiUrl}/v3/commerce/invoices/${invoiceId}`,
+      url: `${this.apiUrl}/v3/commerce/invoices/:invoiceId`,
       headers: this.getAPIHeaders({}),
+      params: { invoiceId },
     };
 
     try {
