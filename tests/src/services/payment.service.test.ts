@@ -27,6 +27,7 @@ import {
   getPromotionCodeResponse,
   getTaxes,
   getUser,
+  getValidUserToken,
 } from '../fixtures';
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import config from '../../../src/config';
@@ -283,11 +284,11 @@ describe('Payments Service tests', () => {
         expect(paymentIntent).toStrictEqual({
           id: mockedInvoice.payment_intent as string,
           type: 'crypto',
+          token: getValidUserToken({ invoiceId: mockedParsedInvoiceResponse.invoiceId }),
           payload: {
             paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
             url: mockedParsedInvoiceResponse.url,
             qrUrl: generateQrCodeUrl({ data: mockedParsedInvoiceResponse.paymentRequestUri }),
-            invoiceId: mockedParsedInvoiceResponse.invoiceId,
             payAmount: mockedParsedInvoiceResponse.payAmount,
             payCurrency: mockedParsedInvoiceResponse.payCurrency,
             paymentAddress: mockedParsedInvoiceResponse.paymentAddress,
