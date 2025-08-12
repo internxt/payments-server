@@ -5,6 +5,8 @@ import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.serv
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
+import { BadRequestError } from '../../../src/errors/Errors';
+import { randomUUID } from 'crypto';
 
 let bit2MeService: Bit2MeService;
 
@@ -243,8 +245,15 @@ describe('Bit2Me Service tests', () => {
       expect(invoice).toStrictEqual(rawResponse);
     });
 
-    test('When an axios error occurs, then an HttpError is thrown', async () => {
+    test('When the uuid is not valid, then an error indicating so is thrown', async () => {
       const invoiceId = 'test_invoice_123';
+      const badRequestError = new BadRequestError(`Invalid invoice id ${invoiceId}`);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(badRequestError);
+    });
+
+    test('When an axios error occurs, then an HttpError is thrown', async () => {
+      const invoiceId = randomUUID();
       const mockErrorData: Bit2MeAPIError = {
         statusCode: 400,
         message: 'Invalid invoice ID',
@@ -264,7 +273,7 @@ describe('Bit2Me Service tests', () => {
     });
 
     test('When a non-axios error occurs, then the original error is re-thrown', async () => {
-      const invoiceId = 'test_invoice_123';
+      const invoiceId = randomUUID();
       const genericError = new Error('Network connection failed');
 
       jest.spyOn(axios, 'request').mockRejectedValue(genericError);
