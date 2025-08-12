@@ -282,7 +282,6 @@ export class Bit2MeService {
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
         const { response } = err;
-        console.log(`ERROR: ${response?.data}`);
         const data = response?.data as Bit2MeAPIError;
         const errorMessage = `Status ${data.statusCode} received -> ${data.message}`;
 
