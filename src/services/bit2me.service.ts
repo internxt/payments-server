@@ -3,6 +3,8 @@ import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
 import { AllowedCryptoCurrencies } from '../utils/currency';
+import validateUUID from '../utils/validateUUID';
+import { BadRequestError } from '../errors/Errors';
 
 export interface Currency {
   currencyId: string; // The ISO code of the currency (e.g., "BTC", "EUR")
@@ -270,6 +272,12 @@ export class Bit2MeService {
   }
 
   async getInvoice(invoiceId: string) {
+    const isUUID = validateUUID(invoiceId);
+
+    if (!isUUID) {
+      throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
+    }
+
     const params: AxiosRequestConfig = {
       method: 'GET',
       url: `${this.apiUrl}/v3/commerce/invoices/${invoiceId}`,
