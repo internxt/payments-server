@@ -278,11 +278,12 @@ export class Bit2MeService {
       throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
     }
 
+    const safeInvoiceId = encodeURIComponent(invoiceId);
+
     const params: AxiosRequestConfig = {
       method: 'GET',
-      url: `${this.apiUrl}/v3/commerce/invoices/:invoiceId`,
+      url: `${this.apiUrl}/v3/commerce/invoices/${safeInvoiceId}`,
       headers: this.getAPIHeaders({}),
-      params: { invoiceId },
     };
 
     try {
