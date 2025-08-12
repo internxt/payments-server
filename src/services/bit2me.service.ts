@@ -3,7 +3,7 @@ import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
 import { HttpError } from '../errors/HttpError';
 import { AllowedCryptoCurrencies } from '../utils/currency';
-import validateUUID from '../utils/validateUUID';
+import { validate as validateUUID } from 'uuid';
 import { BadRequestError } from '../errors/Errors';
 
 export interface Currency {
