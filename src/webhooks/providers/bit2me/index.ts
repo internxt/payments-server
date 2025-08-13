@@ -12,6 +12,7 @@ import { BadRequestError } from '../../../errors/Errors';
 import { InvoiceCompletedHandler } from '../../events/invoices/InvoiceCompletedHandler';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
+import Logger from '../../../Logger';
 
 export interface CryptoWebhookDependencies {
   storageService: StorageService;
@@ -68,21 +69,26 @@ export default function ({
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
       const { id: paymentId, token, foreignId, status } = req.body;
 
-      const { customerId, invoiceId, provider } = await decodeToken(token);
+      const { customerId, invoiceId: stripeInvoiceId, provider } = await decodeToken(token);
 
-      if (invoiceId !== foreignId) {
+      Logger.info(
+        `Received body: ${JSON.stringify(req.body)} for user ${customerId} and invoice ${stripeInvoiceId} with foreign id ${foreignId} and status ${status}`,
+      );
+
+      if (stripeInvoiceId !== foreignId) {
         throw new BadRequestError(
-          `Stripe invoice with id ${invoiceId} and invoice foreign id ${foreignId} does not match for customer ${customerId}`,
+          `Stripe invoice with id ${stripeInvoiceId} and invoice foreign id ${foreignId} does not match for customer ${customerId}`,
         );
       }
 
       if (provider !== 'stripe') {
         throw new BadRequestError(
-          `The provider for the invoice with ID ${invoiceId} and foreign Id ${foreignId} for customer Id ${customerId} is not Stripe.`,
+          `The provider for the invoice with ID ${stripeInvoiceId} and foreign Id ${foreignId} for customer Id ${customerId} is not Stripe.`,
         );
       }
 
       if (status !== 'paid') {
+        Logger.info(`Invoice ${stripeInvoiceId} for customer ${customerId} is not paid. Status: ${status}`);
         return rep.status(200).send();
       }
 
@@ -91,10 +97,12 @@ export default function ({
         throw new BadRequestError(`Customer with ID ${customerId} is deleted`);
       }
 
-      const invoice = await paymentService.getInvoice(invoiceId);
+      const invoice = await paymentService.getInvoice(stripeInvoiceId);
 
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+
       const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
+
       const handler = new InvoiceCompletedHandler({
         logger: fastify.log,
         determineLifetimeConditions,
@@ -112,7 +120,11 @@ export default function ({
         status: invoice.status as string,
       });
 
-      await paymentService.updateInvoice(invoiceId, {
+      Logger.info(
+        `Invoice completed handler executed successfully for customer ${customerId} and invoice ${stripeInvoiceId}`,
+      );
+
+      await paymentService.updateInvoice(stripeInvoiceId, {
         metadata: {
           provider: 'bit2me',
           paymentId,
@@ -120,7 +132,11 @@ export default function ({
         description: 'Invoice paid using crypto currencies.',
       });
 
-      await paymentService.markInvoiceAsPaid(invoiceId);
+      Logger.info(`Invoice metadata updated for customer ${customerId} and invoice ${stripeInvoiceId}`);
+
+      await paymentService.markInvoiceAsPaid(stripeInvoiceId);
+
+      Logger.info(`Invoice marked as paid for customer ${customerId} and invoice ${stripeInvoiceId}`);
 
       return rep.status(200).send();
     });
