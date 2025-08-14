@@ -1,109 +1,60 @@
 import Stripe from 'stripe';
-import { CouponsRepository } from '../../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../../src/core/coupons/UsersCouponsRepository';
-import { DisplayBillingRepository } from '../../../../src/core/users/MongoDBDisplayBillingRepository';
-import { TiersRepository } from '../../../../src/core/users/MongoDBTiersRepository';
-import { UsersTiersRepository } from '../../../../src/core/users/MongoDBUsersTiersRepository';
-import { ProductsRepository } from '../../../../src/core/users/ProductsRepository';
-import { UsersRepository } from '../../../../src/core/users/UsersRepository';
-import { Bit2MeService } from '../../../../src/services/bit2me.service';
-import { PaymentService } from '../../../../src/services/payment.service';
-import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
-import { UserNotFoundError, UsersService } from '../../../../src/services/users.service';
+import { TierNotFoundError } from '../../../../src/services/tiers.service';
+import { UserNotFoundError } from '../../../../src/services/users.service';
 import { handleUserFeatures, HandleUserFeaturesProps } from '../../../../src/webhooks/utils/handleUserFeatures';
-import testFactory from '../../utils/factory';
-import config from '../../../../src/config';
-import axios from 'axios';
 import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
-import { StorageService } from '../../../../src/services/storage.service';
 import { handleStackLifetimeStorage } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
 import { Service, Tier } from '../../../../src/core/users/Tier';
 import { FastifyBaseLogger } from 'fastify';
+import { createTestServices } from '../../helpers/services-factory';
 
 jest.mock('../../../../src/webhooks/utils/handleStackLifetimeStorage');
 
-let tiersService: TiersService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
 let defaultProps: HandleUserFeaturesProps;
-let storageService: StorageService;
 let mockedTier: Tier;
 let mockedUser: User & { email: string };
 let mockedCustomer: Stripe.Customer;
 let mockedPurchasedItem: Stripe.InvoiceLineItem;
 let logger: jest.Mocked<FastifyBaseLogger>;
 
+mockedUser = {
+  ...getUser(),
+  email: 'test@example.com',
+} as User & { email: string };
+logger = getLogger();
+mockedTier = newTier();
+mockedCustomer = getCustomer();
+mockedPurchasedItem = getInvoice().lines.data[0];
+
+const stripeMock = {
+  paymentIntents: {
+    cancel: jest.fn(),
+  },
+};
+const { paymentService, usersService, tiersService, storageService } = createTestServices({
+  stripe: stripeMock,
+});
+
+beforeEach(() => {
+  defaultProps = {
+    user: mockedUser,
+    purchasedItem: mockedPurchasedItem,
+    paymentService,
+    usersService,
+    logger,
+    storageService,
+    isLifetimeCurrentSub: false,
+    customer: mockedCustomer,
+    tiersService,
+  };
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe('Create or update user when after successful payment', () => {
-  beforeEach(() => {
-    mockedUser = {
-      ...getUser(),
-      email: 'test@example.com',
-    } as User & { email: string };
-    logger = getLogger();
-    mockedTier = newTier();
-    mockedCustomer = getCustomer();
-    mockedPurchasedItem = getInvoice().lines.data[0];
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-
-    storageService = new StorageService(config, axios);
-
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
-
-    defaultProps = {
-      user: mockedUser,
-      purchasedItem: mockedPurchasedItem,
-      paymentService,
-      usersService,
-      logger,
-      storageService,
-      isLifetimeCurrentSub: false,
-      customer: mockedCustomer,
-      tiersService,
-    };
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
   it('when the product does not exists, then an error indicating so is thrown', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
@@ -271,7 +222,7 @@ describe('Create or update user when after successful payment', () => {
       );
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
-        storageService,
+        storageService: defaultProps.storageService,
         newTier: mockedTier,
         oldTier: mockedTier,
         user: { ...mockedUser, email: mockedUser.email },
@@ -309,7 +260,7 @@ describe('Create or update user when after successful payment', () => {
       });
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
-        storageService,
+        storageService: defaultProps.storageService,
         newTier: mockedTier,
         oldTier: mockedTier,
         user: { ...mockedUser, email: mockedUser.email },
@@ -362,7 +313,7 @@ describe('Create or update user when after successful payment', () => {
 
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
         logger: defaultProps.logger,
-        storageService,
+        storageService: defaultProps.storageService,
         newTier: newLifetimeTier,
         oldTier: oldLifetimeTier,
         user: { ...mockedUser, email: mockedUser.email },

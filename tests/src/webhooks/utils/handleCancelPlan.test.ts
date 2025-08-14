@@ -1,69 +1,13 @@
-import axios from 'axios';
-import Stripe from 'stripe';
-import config from '../../../../src/config';
-import { CouponsRepository } from '../../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../../src/core/coupons/UsersCouponsRepository';
-import { DisplayBillingRepository } from '../../../../src/core/users/MongoDBDisplayBillingRepository';
-import { ProductsRepository } from '../../../../src/core/users/ProductsRepository';
-import { UsersRepository } from '../../../../src/core/users/UsersRepository';
-import { Bit2MeService } from '../../../../src/services/bit2me.service';
-import { StorageService } from '../../../../src/services/storage.service';
-import { TierNotFoundError, TiersService } from '../../../../src/services/tiers.service';
-import { UsersService } from '../../../../src/services/users.service';
-import testFactory from '../../utils/factory';
-import { PaymentService } from '../../../../src/services/payment.service';
-import { TiersRepository } from '../../../../src/core/users/MongoDBTiersRepository';
-import { UsersTiersRepository } from '../../../../src/core/users/MongoDBUsersTiersRepository';
+import { TierNotFoundError } from '../../../../src/services/tiers.service';
 import { getCustomer, getLogger, getUser, newTier, voidPromise } from '../../fixtures';
 import { handleCancelPlan } from '../../../../src/webhooks/utils/handleCancelPlan';
+import { createTestServices } from '../../helpers/services-factory';
 
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let productsRepository: ProductsRepository;
-let tiersRepository: TiersRepository;
-let usersTiersRepository: UsersTiersRepository;
-let bit2MeService: Bit2MeService;
-let usersService: UsersService;
-let paymentService: PaymentService;
-let storageService: StorageService;
-let tiersService: TiersService;
+const { usersService, tiersService } = createTestServices();
 
 beforeEach(() => {
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  displayBillingRepository = {} as DisplayBillingRepository;
-  couponsRepository = testFactory.getCouponsRepositoryForTest();
-  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-  storageService = new StorageService(config, axios);
-  productsRepository = testFactory.getProductsRepositoryForTest();
-  tiersRepository = testFactory.getTiersRepository();
-  usersTiersRepository = testFactory.getUsersTiersRepository();
-  bit2MeService = new Bit2MeService(config, axios);
-  paymentService = new PaymentService(
-    new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-    productsRepository,
-    bit2MeService,
-  );
-
-  usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    config,
-    axios,
-  );
-
-  tiersService = new TiersService(
-    usersService,
-    paymentService,
-    tiersRepository,
-    usersTiersRepository,
-    storageService,
-    config,
-  );
+  jest.resetAllMocks();
+  jest.clearAllMocks();
 });
 
 describe('Handling canceled plans and refunded lifetimes', () => {
