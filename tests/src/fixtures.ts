@@ -228,6 +228,11 @@ export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.C
           percentage_decimal: '21',
           state: 'ES',
           tax_type: 'vat',
+          flat_amount: {
+            amount: 0,
+            currency: 'EUR',
+          },
+          rate_type: 'flat_amount',
         },
         taxability_reason: 'standard_rated',
         taxable_amount: 11988,
@@ -381,6 +386,7 @@ export const getCreatedSubscription = (
     automatic_tax: {
       enabled: false,
       liability: null,
+      disabled_reason: null,
     },
     billing_cycle_anchor: randomDataGenerator.natural({ length: 10 }),
     billing_thresholds: null,
@@ -427,6 +433,7 @@ export const getCreatedSubscription = (
         routing_number: '110000000',
         swift_code: 'TSTEZ122',
       },
+      allow_redisplay: null,
       amount: null,
       client_secret: 'src_client_secret_ZaOIRUD8a9uGmQobLxGvqKSr',
       created: 1683144457,
@@ -1258,6 +1265,9 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     metadata: {},
     on_behalf_of: null,
     outcome: {
+      advice_code: null,
+      network_advice_code: null,
+      network_decline_code: null,
       network_status: 'approved_by_network',
       reason: null,
       risk_level: 'normal',
@@ -1270,6 +1280,8 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     payment_method: `card_${randomDataGenerator.string({ length: 10 })}`,
     payment_method_details: {
       card: {
+        network_transaction_id: null,
+        regulated_status: null,
         authorization_code: null,
         amount_authorized: 0,
         brand: 'visa',
@@ -1318,7 +1330,9 @@ export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
     charge: `ch_${randomDataGenerator.string({ length: 16 })}`,
     created: 1680651737,
     currency: 'usd',
+    enhanced_eligibility_types: [],
     evidence: {
+      enhanced_evidence: {},
       access_activity_log: null,
       billing_address: null,
       cancellation_policy: null,
@@ -1348,6 +1362,7 @@ export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
       uncategorized_text: null,
     },
     evidence_details: {
+      enhanced_eligibility: {},
       due_by: 1682294399,
       has_evidence: false,
       past_due: false,
