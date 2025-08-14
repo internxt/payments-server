@@ -30,10 +30,13 @@ describe('Products Service Tests', () => {
     describe('User has subscriptions', () => {
       test('When the user only has an individual tier, then the tier is returned correctly', async () => {
         const mockedUser = getUser();
+        const mockedFreeTier = newTier({
+          productId: 'free',
+        });
         const mockedTier = newTier();
 
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
-        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedTier);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([mockedTier]);
 
         const userTier = await productsService.getApplicableTierForUser({
@@ -45,10 +48,13 @@ describe('Products Service Tests', () => {
 
       test('When the user only has an individual tier, then the tier of the subscription is returned correctly', async () => {
         const mockedUser = getUser();
+        const mockedFreeTier = newTier({
+          productId: 'free',
+        });
         const mockedTier = newTier();
 
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
-        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedTier);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([mockedTier]);
 
         const userTier = await productsService.getApplicableTierForUser({
@@ -60,11 +66,14 @@ describe('Products Service Tests', () => {
 
       test('When the user only has a business subscription, then the tier of the subscription is returned correctly', async () => {
         const mockedUser = getUser();
+        const mockedFreeTier = newTier({
+          productId: 'free',
+        });
         const mockedTier = newTier();
         mockedTier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
         jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
-        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedTier);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([mockedTier]);
 
         const userTier = await productsService.getApplicableTierForUser({
@@ -73,6 +82,55 @@ describe('Products Service Tests', () => {
 
         expect(userTier).toStrictEqual(mockedTier);
         expect(userTier.featuresPerService[Service.Drive].workspaces.enabled).toBeTruthy();
+      });
+
+      test('When the user has an individual subscription and a business subscription, then the higher one is returned based on the max space bytes', async () => {
+        const mockedUser = getUser();
+        const mockedIndividualTier = newTier();
+        const mockedBusinessTier = newTier();
+        const mockedFreeTier = newTier({
+          productId: 'free',
+        });
+        mockedIndividualTier.featuresPerService[Service.Drive].maxSpaceBytes = 1000;
+        mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
+        mockedBusinessTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat = 1100;
+
+        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
+        jest
+          .spyOn(tiersService, 'getTiersProductsByUserId')
+          .mockResolvedValueOnce([mockedIndividualTier, mockedBusinessTier]);
+
+        const userTier = await productsService.getApplicableTierForUser({
+          userUuid: mockedUser.uuid,
+        });
+
+        expect(userTier).toStrictEqual(mockedBusinessTier);
+        expect(userTier.featuresPerService[Service.Drive].workspaces.enabled).toBeTruthy();
+      });
+
+      test('When the user has an individual subscription and pertains to a business subscription, then the higher one is returned based on the max space bytes', async () => {
+        const mockedUser = getUser();
+        const mockedIndividualTier = newTier();
+        const mockedBusinessTier = newTier();
+        const mockedFreeTier = newTier({
+          productId: 'free',
+        });
+        mockedIndividualTier.featuresPerService[Service.Drive].maxSpaceBytes = 1100;
+        mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
+        mockedBusinessTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat = 1000;
+
+        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([mockedIndividualTier]);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([mockedBusinessTier]);
+
+        const userTier = await productsService.getApplicableTierForUser({
+          userUuid: mockedUser.uuid,
+        });
+
+        expect(userTier).toStrictEqual(mockedIndividualTier);
+        expect(userTier.featuresPerService[Service.Drive].workspaces.enabled).toBeFalsy();
       });
     });
   });
