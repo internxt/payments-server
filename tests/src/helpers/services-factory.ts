@@ -69,7 +69,7 @@ const createRepositories = (): TestRepositories => ({
 export const createTestServices = (overrides: TestServiceOverrides = {}): TestServices & TestRepositories => {
   const repositories = createRepositories();
 
-  const stripe = overrides.stripe ?? new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
+  const stripe = overrides.stripe ?? new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
   const bit2MeService = new Bit2MeService(config, axios);
   const paymentService = new PaymentService(stripe, repositories.productsRepository, bit2MeService);
   const storageService = new StorageService(config, axios);
