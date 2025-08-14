@@ -1,81 +1,16 @@
-import Stripe from 'stripe';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { PaymentService } from '../../../src/services/payment.service';
-import { StorageService } from '../../../src/services/storage.service';
-import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { TierNotFoundError } from '../../../src/services/tiers.service';
+import { UserNotFoundError } from '../../../src/services/users.service';
 import { getUser, newTier } from '../fixtures';
-import testFactory from '../utils/factory';
-import config from '../../../src/config';
-import axios from 'axios';
-import { ProductsService } from '../../../src/services/products.service';
 import { UserType } from '../../../src/core/users/User';
 import { Service } from '../../../src/core/users/Tier';
-
-let tiersService: TiersService;
-let paymentsService: PaymentService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let storageService: StorageService;
-let productsService: ProductsService;
+import { createTestServices } from '../helpers/services-factory';
 
 describe('Products Service Tests', () => {
-  beforeEach(() => {
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
+  const { productsService, usersService, tiersService } = createTestServices();
 
-    productsService = new ProductsService(tiersService, usersService);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Finding the higher tier for a user', () => {

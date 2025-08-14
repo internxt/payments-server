@@ -1,11 +1,5 @@
-import Stripe from 'stripe';
-import axios from 'axios';
 import jwt from 'jsonwebtoken';
-import { PaymentService, Reason } from '../../../src/services/payment.service';
-import testFactory from '../utils/factory';
-import envVariablesConfig from '../../../src/config';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { Reason } from '../../../src/services/payment.service';
 import { UserType } from '../../../src/core/users/User';
 import {
   getCharge,
@@ -32,18 +26,15 @@ import {
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import config from '../../../src/config';
 import { generateQrCodeUrl } from '../../../src/utils/generateQrCodeUrl';
-
-let productsRepository: ProductsRepository;
-let paymentService: PaymentService;
-let bit2MeService: Bit2MeService;
-let stripe: Stripe;
+import { createTestServices } from '../helpers/services-factory';
+import Stripe from 'stripe';
 
 describe('Payments Service tests', () => {
+  const { paymentService, stripe, bit2MeService } = createTestServices();
+
   beforeEach(() => {
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    bit2MeService = new Bit2MeService(envVariablesConfig, axios);
-    stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
-    paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Creating a customer', () => {
