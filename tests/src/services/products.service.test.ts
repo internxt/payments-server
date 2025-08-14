@@ -6,17 +6,18 @@ import { Service } from '../../../src/core/users/Tier';
 import { createTestServices } from '../helpers/services-factory';
 
 describe('Products Service Tests', () => {
-  let services: ReturnType<typeof createTestServices>;
+  const { productsService, usersService, tiersService } = createTestServices();
 
   beforeEach(() => {
-    services = createTestServices();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Finding the higher tier for a user', () => {
     it('When the subscription type is not Individual or Business, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       await expect(
-        services.productsService.getApplicableTierForUser({
+        productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.ObjectStorage,
         }),
@@ -31,10 +32,10 @@ describe('Products Service Tests', () => {
         const mockedTier = newTier();
         mockedTier.billingType = 'lifetime';
 
-        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(services.tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
-        const result = await services.productsService.getApplicableTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -49,12 +50,10 @@ describe('Products Service Tests', () => {
         const mockedBusinessTier = newTier();
         mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest
-          .spyOn(services.tiersService, 'getTiersProductsByUserId')
-          .mockResolvedValue([mockedTier, mockedBusinessTier]);
+        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await services.productsService.getApplicableTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -71,12 +70,10 @@ describe('Products Service Tests', () => {
         const mockedBusinessTier = newTier();
         mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest
-          .spyOn(services.tiersService, 'getTiersProductsByUserId')
-          .mockResolvedValue([mockedTier, mockedBusinessTier]);
+        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await services.productsService.getApplicableTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid],
           subscriptionType: UserType.Business,
@@ -98,12 +95,12 @@ describe('Products Service Tests', () => {
         mockedBusinessTier2.featuresPerService[Service.Drive].workspaces.enabled = true;
         mockedBusinessTier2.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat = 2000000;
 
-        jest.spyOn(services.usersService, 'findUserByUuid').mockImplementation(async (uuid: string) => {
+        jest.spyOn(usersService, 'findUserByUuid').mockImplementation(async (uuid: string) => {
           if (uuid === mockedUser.uuid) return mockedUser;
           if (uuid === mockedOwner.uuid) return mockedOwner;
           throw new UserNotFoundError(`User with uuid ${uuid} not found`);
         });
-        jest.spyOn(services.tiersService, 'getTiersProductsByUserId').mockImplementation(async (ownerId: string) => {
+        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockImplementation(async (ownerId: string) => {
           if (ownerId === mockedUser.id) {
             return [mockedTier, mockedBusinessTier];
           }
@@ -113,7 +110,7 @@ describe('Products Service Tests', () => {
           return [];
         });
 
-        const result = await services.productsService.getApplicableTierForUser({
+        const result = await productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid, mockedOwner.uuid],
           subscriptionType: UserType.Business,
