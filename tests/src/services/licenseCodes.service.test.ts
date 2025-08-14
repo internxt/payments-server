@@ -1,86 +1,17 @@
-import axios from 'axios';
 import Stripe from 'stripe';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import {
-  InvalidLicenseCodeError,
-  LicenseCodeAlreadyAppliedError,
-  LicenseCodesService,
-} from '../../../src/services/licenseCodes.service';
-import testFactory from '../utils/factory';
-import { PaymentService } from '../../../src/services/payment.service';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
-import { StorageService } from '../../../src/services/storage.service';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import config from '../../../src/config';
-import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { InvalidLicenseCodeError, LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCodes.service';
+import { UserNotFoundError } from '../../../src/services/users.service';
+import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { getCustomer, getLicenseCode, getLogger, getProduct, getUser, newTier, priceById } from '../fixtures';
-import { LicenseCodesRepository } from '../../../src/core/users/LicenseCodeRepository';
-
-let tiersRepository: TiersRepository;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let licenseCodesRepository: LicenseCodesRepository;
-let bit2MeService: Bit2MeService;
-let tiersService: TiersService;
-let licenseCodesService: LicenseCodesService;
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
+import { createTestServices } from '../helpers/services-factory';
 
 describe('Tests for License Codes service', () => {
-  beforeEach(() => {
-    jest.resetAllMocks();
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    licenseCodesRepository = testFactory.getLicenseCodesRepositoryForTest();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
+  const { licenseCodesRepository, licenseCodesService, usersService, tiersService, paymentService, storageService } =
+    createTestServices();
 
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
-    licenseCodesService = new LicenseCodesService({
-      paymentService,
-      usersService,
-      storageService,
-      licenseCodesRepository,
-      tiersService,
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Check if license code is available', () => {

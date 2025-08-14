@@ -5,14 +5,12 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { PaymentService } from '../services/payment.service';
+import { PaymentIntent, PaymentService } from '../services/payment.service';
 import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
-
-function signUserToken(customerId: string) {
-  return jwt.sign({ customerId }, config.JWT_SECRET);
-}
+import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
+import { signUserToken } from '../utils/signUserToken';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -100,7 +98,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
-        return res.send({ customerId, token: signUserToken(customerId) });
+        return res.send({ customerId, token: signUserToken({ customerId }) });
       },
     );
 
@@ -182,7 +180,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         customerId: string;
         priceId: string;
         token: string;
-        currency?: string;
+        currency: string;
         promoCodeId?: string;
       };
     }>(
@@ -191,7 +189,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token'],
+            required: ['customerId', 'priceId', 'token', 'currency'],
             properties: {
               customerId: {
                 type: 'string',
@@ -211,11 +209,24 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             },
           },
         },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
       },
-      async (req, res) => {
+      async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
         const { customerId, priceId, token, currency, promoCodeId } = req.body;
+
+        if (!isValidCurrency(currency)) {
+          const allowedCurrencies = getAllowedCurrencies().join(', ');
+          throw new BadRequestError(
+            'Invalid currency. The currency must be one of the following: ' + allowedCurrencies,
+          );
+        }
 
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
@@ -231,22 +242,22 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         }
 
         const price = await paymentsService.getPriceById(priceId);
+
+        if (price.interval !== 'lifetime') {
+          throw new BadRequestError('Only lifetime plans are supported');
+        }
+
         const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
 
         if (!isStorageUpgradeAllowed) {
           throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
-        const {
-          clientSecret,
-          id,
-          invoiceStatus,
-          type: paymentIntentType,
-        } = await paymentsService.createInvoice({
+        const result = await paymentsService.createInvoice({
           customerId,
           priceId,
           userEmail: email,
-          currency,
+          currency: currency.trim(),
           promoCodeId,
           additionalInvoiceOptions: {
             automatic_tax: {
@@ -255,7 +266,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           },
         });
 
-        return res.status(200).send({ clientSecret, id, invoiceStatus, type: paymentIntentType });
+        return res.status(200).send(result);
       },
     );
 
@@ -343,6 +354,67 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             decimalAmountWithTax: amountTotal / 100,
           },
         });
+      },
+    );
+
+    fastify.get(
+      '/crypto/currencies',
+      {
+        config: {
+          skipAuth: true,
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const cryptoCurrencies = await paymentsService.getCryptoCurrencies();
+        return res.status(200).send(cryptoCurrencies);
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        token: string;
+      };
+    }>(
+      '/crypto/verify/payment',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['token'],
+            properties: {
+              token: {
+                type: 'string',
+                description: 'The user token generated when creating the payment intent that contains the invoice id',
+              },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 3,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        let decodedInvoiceId: string;
+        const { token } = req.body;
+
+        try {
+          const { invoiceId } = jwt.verify(token, config.JWT_SECRET) as {
+            invoiceId: string;
+          };
+          decodedInvoiceId = invoiceId;
+        } catch {
+          throw new ForbiddenError();
+        }
+
+        const result = await paymentsService.verifyCryptoPayment(decodedInvoiceId);
+        return res.status(200).send(result);
       },
     );
   };

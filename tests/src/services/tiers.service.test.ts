@@ -1,92 +1,31 @@
-import axios from 'axios';
-import Stripe from 'stripe';
+import { AxiosError } from 'axios';
 
-import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
-  TiersService,
 } from '../../../src/services/tiers.service';
-import { UsersService } from '../../../src/services/users.service';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import {
-  CustomerId,
-  ExtendedSubscription,
-  NotFoundSubscriptionError,
-  PaymentService,
-} from '../../../src/services/payment.service';
-import { StorageService, updateUserTier } from '../../../src/services/storage.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { CustomerId, ExtendedSubscription, NotFoundSubscriptionError } from '../../../src/services/payment.service';
+import { updateUserTier } from '../../../src/services/storage.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
-import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { createTestServices } from '../helpers/services-factory';
 
-let tiersService: TiersService;
-let paymentsService: PaymentService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let storageService: StorageService;
-
-jest
-  .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
-  .mockImplementation(() => Promise.resolve() as any);
+jest.mock('../../../src/services/storage.service', () => ({
+  ...jest.requireActual('../../../src/services/storage.service'),
+  updateUserTier: jest.fn().mockResolvedValue(() => {}),
+}));
 
 describe('TiersService tests', () => {
+  const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
+    createTestServices();
+
   beforeEach(() => {
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('User-Tier Relationship', () => {
@@ -108,10 +47,10 @@ describe('TiersService tests', () => {
         const oldTier = newTier();
         const newTierData = newTier();
 
-        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
+        const usersTiersRepositorySpy = jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
 
         await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).resolves.toBeUndefined();
-        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+        expect(usersTiersRepositorySpy).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
       });
 
       it('When updating a user tier and it does not exist, then an error indicating so is thrown', async () => {
@@ -565,11 +504,15 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      const updateWorkspaceError = new Error('Workspace does not exist');
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(updateWorkspaceError));
-      const initializeWorkspace = jest
-        .spyOn(usersService, 'initializeWorkspace')
-        .mockImplementation(() => Promise.resolve());
+      const axiosError404 = {
+        isAxiosError: true,
+        response: { status: 404 },
+        toJSON: () => ({}),
+      } as AxiosError;
+
+      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(axiosError404));
+
+      const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
@@ -579,6 +522,25 @@ describe('TiersService tests', () => {
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
       });
+    });
+
+    it('When an unexpected error occurs while initializing the workspace, then an error indicating so is thrown', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const logger = getLogger();
+      const tier = newTier();
+      const mockedCustomer = getCustomer();
+      const amountOfSeats = 5;
+
+      tier.featuresPerService[Service.Drive].enabled = true;
+      tier.featuresPerService[Service.Drive].workspaces.enabled = true;
+
+      const unexpectedError = new Error('Unexpected error');
+
+      jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
+
+      await expect(
+        tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
+      ).rejects.toThrow(unexpectedError);
     });
 
     it('When workspaces is not enabled, then individual is initialized', async () => {

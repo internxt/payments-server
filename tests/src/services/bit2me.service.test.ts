@@ -1,9 +1,12 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { AllowedCurrencies, Bit2MeService } from '../../../src/services/bit2me.service';
+import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
+import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
+import { BadRequestError } from '../../../src/errors/Errors';
+import { randomUUID } from 'crypto';
 
 let bit2MeService: Bit2MeService;
 
@@ -49,18 +52,6 @@ describe('Bit2Me Service tests', () => {
       jest.spyOn(axios, 'request').mockRejectedValue(error);
 
       await expect(bit2MeService.getCurrencies()).rejects.toThrow(error);
-    });
-  });
-
-  describe('Check if the currency is allowed', () => {
-    test('When the currency is allowed, then true is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('BTC');
-      expect(result).toBeTruthy();
-    });
-
-    test('When the currency is not allowed, then false is returned indicating so', () => {
-      const result = bit2MeService.isAllowedCurrency('EUR');
-      expect(result).toBeFalsy();
     });
   });
 
@@ -123,7 +114,7 @@ describe('Bit2Me Service tests', () => {
       const rawResponse = getRawCryptoInvoiceResponse();
       const mockedCurrency = getCryptoCurrency();
       const invoiceId = rawResponse.invoiceId;
-      const currencyId = AllowedCurrencies['Bitcoin'];
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
 
       jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
       jest.spyOn(axios, 'request').mockResolvedValue({ data: rawResponse });
@@ -148,6 +139,50 @@ describe('Bit2Me Service tests', () => {
           data: expect.objectContaining({ currencyId }),
         }),
       );
+    });
+
+    test('When an axios error occurs, then an HttpError is thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
+      const mockedCurrency = getCryptoCurrency();
+
+      const mockErrorData: Bit2MeAPIError = {
+        statusCode: 400,
+        message: 'Invalid currency or network',
+        error: ['Bad Request'],
+      };
+
+      const axiosError = new AxiosError('Request failed with status code 400', 'ECONNABORTED', undefined, undefined, {
+        status: 400,
+        data: mockErrorData,
+        headers: {},
+        config: {} as any,
+        statusText: 'Bad Request',
+      });
+
+      jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
+      jest.spyOn(axios, 'request').mockRejectedValue(axiosError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(HttpError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(
+        'Status 400 received -> Invalid currency or network / payload',
+      );
+    });
+
+    test('When a non-axios error occurs, then the original error is re-thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const currencyId = AllowedCryptoCurrencies['Bitcoin'];
+      const mockedCurrency = getCryptoCurrency();
+
+      const genericError = new Error('Network connection failed');
+
+      jest.spyOn(bit2MeService, 'getCurrencyByCurrencyId').mockResolvedValue(mockedCurrency);
+      jest.spyOn(axios, 'request').mockRejectedValue(genericError);
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow('Network connection failed');
+
+      await expect(bit2MeService.checkoutInvoice(invoiceId, currencyId)).rejects.toThrow(Error);
     });
   });
 
@@ -196,6 +231,54 @@ describe('Bit2Me Service tests', () => {
       await expect(bit2MeService.getCurrencyByCurrencyId(mockedCryptoCurrency.currencyId)).rejects.toThrow(
         unexpectedError,
       );
+    });
+  });
+
+  describe('Get an invoice by Its ID', () => {
+    test('When an invoice is requested by its ID, then the invoice is returned', async () => {
+      const rawResponse = getRawCryptoInvoiceResponse();
+
+      jest.spyOn(axios, 'request').mockResolvedValue({ data: rawResponse });
+
+      const invoice = await bit2MeService.getInvoice(rawResponse.invoiceId);
+
+      expect(invoice).toStrictEqual(rawResponse);
+    });
+
+    test('When the uuid is not valid, then an error indicating so is thrown', async () => {
+      const invoiceId = 'test_invoice_123';
+      const badRequestError = new BadRequestError(`Invalid invoice id ${invoiceId}`);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(badRequestError);
+    });
+
+    test('When an axios error occurs, then an HttpError is thrown', async () => {
+      const invoiceId = randomUUID();
+      const mockErrorData: Bit2MeAPIError = {
+        statusCode: 400,
+        message: 'Invalid invoice ID',
+        error: ['Bad Request'],
+      };
+      const axiosError = new AxiosError('Request failed with status code 400', 'ECONNABORTED', undefined, undefined, {
+        status: 400,
+        data: mockErrorData,
+        headers: {},
+        config: {} as any,
+        statusText: 'Bad Request',
+      });
+
+      jest.spyOn(axios, 'request').mockRejectedValue(axiosError);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(HttpError);
+    });
+
+    test('When a non-axios error occurs, then the original error is re-thrown', async () => {
+      const invoiceId = randomUUID();
+      const genericError = new Error('Network connection failed');
+
+      jest.spyOn(axios, 'request').mockRejectedValue(genericError);
+
+      await expect(bit2MeService.getInvoice(invoiceId)).rejects.toThrow(Error);
     });
   });
 });

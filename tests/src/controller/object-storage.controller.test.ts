@@ -39,7 +39,7 @@ describe('Object Storage controller', () => {
       it('When something goes wrong while fetching invoices, then an error indicating so is thrown', async () => {
         const unexpectedError = new Error('Unexpected error');
         const mockedUser = getUser();
-        const token = getValidUserToken(mockedUser.customerId);
+        const token = getValidUserToken({ customerId: mockedUser.customerId });
         jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockRejectedValue(unexpectedError);
 
         const response = await app.inject({
@@ -56,7 +56,7 @@ describe('Object Storage controller', () => {
 
     it('When the user has no invoices, then an empty array is returned', async () => {
       const mockedUser = getUser();
-      const token = getValidUserToken(mockedUser.customerId);
+      const token = getValidUserToken({ customerId: mockedUser.customerId });
       jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockResolvedValue([]);
 
       const response = await app.inject({
@@ -75,7 +75,7 @@ describe('Object Storage controller', () => {
 
     it('When the user has object storage invoices, then the invoices are returned', async () => {
       const mockedUser = getUser();
-      const token = getValidUserToken(mockedUser.customerId);
+      const token = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedProduct = getProduct({
         params: {
           metadata: {
@@ -141,7 +141,7 @@ describe('Object Storage controller', () => {
 
     it('When the user has no object invoices invoices, then no invoices are returned', async () => {
       const mockedUser = getUser();
-      const token = getValidUserToken(mockedUser.customerId);
+      const token = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedProduct = getProduct({});
       const mockedInvoices = getInvoices(3, [
         {

@@ -1,89 +1,25 @@
 import Stripe from 'stripe';
-import axios from 'axios';
 import { getPaymentIntent, getLogger, getCustomer, getCreateSubscriptionResponse } from '../fixtures';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { PaymentService } from '../../../src/services/payment.service';
-import testFactory from '../utils/factory';
-import { UsersService } from '../../../src/services/users.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { StorageService } from '../../../src/services/storage.service';
-import config from '../../../src/config';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { FastifyBaseLogger } from 'fastify';
-import { TiersService } from '../../../src/services/tiers.service';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
-import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { BadRequestError, ConflictError, GoneError, InternalServerError } from '../../../src/errors/Errors';
 import { UserSubscription, UserType } from '../../../src/core/users/User';
+import { createTestServices } from '../helpers/services-factory';
 
-jest.mock('stripe', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      paymentIntents: {
-        cancel: jest.fn(),
-      },
-    })),
-  };
+const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
+
+const stripeMock = {
+  paymentIntents: {
+    cancel: jest.fn(),
+  },
+};
+const { paymentService, objectStorageService, stripe } = createTestServices({
+  stripe: stripeMock,
 });
 
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let objectStorageService: ObjectStorageService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let tiersService: TiersService;
-let tiersRepository: TiersRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let stripe: Stripe;
-let logger: jest.Mocked<FastifyBaseLogger>;
-
 beforeEach(() => {
-  logger = getLogger();
-
-  stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  displayBillingRepository = {} as DisplayBillingRepository;
-  couponsRepository = testFactory.getCouponsRepositoryForTest();
-  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-  productsRepository = testFactory.getProductsRepositoryForTest();
-  tiersRepository = testFactory.getTiersRepository();
-  usersTiersRepository = testFactory.getUsersTiersRepository();
-
-  storageService = new StorageService(config, axios);
-  bit2MeService = new Bit2MeService(config, axios);
-  paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
-  objectStorageService = new ObjectStorageService(paymentService, config, axios);
-
-  tiersService = new TiersService(
-    usersService,
-    paymentService,
-    tiersRepository,
-    usersTiersRepository,
-    storageService,
-    config,
-  );
-  usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    config,
-    axios,
-  );
-
   jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 describe('Handling captured funds from a payment method', () => {

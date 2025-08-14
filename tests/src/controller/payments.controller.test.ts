@@ -26,15 +26,6 @@ import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue('OK'),
-    del: jest.fn().mockResolvedValue(1),
-    quit: jest.fn().mockResolvedValue(undefined),
-  }));
-});
-
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -475,7 +466,7 @@ describe('Payment controller e2e tests', () => {
     describe('Create subscription', () => {
       it('When the user wants to create a sub for object storage, then the subscription is created successfully with the additional taxes', async () => {
         const mockedUser = getUser();
-        const token = getValidUserToken(mockedUser.customerId);
+        const token = getValidUserToken({ customerId: mockedUser.customerId });
         const subResponse = getCreateSubscriptionResponse();
 
         const createSubscriptionSpy = jest
@@ -511,7 +502,7 @@ describe('Payment controller e2e tests', () => {
 
       it('When the user wants to create a subscription with promotional code, then the promotional code is applied', async () => {
         const mockedUser = getUser();
-        const token = getValidUserToken(mockedUser.customerId);
+        const token = getValidUserToken({ customerId: mockedUser.customerId });
         const promoCodeName = 'obj-sotrage-promo-code-name';
         const subResponse = getCreateSubscriptionResponse();
 
