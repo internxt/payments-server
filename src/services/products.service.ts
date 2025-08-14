@@ -1,48 +1,7 @@
 import { Service, Tier } from '../core/users/Tier';
 import { User } from '../core/users/User';
-import { TiersService } from './tiers.service';
+import { TierNotFoundError, TiersService } from './tiers.service';
 import { UserNotFoundError, UsersService } from './users.service';
-
-interface MergedTierFeatures {
-  mail: {
-    enabled: boolean;
-    addressesPerUser: number;
-    sourceTierId?: string;
-  };
-  meet: {
-    enabled: boolean;
-    paxPerCall: number;
-    sourceTierId?: string;
-  };
-  vpn: {
-    enabled: boolean;
-    featureId: string;
-    sourceTierId?: string;
-  };
-  antivirus: {
-    enabled: boolean;
-    sourceTierId?: string;
-  };
-  backups: {
-    enabled: boolean;
-    sourceTierId?: string;
-  };
-  cleaner: {
-    enabled: boolean;
-    sourceTierId?: string;
-  };
-  drive: {
-    enabled: boolean;
-    maxSpaceBytes: number;
-    workspaces: {
-      enabled: boolean;
-      minimumSeats: number;
-      maximumSeats: number;
-      maxSpaceBytesPerSeat: number;
-    };
-    sourceTierId?: string;
-  };
-}
 
 export class ProductsService {
   constructor(
@@ -54,14 +13,20 @@ export class ProductsService {
     const availableTiers: Tier[] = [];
 
     const user = await this.usersService.findUserByUuid(userUuid);
-    const userDirectTiers = await this.tiersService.getTiersProductsByUserId(user.id);
+    const userDirectTiers = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+      if (err instanceof TierNotFoundError) return [];
+      throw err;
+    });
     availableTiers.push(...userDirectTiers);
 
     if (ownersId && ownersId.length > 0) {
       const ownerTierPromises = ownersId.map(async (ownerUuid) => {
         try {
           const owner = await this.usersService.findUserByUuid(ownerUuid);
-          const ownerTiers = await this.tiersService.getTiersProductsByUserId(owner.id);
+          const ownerTiers = await this.tiersService.getTiersProductsByUserId(owner.id).catch((err) => {
+            if (err instanceof TierNotFoundError) return [];
+            throw err;
+          });
           return ownerTiers.filter((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled);
         } catch (error) {
           if (error instanceof UserNotFoundError) return [];

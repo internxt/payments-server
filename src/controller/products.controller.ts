@@ -8,6 +8,7 @@ import { TiersService } from '../services/tiers.service';
 import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
+import { Tier } from '../core/users/Tier';
 
 export default function (
   tiersService: TiersService,
@@ -64,7 +65,7 @@ export default function (
       },
     );
 
-    fastify.get('/tier', async (req, rep) => {
+    fastify.get('/tier', async (req, rep): Promise<Tier> => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces?.owners ?? [];
 

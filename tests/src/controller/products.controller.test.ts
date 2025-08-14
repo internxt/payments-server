@@ -17,7 +17,7 @@ afterAll(async () => {
 
 describe('Testing products endpoints', () => {
   describe('Fetching products available for user', () => {
-    it('When the user is not found, then an error indicating so is thrown', async () => {
+    test('When the user is not found, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError('User not found'));
@@ -41,7 +41,7 @@ describe('Testing products endpoints', () => {
       });
     });
 
-    it('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
+    test('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -69,7 +69,7 @@ describe('Testing products endpoints', () => {
       expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
     });
 
-    it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
+    test('When an unexpected error occurs, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(mockedUser);
@@ -89,7 +89,7 @@ describe('Testing products endpoints', () => {
       expect(responseBody).toStrictEqual({ error: 'Internal server error' });
     });
 
-    it('When the user is found and has a valid subscription, then the user is able to use the products', async () => {
+    test('When the user is found and has a valid subscription, then the user is able to use the products', async () => {
       const mockedAvailableUserProducts = {
         featuresPerService: {
           antivirus: true,
@@ -120,7 +120,7 @@ describe('Testing products endpoints', () => {
   });
 
   describe('Fetching tier for user', () => {
-    it('When an unexpected error occurs, then an error indicating so is thrown', async () => {
+    test('When an unexpected error occurs, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('Unexpected error'));
@@ -134,7 +134,7 @@ describe('Testing products endpoints', () => {
       expect(response.statusCode).toBe(500);
     });
 
-    it('When the user has no tiers, then the free tier is returned successfully', async () => {
+    test('When the user has no tiers, then the free tier is returned successfully', async () => {
       const mockedUser = getUser();
       const mockedFreeTier = newTier({
         id: 'free',
@@ -155,13 +155,10 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody.drive).toBeDefined();
-      expect(responseBody.drive.sourceTierId).toBe('free');
-      expect(responseBody.mail).toBeDefined();
-      expect(responseBody.vpn).toBeDefined();
+      expect(responseBody).toStrictEqual(mockedFreeTier);
     });
 
-    it('When the user has a valid subscription, then the best tier is returned successfully', async () => {
+    test('When the user has a valid subscription, then the best tier is returned successfully', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       const mockedTier = newTier();
@@ -177,12 +174,10 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody.drive).toBeDefined();
-      expect(responseBody.mail).toBeDefined();
-      expect(responseBody.drive.sourceTierId).toBeDefined();
+      expect(responseBody).toStrictEqual(mockedTier);
     });
 
-    it('When the user has workspace access, then the business tier is returned successfully', async () => {
+    test('When the user has workspace access, then the business tier is returned successfully', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid, {
         owners: [mockedUser.uuid],
@@ -202,9 +197,7 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody.drive).toBeDefined();
-      expect(responseBody.drive.workspaces.enabled).toBe(true);
-      expect(responseBody.drive.sourceTierId).toBeDefined();
+      expect(responseBody).toStrictEqual(mockedTier);
     });
   });
 });
