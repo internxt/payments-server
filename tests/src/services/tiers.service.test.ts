@@ -14,15 +14,17 @@ import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
 
-jest
-  .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
-  .mockImplementation(() => Promise.resolve() as any);
+jest.mock('../../../src/services/storage.service', () => ({
+  ...jest.requireActual('../../../src/services/storage.service'),
+  updateUserTier: jest.fn().mockResolvedValue(() => {}),
+}));
 
 describe('TiersService tests', () => {
   const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
     createTestServices();
 
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.restoreAllMocks();
   });
 
@@ -45,10 +47,10 @@ describe('TiersService tests', () => {
         const oldTier = newTier();
         const newTierData = newTier();
 
-        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
+        const usersTiersRepositorySpy = jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
 
         await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).resolves.toBeUndefined();
-        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+        expect(usersTiersRepositorySpy).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
       });
 
       it('When updating a user tier and it does not exist, then an error indicating so is thrown', async () => {

@@ -14,10 +14,11 @@ jest.mock('jsonwebtoken', () => ({
 }));
 
 describe('UsersService tests', () => {
-  const { usersRepository, usersService, couponsRepository, usersCouponsRepository, paymentService, storageService } =
+  const { usersRepository, usersService, usersCouponsRepository, couponsRepository, paymentService, storageService } =
     createTestServices();
 
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.restoreAllMocks();
   });
 

@@ -29,6 +29,7 @@ const { storageService } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 afterEach(() => jest.restoreAllMocks());
