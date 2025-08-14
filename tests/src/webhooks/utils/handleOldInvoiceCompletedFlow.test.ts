@@ -6,7 +6,7 @@ import { handleOldInvoiceCompletedFlow } from '../../../../src/webhooks/utils/ha
 import { createTestServices } from '../../helpers/services-factory';
 
 jest.mock('../../../../src/services/storage.service', () => ({
-  ...jest.requireActual('../../../src/services/storage.service'),
+  ...jest.requireActual('../../../../src/services/storage.service'),
   updateUserTier: jest.fn().mockResolvedValue(() => {}),
 }));
 const logger = getLogger();
