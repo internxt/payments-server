@@ -1,66 +1,18 @@
-import axios from 'axios';
 import config from '../../../../src/config';
-import { CouponsRepository } from '../../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../../src/core/coupons/UsersCouponsRepository';
-import { DisplayBillingRepository } from '../../../../src/core/users/MongoDBDisplayBillingRepository';
-import { TiersRepository } from '../../../../src/core/users/MongoDBTiersRepository';
-import { ProductsRepository } from '../../../../src/core/users/ProductsRepository';
-import { UsersRepository } from '../../../../src/core/users/UsersRepository';
-import { Bit2MeService } from '../../../../src/services/bit2me.service';
-import { PaymentService } from '../../../../src/services/payment.service';
-import { StorageService, updateUserTier } from '../../../../src/services/storage.service';
+import { updateUserTier } from '../../../../src/services/storage.service';
 import { NoSubscriptionSeatsProvidedError } from '../../../../src/services/tiers.service';
-import { UsersService } from '../../../../src/services/users.service';
 import { getCustomer, getLogger, getProduct, getUser, voidPromise } from '../../fixtures';
-import testFactory from '../../utils/factory';
-import Stripe from 'stripe';
 import { handleOldInvoiceCompletedFlow } from '../../../../src/webhooks/utils/handleOldInvoiceCompletedFlow';
+import { createTestServices } from '../../helpers/services-factory';
 
+jest
+  .spyOn(require('../../../../src/services/storage.service'), 'updateUserTier')
+  .mockImplementation(() => Promise.resolve() as any);
 const logger = getLogger();
-
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
+const { usersService, storageService } = createTestServices();
 
 beforeEach(() => {
-  tiersRepository = testFactory.getTiersRepository();
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  displayBillingRepository = {} as DisplayBillingRepository;
-  couponsRepository = testFactory.getCouponsRepositoryForTest();
-  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-  productsRepository = testFactory.getProductsRepositoryForTest();
-  bit2MeService = new Bit2MeService(config, axios);
-  paymentService = new PaymentService(
-    new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-    productsRepository,
-    bit2MeService,
-  );
-  usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    config,
-    axios,
-  );
-
-  storageService = new StorageService(config, axios);
-
-  jest
-    .spyOn(require('../../../../src/services/storage.service'), 'updateUserTier')
-    .mockImplementation(() => Promise.resolve() as any);
-});
-
-afterEach(() => {
+  jest.clearAllMocks();
   jest.restoreAllMocks();
 });
 
