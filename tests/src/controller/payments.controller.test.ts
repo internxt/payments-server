@@ -26,15 +26,6 @@ import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue('OK'),
-    del: jest.fn().mockResolvedValue(1),
-    quit: jest.fn().mockResolvedValue(undefined),
-  }));
-});
-
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');

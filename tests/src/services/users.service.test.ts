@@ -1,64 +1,24 @@
 import axios from 'axios';
 import Stripe from 'stripe';
 
-import { ExtendedSubscription, PaymentService } from '../../../src/services/payment.service';
-import { StorageService } from '../../../src/services/storage.service';
-import { CouponNotBeingTrackedError, UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { ExtendedSubscription } from '../../../src/services/payment.service';
+import { CouponNotBeingTrackedError, UserNotFoundError } from '../../../src/services/users.service';
 import config from '../../../src/config';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
-import testFactory from '../utils/factory';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { getActiveSubscriptions, getCoupon, getUser, newTier } from '../fixtures';
-
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
+import { getActiveSubscriptions, getCoupon, getUser, newTier, voidPromise } from '../fixtures';
+import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('jsonwebtoken', () => ({
   ...jest.requireActual('jsonwebtoken'),
   sign: jest.fn(),
 }));
 
-beforeEach(() => {
-  usersRepository = testFactory.getUsersRepositoryForTest();
-  displayBillingRepository = {} as DisplayBillingRepository;
-  couponsRepository = testFactory.getCouponsRepositoryForTest();
-  usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-  storageService = new StorageService(config, axios);
-  productsRepository = testFactory.getProductsRepositoryForTest();
-  bit2MeService = new Bit2MeService(config, axios);
-  paymentService = new PaymentService(
-    new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-    productsRepository,
-    bit2MeService,
-  );
-
-  usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    config,
-    axios,
-  );
-});
-
-const voidPromise = () => Promise.resolve();
-
 describe('UsersService tests', () => {
+  const { usersRepository, usersService, usersCouponsRepository, couponsRepository, paymentService, storageService } =
+    createTestServices();
+
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.restoreAllMocks();
   });
 
