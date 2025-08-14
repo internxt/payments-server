@@ -1,26 +1,14 @@
 import Stripe from 'stripe';
-import axios from 'axios';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { ExtendedSubscription, PaymentService } from '../../../src/services/payment.service';
-import testFactory from '../utils/factory';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { StorageService, updateUserTier } from '../../../src/services/storage.service';
+import { UserNotFoundError } from '../../../src/services/users.service';
+import { updateUserTier } from '../../../src/services/storage.service';
 import config from '../../../src/config';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import CacheService from '../../../src/services/cache.service';
 import handleInvoiceCompleted, {
   handleObjectStorageInvoiceCompleted,
 } from '../../../src/webhooks/handleInvoiceCompleted';
-import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { getCustomer, getInvoice, getLogger, getProduct, getUser, voidPromise } from '../fixtures';
 import { UserType } from '../../../src/core/users/User';
-import { TiersService } from '../../../src/services/tiers.service';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { createTestServices } from '../helpers/services-factory';
+import { ExtendedSubscription } from '../../../src/services/payment.service';
 
 jest.mock('../../../src/services/storage.service', () => {
   const actualModule = jest.requireActual('../../../src/services/storage.service');
@@ -31,25 +19,6 @@ jest.mock('../../../src/services/storage.service', () => {
   };
 });
 
-jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
-
-jest.mock('stripe', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      charges: {
-        retrieve: jest.fn(),
-      },
-      invoices: {
-        retrieve: jest.fn(),
-      },
-    })),
-  };
-});
-
 jest.mock('../../../src/services/cache.service', () => {
   return {
     __esModule: true,
@@ -57,69 +26,37 @@ jest.mock('../../../src/services/cache.service', () => {
   };
 });
 
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let tierRepository: TiersRepository;
-let usersTiersRepository: UsersTiersRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let cacheService: CacheService;
-let stripe: Stripe;
-let objectStorageService: ObjectStorageService;
-let tiersService: TiersService;
-let user: ReturnType<typeof getUser>;
+jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
+const user = getUser({ lifetime: true });
+const mockStripe = {
+  charges: {
+    retrieve: jest.fn(),
+  },
+  invoices: {
+    retrieve: jest.fn(),
+  },
+};
+const {
+  paymentService,
+  tiersService,
+  cacheService,
+  usersService,
+  objectStorageService,
+  storageService,
+  usersRepository,
+} = createTestServices({
+  stripe: mockStripe,
+});
 
 describe('Process when an invoice payment is completed', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    user = getUser({ lifetime: true });
-    stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    tierRepository = testFactory.getTiersRepository();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-
-    cacheService = new CacheService(config);
-    storageService = new StorageService(config, axios);
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
-
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tierRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
-
-    objectStorageService = new ObjectStorageService(paymentService, config, axios);
-
-    jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: false, customer: user.customerId } as any);
-
-    jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([] as ExtendedSubscription[]);
-    (updateUserTier as jest.Mock).mockResolvedValue(Promise.resolve());
+    jest.restoreAllMocks();
   });
-
-  afterEach(() => jest.restoreAllMocks());
 
   it('When the invoice is not paid, then log a message and stop processing', async () => {
     const mockedInvoice = getInvoice({ status: 'open' });
@@ -150,6 +87,10 @@ describe('Process when an invoice payment is completed', () => {
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
       const updateUserSpy = jest.spyOn(usersService, 'updateUser');
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      (updateUserTier as jest.Mock).mockResolvedValue(voidPromise);
+      const getActiveSubscriptionsSpy = jest
+        .spyOn(paymentService, 'getActiveSubscriptions')
+        .mockResolvedValue([] as ExtendedSubscription[]);
 
       await handleInvoiceCompleted(
         mockedInvoice,
@@ -164,7 +105,7 @@ describe('Process when an invoice payment is completed', () => {
 
       expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
       expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(1);
-      expect(paymentService.getActiveSubscriptions).toHaveBeenCalledTimes(1);
+      expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(1);
       expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(updateUserSpy).toHaveBeenCalledWith(mockedUSer.customerId, { lifetime: mockedUSer.lifetime });
@@ -183,7 +124,10 @@ describe('Process when an invoice payment is completed', () => {
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
       jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
-      (updateUserTier as jest.Mock).mockImplementation();
+      (updateUserTier as jest.Mock).mockResolvedValue(voidPromise);
+      const getActiveSubscriptionsSpy = jest
+        .spyOn(paymentService, 'getActiveSubscriptions')
+        .mockResolvedValue([] as ExtendedSubscription[]);
 
       const insertUserSpy = jest.spyOn(usersService, 'insertUser');
 
@@ -200,7 +144,7 @@ describe('Process when an invoice payment is completed', () => {
 
       expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
       expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(1);
-      expect(paymentService.getActiveSubscriptions).toHaveBeenCalledTimes(1);
+      expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(1);
       expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(usersRepository.updateUser).toHaveBeenCalledTimes(0);
@@ -219,12 +163,16 @@ describe('Process when an invoice payment is completed', () => {
       jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoice.lines as any);
       const insertUserError = new Error('Error while inserting the user');
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
-      jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(userNotFoundError);
+      jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValueOnce(userNotFoundError);
       jest
         .spyOn(usersService, 'findUserByEmail')
         .mockResolvedValue({ data: { uuid: mockedUser.uuid, email: 'random@inxt.com' } });
-      jest.spyOn(usersRepository, 'insertUser').mockRejectedValue(insertUserError);
+      jest.spyOn(usersRepository, 'insertUser').mockRejectedValueOnce(insertUserError);
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      (updateUserTier as jest.Mock).mockResolvedValue(voidPromise);
+      const getActiveSubscriptionsSpy = jest
+        .spyOn(paymentService, 'getActiveSubscriptions')
+        .mockResolvedValue([] as ExtendedSubscription[]);
 
       await expect(
         handleInvoiceCompleted(
@@ -240,7 +188,7 @@ describe('Process when an invoice payment is completed', () => {
       ).rejects.toThrow(insertUserError);
       expect(paymentService.getCustomer).toHaveBeenCalledTimes(1);
       expect(paymentService.getInvoiceLineItems).toHaveBeenCalledTimes(1);
-      expect(paymentService.getActiveSubscriptions).toHaveBeenCalledTimes(1);
+      expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(1);
       expect(changeStorageSpy).toHaveBeenCalledTimes(1);
       expect(updateUserTier).toHaveBeenCalledTimes(1);
       expect(usersRepository.insertUser).toHaveBeenCalledTimes(1);
@@ -282,8 +230,8 @@ describe('Process when an invoice payment is completed', () => {
         maxSpaceBytes: mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes,
         product: mockedInvoice.lines.data[0].price?.product,
         subscriptionSeats: mockedInvoice.lines.data[0].quantity,
-        usersService,
-        storageService,
+        usersService: usersService,
+        storageService: storageService,
         userUuid: mockedUser.uuid,
       });
     });
@@ -405,7 +353,7 @@ describe('Process when an invoice payment is completed', () => {
       expect(getCustomerSpy).toHaveBeenCalledTimes(1);
       expect(getInvoiceItemsSpy).toHaveBeenCalledTimes(1);
       expect(log.error).toHaveBeenCalled();
-      expect(getActiveSubscriptionsSpy).toHaveBeenCalledTimes(0);
+      expect(getActiveSubscriptionsSpy).not.toHaveBeenCalled();
     });
 
     it('When the price metadata has no maxSpaceBytes, then log an error and stop processing', async () => {
@@ -413,6 +361,7 @@ describe('Process when an invoice payment is completed', () => {
         status: 'paid',
       });
       const log = getLogger();
+      jest.spyOn(paymentService, 'getCustomer').mockResolvedValue({ deleted: false, customer: user.customerId } as any);
       if (mockedInvoice.lines.data[0].price?.metadata) {
         mockedInvoice.lines.data[0].price.metadata = {};
       }
