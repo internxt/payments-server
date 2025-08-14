@@ -5,9 +5,10 @@ import { getCustomer, getLogger, getProduct, getUser, voidPromise } from '../../
 import { handleOldInvoiceCompletedFlow } from '../../../../src/webhooks/utils/handleOldInvoiceCompletedFlow';
 import { createTestServices } from '../../helpers/services-factory';
 
-jest
-  .spyOn(require('../../../../src/services/storage.service'), 'updateUserTier')
-  .mockImplementation(() => Promise.resolve() as any);
+jest.mock('../../../../src/services/storage.service', () => ({
+  ...jest.requireActual('../../../src/services/storage.service'),
+  updateUserTier: jest.fn().mockResolvedValue(() => {}),
+}));
 const logger = getLogger();
 const { usersService, storageService } = createTestServices();
 
