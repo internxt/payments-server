@@ -1,5 +1,5 @@
 import { Service, Tier } from '../core/users/Tier';
-import { UserType } from '../core/users/User';
+import { User } from '../core/users/User';
 import { TierNotFoundError, TiersService } from './tiers.service';
 import { UserNotFoundError, UsersService } from './users.service';
 
@@ -9,60 +9,112 @@ export class ProductsService {
     private readonly usersService: UsersService,
   ) {}
 
-  async getApplicableTierForUser({
-    userUuid,
-    ownersId,
-    subscriptionType,
-  }: {
-    userUuid: string;
-    ownersId?: string[];
-    subscriptionType: UserType;
-  }): Promise<Tier> {
-    switch (subscriptionType) {
-      case UserType.Individual: {
-        const user = await this.usersService.findUserByUuid(userUuid);
-        const userTiers = await this.tiersService.getTiersProductsByUserId(user.id);
-        if (user.lifetime) {
-          return userTiers.filter((tier) => tier.billingType === 'lifetime')[0];
-        }
+  private async collectAllAvailableTiers(userUuid: string, ownersId?: string[]): Promise<Tier[]> {
+    const availableTiers: Tier[] = [];
 
-        return userTiers.filter((userTier) => !userTier.featuresPerService[Service.Drive].workspaces.enabled)[0];
-      }
+    const user = await this.usersService.findUserByUuid(userUuid);
+    const userDirectTiers = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
+      if (err instanceof TierNotFoundError) return [];
+      throw err;
+    });
+    availableTiers.push(...userDirectTiers);
 
-      case UserType.Business: {
-        const tiers: Tier[] = [];
-        if (ownersId && ownersId?.length > 0) {
-          const ownerTierPromises = ownersId.map(async (ownerUuid) => {
-            try {
-              const owner = await this.usersService.findUserByUuid(ownerUuid);
-              const ownerTiers = await this.tiersService.getTiersProductsByUserId(owner.id);
-
-              return ownerTiers.find((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled) || null;
-            } catch (error) {
-              if (error instanceof UserNotFoundError) return null;
-              throw error;
-            }
+    if (ownersId && ownersId.length > 0) {
+      const ownerTierPromises = ownersId.map(async (ownerUuid) => {
+        try {
+          const owner = await this.usersService.findUserByUuid(ownerUuid);
+          const ownerTiers = await this.tiersService.getTiersProductsByUserId(owner.id).catch((err) => {
+            if (err instanceof TierNotFoundError) return [];
+            throw err;
           });
-
-          const ownerTiersResolved = await Promise.all(ownerTierPromises);
-          const validOwnerTiers = ownerTiersResolved.filter((tier): tier is Tier => tier !== null);
-
-          tiers.push(...validOwnerTiers);
+          return ownerTiers.filter((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled);
+        } catch (error) {
+          if (error instanceof UserNotFoundError) return [];
+          throw error;
         }
+      });
 
-        if (tiers.length === 0) {
-          throw new TierNotFoundError(`No tiers found for user uuid ${userUuid} or associated workspaces.`);
-        }
-
-        return [...tiers].sort(
-          (a, b) =>
-            b.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat -
-            a.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        )[0];
-      }
-
-      default:
-        throw new TierNotFoundError(`Tier for ${userUuid} was not found while getting user Tier`);
+      const ownerTiersArrays = await Promise.all(ownerTierPromises);
+      const businessTiers = ownerTiersArrays.flat();
+      availableTiers.push(...businessTiers);
     }
+
+    const uniqueTiers = availableTiers.filter((tier, index, self) => index === self.findIndex((t) => t.id === tier.id));
+
+    return uniqueTiers;
+  }
+
+  private getBestIndividualTier(availableTiers: Tier[]): Tier | undefined {
+    const individualTiers = availableTiers.filter((tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled);
+
+    if (individualTiers.length === 0) {
+      return undefined;
+    }
+
+    return individualTiers.reduce(
+      (best, current) => (this.compareIndividualTiers(current, best) > 0 ? current : best),
+      individualTiers[0],
+    );
+  }
+
+  private getBestBusinessTier(availableTiers: Tier[]): Tier | undefined {
+    const businessTiers = availableTiers.filter((tier) => tier.featuresPerService[Service.Drive].workspaces.enabled);
+
+    if (businessTiers.length === 0) {
+      return undefined;
+    }
+
+    return businessTiers.reduce(
+      (best, current) => (this.compareBusinessTiers(current, best) > 0 ? current : best),
+      businessTiers[0],
+    );
+  }
+
+  private compareIndividualTiers(tierA: Tier, tierB: Tier): number {
+    const best = tierA.featuresPerService[Service.Drive].maxSpaceBytes;
+    const current = tierB.featuresPerService[Service.Drive].maxSpaceBytes;
+
+    return best - current;
+  }
+
+  private compareBusinessTiers(bestTier: Tier, currentTier: Tier): number {
+    const best = bestTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
+    const current = currentTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
+
+    return best - current;
+  }
+
+  private selectHighestTier(individualTier?: Tier, businessTier?: Tier): Tier | undefined {
+    if (!individualTier && !businessTier) {
+      return undefined;
+    }
+
+    if (!individualTier) return businessTier;
+    if (!businessTier) return individualTier;
+
+    const individualStorage = individualTier.featuresPerService[Service.Drive].maxSpaceBytes;
+    const businessStoragePerSeat = businessTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
+
+    return businessStoragePerSeat >= individualStorage ? businessTier : individualTier;
+  }
+
+  private async determineUserTier(userUuid: User['uuid'], ownersId?: string[]): Promise<Tier | undefined> {
+    const availableTiers = await this.collectAllAvailableTiers(userUuid, ownersId);
+
+    if (availableTiers.length === 0) {
+      return undefined;
+    }
+
+    const individualTier = this.getBestIndividualTier(availableTiers);
+    const businessTier = this.getBestBusinessTier(availableTiers);
+
+    return this.selectHighestTier(individualTier, businessTier);
+  }
+
+  async getApplicableTierForUser({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<Tier> {
+    const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+    const availableTier = await this.determineUserTier(userUuid, ownersId);
+
+    return availableTier ?? freeTier;
   }
 }

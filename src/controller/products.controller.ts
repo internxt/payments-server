@@ -4,9 +4,10 @@ import { NotFoundSubscriptionError } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { User, UserType } from '../core/users/User';
+import { TiersService } from '../services/tiers.service';
+import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
+import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
 
 export default function (
@@ -64,36 +65,19 @@ export default function (
       },
     );
 
-    fastify.get<{
-      Querystring: { subscriptionType?: 'individual' | 'business' };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: {
-            subscriptionType: { type: 'string'; enum: ['individual', 'business'] };
-          };
-        };
-      };
-    }>('/tier', async (req, rep): Promise<Tier | Error> => {
+    fastify.get('/tier', async (req, rep): Promise<Tier> => {
       const userUuid = req.user.payload.uuid;
       const ownersId = req.user.payload.workspaces?.owners ?? [];
-      const subscriptionType = (req.query.subscriptionType as UserType) || UserType.Individual;
 
       try {
-        const higherTier = await productsService.getApplicableTierForUser({
+        const mergedFeatures = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
-          subscriptionType,
         });
 
-        return rep.status(200).send(higherTier);
+        return rep.status(200).send(mergedFeatures);
       } catch (error) {
-        req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
-        if (error instanceof UserNotFoundError || error instanceof TierNotFoundError) {
-          const freeTier = await tiersService.getTierProductsByProductsId('free');
-          return rep.status(200).send(freeTier);
-        }
-
+        Logger.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
         return rep.status(500).send({ message: 'Internal server error' });
       }
     });
