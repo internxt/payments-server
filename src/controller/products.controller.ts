@@ -7,7 +7,7 @@ import fastifyLimit from '@fastify/rate-limit';
 import { TiersService } from '../services/tiers.service';
 import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
-import { Tier } from '../core/users/Tier';
+import Logger from '../Logger';
 
 export default function (
   tiersService: TiersService,
@@ -76,7 +76,7 @@ export default function (
 
         return rep.status(200).send(mergedFeatures);
       } catch (error) {
-        req.log.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
+        Logger.error(`[TIER PRODUCT/ERROR]: ${(error as Error).message || error} for user ${userUuid}`);
         return rep.status(500).send({ message: 'Internal server error' });
       }
     });

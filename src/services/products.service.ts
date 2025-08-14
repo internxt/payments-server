@@ -44,14 +44,6 @@ interface MergedTierFeatures {
   };
 }
 
-interface AllVpnFeatures {
-  vpnOptions: Array<{
-    featureId: string;
-    sourceTierId: string;
-    tierLabel: string;
-  }>;
-}
-
 export class ProductsService {
   constructor(
     private readonly tiersService: TiersService,
