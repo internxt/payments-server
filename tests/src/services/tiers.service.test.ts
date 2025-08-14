@@ -1,92 +1,29 @@
-import axios, { AxiosError } from 'axios';
-import Stripe from 'stripe';
+import { AxiosError } from 'axios';
 
-import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
-  TiersService,
 } from '../../../src/services/tiers.service';
-import { UsersService } from '../../../src/services/users.service';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import {
-  CustomerId,
-  ExtendedSubscription,
-  NotFoundSubscriptionError,
-  PaymentService,
-} from '../../../src/services/payment.service';
-import { StorageService, updateUserTier } from '../../../src/services/storage.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { CustomerId, ExtendedSubscription, NotFoundSubscriptionError } from '../../../src/services/payment.service';
+import { updateUserTier } from '../../../src/services/storage.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
-import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
-
-let tiersService: TiersService;
-let paymentsService: PaymentService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let storageService: StorageService;
+import { createTestServices } from '../helpers/services-factory';
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
+  const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
+    createTestServices();
+
   beforeEach(() => {
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
+    jest.restoreAllMocks();
   });
 
   describe('User-Tier Relationship', () => {
