@@ -34,8 +34,8 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  jest.restoreAllMocks();
   jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 describe('Checkout controller', () => {
