@@ -1,88 +1,22 @@
-import Stripe from 'stripe';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { PaymentService } from '../../../src/services/payment.service';
-import { StorageService } from '../../../src/services/storage.service';
-import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { TierNotFoundError } from '../../../src/services/tiers.service';
+import { UserNotFoundError } from '../../../src/services/users.service';
 import { getUser, newTier } from '../fixtures';
-import testFactory from '../utils/factory';
-import config from '../../../src/config';
-import axios from 'axios';
-import { ProductsService } from '../../../src/services/products.service';
 import { UserType } from '../../../src/core/users/User';
 import { Service } from '../../../src/core/users/Tier';
-
-let tiersService: TiersService;
-let paymentsService: PaymentService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let storageService: StorageService;
-let productsService: ProductsService;
+import { createTestServices } from '../helpers/services-factory';
 
 describe('Products Service Tests', () => {
-  beforeEach(() => {
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
+  let services: ReturnType<typeof createTestServices>;
 
-    productsService = new ProductsService(tiersService, usersService);
+  beforeEach(() => {
+    services = createTestServices();
   });
 
   describe('Finding the higher tier for a user', () => {
     it('When the subscription type is not Individual or Business, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       await expect(
-        productsService.getApplicableTierForUser({
+        services.productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.ObjectStorage,
         }),
@@ -97,10 +31,10 @@ describe('Products Service Tests', () => {
         const mockedTier = newTier();
         mockedTier.billingType = 'lifetime';
 
-        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
+        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest.spyOn(services.tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
-        const result = await productsService.getApplicableTierForUser({
+        const result = await services.productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -115,10 +49,12 @@ describe('Products Service Tests', () => {
         const mockedBusinessTier = newTier();
         mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
+        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest
+          .spyOn(services.tiersService, 'getTiersProductsByUserId')
+          .mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await productsService.getApplicableTierForUser({
+        const result = await services.productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           subscriptionType: UserType.Individual,
         });
@@ -135,10 +71,12 @@ describe('Products Service Tests', () => {
         const mockedBusinessTier = newTier();
         mockedBusinessTier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-        jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
-        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier, mockedBusinessTier]);
+        jest.spyOn(services.usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+        jest
+          .spyOn(services.tiersService, 'getTiersProductsByUserId')
+          .mockResolvedValue([mockedTier, mockedBusinessTier]);
 
-        const result = await productsService.getApplicableTierForUser({
+        const result = await services.productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid],
           subscriptionType: UserType.Business,
@@ -160,12 +98,12 @@ describe('Products Service Tests', () => {
         mockedBusinessTier2.featuresPerService[Service.Drive].workspaces.enabled = true;
         mockedBusinessTier2.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat = 2000000;
 
-        jest.spyOn(usersService, 'findUserByUuid').mockImplementation(async (uuid: string) => {
+        jest.spyOn(services.usersService, 'findUserByUuid').mockImplementation(async (uuid: string) => {
           if (uuid === mockedUser.uuid) return mockedUser;
           if (uuid === mockedOwner.uuid) return mockedOwner;
           throw new UserNotFoundError(`User with uuid ${uuid} not found`);
         });
-        jest.spyOn(tiersService, 'getTiersProductsByUserId').mockImplementation(async (ownerId: string) => {
+        jest.spyOn(services.tiersService, 'getTiersProductsByUserId').mockImplementation(async (ownerId: string) => {
           if (ownerId === mockedUser.id) {
             return [mockedTier, mockedBusinessTier];
           }
@@ -175,7 +113,7 @@ describe('Products Service Tests', () => {
           return [];
         });
 
-        const result = await productsService.getApplicableTierForUser({
+        const result = await services.productsService.getApplicableTierForUser({
           userUuid: mockedUser.uuid,
           ownersId: [mockedUser.uuid, mockedOwner.uuid],
           subscriptionType: UserType.Business,

@@ -1,92 +1,28 @@
-import axios, { AxiosError } from 'axios';
-import Stripe from 'stripe';
+import { AxiosError } from 'axios';
 
-import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
-  TiersService,
 } from '../../../src/services/tiers.service';
-import { UsersService } from '../../../src/services/users.service';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
-import {
-  CustomerId,
-  ExtendedSubscription,
-  NotFoundSubscriptionError,
-  PaymentService,
-} from '../../../src/services/payment.service';
-import { StorageService, updateUserTier } from '../../../src/services/storage.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
+import { CustomerId, ExtendedSubscription, NotFoundSubscriptionError } from '../../../src/services/payment.service';
+import { updateUserTier } from '../../../src/services/storage.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
-import { UsersTiersRepository, UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
-
-let tiersService: TiersService;
-let paymentsService: PaymentService;
-let tiersRepository: TiersRepository;
-let paymentService: PaymentService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let storageService: StorageService;
+import { createTestServices } from '../helpers/services-factory';
 
 jest
   .spyOn(require('../../../src/services/storage.service'), 'updateUserTier')
   .mockImplementation(() => Promise.resolve() as any);
 
 describe('TiersService tests', () => {
+  let services: ReturnType<typeof createTestServices>;
+
   beforeEach(() => {
-    tiersRepository = testFactory.getTiersRepository();
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    paymentsService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(
-      new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' }),
-      productsRepository,
-      bit2MeService,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-    storageService = new StorageService(config, axios);
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
+    services = createTestServices();
   });
 
   describe('User-Tier Relationship', () => {
@@ -95,10 +31,10 @@ describe('TiersService tests', () => {
         const user = getUser();
         const tier = newTier();
 
-        jest.spyOn(usersTiersRepository, 'insertTierToUser').mockResolvedValue();
+        jest.spyOn(services.usersTiersRepository, 'insertTierToUser').mockResolvedValue();
 
-        await expect(tiersService.insertTierToUser(user.id, tier.id)).resolves.toBeUndefined();
-        expect(usersTiersRepository.insertTierToUser).toHaveBeenCalledWith(user.id, tier.id);
+        await expect(services.tiersService.insertTierToUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(services.usersTiersRepository.insertTierToUser).toHaveBeenCalledWith(user.id, tier.id);
       });
     });
 
@@ -108,10 +44,12 @@ describe('TiersService tests', () => {
         const oldTier = newTier();
         const newTierData = newTier();
 
-        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
+        jest.spyOn(services.usersTiersRepository, 'updateUserTier').mockResolvedValue(true);
 
-        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).resolves.toBeUndefined();
-        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+        await expect(
+          services.tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id),
+        ).resolves.toBeUndefined();
+        expect(services.usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
       });
 
       it('When updating a user tier and it does not exist, then an error indicating so is thrown', async () => {
@@ -119,10 +57,12 @@ describe('TiersService tests', () => {
         const oldTier = newTier();
         const newTierData = newTier();
 
-        jest.spyOn(usersTiersRepository, 'updateUserTier').mockResolvedValue(false);
+        jest.spyOn(services.usersTiersRepository, 'updateUserTier').mockResolvedValue(false);
 
-        await expect(tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).rejects.toThrow(Error);
-        expect(usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
+        await expect(services.tiersService.updateTierToUser(user.id, oldTier.id, newTierData.id)).rejects.toThrow(
+          Error,
+        );
+        expect(services.usersTiersRepository.updateUserTier).toHaveBeenCalledWith(user.id, oldTier.id, newTierData.id);
       });
     });
 
@@ -131,20 +71,20 @@ describe('TiersService tests', () => {
         const user = getUser();
         const tier = newTier();
 
-        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(true);
+        jest.spyOn(services.usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(true);
 
-        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).resolves.toBeUndefined();
-        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+        await expect(services.tiersService.deleteTierFromUser(user.id, tier.id)).resolves.toBeUndefined();
+        expect(services.usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
       });
 
       it('When deleting a tier from a user and it does not exist, then an error indicating so is thrown', async () => {
         const user = getUser();
         const tier = newTier();
 
-        jest.spyOn(usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(false);
+        jest.spyOn(services.usersTiersRepository, 'deleteTierFromUser').mockResolvedValue(false);
 
-        await expect(tiersService.deleteTierFromUser(user.id, tier.id)).rejects.toThrow(Error);
-        expect(usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
+        await expect(services.tiersService.deleteTierFromUser(user.id, tier.id)).rejects.toThrow(Error);
+        expect(services.usersTiersRepository.deleteTierFromUser).toHaveBeenCalledWith(user.id, tier.id);
       });
     });
   });
@@ -153,9 +93,9 @@ describe('TiersService tests', () => {
     it('When the user has no assigned tiers, then an error indicating so is thrown', async () => {
       const { id: userId } = getUser();
 
-      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue([]);
+      jest.spyOn(services.usersTiersRepository, 'findTierIdByUserId').mockResolvedValue([]);
 
-      await expect(tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(TierNotFoundError);
+      await expect(services.tiersService.getTiersProductsByUserId(userId)).rejects.toThrow(TierNotFoundError);
     });
 
     it('When the user has assigned tiers, then it returns the corresponding tier objects', async () => {
@@ -167,17 +107,17 @@ describe('TiersService tests', () => {
         { id: '', userId, tierId: tier2.id },
       ];
 
-      jest.spyOn(usersTiersRepository, 'findTierIdByUserId').mockResolvedValue(userTiers);
+      jest.spyOn(services.usersTiersRepository, 'findTierIdByUserId').mockResolvedValue(userTiers);
       jest
-        .spyOn(tiersService, 'getTierProductsByTierId')
+        .spyOn(services.tiersService, 'getTierProductsByTierId')
         .mockImplementation(async (tierId) => (tierId === tier1.id ? tier1 : tier2));
 
-      const result = await tiersService.getTiersProductsByUserId(userId);
+      const result = await services.tiersService.getTiersProductsByUserId(userId);
 
       expect(result).toStrictEqual([tier1, tier2]);
-      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
-      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
-      expect(tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
+      expect(services.tiersService.getTierProductsByTierId).toHaveBeenCalledTimes(2);
+      expect(services.tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier1.id);
+      expect(services.tiersService.getTierProductsByTierId).toHaveBeenCalledWith(tier2.id);
     });
   });
 
@@ -185,20 +125,20 @@ describe('TiersService tests', () => {
     it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
       const { id: tierId } = newTier();
 
-      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(null);
+      jest.spyOn(services.tiersRepository, 'findByTierId').mockResolvedValue(null);
 
-      await expect(tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(TierNotFoundError);
+      await expect(services.tiersService.getTierProductsByTierId(tierId)).rejects.toThrow(TierNotFoundError);
     });
 
     it('When the requested tier exists, then it returns the tier object', async () => {
       const tier = newTier();
 
-      jest.spyOn(tiersRepository, 'findByTierId').mockResolvedValue(tier);
+      jest.spyOn(services.tiersRepository, 'findByTierId').mockResolvedValue(tier);
 
-      const result = await tiersService.getTierProductsByTierId(tier.id);
+      const result = await services.tiersService.getTierProductsByTierId(tier.id);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
+      expect(services.tiersRepository.findByTierId).toHaveBeenCalledWith(tier.id);
     });
   });
 
@@ -206,20 +146,20 @@ describe('TiersService tests', () => {
     it('When the requested tier does not exist, then an error indicating so is thrown', async () => {
       const { id: productId } = newTier();
 
-      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(null);
+      jest.spyOn(services.tiersRepository, 'findByProductId').mockResolvedValue(null);
 
-      await expect(tiersService.getTierProductsByProductsId(productId)).rejects.toThrow(TierNotFoundError);
+      await expect(services.tiersService.getTierProductsByProductsId(productId)).rejects.toThrow(TierNotFoundError);
     });
 
     it('When the requested tier exists, then it returns the tier object', async () => {
       const tier = newTier();
 
-      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+      jest.spyOn(services.tiersRepository, 'findByProductId').mockResolvedValue(tier);
 
-      const result = await tiersService.getTierProductsByProductsId(tier.productId);
+      const result = await services.tiersService.getTierProductsByProductsId(tier.productId);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({ productId: tier.productId });
+      expect(services.tiersRepository.findByProductId).toHaveBeenCalledWith({ productId: tier.productId });
     });
 
     it('When the requested tier exists and the billing type is lifetime, then it returns the tier object', async () => {
@@ -228,12 +168,12 @@ describe('TiersService tests', () => {
         billingType: tierBillingType,
       });
 
-      jest.spyOn(tiersRepository, 'findByProductId').mockResolvedValue(tier);
+      jest.spyOn(services.tiersRepository, 'findByProductId').mockResolvedValue(tier);
 
-      const result = await tiersService.getTierProductsByProductsId(tier.productId, tierBillingType);
+      const result = await services.tiersService.getTierProductsByProductsId(tier.productId, tierBillingType);
 
       expect(result).toStrictEqual(tier);
-      expect(tiersRepository.findByProductId).toHaveBeenCalledWith({
+      expect(services.tiersRepository.findByProductId).toHaveBeenCalledWith({
         productId: tier.productId,
         billingType: tierBillingType,
       });
@@ -246,9 +186,9 @@ describe('TiersService tests', () => {
       const customerId: CustomerId = user.customerId;
       const isLifetime = user.lifetime ?? false;
 
-      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+      jest.spyOn(services.paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
-      await expect(tiersService.getProductsTier(customerId, isLifetime)).rejects.toThrow(
+      await expect(services.tiersService.getProductsTier(customerId, isLifetime)).rejects.toThrow(
         new NotFoundSubscriptionError('User has no active subscriptions'),
       );
     });
@@ -264,10 +204,10 @@ describe('TiersService tests', () => {
 
       const isLifetime = mockedUser.lifetime as boolean;
 
-      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+      jest.spyOn(services.paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+      jest.spyOn(services.paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
 
-      const antivirusTier = await tiersService.getProductsTier(mockedUser.customerId, isLifetime);
+      const antivirusTier = await services.tiersService.getProductsTier(mockedUser.customerId, isLifetime);
 
       expect(antivirusTier).toEqual({
         featuresPerService: { antivirus: false, backups: false },
@@ -281,10 +221,10 @@ describe('TiersService tests', () => {
         const activeSubscription = { status: 'active' };
 
         jest
-          .spyOn(paymentService, 'getActiveSubscriptions')
+          .spyOn(services.paymentService, 'getActiveSubscriptions')
           .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-        const antivirusTier = await tiersService.getProductsTier(customerId, false);
+        const antivirusTier = await services.tiersService.getProductsTier(customerId, false);
 
         expect(antivirusTier).toEqual({
           featuresPerService: { antivirus: false, backups: true },
@@ -295,10 +235,10 @@ describe('TiersService tests', () => {
         const customerId: CustomerId = getUser().customerId;
         const isLifetime = true;
 
-        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([{ status: 'paid' }] as any);
+        jest.spyOn(services.paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest.spyOn(services.paymentService, 'getInvoicesFromUser').mockResolvedValue([{ status: 'paid' }] as any);
 
-        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+        const antivirusTier = await services.tiersService.getProductsTier(customerId, isLifetime);
 
         expect(antivirusTier).toEqual({
           featuresPerService: { antivirus: false, backups: true },
@@ -313,10 +253,10 @@ describe('TiersService tests', () => {
         const activeSubscription = { status: 'active', product: { id: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } };
 
         jest
-          .spyOn(paymentService, 'getActiveSubscriptions')
+          .spyOn(services.paymentService, 'getActiveSubscriptions')
           .mockResolvedValue([activeSubscription as ExtendedSubscription]);
 
-        const antivirusTier = await tiersService.getProductsTier(customerId, false);
+        const antivirusTier = await services.tiersService.getProductsTier(customerId, false);
 
         expect(antivirusTier).toEqual({
           featuresPerService: { antivirus: true, backups: true },
@@ -327,14 +267,14 @@ describe('TiersService tests', () => {
         const customerId: CustomerId = getUser().customerId;
         const isLifetime = true;
 
-        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest.spyOn(services.paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
         jest
-          .spyOn(paymentService, 'getInvoicesFromUser')
+          .spyOn(services.paymentService, 'getInvoicesFromUser')
           .mockResolvedValue([
             { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
           ] as any);
 
-        const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
+        const antivirusTier = await services.tiersService.getProductsTier(customerId, isLifetime);
 
         expect(antivirusTier).toEqual({
           featuresPerService: { antivirus: true, backups: true },
@@ -352,11 +292,11 @@ describe('TiersService tests', () => {
       const mockedInvoiceLineItem = getInvoice().lines.data[0];
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(
-        tiersService.applyTier(
+        services.tiersService.applyTier(
           { ...user, email: 'example@internxt.com' },
           mockedCustomer,
           mockedInvoiceLineItem.quantity,
@@ -380,14 +320,16 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Vpn].enabled = false;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(tier));
       const applyDriveFeatures = jest
-        .spyOn(tiersService, 'applyDriveFeatures')
+        .spyOn(services.tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest
+        .spyOn(services.tiersService, 'applyVpnFeatures')
+        .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(
+      await services.tiersService.applyTier(
         { ...user, email: 'example@internxt.com' },
         mockedCustomer,
         mockedInvoiceLineItem.quantity,
@@ -413,14 +355,16 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Vpn].enabled = true;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(tier));
       const applyDriveFeatures = jest
-        .spyOn(tiersService, 'applyDriveFeatures')
+        .spyOn(services.tiersService, 'applyDriveFeatures')
         .mockImplementation(() => Promise.resolve());
-      const applyVpnFeatures = jest.spyOn(tiersService, 'applyVpnFeatures').mockImplementation(() => Promise.resolve());
+      const applyVpnFeatures = jest
+        .spyOn(services.tiersService, 'applyVpnFeatures')
+        .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(
+      await services.tiersService.applyTier(
         { ...user, email: 'example@internxt.com' },
         mockedCustomer,
         mockedInvoiceLineItem.quantity,
@@ -440,11 +384,11 @@ describe('TiersService tests', () => {
       const productId = 'productId';
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(
-        tiersService.removeTier({ ...mockedUser, email: 'example@internxt.com' }, productId, getLogger()),
+        services.tiersService.removeTier({ ...mockedUser, email: 'example@internxt.com' }, productId, getLogger()),
       ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
@@ -460,16 +404,16 @@ describe('TiersService tests', () => {
       mockedTier.featuresPerService[Service.Vpn].enabled = false;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(mockedTier));
       const removeDriveFeatures = jest
-        .spyOn(tiersService, 'removeDriveFeatures')
+        .spyOn(services.tiersService, 'removeDriveFeatures')
         .mockImplementation(() => Promise.resolve());
       const removeVPNFeatures = jest
-        .spyOn(tiersService, 'removeVPNFeatures')
+        .spyOn(services.tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId, log);
+      await services.tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
@@ -486,16 +430,16 @@ describe('TiersService tests', () => {
       mockedTier.featuresPerService[Service.Vpn].enabled = true;
 
       const findTierByProductId = jest
-        .spyOn(tiersRepository, 'findByProductId')
+        .spyOn(services.tiersRepository, 'findByProductId')
         .mockImplementation(() => Promise.resolve(mockedTier));
       const removeDriveFeatures = jest
-        .spyOn(tiersService, 'removeDriveFeatures')
+        .spyOn(services.tiersService, 'removeDriveFeatures')
         .mockImplementation(() => Promise.resolve());
       const removeVPNFeatures = jest
-        .spyOn(tiersService, 'removeVPNFeatures')
+        .spyOn(services.tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId, log);
+      await services.tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
@@ -514,13 +458,19 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
+      jest.spyOn(services.tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(services.usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
       await expect(
-        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId, logger),
+        services.tiersService.applyTier(
+          userWithEmail,
+          mockedCustomer,
+          mockedInvoiceLineItem.quantity,
+          tier.productId,
+          logger,
+        ),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
     });
@@ -535,12 +485,12 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
+      jest.spyOn(services.tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(services.usersService, 'updateWorkspaceStorage')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyTier(
+      await services.tiersService.applyTier(
         userWithEmail,
         mockedCustomer,
         mockedInvoiceLineItem.quantity,
@@ -571,11 +521,13 @@ describe('TiersService tests', () => {
         toJSON: () => ({}),
       } as AxiosError;
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(axiosError404));
+      jest
+        .spyOn(services.usersService, 'updateWorkspaceStorage')
+        .mockImplementation(() => Promise.reject(axiosError404));
 
-      const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
+      const initializeWorkspace = jest.spyOn(services.usersService, 'initializeWorkspace').mockResolvedValue();
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
+      await services.tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(initializeWorkspace).toHaveBeenCalledWith(userWithEmail.uuid, {
         newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
@@ -597,10 +549,10 @@ describe('TiersService tests', () => {
 
       const unexpectedError = new Error('Unexpected error');
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
+      jest.spyOn(services.usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
 
       await expect(
-        tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
+        services.tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
       ).rejects.toThrow(unexpectedError);
     });
 
@@ -613,9 +565,9 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const changeStorageSpy = jest.spyOn(services.storageService, 'changeStorage').mockImplementation(voidPromise);
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
+      await services.tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(changeStorageSpy).toHaveBeenCalledWith(
         userWithEmail.uuid,
@@ -633,10 +585,12 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
-      const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
+      const destroyWorkspace = jest
+        .spyOn(services.usersService, 'destroyWorkspace')
+        .mockImplementation(() => Promise.resolve());
       (updateUserTier as jest.Mock).mockClear();
 
-      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+      await services.tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
 
@@ -650,11 +604,11 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
-      const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const destroyWorkspaceSpy = jest.spyOn(services.usersService, 'destroyWorkspace');
+      const changeStorageSpy = jest.spyOn(services.storageService, 'changeStorage').mockImplementation(voidPromise);
       (updateUserTier as jest.Mock).mockClear();
 
-      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+      await services.tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
       expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);
@@ -669,9 +623,11 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+      const enableVPNTierSpy = jest
+        .spyOn(services.usersService, 'enableVPNTier')
+        .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyVpnFeatures(userWithEmail, tier);
+      await services.tiersService.applyVpnFeatures(userWithEmail, tier);
 
       expect(enableVPNTierSpy).toHaveBeenCalledWith(userWithEmail.uuid, tier.featuresPerService[Service.Vpn].featureId);
     });
@@ -680,9 +636,11 @@ describe('TiersService tests', () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
-      const enableVPNTierSpy = jest.spyOn(usersService, 'enableVPNTier').mockImplementation(() => Promise.resolve());
+      const enableVPNTierSpy = jest
+        .spyOn(services.usersService, 'enableVPNTier')
+        .mockImplementation(() => Promise.resolve());
 
-      await tiersService.applyVpnFeatures(userWithEmail, tier);
+      await services.tiersService.applyVpnFeatures(userWithEmail, tier);
 
       expect(enableVPNTierSpy).not.toHaveBeenCalled();
     });
@@ -695,9 +653,11 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Vpn].enabled = true;
 
-      const removeVPNTierSpy = jest.spyOn(usersService, 'disableVPNTier').mockImplementation(() => Promise.resolve());
+      const removeVPNTierSpy = jest
+        .spyOn(services.usersService, 'disableVPNTier')
+        .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
+      await services.tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
 
       expect(removeVPNTierSpy).toHaveBeenCalledWith(uuid, tier.featuresPerService[Service.Vpn].featureId);
     });
