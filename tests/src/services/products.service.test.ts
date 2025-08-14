@@ -1,4 +1,5 @@
 import { Service } from '../../../src/core/users/Tier';
+import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { getUser, newTier } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
@@ -12,13 +13,14 @@ describe('Products Service Tests', () => {
 
   describe('Finding the higher tier for a user', () => {
     it('When the subscription type is not Individual or Business, then an error indicating so is thrown', async () => {
+      const tierNotFoundError = new TierNotFoundError('Tier was not found');
       const mockedUser = getUser();
       const mockedFreeTier = newTier({
         productId: 'free',
       });
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValueOnce(mockedUser);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValueOnce(mockedFreeTier);
-      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValueOnce([]);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
 
       const userTier = await productsService.getApplicableTierForUser({
         userUuid: mockedUser.uuid,
