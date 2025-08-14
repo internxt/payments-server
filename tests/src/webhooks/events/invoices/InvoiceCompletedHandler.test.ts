@@ -9,7 +9,16 @@ import Logger from '../../../../../src/Logger';
 import { Service } from '../../../../../src/core/users/Tier';
 import { createTestServices } from '../../../helpers/services-factory';
 
-const { invoiceCompletedHandler, paymentService, tiersService, usersService } = createTestServices();
+const {
+  invoiceCompletedHandler,
+  paymentService,
+  tiersService,
+  usersService,
+  determineLifetimeConditions,
+  objectStorageWebhookHandler,
+  cacheService,
+  storageService,
+} = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
