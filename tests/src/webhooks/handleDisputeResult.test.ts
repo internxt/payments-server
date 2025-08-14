@@ -1,103 +1,32 @@
-import Stripe from 'stripe';
 import axios from 'axios';
-import { FastifyBaseLogger } from 'fastify';
-import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { PaymentService } from '../../../src/services/payment.service';
-import testFactory from '../utils/factory';
-import { UsersService } from '../../../src/services/users.service';
-import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
-import { StorageService } from '../../../src/services/storage.service';
 import config from '../../../src/config';
-import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
-import { CouponsRepository } from '../../../src/core/coupons/CouponsRepository';
-import { UsersRepository } from '../../../src/core/users/UsersRepository';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
-import CacheService from '../../../src/services/cache.service';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
-import { TiersService } from '../../../src/services/tiers.service';
-import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   __esModule: true,
   default: jest.fn(),
 }));
 
-jest.mock('stripe', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(() => ({
-      charges: {
-        retrieve: jest.fn(),
-      },
-      invoices: {
-        retrieve: jest.fn(),
-      },
-    })),
-  };
-});
+const mockStripe = {
+  charges: {
+    retrieve: jest.fn(),
+  },
+  invoices: {
+    retrieve: jest.fn(),
+  },
+};
 
-jest.mock('../../../src/services/cache.service', () => {
-  return {
-    __esModule: true,
-    default: jest.fn().mockImplementation(),
-  };
-});
-
-let paymentService: PaymentService;
-let storageService: StorageService;
-let usersService: UsersService;
-let usersRepository: UsersRepository;
-let displayBillingRepository: DisplayBillingRepository;
-let couponsRepository: CouponsRepository;
-let usersCouponsRepository: UsersCouponsRepository;
-let tiersService: TiersService;
-let tiersRepository: TiersRepository;
-let usersTiersRepository: UsersTiersRepository;
-let productsRepository: ProductsRepository;
-let bit2MeService: Bit2MeService;
-let cacheService: CacheService;
-let stripe: Stripe;
-let logger: jest.Mocked<FastifyBaseLogger>;
+const { stripe, paymentService, usersRepository, cacheService, usersService, storageService, tiersService } =
+  createTestServices({
+    stripe: mockStripe,
+  });
+const logger = getLogger();
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
-    logger = getLogger();
-
-    stripe = new Stripe('mock-key', { apiVersion: '2024-04-10' }) as jest.Mocked<Stripe>;
-    usersRepository = testFactory.getUsersRepositoryForTest();
-    displayBillingRepository = {} as DisplayBillingRepository;
-    couponsRepository = testFactory.getCouponsRepositoryForTest();
-    usersCouponsRepository = testFactory.getUsersCouponsRepositoryForTest();
-    productsRepository = testFactory.getProductsRepositoryForTest();
-    tiersRepository = testFactory.getTiersRepository();
-    usersTiersRepository = testFactory.getUsersTiersRepository();
-
-    cacheService = new CacheService(config);
-    storageService = new StorageService(config, axios);
-    bit2MeService = new Bit2MeService(config, axios);
-    paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
-
-    tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      config,
-    );
-    usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      config,
-      axios,
-    );
-
     jest.clearAllMocks();
   });
 
@@ -119,7 +48,7 @@ describe('handleDisputeResult()', () => {
 
       await handleDisputeResult({
         dispute: mockedDispute,
-        cacheService,
+        cacheService: cacheService,
         config,
         paymentService,
         usersService,
@@ -159,7 +88,6 @@ describe('handleDisputeResult()', () => {
 
       await handleDisputeResult({
         dispute: mockedDispute,
-        tiersService,
         cacheService,
         config,
         paymentService,
@@ -167,6 +95,7 @@ describe('handleDisputeResult()', () => {
         stripe,
         storageService,
         log: logger,
+        tiersService,
       });
 
       expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
@@ -210,7 +139,6 @@ describe('handleDisputeResult()', () => {
 
       await handleDisputeResult({
         dispute: mockedDispute,
-        tiersService,
         cacheService,
         config,
         paymentService,
@@ -218,6 +146,7 @@ describe('handleDisputeResult()', () => {
         stripe,
         storageService,
         log: logger,
+        tiersService,
       });
 
       expect(stripe.charges.retrieve).not.toHaveBeenCalled();
