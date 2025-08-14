@@ -25,11 +25,11 @@ let mockedLogger = getLogger();
 let mockedOldTier = getTier();
 let mockedNewTier = getTier();
 
-let services: ReturnType<typeof createTestServices>;
+const { storageService } = createTestServices();
 
 beforeEach(() => {
-  services = createTestServices();
   jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -45,7 +45,7 @@ describe('Stack lifetime storage', () => {
         logger: mockedLogger,
         newTier: mockedNewTier,
         oldTier: mockedOldTier,
-        storageService: services.storageService,
+        storageService,
         user: mockedUser,
       }),
     ).rejects.toThrow(ExpandStorageNotAvailableError);
@@ -62,14 +62,14 @@ describe('Stack lifetime storage', () => {
       canExpand: true,
       currentMaxSpaceBytes: mockedOldTier.featuresPerService['drive'].maxSpaceBytes,
     });
-    const changeStorageSpy = jest.spyOn(services.storageService, 'changeStorage').mockImplementation(voidPromise);
+    const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
     (updateUserTier as jest.Mock).mockImplementation();
 
     await handleStackLifetimeStorage({
       logger: mockedLogger,
       newTier: mockedNewTier,
       oldTier: mockedOldTier,
-      storageService: services.storageService,
+      storageService,
       user: mockedUser,
     });
 
