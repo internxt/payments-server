@@ -51,7 +51,10 @@ export class ProductsService {
       return undefined;
     }
 
-    return individualTiers.reduce((best, current) => (this.compareIndividualTiers(current, best) > 0 ? current : best));
+    return individualTiers.reduce(
+      (best, current) => (this.compareIndividualTiers(current, best) > 0 ? current : best),
+      individualTiers[0],
+    );
   }
 
   private getBestBusinessTier(availableTiers: Tier[]): Tier | undefined {
@@ -61,7 +64,10 @@ export class ProductsService {
       return undefined;
     }
 
-    return businessTiers.reduce((best, current) => (this.compareBusinessTiers(current, best) > 0 ? current : best));
+    return businessTiers.reduce(
+      (best, current) => (this.compareBusinessTiers(current, best) > 0 ? current : best),
+      businessTiers[0],
+    );
   }
 
   private compareIndividualTiers(tierA: Tier, tierB: Tier): number {
