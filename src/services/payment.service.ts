@@ -451,6 +451,7 @@ export class PaymentService {
 
       const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({
         customer: customerId,
+        subscription_items: undefined,
         automatic_tax: {
           enabled: true,
         },
