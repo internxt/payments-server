@@ -471,7 +471,9 @@ export class PaymentService {
 
       const priceAmount = upcomingInvoice.amount_remaining / 100;
 
-      Logger.info(`Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}`);
+      Logger.info(
+        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.amount_remaining}`,
+      );
 
       const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
