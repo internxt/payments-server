@@ -67,7 +67,7 @@ export default function ({
     };
 
     fastify.post<{ Body: Bit2MePaymentStatusCallback }>('/webhook/crypto', async (req, rep) => {
-      const { id: paymentId, token, foreignId, status } = req.body;
+      const { token, foreignId, status } = req.body;
 
       const { customerId, invoiceId: stripeInvoiceId, provider } = await decodeToken(token);
 
@@ -99,6 +99,10 @@ export default function ({
 
       const invoice = await paymentService.getInvoice(stripeInvoiceId);
 
+      await paymentService.markInvoiceAsPaid(stripeInvoiceId);
+
+      Logger.info(`Invoice marked as paid for customer ${customerId} and invoice ${stripeInvoiceId}`);
+
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
 
       const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
@@ -123,20 +127,6 @@ export default function ({
       Logger.info(
         `Invoice completed handler executed successfully for customer ${customerId} and invoice ${stripeInvoiceId}`,
       );
-
-      await paymentService.updateInvoice(stripeInvoiceId, {
-        metadata: {
-          provider: 'bit2me',
-          paymentId,
-        },
-        description: 'Invoice paid using crypto currencies.',
-      });
-
-      Logger.info(`Invoice metadata updated for customer ${customerId} and invoice ${stripeInvoiceId}`);
-
-      await paymentService.markInvoiceAsPaid(stripeInvoiceId);
-
-      Logger.info(`Invoice marked as paid for customer ${customerId} and invoice ${stripeInvoiceId}`);
 
       return rep.status(200).send();
     });
