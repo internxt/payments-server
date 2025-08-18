@@ -70,6 +70,8 @@ export class InvoiceCompletedHandler {
     const customerEmail = customer.email;
     const isInvoicePaid = invoiceStatus === 'paid';
 
+    Logger.info(`Processing invoice ${invoiceId} for customer ${customerId}...`);
+
     if (!isInvoicePaid) {
       Logger.info(`Invoice ${invoiceId} not paid, skipping processing`);
       return;
@@ -108,7 +110,15 @@ export class InvoiceCompletedHandler {
 
     const { uuid: userUuid } = await this.getUserUuid(customerId, email);
 
+    Logger.info(
+      `Tier with product ID ${tier?.productId} found to apply it to the user with customer ID: ${customerId} and User id: ${userUuid}`,
+    );
+
     await this.updateOrInsertUser({ customerId: customer.id, userUuid, isLifetimePlan, isBusinessPlan });
+
+    Logger.info(
+      `User with customer ID ${customer.id} and user id: ${userUuid} inserted/updated successfully in the Users collection`,
+    );
 
     if (isOldProduct) {
       await this.handleOldProduct(userUuid, Number(maxSpaceBytes));
@@ -313,6 +323,10 @@ export class InvoiceCompletedHandler {
         });
       }
     }
+
+    Logger.info(
+      `Applying new features from the tier ${tierToApply.productId} for user ${customer.id} and user id: ${user.id}`,
+    );
 
     // Apply Drive features
     try {

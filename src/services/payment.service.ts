@@ -458,6 +458,7 @@ export class PaymentService {
         invoice_items: [
           {
             price: priceId,
+            currency: normalizedCurrencyForStripe,
             quantity: 1,
             discounts: [
               {
@@ -466,7 +467,6 @@ export class PaymentService {
             ],
           },
         ],
-        currency: normalizedCurrencyForStripe,
       });
 
       const priceAmount = upcomingInvoice.amount_remaining / 100;
