@@ -443,25 +443,16 @@ export class PaymentService {
       ],
     });
 
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
-
-    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
-      return {
-        clientSecret: '',
-        id: '',
-        type: 'fiat',
-        invoiceStatus: finalizedInvoice.status,
-      };
-    }
-
     const isLifetime = invoiceItem.price?.type === 'one_time';
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+      const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id, {
+        auto_advance: false,
+      });
       const priceAmount = finalizedInvoice.total / 100;
 
-      const invoice = await this.bit2MeService.createCryptoInvoice({
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
         priceAmount,
         priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
@@ -481,7 +472,7 @@ export class PaymentService {
       });
 
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
-        invoice.invoiceId,
+        cryptoInvoice.invoiceId,
         normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
       );
 
@@ -501,6 +492,18 @@ export class PaymentService {
           url: checkoutPayload.url,
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },
+      };
+    }
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+      return {
+        clientSecret: '',
+        id: '',
+        type: 'fiat',
+        invoiceStatus: finalizedInvoice.status,
       };
     }
 
