@@ -10,6 +10,7 @@ import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
+import Logger from '../Logger';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -458,13 +459,21 @@ export class PaymentService {
           {
             price: priceId,
             quantity: 1,
-            ...(couponId && { discounts: [{ coupon: couponId }] }),
+            discounts: [
+              {
+                coupon: couponId,
+              },
+            ],
           },
         ],
         currency: normalizedCurrencyForStripe,
       });
 
       const priceAmount = upcomingInvoice.amount_remaining / 100;
+
+      Logger.info(
+        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.amount_remaining}`,
+      );
 
       const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
