@@ -451,13 +451,13 @@ export class PaymentService {
 
       const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({
         customer: customerId,
-        subscription_items: undefined,
         automatic_tax: {
           enabled: true,
         },
         invoice_items: [
           {
             price: priceId,
+            currency: normalizedCurrencyForStripe,
             quantity: 1,
             discounts: [
               {
@@ -466,7 +466,6 @@ export class PaymentService {
             ],
           },
         ],
-        currency: normalizedCurrencyForStripe,
       });
 
       const priceAmount = upcomingInvoice.amount_remaining / 100;

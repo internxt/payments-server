@@ -97,11 +97,11 @@ export default function ({
         throw new BadRequestError(`Customer with ID ${customerId} is deleted`);
       }
 
-      const invoice = await paymentService.getInvoice(stripeInvoiceId);
-
       await paymentService.markInvoiceAsPaid(stripeInvoiceId);
 
       Logger.info(`Invoice marked as paid for customer ${customerId} and invoice ${stripeInvoiceId}`);
+
+      const invoice = await paymentService.getInvoice(stripeInvoiceId);
 
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
 
