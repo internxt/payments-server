@@ -447,35 +447,54 @@ export class PaymentService {
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+
+      const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({
+        customer: customerId,
+        subscription_items: undefined,
+        automatic_tax: {
+          enabled: true,
+        },
+        invoice_items: [
+          {
+            price: priceId,
+            quantity: 1,
+            ...(couponId && { discounts: [{ coupon: couponId }] }),
+          },
+        ],
+        currency: normalizedCurrencyForStripe,
+      });
+
+      const priceAmount = upcomingInvoice.amount_remaining / 100;
+
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
+        description: `Payment for lifetime product ${priceId}`,
+        priceAmount,
+        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
+        title: `Invoice from Stripe ${invoice.id}`,
+        securityToken: jwt.sign(
+          {
+            invoiceId: invoice.id,
+            customerId: customerId,
+            provider: 'stripe',
+          },
+          config.JWT_SECRET,
+        ),
+        foreignId: invoice.id,
+        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+        purchaserEmail: userEmail,
+      });
+
       await this.updateInvoice(invoice.id, {
         metadata: {
           provider: 'bit2me',
+          cryptoInvoiceId: cryptoInvoice.invoiceId,
         },
         description: 'Invoice paid using crypto currencies.',
       });
 
       const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id, {
         auto_advance: false,
-      });
-      const priceAmount = finalizedInvoice.total / 100;
-
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
-        description: `Payment for lifetime product ${priceId}`,
-        priceAmount,
-        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
-        title: `Invoice from Stripe ${finalizedInvoice.id}`,
-        securityToken: jwt.sign(
-          {
-            invoiceId: finalizedInvoice.id,
-            customerId: customerId,
-            provider: 'stripe',
-          },
-          config.JWT_SECRET,
-        ),
-        foreignId: finalizedInvoice.id,
-        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
-        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
-        purchaserEmail: userEmail,
       });
 
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
