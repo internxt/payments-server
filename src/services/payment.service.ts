@@ -447,6 +447,13 @@ export class PaymentService {
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
+      await this.updateInvoice(invoice.id, {
+        metadata: {
+          provider: 'bit2me',
+        },
+        description: 'Invoice paid using crypto currencies.',
+      });
+
       const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id, {
         auto_advance: false,
       });

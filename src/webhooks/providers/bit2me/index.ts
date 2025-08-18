@@ -99,16 +99,6 @@ export default function ({
 
       const invoice = await paymentService.getInvoice(stripeInvoiceId);
 
-      await paymentService.updateInvoice(stripeInvoiceId, {
-        metadata: {
-          provider: 'bit2me',
-          paymentId,
-        },
-        description: 'Invoice paid using crypto currencies.',
-      });
-
-      Logger.info(`Invoice metadata updated for customer ${customerId} and invoice ${stripeInvoiceId}`);
-
       await paymentService.markInvoiceAsPaid(stripeInvoiceId);
 
       Logger.info(`Invoice marked as paid for customer ${customerId} and invoice ${stripeInvoiceId}`);
