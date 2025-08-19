@@ -449,30 +449,12 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
-      const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({
-        customer: customerId,
-        subscription_items: undefined,
-        automatic_tax: {
-          enabled: true,
-        },
-        invoice_items: [
-          {
-            price: priceId,
-            quantity: 1,
-            discounts: [
-              {
-                coupon: couponId,
-              },
-            ],
-          },
-        ],
-        currency: normalizedCurrencyForStripe,
-      });
+      const upcomingInvoice = await this.provider.invoices.retrieve(invoice.id);
 
-      const priceAmount = upcomingInvoice.amount_remaining / 100;
+      const priceAmount = upcomingInvoice.total / 100;
 
       Logger.info(
-        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.amount_remaining}`,
+        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
       );
 
       const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
