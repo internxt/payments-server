@@ -258,7 +258,7 @@ describe('Payments Service tests', () => {
 
         jest.spyOn(stripe.invoices, 'update').mockImplementation();
         jest
-          .spyOn(stripe.invoices, 'retrieveUpcoming')
+          .spyOn(stripe.invoices, 'retrieve')
           .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
         jest
           .spyOn(stripe.invoices, 'finalizeInvoice')
