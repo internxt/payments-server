@@ -322,6 +322,7 @@ export const getPrice = (params?: Partial<Stripe.Price>): Stripe.Price => {
     nickname: null,
     product: 'prod_NZKdYqrwEYx6iK',
     recurring: {
+      meter: null,
       aggregate_usage: null,
       interval: 'month',
       interval_count: 1,
@@ -521,6 +522,7 @@ export const getCreatedSubscription = (
           metadata: {},
           discounts: null as any,
           plan: {
+            meter: null,
             id: `price_${randomDataGenerator.string({ length: 20 })}`,
             object: 'plan',
             active: true,
@@ -574,6 +576,7 @@ export const getCreatedSubscription = (
             nickname: null,
             product: `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
+              meter: null,
               aggregate_usage: null,
               interval: 'month',
               interval_count: 1,
@@ -1268,6 +1271,7 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     payment_method: `card_${randomDataGenerator.string({ length: 10 })}`,
     payment_method_details: {
       card: {
+        authorization_code: null,
         amount_authorized: 0,
         brand: 'visa',
         checks: {
