@@ -220,6 +220,7 @@ describe('Payments Service tests', () => {
           status: 'open',
           payment_intent: 'payment_intent_id',
           total: mockInvoiceTotal,
+          amount_remaining: mockInvoiceTotal,
           lines: {
             data: [
               {
@@ -254,6 +255,11 @@ describe('Payments Service tests', () => {
         jest
           .spyOn(stripe.invoiceItems, 'create')
           .mockResolvedValue(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
+
+        jest.spyOn(stripe.invoices, 'update').mockImplementation();
+        jest
+          .spyOn(stripe.invoices, 'retrieve')
+          .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
         jest
           .spyOn(stripe.invoices, 'finalizeInvoice')
           .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);

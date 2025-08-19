@@ -878,6 +878,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
       vpn: { enabled: false, featureId: randomDataGenerator.string({ length: 10 }) },
       antivirus: { enabled: false },
       backups: { enabled: false },
+      cleaner: { enabled: false },
       drive: {
         enabled: false,
         maxSpaceBytes: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),

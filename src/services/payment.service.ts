@@ -10,6 +10,7 @@ import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
+import Logger from '../Logger';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -443,45 +444,52 @@ export class PaymentService {
       ],
     });
 
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
-
-    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
-      return {
-        clientSecret: '',
-        id: '',
-        type: 'fiat',
-        invoiceStatus: finalizedInvoice.status,
-      };
-    }
-
     const isLifetime = invoiceItem.price?.type === 'one_time';
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
-      const priceAmount = finalizedInvoice.total / 100;
 
-      const invoice = await this.bit2MeService.createCryptoInvoice({
+      const upcomingInvoice = await this.provider.invoices.retrieve(invoice.id);
+
+      const priceAmount = upcomingInvoice.total / 100;
+
+      Logger.info(
+        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
+      );
+
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
         description: `Payment for lifetime product ${priceId}`,
         priceAmount,
         priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
-        title: `Invoice from Stripe ${finalizedInvoice.id}`,
+        title: `Invoice from Stripe ${invoice.id}`,
         securityToken: jwt.sign(
           {
-            invoiceId: finalizedInvoice.id,
+            invoiceId: invoice.id,
             customerId: customerId,
             provider: 'stripe',
           },
           config.JWT_SECRET,
         ),
-        foreignId: finalizedInvoice.id,
+        foreignId: invoice.id,
         cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
         successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
         purchaserEmail: userEmail,
       });
 
+      await this.updateInvoice(invoice.id, {
+        metadata: {
+          provider: 'bit2me',
+          cryptoInvoiceId: cryptoInvoice.invoiceId,
+        },
+        description: 'Invoice paid using crypto currencies.',
+      });
+
+      const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id, {
+        auto_advance: false,
+      });
+
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
-        invoice.invoiceId,
+        cryptoInvoice.invoiceId,
         normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
       );
 
@@ -501,6 +509,18 @@ export class PaymentService {
           url: checkoutPayload.url,
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },
+      };
+    }
+
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
+    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+
+    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+      return {
+        clientSecret: '',
+        id: '',
+        type: 'fiat',
+        invoiceStatus: finalizedInvoice.status,
       };
     }
 
