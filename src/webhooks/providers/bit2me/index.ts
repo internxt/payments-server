@@ -87,7 +87,8 @@ export default function ({
         );
       }
 
-      if (status !== 'paid') {
+      const isPaid = status === 'paid_after_expired' || status === 'paid';
+      if (!isPaid) {
         Logger.info(`Invoice ${stripeInvoiceId} for customer ${customerId} is not paid. Status: ${status}`);
         return rep.status(200).send();
       }
