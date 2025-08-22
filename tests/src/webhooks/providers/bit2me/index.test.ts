@@ -93,6 +93,8 @@ describe('Handling webhook for crypto payments', () => {
       status: 'pending',
     });
 
+    const getCustomerSpy = jest.spyOn(PaymentService.prototype, 'getCustomer');
+
     const response = await app.inject({
       method: 'POST',
       url: '/webhook/crypto',
@@ -100,6 +102,7 @@ describe('Handling webhook for crypto payments', () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(getCustomerSpy).not.toHaveBeenCalled();
   });
 
   test('when the customer is deleted, then an error indicating so is thrown', async () => {
