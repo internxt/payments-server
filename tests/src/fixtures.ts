@@ -328,7 +328,6 @@ export const getPrice = (params?: Partial<Stripe.Price>): Stripe.Price => {
     product: 'prod_NZKdYqrwEYx6iK',
     recurring: {
       meter: null,
-      aggregate_usage: null,
       interval: 'month',
       interval_count: 1,
       trial_period_days: null,
@@ -369,6 +368,9 @@ export const getCreatedSubscription = (
 
   return {
     id: `sub_${randomDataGenerator.string({ length: 14 })}`,
+    billing_mode: {
+      type: 'classic',
+    },
     object: 'subscription',
     billing_cycle_anchor_config: {
       day_of_month: 1,
@@ -401,8 +403,6 @@ export const getCreatedSubscription = (
     collection_method: 'charge_automatically',
     created: randomDataGenerator.natural({ length: 10 }),
     currency: 'usd',
-    current_period_end: randomDataGenerator.natural({ length: 10 }),
-    current_period_start: randomDataGenerator.natural({ length: 10 }),
     customer,
     days_until_due: null,
     default_payment_method: {
@@ -412,6 +412,7 @@ export const getCreatedSubscription = (
         address: randomDataGenerator.address() as any,
         email: randomDataGenerator.email(),
         phone: randomDataGenerator.phone(),
+        tax_id: null,
       },
       created: randomDataGenerator.natural({ length: 10 }),
       customer,
@@ -466,7 +467,6 @@ export const getCreatedSubscription = (
     },
     default_tax_rates: [],
     description: null,
-    discount: null,
     discounts: [
       {
         id: 'jMT0WJUD',
@@ -522,6 +522,8 @@ export const getCreatedSubscription = (
       object: 'list',
       data: [
         {
+          current_period_end: randomDataGenerator.natural({ length: 10 }),
+          current_period_start: randomDataGenerator.natural({ length: 10 }),
           id: `si_${randomDataGenerator.string({ length: 12 })}`,
           object: 'subscription_item',
           billing_thresholds: null,
@@ -533,7 +535,6 @@ export const getCreatedSubscription = (
             id: `price_${randomDataGenerator.string({ length: 20 })}`,
             object: 'plan',
             active: true,
-            aggregate_usage: null,
             amount: 1000,
             amount_decimal: '1000',
             billing_scheme: 'per_unit',
@@ -584,7 +585,6 @@ export const getCreatedSubscription = (
             product: `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
               meter: null,
-              aggregate_usage: null,
               interval: 'month',
               interval_count: 1,
               trial_period_days: null,
@@ -799,7 +799,6 @@ export function getParsedCreatedInvoiceResponse(
 export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe.PaymentIntent => {
   return {
     id: `pi_${randomDataGenerator.string({ length: 14 })}`,
-    invoice: `in_${randomDataGenerator.string({ length: 14 })}`,
     payment_method_configuration_details: {
       id: '',
       parent: '',
@@ -1049,7 +1048,7 @@ export const getInvoice = (
         {
           id: 'il_tmp_1Nzo1ZGgdF1VjufLzD1UUn9R',
           object: 'line_item',
-          invoice: '',
+          invoice: `in_${randomDataGenerator.string({ length: 20 })}`,
           amount: 1000,
           amount_excluding_tax: 1000,
           currency: 'usd',
@@ -1064,77 +1063,11 @@ export const getInvoice = (
             end: 1696975413,
             start: 1696975413,
           },
-          plan: {
-            id: `price_${randomDataGenerator.string({ length: 20 })}`,
-            object: 'plan',
-            active: true,
-            aggregate_usage: null,
-            amount: 1000,
-            amount_decimal: '1000',
-            billing_scheme: 'per_unit',
-            created: randomDataGenerator.natural({ length: 10 }),
-            currency: 'usd',
-            interval: 'month',
-            interval_count: 1,
-            livemode: false,
-            metadata: {},
-            nickname: null,
-            product: `prod_${randomDataGenerator.string({ length: 15 })}`,
-            tiers_mode: null,
-            transform_usage: null,
-            trial_period_days: null,
-            usage_type: 'licensed',
-          },
-          price: {
-            id: `price_${randomDataGenerator.string({ length: 12 })}`,
-            object: 'price',
-            active: true,
-            billing_scheme: 'per_unit',
-            created: randomDataGenerator.natural({ length: 10 }),
-            currency: 'usd',
-            custom_unit_amount: null,
-            livemode: false,
-            lookup_key: null,
-            metadata: {
-              maxSpaceBytes: `${randomDataGenerator.natural({ length: 8 })}`,
-              type: userType as string,
+          pricing: {
+            price_details: {
+              price: `price_${randomDataGenerator.string({ length: 20 })}`,
+              product: `prod_${randomDataGenerator.string({ length: 15 })}`,
             },
-            nickname: null,
-            product: {
-              id: productId ?? `prod_${randomDataGenerator.string({ length: 12 })}`,
-              type: 'service',
-              object: 'product',
-              active: true,
-              created: 1678833149,
-              default_price: null,
-              description: null,
-              images: [],
-              marketing_features: [],
-              livemode: false,
-              metadata: {
-                type: userType,
-              },
-              name: 'Gold Plan',
-              package_dimensions: null,
-              shippable: null,
-              statement_descriptor: null,
-              tax_code: null,
-              unit_label: null,
-              updated: 1678833149,
-              url: null,
-            },
-            recurring: {
-              aggregate_usage: null,
-              interval: 'month',
-              interval_count: 1,
-              trial_period_days: null,
-              usage_type: 'licensed',
-            },
-            tax_behavior: 'unspecified',
-            tiers_mode: null,
-            transform_quantity: null,
-            type: 'recurring',
-            unit_amount: 1000,
             unit_amount_decimal: '1000',
           },
           proration: false,
@@ -1197,6 +1130,37 @@ export const getInvoice = (
   };
 };
 
+export const getInvoicePayment = (params?: Partial<Stripe.InvoicePayment>): Stripe.ApiList<Stripe.InvoicePayment> => {
+  return {
+    data: [
+      {
+        id: `inpay_${randomDataGenerator.string({ length: 20 })}`,
+        object: 'invoice_payment',
+        amount_paid: 2000,
+        amount_requested: 2000,
+        created: 1391288554,
+        currency: 'usd',
+        invoice: `in_${randomDataGenerator.string({ length: 20 })}`,
+        is_default: true,
+        livemode: false,
+        payment: {
+          type: 'payment_intent',
+          payment_intent: `pi_${randomDataGenerator.string({ length: 20 })}`,
+        },
+        status: 'paid',
+        status_transitions: {
+          canceled_at: null,
+          paid_at: 1391288554,
+        },
+        ...(params as any),
+      },
+    ],
+    has_more: false,
+    object: 'list',
+    url: '',
+  };
+};
+
 export function getInvoices(count = 2, paramsArray: DeepPartial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
   return Array.from({ length: count }, (_, index) => ({
     ...getInvoice(),
@@ -1238,6 +1202,7 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     application_fee_amount: null,
     balance_transaction: `txn_${randomDataGenerator.string({ length: 10 })}`,
     billing_details: {
+      tax_id: null,
       address: {
         city: null,
         country: null,
@@ -1261,7 +1226,6 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     failure_code: null,
     failure_message: null,
     fraud_details: {},
-    invoice: `in_${randomDataGenerator.string({ length: 16 })}`,
     livemode: false,
     metadata: {},
     on_behalf_of: null,
@@ -1277,7 +1241,7 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
       type: 'authorized',
     },
     paid: true,
-    payment_intent: null,
+    payment_intent: `pi_${randomDataGenerator.string({ length: 20 })}`,
     payment_method: `card_${randomDataGenerator.string({ length: 10 })}`,
     payment_method_details: {
       card: {
@@ -1409,6 +1373,7 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
     object: 'payment_method',
     allow_redisplay: 'unspecified',
     billing_details: {
+      tax_id: null,
       address: {
         city: null,
         country: null,

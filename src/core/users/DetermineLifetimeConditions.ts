@@ -5,6 +5,7 @@ import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
+import Logger from '../../Logger';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -91,15 +92,24 @@ export class DetermineLifetimeConditions {
       const filteredPaidInvoices = await this.getPaidInvoices(customer, invoices);
 
       filteredPaidInvoices.forEach((invoice) => {
-        const price = invoice.lines.data[0].price;
-        const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
+        const pricing = invoice.lines.data[0].pricing;
+        const productId = pricing?.price_details?.product;
         productIds.push(productId ?? '');
       });
 
-      totalMaxSpaceBytes += filteredPaidInvoices.reduce(
-        (accum, invoice) => parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
-        0,
-      );
+      const pricePromises = filteredPaidInvoices.map(async (invoice) => {
+        const pricing = invoice.lines.data[0].pricing;
+        if (pricing?.type === 'price_details' && pricing.price_details?.price) {
+          const priceId = pricing.price_details.price;
+          const price = await this.paymentsService.getPrice(priceId);
+          return parseInt(price?.metadata?.maxSpaceBytes ?? '0');
+        }
+        return 0;
+      });
+
+      const spaceBytesArray = await Promise.all(pricePromises);
+      const customerTotalBytes = spaceBytesArray.reduce((accum, bytes) => accum + bytes, 0);
+      totalMaxSpaceBytes += customerTotalBytes;
     }
 
     const userTier = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
@@ -125,28 +135,41 @@ export class DetermineLifetimeConditions {
   private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
     const paidInvoices = await Promise.all(
       invoices.map(async (invoice) => {
-        const line = invoice.lines.data[0];
+        const invoiceData = await this.paymentsService.getInvoice(invoice.id);
+        const line = invoiceData.lines.data[0];
+        const price = await this.paymentsService.getPrice(line.pricing?.price_details?.price as string);
 
-        if (!line?.price?.metadata) {
-          console.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+        if (!price?.metadata) {
+          console.warn(`Invoice ${invoiceData.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
 
         let chargeId;
-        const isLifetime = line.price?.metadata?.planType === 'one_time';
-        const isPaid = invoice.paid;
-        const invoiceMetadata = invoice.metadata;
-        const isOutOfBand = invoice.paid_out_of_band;
+        const isLifetime = price?.metadata?.planType === 'one_time';
+        const isPaid = invoiceData.status === 'paid';
+        const invoiceMetadata = invoiceData.metadata;
+        const isPaidOutOfBand = isPaid && invoiceData.payments?.data.length === 0;
 
         if (invoiceMetadata?.chargeId) {
           chargeId = invoiceMetadata.chargeId;
         } else {
-          chargeId = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          if (invoiceData.payments?.data.length === 0) return null;
+
+          const paymentIntent = await this.paymentsService.getPaymentIntent(
+            invoiceData.payments?.data[0].payment.payment_intent as string,
+          );
+
+          if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
+            Logger.info('The payment type is not a charge');
+          } else {
+            const charge = paymentIntent.latest_charge;
+            chargeId = typeof charge === 'string' ? charge : charge.id;
+          }
         }
 
         if (!chargeId) {
-          if (isLifetime && isPaid && isOutOfBand) {
-            return invoice;
+          if (isLifetime && isPaid && isPaidOutOfBand) {
+            return invoiceData;
           }
           return null;
         }
@@ -156,14 +179,14 @@ export class DetermineLifetimeConditions {
         const isDisputed = charge.disputed;
 
         if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
-          return invoice;
+          return invoiceData;
         }
 
         return null;
       }),
     );
 
-    return paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+    return paidInvoices.filter((invoice): invoice is Stripe.Response<Stripe.Invoice> => invoice !== null);
   }
 
   private async getHigherTier(productIds: string[], userTier: Tier[] | null) {

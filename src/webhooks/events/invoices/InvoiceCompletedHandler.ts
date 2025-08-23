@@ -65,7 +65,7 @@ export class InvoiceCompletedHandler {
    */
   async run(payload: InvoiceCompletedHandlerPayload): Promise<void> {
     const { customer, invoice, status: invoiceStatus } = payload;
-    const invoiceId = invoice.id;
+    const invoiceId = invoice.id as string;
     const customerId = customer.id;
     const customerEmail = customer.email;
     const isInvoicePaid = invoiceStatus === 'paid';
@@ -77,15 +77,25 @@ export class InvoiceCompletedHandler {
       return;
     }
 
-    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
-    const totalQuantity = items.data[0].quantity ?? 1;
-    const price = items.data?.[0].price;
-
-    if (!price) {
-      throw new NotFoundError(`There is no price in the invoice ${invoiceId}. Customer ID: ${customerId}`);
+    if (!invoiceId) {
+      throw new NotFoundError(`There is no invoice ID in the invoice ${invoiceId}. Customer ID: ${customerId}`);
     }
 
-    const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(price);
+    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
+    const totalQuantity = items.data[0].quantity ?? 1;
+    const priceId = items.data?.[0].pricing?.price_details?.price as string;
+    const productId = items.data?.[0].pricing?.price_details?.product as string;
+
+    if (!priceId || !productId) {
+      throw new NotFoundError(
+        `There is no price ID or product Id in the invoice ${invoiceId}. Customer ID: ${customerId}`,
+      );
+    }
+
+    const price = await this.paymentService.getPrice(priceId);
+    const product = await this.paymentService.getProduct(productId);
+
+    const { maxSpaceBytes, planType, productType } = this.getPriceData(price, product);
 
     const isLifetimePlan = planType === 'one_time';
     const isBusinessPlan = productType === UserType.Business;
@@ -150,9 +160,7 @@ export class InvoiceCompletedHandler {
 
     await this.handleUserCouponRelationship({
       userUuid,
-      invoice,
       invoiceLineItem: items.data[0],
-      isLifetimePlan,
     });
 
     await this.clearUserRelatedCache(customerId, userUuid);
@@ -199,21 +207,20 @@ export class InvoiceCompletedHandler {
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
   }
 
-  private getPriceData(price: Stripe.Price): {
-    productId: string;
+  private getPriceData(
+    price: Stripe.Price,
+    product: Stripe.Product,
+  ): {
     productType: string;
     planType: string;
     maxSpaceBytes: string;
   } {
-    const product = price?.product as Stripe.Product;
-    const productId = product.id;
     const productType = product.metadata?.type;
     const metadata = price.metadata as PriceMetadata;
     const planType = metadata?.planType;
     const maxSpaceBytes = metadata?.maxSpaceBytes;
 
     return {
-      productId,
       productType,
       planType,
       maxSpaceBytes,
@@ -441,23 +448,17 @@ export class InvoiceCompletedHandler {
    */
   private async handleUserCouponRelationship({
     userUuid,
-    invoice,
     invoiceLineItem,
-    isLifetimePlan,
   }: {
     userUuid: string;
-    invoice: Stripe.Invoice;
     invoiceLineItem: Stripe.InvoiceLineItem;
-    isLifetimePlan: boolean;
   }): Promise<void> {
     try {
       const userData = await this.usersService.findUserByUuid(userUuid);
 
-      const areDiscounts = isLifetimePlan ? invoiceLineItem.discounts.length > 0 : !!invoice.discount?.coupon;
+      const areDiscounts = invoiceLineItem.discounts.length > 0;
       if (areDiscounts) {
-        const coupon = isLifetimePlan
-          ? (invoiceLineItem.discounts[0] as Stripe.Discount).coupon
-          : invoice.discount?.coupon;
+        const coupon = (invoiceLineItem.discounts[0] as Stripe.Discount).coupon;
 
         if (coupon) {
           await this.usersService.storeCouponUsedByUser(userData, coupon.id);

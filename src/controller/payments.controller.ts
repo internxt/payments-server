@@ -87,6 +87,7 @@ export default function (
       }
     });
 
+    // !TODO: Remove useless endpoint
     fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
       '/create-customer',
       {
@@ -154,6 +155,7 @@ export default function (
       },
     );
 
+    // !TODO: Remove useless endpoint
     fastify.get<{
       Querystring: { email: string };
       schema: {
@@ -204,6 +206,7 @@ export default function (
       }
     });
 
+    // !TODO: Remove useless endpoint
     fastify.post<{
       Body: {
         customerId: string;
@@ -699,6 +702,7 @@ export default function (
       },
     );
 
+    // !TODO: Remove useless endpoint
     fastify.get<{
       Querystring: {
         customerId: CustomerId;
@@ -997,6 +1001,7 @@ export default function (
       }
     });
 
+    // !TODO: remove useless endpoint (check if it is used or not, not sure)
     fastify.get<{
       Querystring: { planId: string; currency?: string };
       schema: {
@@ -1108,6 +1113,7 @@ export default function (
       }
     });
 
+    // !TODO: Remove useless endpoint
     fastify.post<{
       Body: {
         price_id: string;
@@ -1285,6 +1291,7 @@ export default function (
       }
     });
 
+    // !TODO: remove useless endpoint
     fastify.get<{ Querystring: { code: Coupon['code'] | Stripe.PromotionCode['code'] } }>(
       '/coupon-in-use',
       {
@@ -1338,6 +1345,7 @@ export default function (
       },
     );
 
+    // !TODO: Remove useless endpoint
     fastify.get('/currencies', () => paymentService.getCryptoCurrencies());
   };
 }

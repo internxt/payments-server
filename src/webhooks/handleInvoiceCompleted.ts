@@ -34,7 +34,14 @@ export async function handleObjectStorageInvoiceCompleted(
 
   const [item] = invoice.lines.data;
   const { customer_email } = invoice;
-  const { price } = item;
+  const priceId = item.pricing?.price_details?.price;
+
+  if (!priceId) {
+    log.info(`Invoice ${invoice.id} not handled by object-storage handler due to missing price ID in item lines`);
+    return;
+  }
+
+  const price = await paymentService.getPrice(priceId);
 
   if (!price || !price.product) {
     log.info(`Invoice ${invoice.id} not handled by object-storage handler`);
@@ -79,14 +86,15 @@ export default async function handleInvoiceCompleted(
     return;
   }
 
-  const items = await paymentService.getInvoiceLineItems(session.id);
-  const price = items.data?.[0].price;
-  if (!price) {
+  const items = await paymentService.getInvoiceLineItems(session.id as string);
+  const priceId = session.lines?.data?.[0]?.pricing?.price_details?.price;
+  if (!priceId) {
     log.error(`Invoice completed with id ${session.id} does not contain price, customer: ${session.customer_email}`);
     return;
   }
 
-  const product = price?.product as Stripe.Product;
+  const price = await paymentService.getPrice(priceId as string);
+  const product = await paymentService.getProduct(price.product as string);
   const productType = product.metadata?.type;
   const isBusinessPlan = productType === UserType.Business;
   const isObjStoragePlan = productType === UserType.ObjectStorage;
@@ -153,7 +161,7 @@ export default async function handleInvoiceCompleted(
       paymentService,
       isLifetimeCurrentSub: isLifetimePlan,
       usersService,
-      purchasedItem: items.data[0],
+      purchasedItem: items.data?.[0],
       tiersService,
       storageService,
       user: {
@@ -210,9 +218,9 @@ export default async function handleInvoiceCompleted(
   try {
     const userData = await usersService.findUserByUuid(user.uuid);
 
-    const areDiscounts = isLifetimePlan ? items.data[0].discounts.length > 0 : !!session.discount?.coupon;
+    const areDiscounts = items.data[0].discounts.length > 0;
     if (areDiscounts) {
-      const coupon = isLifetimePlan ? (items.data[0].discounts[0] as Stripe.Discount).coupon : session.discount?.coupon;
+      const coupon = (items.data[0].discounts[0] as Stripe.Discount).coupon;
 
       if (coupon) {
         await usersService.storeCouponUsedByUser(userData, coupon.id);

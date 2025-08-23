@@ -8,6 +8,7 @@ import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
+import Logger from '../Logger';
 
 export default async function handleLifetimeRefunded(
   storageService: StorageService,
@@ -21,19 +22,37 @@ export default async function handleLifetimeRefunded(
 ): Promise<void> {
   const customerId = charge.customer as string;
   const userEmail = charge.receipt_email;
-  const invoiceId = charge.invoice as string;
+  let invoiceId;
   const { uuid, lifetime } = await usersService.findUserByCustomerID(customerId);
 
-  const invoice = await paymentsService.getInvoiceLineItems(invoiceId);
-  const product = invoice.data[0].price?.product;
-
-  let productId: string = '';
-
-  if (typeof product === 'string') {
-    productId = product;
-  } else if (product && 'id' in product) {
-    productId = product.id;
+  if (!charge.payment_intent) {
+    Logger.info(
+      `There is no payment intent for this charge ${charge.id}. Customer is ${customerId} and the uuid is ${uuid}`,
+    );
+    return;
   }
+
+  const invoicePayments = await paymentsService.getInvoicePayment({
+    payment: {
+      type: 'payment_intent',
+      payment_intent: charge.payment_intent as string,
+    },
+  });
+
+  if (invoicePayments.data.length > 0) {
+    invoiceId = invoicePayments.data[0].invoice as string;
+  }
+
+  if (!invoiceId) {
+    Logger.info(
+      `There is no invoice id for this payment. The customer is ${customerId} and the uuid is ${uuid}, skipping it..`,
+    );
+    return;
+  }
+
+  const invoice = await paymentsService.getInvoiceLineItems(invoiceId);
+
+  const productId = invoice.data[0].pricing?.price_details?.product as string;
 
   log.info(
     `[LIFETIME REFUNDED]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,

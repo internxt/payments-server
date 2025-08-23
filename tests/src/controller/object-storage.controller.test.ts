@@ -89,8 +89,10 @@ describe('Object Storage controller', () => {
           lines: {
             data: [
               {
-                price: {
-                  product: mockedProduct.id,
+                pricing: {
+                  price_details: {
+                    product: mockedProduct.id,
+                  },
                 },
               },
             ],
@@ -101,8 +103,10 @@ describe('Object Storage controller', () => {
           lines: {
             data: [
               {
-                price: {
-                  product: mockedProduct.id,
+                pricing: {
+                  price_details: {
+                    product: mockedProduct.id,
+                  },
                 },
               },
             ],

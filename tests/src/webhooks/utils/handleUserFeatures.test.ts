@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { TierNotFoundError } from '../../../../src/services/tiers.service';
 import { UserNotFoundError } from '../../../../src/services/users.service';
 import { handleUserFeatures, HandleUserFeaturesProps } from '../../../../src/webhooks/utils/handleUserFeatures';
-import { getCustomer, getInvoice, getLogger, getUser, newTier } from '../../fixtures';
+import { getCustomer, getInvoice, getLogger, getProduct, getUser, newTier } from '../../fixtures';
 import { User } from '../../../../src/core/users/User';
 import { handleStackLifetimeStorage } from '../../../../src/webhooks/utils/handleStackLifetimeStorage';
 import { Service, Tier } from '../../../../src/core/users/Tier';
@@ -57,6 +57,8 @@ afterEach(() => {
 describe('Create or update user when after successful payment', () => {
   it('when the product does not exists, then an error indicating so is thrown', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
+    const mockedProduct = getProduct({});
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(tierNotFoundError);
 
     await expect(handleUserFeatures(defaultProps)).rejects.toThrow(tierNotFoundError);
@@ -64,6 +66,12 @@ describe('Create or update user when after successful payment', () => {
 
   it('When the user does not have tiers, then it should insert a new tier', async () => {
     const tierNotFoundError = new TierNotFoundError('Tier not found');
+    const mockedProduct = getProduct({
+      params: {
+        id: mockedPurchasedItem.pricing?.price_details?.product,
+      },
+    });
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
     const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
     jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -74,7 +82,7 @@ describe('Create or update user when after successful payment', () => {
     await handleUserFeatures(defaultProps);
 
     expect(getTierProductsSPy).toHaveBeenCalledWith(
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       mockedTier.billingType,
     );
     expect(spyInsert).toHaveBeenCalledTimes(1);
@@ -83,7 +91,7 @@ describe('Create or update user when after successful payment', () => {
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       logger,
       undefined,
     );
@@ -93,6 +101,12 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers and the second invoice has a product that is not mapped (old subscription), then the user-tier relationship is saved and the tier is applied', async () => {
     const randomMockedTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    const mockedProduct = getProduct({
+      params: {
+        id: mockedPurchasedItem.pricing?.price_details?.product,
+      },
+    });
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
     jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
@@ -102,12 +116,20 @@ describe('Create or update user when after successful payment', () => {
         pdf: '',
         product: randomMockedTier.productId,
         bytesInPlan: '',
+        created: mockedInvoices.created,
+        currency: mockedInvoices.currency,
+        id: mockedInvoices.id,
+        total: mockedInvoices.total,
       },
       {
         ...mockedInvoices,
         pdf: '',
         product: randomMockedTier.productId,
         bytesInPlan: '',
+        created: mockedInvoices.created,
+        currency: mockedInvoices.currency,
+        id: mockedInvoices.id,
+        total: mockedInvoices.total,
       },
     ]);
     const spyInsert = jest.spyOn(tiersService, 'insertTierToUser');
@@ -117,14 +139,14 @@ describe('Create or update user when after successful payment', () => {
     await handleUserFeatures(defaultProps);
 
     expect(getTierProductsSPy).toHaveBeenCalledWith(
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       mockedTier.billingType,
     );
     expect(spyApplyTier).toHaveBeenCalledWith(
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       logger,
       undefined,
     );
@@ -135,6 +157,12 @@ describe('Create or update user when after successful payment', () => {
   it('when the user has existing tiers, then it should update from that old tier to the new tier', async () => {
     const mockedOldTier = newTier();
     const mockedInvoices = getInvoice(undefined, undefined, mockedTier.productId);
+    const mockedProduct = getProduct({
+      params: {
+        id: mockedPurchasedItem.pricing?.price_details?.product,
+      },
+    });
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
     jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
     const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedOldTier]);
@@ -144,12 +172,20 @@ describe('Create or update user when after successful payment', () => {
         pdf: '',
         product: mockedOldTier.productId,
         bytesInPlan: '',
+        created: mockedInvoices.created,
+        currency: mockedInvoices.currency,
+        id: mockedInvoices.id,
+        total: mockedInvoices.total,
       },
       {
         ...mockedInvoices,
         pdf: '',
         product: mockedOldTier.productId,
         bytesInPlan: '',
+        created: mockedInvoices.created,
+        currency: mockedInvoices.currency,
+        id: mockedInvoices.id,
+        total: mockedInvoices.total,
       },
     ]);
     const spyUpdate = jest.spyOn(tiersService, 'updateTierToUser').mockResolvedValue();
@@ -158,7 +194,7 @@ describe('Create or update user when after successful payment', () => {
     await handleUserFeatures(defaultProps);
 
     expect(getTierProductsSPy).toHaveBeenCalledWith(
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       mockedTier.billingType,
     );
     expect(spyUpdate).toHaveBeenCalledTimes(1);
@@ -167,7 +203,7 @@ describe('Create or update user when after successful payment', () => {
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       logger,
     );
     expect(spyInsert).not.toHaveBeenCalled();
@@ -175,6 +211,12 @@ describe('Create or update user when after successful payment', () => {
 
   it('When the tier exists but the user does not, then the tier is added and the user is created', async () => {
     const userNotFoundError = new UserNotFoundError('Tier not found');
+    const mockedProduct = getProduct({
+      params: {
+        id: mockedPurchasedItem.pricing?.price_details?.product,
+      },
+    });
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
     const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
     const findByUuidSpy = jest.spyOn(usersService, 'findUserByUuid');
     findByUuidSpy.mockRejectedValueOnce(userNotFoundError);
@@ -187,7 +229,7 @@ describe('Create or update user when after successful payment', () => {
     await handleUserFeatures(defaultProps);
 
     expect(getTierProductsSPy).toHaveBeenCalledWith(
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       mockedTier.billingType,
     );
     expect(spyInsert).toHaveBeenCalledTimes(1);
@@ -196,7 +238,7 @@ describe('Create or update user when after successful payment', () => {
       mockedUser,
       mockedCustomer,
       mockedPurchasedItem.quantity,
-      (mockedPurchasedItem.price?.product as Stripe.Product).id,
+      mockedPurchasedItem.pricing?.price_details?.product,
       logger,
     );
     expect(spyUpdate).not.toHaveBeenCalled();
@@ -207,7 +249,12 @@ describe('Create or update user when after successful payment', () => {
       mockedUser.lifetime = true;
       mockedTier.billingType = 'lifetime';
       defaultProps.isLifetimeCurrentSub = true;
-
+      const mockedProduct = getProduct({
+        params: {
+          id: mockedPurchasedItem.pricing?.price_details?.product,
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
       const getDriveInvoicesSpy = jest.spyOn(paymentService, 'getDriveInvoices');
       const handleStackLifetimeStorageSpy = handleStackLifetimeStorage as jest.Mock;
@@ -217,7 +264,7 @@ describe('Create or update user when after successful payment', () => {
       await handleUserFeatures(defaultProps);
 
       expect(getTierProductsSPy).toHaveBeenCalledWith(
-        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        mockedPurchasedItem.pricing?.price_details?.product,
         mockedTier.billingType,
       );
       expect(handleStackLifetimeStorageSpy).toHaveBeenCalledWith({
@@ -234,7 +281,12 @@ describe('Create or update user when after successful payment', () => {
       mockedUser.lifetime = true;
       mockedTier.billingType = 'lifetime';
       defaultProps.isLifetimeCurrentSub = true;
-
+      const mockedProduct = getProduct({
+        params: {
+          id: mockedPurchasedItem.pricing?.price_details?.product,
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const tierNotFoundError = new TierNotFoundError('Tier not found');
       const getTierProductsSPy = jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
@@ -249,7 +301,7 @@ describe('Create or update user when after successful payment', () => {
       await handleUserFeatures(defaultProps);
 
       expect(getTierProductsSPy).toHaveBeenCalledWith(
-        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        mockedPurchasedItem.pricing?.price_details?.product,
         mockedTier.billingType,
       );
       expect(spyInsert).toHaveBeenCalledTimes(1);
@@ -269,7 +321,7 @@ describe('Create or update user when after successful payment', () => {
         mockedUser,
         mockedCustomer,
         mockedPurchasedItem.quantity,
-        (mockedPurchasedItem.price?.product as Stripe.Product).id,
+        mockedPurchasedItem.pricing?.price_details?.product,
         logger,
         [Service.Drive],
       );
@@ -297,6 +349,13 @@ describe('Create or update user when after successful payment', () => {
 
       mockedUser.lifetime = true;
       defaultProps.isLifetimeCurrentSub = true;
+
+      const mockedProduct = getProduct({
+        params: {
+          id: mockedPurchasedItem.pricing?.price_details?.product,
+        },
+      });
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
 
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(newLifetimeTier);
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);

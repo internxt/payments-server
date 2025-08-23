@@ -116,7 +116,7 @@ export default async function handleCheckoutSessionCompleted(
 
       const invoice = await stripe.invoices.retrieve(session.invoice as string);
 
-      const couponId = invoice.discount?.coupon.id;
+      const couponId = (invoice.discounts[0] as Stripe.Discount).coupon.id;
 
       if (couponId) {
         await usersService.storeCouponUsedByUser(userData, couponId);

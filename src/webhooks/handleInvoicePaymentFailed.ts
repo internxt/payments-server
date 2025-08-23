@@ -16,9 +16,9 @@ async function findObjectStorageLineItem(
   paymentService: PaymentService,
 ): Promise<Stripe.InvoiceLineItem | undefined> {
   for (const line of invoice.lines.data) {
-    const price = line.price;
-    if (!price?.product) continue;
-    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+    const productId = line.pricing?.price_details?.product;
+
+    if (!productId) continue;
 
     const product = await paymentService.getProduct(productId);
     if (isProduct(product)) return line;

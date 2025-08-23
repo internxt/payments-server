@@ -38,7 +38,8 @@ export const handleUserFeatures = async ({
   user,
   logger,
 }: HandleUserFeaturesProps): Promise<void> => {
-  const product = purchasedItem.price?.product as Stripe.Product;
+  const productId = purchasedItem.pricing?.price_details?.product as string;
+  const product = await paymentService.getProduct(productId);
   const isBusinessPlan = product.metadata.type === UserType.Business;
   const userType = isBusinessPlan ? UserType.Business : UserType.Individual;
   const tierBillingType: Tier['billingType'] = isLifetimeCurrentSub ? 'lifetime' : 'subscription';
