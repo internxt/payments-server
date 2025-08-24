@@ -429,7 +429,7 @@ export class PaymentService {
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
-        payment_method_types: ['card', 'paypal', 'klarna'],
+        payment_method_types: ['card', 'paypal'],
       },
       ...additionalInvoiceOptions,
     });

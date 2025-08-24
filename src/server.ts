@@ -42,7 +42,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
   const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
 
-  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-07-30.basil' });
+  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-07-30.basil', typescript: true });
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
   const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);
