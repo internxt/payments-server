@@ -1029,7 +1029,6 @@ export class PaymentService {
       customer: customerId,
       usage: 'off_session',
       metadata,
-      payment_method_types: ['card', 'paypal'],
     });
   }
 
