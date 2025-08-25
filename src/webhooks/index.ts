@@ -6,7 +6,6 @@ import { UsersService } from '../services/users.service';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/payment.service';
-import handleInvoiceCompleted from './handleInvoiceCompleted';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
@@ -16,6 +15,11 @@ import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 import { TiersService } from '../services/tiers.service';
 import handleFundsCaptured from './handleFundsCaptured';
+import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
+import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
+import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
+import { BadRequestError } from '../errors/Errors';
+import Logger from '../Logger';
 
 export default function (
   stripe: Stripe,
@@ -40,14 +44,14 @@ export default function (
         event = stripe.webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_KEY);
       } catch (err) {
         if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
-          fastify.log.info('Stripe event could not be verified');
+          Logger.info('Stripe event could not be verified');
           return rep.status(401).send();
         } else {
           throw err;
         }
       }
 
-      fastify.log.info(`Stripe event received: ${event.type}, id: ${event.id}`);
+      Logger.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
         case 'invoice.payment_failed':
@@ -105,18 +109,35 @@ export default function (
           break;
         }
 
-        case 'invoice.payment_succeeded':
-          await handleInvoiceCompleted(
-            event.data.object,
-            usersService,
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object;
+          const customer = await paymentService.getCustomer(invoice.customer as string);
+
+          if (customer.deleted) {
+            throw new BadRequestError(`The customer with ID ${invoice.customer as string} does not exist`);
+          }
+
+          const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+          const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
+          const handler = new InvoiceCompletedHandler({
+            logger: fastify.log,
+            determineLifetimeConditions,
+            objectStorageWebhookHandler,
             paymentService,
-            fastify.log,
-            cacheService,
-            tiersService,
             storageService,
-            objectStorageService,
-          );
+            tiersService,
+            usersService,
+            cacheService,
+          });
+
+          await handler.run({
+            invoice,
+            customer,
+            status: invoice.status as string,
+          });
+
           break;
+        }
 
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
@@ -183,7 +204,7 @@ export default function (
           break;
 
         default:
-          fastify.log.info(`No handler registered for event: ${event.type}, id: ${event.id}`);
+          Logger.info(`No handler registered for event: ${event.type}, id: ${event.id}`);
       }
 
       return rep.status(204).send();
