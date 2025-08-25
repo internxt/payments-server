@@ -535,83 +535,6 @@ export class PaymentService {
     };
   }
 
-  /**
-   * @deprecated Use `createInvoice` instead.
-   *
-   * Creates an invoice to purchase a lifetime plan.
-   *
-   * @param customerId - The ID of the customer who is purchasing the plan.
-   * @param priceId - The ID of the price associated with the lifetime plan.
-   * @param currency - The currency in which the purchase is made.
-   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
-   *
-   * @returns {PaymentIntent} An object containing:
-   * - `client_secret`: to be used with Stripe Elements,
-   * - `invoice_id`: the ID of the created invoice,
-   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
-   */
-
-  async createPaymentIntent(
-    customerId: CustomerId,
-    amount: number,
-    priceId: string,
-    currency?: string,
-    promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<OldPaymentIntent> {
-    let couponId;
-    const currencyValue = currency ?? 'eur';
-
-    if (!customerId || !amount || !priceId) {
-      throw new MissingParametersError(['customerId', 'amount', 'priceId']);
-    }
-
-    const price = await this.provider.prices.retrieve(priceId);
-
-    const invoice = await this.provider.invoices.create({
-      customer: customerId,
-      currency: currencyValue,
-      payment_settings: {
-        payment_method_types: ['card', 'paypal'],
-      },
-    });
-
-    if (promoCodeId) {
-      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
-    }
-
-    await this.provider.invoiceItems.create({
-      customer: customerId,
-      price: price.id,
-      invoice: invoice.id,
-      discounts: [
-        {
-          coupon: couponId,
-        },
-      ],
-    });
-
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-
-    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
-
-    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
-      return {
-        clientSecret: '',
-        id: '',
-        invoiceStatus: finalizedInvoice.status,
-      };
-    }
-
-    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
-      paymentIntentForFinalizedInvoice as string,
-    );
-
-    return {
-      clientSecret: client_secret,
-      id,
-    };
-  }
-
   async updateCustomerBillingInfo(
     customerId: CustomerId,
     payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
@@ -1412,31 +1335,6 @@ export class PaymentService {
   }
 
   /**
-   * @deprecated Use `getPromoCode` instead
-   * @param promoCodeName - The name of the promotion code
-   * @returns The ACTIVE promotion code object
-   */
-  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
-    const { data: promotionCodes } = await this.provider.promotionCodes.list({
-      active: true,
-      code: promoCodeName,
-      expand: ['data.coupon.applies_to'],
-    });
-
-    if (!promotionCodes || promotionCodes.length === 0) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    const [lastActiveCoupon] = promotionCodes;
-
-    if (!lastActiveCoupon?.active) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    return lastActiveCoupon;
-  }
-
-  /**
    * This function is used to get the promotion code object from Stripe.
    * @param promoCodeName - The name of the promotion code
    * @returns The ACTIVE promotion code object
@@ -1497,7 +1395,7 @@ export class PaymentService {
       throw new MissingParametersError(['promoCode', 'priceId']);
     }
 
-    const promoCode = await this.getPromotionCodeObject(promoCodeName);
+    const promoCode = await this.getPromoCode({ promoCodeName });
 
     const product = await this.provider.prices.retrieve(priceId);
 

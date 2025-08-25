@@ -6,7 +6,6 @@ import {
   getLicenseCode,
   getLogger,
   getPaymentIntent,
-  getPrice,
   getPrices,
   getUniqueCodes,
   getUser,
@@ -16,10 +15,8 @@ import {
   voidPromise,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getUserStorage } from '../../../src/services/storage.service';
 import { CustomerNotFoundError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
-import { HUNDRED_TB } from '../../../src/constants';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
@@ -146,109 +143,6 @@ describe('Payment controller e2e tests', () => {
 
         expect(response.statusCode).toBe(404);
       });
-    });
-  });
-
-  describe('Create a payment intent for one time payment products (lifetimes)', () => {
-    it('When the user attempts to purchase a lifetime plan and is a free user, then the user should be allowed to purchase the product', async () => {
-      const mockedUser = getUser();
-      const mockedPrice = getPrice();
-      const mockedToken = getValidAuthToken(mockedUser.uuid);
-      const paymentIntentResponse = {
-        clientSecret: 'client-secret',
-        id: 'client-secret-id',
-      };
-
-      jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue({
-        selectedPlan: {
-          amount: Number(mockedPrice.unit_amount),
-          bytes: 10,
-          currency: mockedPrice.currency,
-          decimalAmount: Number(mockedPrice.unit_amount_decimal),
-          id: mockedPrice.id,
-          interval: 'lifetime',
-        },
-      });
-      (getUserStorage as jest.Mock).mockResolvedValue(Promise.resolve({ currentMaxSpaceBytes: 1024 }));
-      jest.spyOn(PaymentService.prototype, 'createPaymentIntent').mockResolvedValue(paymentIntentResponse);
-
-      const token = jwt.sign(
-        {
-          customerId: mockedUser.customerId,
-        },
-        config.JWT_SECRET,
-      );
-
-      const mockedQuery = {
-        customerId: mockedUser.customerId,
-        planId: mockedPrice.id,
-        amount: mockedPrice.unit_amount !== null ? String(mockedPrice.unit_amount) : '',
-        token: token,
-        currency: mockedPrice.currency,
-      };
-
-      const response = await app.inject({
-        method: 'GET',
-        path: '/payment-intent',
-        headers: {
-          authorization: `Bearer ${mockedToken}`,
-        },
-        query: mockedQuery,
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(paymentIntentResponse);
-    });
-
-    it('When the user is close to the storage limit (100TB) and the product to purchase passes it, then an error indicating so is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedPrice = getPrice();
-      const mockedToken = getValidAuthToken(mockedUser.uuid);
-      const paymentIntentResponse = {
-        clientSecret: 'client-secret',
-        id: 'client-secret-id',
-      };
-
-      jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue({
-        selectedPlan: {
-          amount: Number(mockedPrice.unit_amount),
-          bytes: 10,
-          currency: mockedPrice.currency,
-          decimalAmount: Number(mockedPrice.unit_amount_decimal),
-          id: mockedPrice.id,
-          interval: 'lifetime',
-        },
-      });
-      (getUserStorage as jest.Mock).mockResolvedValue(Promise.resolve({ currentMaxSpaceBytes: HUNDRED_TB }));
-      jest.spyOn(PaymentService.prototype, 'createPaymentIntent').mockResolvedValue(paymentIntentResponse);
-
-      const token = jwt.sign(
-        {
-          customerId: mockedUser.customerId,
-        },
-        config.JWT_SECRET,
-      );
-
-      const mockedQuery = {
-        customerId: mockedUser.customerId,
-        planId: mockedPrice.id,
-        amount: mockedPrice.unit_amount !== null ? String(mockedPrice.unit_amount) : '',
-        token: token,
-        currency: mockedPrice.currency,
-      };
-
-      const response = await app.inject({
-        method: 'GET',
-        path: '/payment-intent',
-        headers: {
-          authorization: `Bearer ${mockedToken}`,
-        },
-        query: mockedQuery,
-      });
-
-      expect(response.statusCode).toBe(400);
     });
   });
 
