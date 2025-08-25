@@ -109,8 +109,8 @@ export default function (
           break;
         }
 
-        case 'invoice.payment_succeeded':
-          const invoice = event.data.object as Stripe.Invoice;
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object;
           const customer = await paymentService.getCustomer(invoice.customer as string);
 
           if (customer.deleted) {
@@ -137,6 +137,7 @@ export default function (
           });
 
           break;
+        }
 
         case 'checkout.session.completed':
           await handleCheckoutSessionCompleted(
