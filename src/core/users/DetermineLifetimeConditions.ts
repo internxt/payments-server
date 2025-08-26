@@ -140,8 +140,9 @@ export class DetermineLifetimeConditions {
 
         const chargeIdFromInvoice = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
         const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromInvoice;
+        const paidExternally = isOutOfBand || !chargeId;
 
-        if (isLifetime && isPaid && (isOutOfBand || !chargeId)) {
+        if (isLifetime && isPaid && paidExternally) {
           return invoice;
         }
 
