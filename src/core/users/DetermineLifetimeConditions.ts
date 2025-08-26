@@ -5,6 +5,7 @@ import { Service, Tier } from './Tier';
 import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
+import Logger from '../../Logger';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -128,7 +129,7 @@ export class DetermineLifetimeConditions {
         const line = invoice.lines.data[0];
 
         if (!line?.price?.metadata) {
-          console.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+          Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
 
