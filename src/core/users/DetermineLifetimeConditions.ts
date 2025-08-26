@@ -144,33 +144,37 @@ export class DetermineLifetimeConditions {
           return null;
         }
 
-        let chargeId;
         const isLifetime = price?.metadata?.planType === 'one_time';
         const isPaid = invoiceData.status === 'paid';
         const invoiceMetadata = invoiceData.metadata;
         const isPaidOutOfBand = isPaid && invoiceData.payments?.data.length === 0;
 
-        if (invoiceMetadata?.chargeId) {
-          chargeId = invoiceMetadata.chargeId;
-        } else {
-          if (invoiceData.payments?.data.length === 0) return null;
-
-          const paymentIntent = await this.paymentsService.getPaymentIntent(
-            invoiceData.payments?.data[0].payment.payment_intent as string,
-          );
-
-          if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
-            Logger.info('The payment type is not a charge');
-          } else {
-            const charge = paymentIntent.latest_charge;
-            chargeId = typeof charge === 'string' ? charge : charge.id;
-          }
+        if (isLifetime && isPaid && isPaidOutOfBand) {
+          return invoiceData;
         }
 
+        if (!invoiceData.payments?.data[0].payment.payment_intent) {
+          Logger.info('There is no payment intent in the invoice');
+          return null;
+        }
+
+        const paymentIntent = await this.paymentsService.getPaymentIntent(
+          invoiceData.payments?.data[0].payment.payment_intent as string,
+        );
+
+        if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
+          Logger.info(
+            `There is no charge in the payment intent or the status is not succeeded. Payment intent: ${paymentIntent.latest_charge}`,
+          );
+          return null;
+        }
+        const chargeIdFromPaymentIntent =
+          typeof paymentIntent.latest_charge === 'string'
+            ? paymentIntent.latest_charge
+            : paymentIntent.latest_charge.id;
+        const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromPaymentIntent;
+
         if (!chargeId) {
-          if (isLifetime && isPaid && isPaidOutOfBand) {
-            return invoiceData;
-          }
           return null;
         }
 
