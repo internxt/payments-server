@@ -139,7 +139,7 @@ export class DetermineLifetimeConditions {
         const line = invoiceData.lines.data[0];
         const price = await this.paymentsService.getPrice(line.pricing?.price_details?.price as string);
 
-        if (!line?.price?.metadata) {
+        if (!price?.metadata) {
           Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
@@ -173,10 +173,6 @@ export class DetermineLifetimeConditions {
             ? paymentIntent.latest_charge
             : paymentIntent.latest_charge.id;
         const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromPaymentIntent;
-
-        if (!chargeId) {
-          return null;
-        }
 
         if (!chargeId) return null;
 
