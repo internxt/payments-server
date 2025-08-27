@@ -9,15 +9,12 @@ import {
   CouponCodeError,
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
-  CustomerId,
   ExistingSubscriptionError,
   MissingParametersError,
   NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
   PaymentService,
   PromoCodeIsNotValidError,
-  CustomerNotFoundError,
-  InvalidTaxIdError,
 } from '../services/payment.service';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
@@ -26,11 +23,8 @@ import {
   LicenseCodeAlreadyAppliedError,
   LicenseCodesService,
 } from '../services/licenseCodes.service';
-import { Coupon } from '../core/coupons/Coupon';
 import { assertUser } from '../utils/assertUser';
-import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { CustomerSyncService } from '../services/customerSync.service';
 import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
 
@@ -86,217 +80,6 @@ export default function (
         reply.status(401).send();
       }
     });
-
-    fastify.post<{ Body: { name: string; email: string; country?: string; companyVatId?: string } }>(
-      '/create-customer',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['email', 'name'],
-            properties: {
-              name: { type: 'string' },
-              email: { type: 'string' },
-              country: { type: 'string' },
-              companyVatId: { type: 'string' },
-            },
-          },
-        },
-        config: {
-          rateLimit: {
-            max: 5,
-            timeWindow: '1 hour',
-          },
-        },
-      },
-      async (req, res) => {
-        const { name, email, country, companyVatId } = req.body;
-        const { uuid } = req.user.payload;
-
-        if (!email) {
-          return res.status(404).send({
-            message: 'Email should be provided',
-          });
-        }
-
-        try {
-          const customerSyncService = new CustomerSyncService(usersService, paymentService);
-
-          const existingCustomerId = await customerSyncService.findOrSyncCustomerByUuidOrEmail(uuid, email);
-
-          if (existingCustomerId) {
-            const token = jwt.sign({ customerId: existingCustomerId }, config.JWT_SECRET);
-            return res.send({ customerId: existingCustomerId, token });
-          }
-
-          const { id } = await paymentService.createCustomer({ name, email });
-
-          await paymentService.getVatIdAndAttachTaxIdToCustomer(id, country, companyVatId);
-
-          const token = jwt.sign({ customerId: id }, config.JWT_SECRET);
-
-          return res.send({ customerId: id, token });
-        } catch (err) {
-          const error = err as Error;
-
-          req.log.error(`[ERROR CREATING CUSTOMER]: ${error.stack ?? error.message}`);
-
-          if (error instanceof InvalidTaxIdError) {
-            return res.status(400).send({
-              message: error.message,
-            });
-          }
-
-          return res.status(500).send({
-            message: 'Internal Server Error',
-          });
-        }
-      },
-    );
-
-    fastify.get<{
-      Querystring: { email: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { email: { type: 'number' } };
-        };
-      };
-    }>('/get-customer-id', async (req, res) => {
-      const { email } = req.query;
-
-      if (!email) {
-        return res.status(404).send({
-          message: 'Email should be provided',
-        });
-      }
-
-      try {
-        const { id } = await paymentService.getCustomerIdByEmail(email);
-
-        const token = jwt.sign(
-          {
-            customerId: id,
-          },
-          config.JWT_SECRET,
-          {
-            expiresIn: '1h',
-          },
-        );
-
-        return res.status(200).send({
-          customerId: id,
-          token,
-        });
-      } catch (error) {
-        if (error instanceof CustomerNotFoundError) {
-          return res.status(404).send({
-            message: error.message,
-          });
-        }
-
-        const err = error as Error;
-        req.log.error(`[ERROR FETCHING THE CUSTOMER ID]: ${err.stack ?? err.message}`);
-
-        return res.status(500).send({
-          message: 'Internal Server Error',
-        });
-      }
-    });
-
-    fastify.post<{
-      Body: {
-        customerId: string;
-        priceId: string;
-        currency: string;
-        token: string;
-        quantity?: number;
-        promoCodeId?: string;
-      };
-    }>(
-      '/create-subscription',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['customerId', 'priceId'],
-            properties: {
-              customerId: {
-                type: 'string',
-              },
-              priceId: {
-                type: 'string',
-              },
-              token: {
-                type: 'string',
-              },
-              currency: {
-                type: 'string',
-              },
-              promoCodeId: {
-                type: 'string',
-              },
-              quantity: {
-                type: 'number',
-              },
-            },
-          },
-        },
-      },
-      async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId, quantity: seatsForBusinessSubscription } = req.body;
-
-        if (!customerId || !priceId) {
-          throw new MissingParametersError(['customerId', 'priceId']);
-        }
-
-        try {
-          const payload = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          const tokenCustomerId = payload.customerId;
-
-          if (customerId !== tokenCustomerId) {
-            return res.status(403).send();
-          }
-        } catch (error) {
-          return res.status(403).send();
-        }
-
-        try {
-          const subscriptionSetup = await paymentService.createSubscription({
-            customerId,
-            priceId,
-            seatsForBusinessSubscription: seatsForBusinessSubscription ?? 1,
-            currency,
-            promoCodeId,
-          });
-
-          return res.send(subscriptionSetup);
-        } catch (err) {
-          const error = err as Error;
-          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
-
-          if (error instanceof MissingParametersError) {
-            return res.status(400).send({
-              message: error.message,
-            });
-          } else if (error instanceof PromoCodeIsNotValidError) {
-            return res
-              .status(422)
-              .send({ message: 'The promotion code is not applicable under the current conditions' });
-          } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send({
-              message: error.message,
-            });
-          }
-
-          return res.status(500).send({
-            message: 'Internal Server Error',
-          });
-        }
-      },
-    );
 
     fastify.post<{
       Body: {
@@ -700,149 +483,6 @@ export default function (
     );
 
     fastify.get<{
-      Querystring: {
-        customerId: CustomerId;
-        amount: number;
-        planId: string;
-        token: string;
-        currency?: string;
-        promoCodeName?: string;
-      };
-      schema: {
-        querystring: {
-          properties: {
-            customerId: { type: 'string' };
-            planId: { type: 'string' };
-            amount: { type: 'number' };
-            token: { type: 'string' };
-            currency: { type: 'string' };
-            promoCodeName: { type: 'string' };
-          };
-        };
-      };
-    }>('/payment-intent', async (req, res) => {
-      const { uuid, email } = req.user.payload;
-      const { customerId, amount, planId, currency, token, promoCodeName } = req.query;
-
-      try {
-        const payload = jwt.verify(token, config.JWT_SECRET) as {
-          customerId: string;
-        };
-        const tokenCustomerId = payload.customerId;
-
-        if (customerId !== tokenCustomerId) {
-          return res.status(403).send();
-        }
-      } catch (error) {
-        return res.status(403).send();
-      }
-
-      try {
-        const { selectedPlan } = await paymentService.getPlanById(planId);
-        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
-          uuid,
-          email,
-          selectedPlan.bytes.toString(),
-        );
-
-        if (!isStorageUpgradeAllowed) {
-          return res.status(400).send({
-            message: "The user can't stack more storage",
-          });
-        }
-
-        const { clientSecret, id, invoiceStatus } = await paymentService.createPaymentIntent(
-          customerId,
-          amount,
-          planId,
-          currency,
-          promoCodeName,
-        );
-
-        return { clientSecret, id, invoiceStatus };
-      } catch (err) {
-        const error = err as Error;
-        if (error instanceof MissingParametersError) {
-          return res.status(404).send({
-            message: error.message,
-          });
-        }
-
-        if (error instanceof PromoCodeIsNotValidError) {
-          return res.status(400).send({
-            message: error.message,
-          });
-        }
-
-        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
-        return res.status(500).send({
-          message: 'Internal Server Error',
-        });
-      }
-    });
-
-    // TODO: Remove this useless endpoint
-    fastify.get<{
-      Querystring: {
-        customerId: CustomerId;
-        amount: number;
-        planId: string;
-        token: string;
-        currency?: string;
-      };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: {
-            customerId: { type: 'string' };
-            planId: { type: 'string' };
-            amount: { type: 'number' };
-            token: { type: 'string' };
-            currency: { type: 'string' };
-          };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 hour';
-        };
-      };
-    }>('/payment-intent-for-object-storage', async (req, res) => {
-      const { customerId, amount, planId, currency, token } = req.query;
-
-      try {
-        const payload = jwt.verify(token, config.JWT_SECRET) as {
-          customerId: string;
-        };
-        const tokenCustomerId = payload.customerId;
-
-        if (customerId !== tokenCustomerId) {
-          return res.status(403).send();
-        }
-      } catch (error) {
-        return res.status(403).send();
-      }
-
-      try {
-        const { clientSecret } = await paymentService.createPaymentIntent(customerId, amount, planId, currency);
-
-        return { clientSecret };
-      } catch (err) {
-        const error = err as Error;
-        if (error instanceof MissingParametersError) {
-          return res.status(404).send({
-            message: error.message,
-          });
-        }
-        req.log.error(`[ERROR WHILE CREATING PAYMENT INTENT]: ${error.stack ?? error.message}`);
-        return res.status(500).send({
-          message: 'Internal Server Error',
-        });
-      }
-    });
-
-    fastify.get<{
       Querystring: { userType?: 'individual' | 'business' };
     }>(
       '/default-payment-method',
@@ -1083,7 +723,7 @@ export default function (
       const { promotionCode } = req.query;
 
       try {
-        const promoCode = await paymentService.getPromotionCodeObject(promotionCode);
+        const promoCode = await paymentService.getPromoCode({ promoCodeName: promotionCode });
 
         const promoCodeObj = {
           promoCodeName: promotionCode,
@@ -1284,60 +924,5 @@ export default function (
         return rep.status(500).send({ message: 'Internal Server Error' });
       }
     });
-
-    fastify.get<{ Querystring: { code: Coupon['code'] | Stripe.PromotionCode['code'] } }>(
-      '/coupon-in-use',
-      {
-        schema: {
-          querystring: {
-            type: 'object',
-            properties: { code: { type: 'string' } },
-          },
-        },
-        config: {
-          rateLimit: {
-            max: 5,
-            timeWindow: '1 minute',
-          },
-        },
-      },
-      async (req, rep) => {
-        const { code } = req.query;
-        const { uuid } = req.user.payload;
-        const user = await usersService.findUserByUuid(uuid);
-
-        if (!code) {
-          return rep.status(400).send({ message: 'Bad Request' });
-        }
-
-        try {
-          let isBeingUsed = await usersService.isCouponBeingUsedByUser(user, code);
-
-          if (!isBeingUsed) {
-            const stripePromotionCode = await paymentService.getPromotionCodeObject(code);
-
-            if (stripePromotionCode) {
-              isBeingUsed = await usersService.isCouponBeingUsedByUser(user, stripePromotionCode.coupon.id);
-            }
-          }
-
-          return rep.status(200).send({ couponUsed: isBeingUsed });
-        } catch (error) {
-          const err = error as Error;
-          if (
-            err instanceof LicenseCodeAlreadyAppliedError ||
-            err instanceof InvalidLicenseCodeError ||
-            err instanceof NotFoundPromoCodeByNameError
-          ) {
-            return rep.status(404).send({ message: err.message });
-          }
-
-          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-          return rep.status(500).send({ message: 'Internal Server Error' });
-        }
-      },
-    );
-
-    fastify.get('/currencies', () => paymentService.getCryptoCurrencies());
   };
 }
