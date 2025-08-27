@@ -139,8 +139,8 @@ export class DetermineLifetimeConditions {
         const line = invoiceData.lines.data[0];
         const price = await this.paymentsService.getPrice(line.pricing?.price_details?.price as string);
 
-        if (!price?.metadata) {
-          console.warn(`Invoice ${invoiceData.id} for customer ${customer.id} has no price metadata`);
+        if (!line?.price?.metadata) {
+          Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
 
@@ -177,6 +177,8 @@ export class DetermineLifetimeConditions {
         if (!chargeId) {
           return null;
         }
+
+        if (!chargeId) return null;
 
         const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
         const isFullyRefunded = charge.refunded;

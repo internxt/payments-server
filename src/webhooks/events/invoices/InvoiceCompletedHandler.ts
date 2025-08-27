@@ -325,9 +325,9 @@ export class InvoiceCompletedHandler {
         tierToApply = lifetimeTier;
         lifetimeMaxSpaceBytesToApply = Number(lifetimeMaxSpaceBytes);
       } catch (error) {
-        Logger.error(`Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}`, {
-          error: (error as Error).message,
-        });
+        Logger.error(
+          `Failed to determine lifetime conditions for user ${user.uuid} with customerId ${customer.id}. Error: ${(error as Error).message}`,
+        );
       }
     }
 
