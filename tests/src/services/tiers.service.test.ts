@@ -198,7 +198,9 @@ describe('TiersService tests', () => {
       });
       const mockedInvoice = getInvoice({
         status: 'paid',
-        paid_out_of_band: true,
+        payments: {
+          data: [],
+        },
       });
 
       const isLifetime = mockedUser.lifetime as boolean;
@@ -270,7 +272,10 @@ describe('TiersService tests', () => {
         jest
           .spyOn(paymentService, 'getInvoicesFromUser')
           .mockResolvedValue([
-            { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
+            {
+              lines: { data: [{ pricing: { price_details: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } } }] },
+              status: 'paid',
+            },
           ] as any);
 
         const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);

@@ -138,12 +138,8 @@ export class TiersService {
 
       for (const invoice of paidInvoices) {
         const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-
-        if (invoice.paid_out_of_band) {
-          isLifetimePaidOutOfBand = true;
-          break;
-        }
+        const product = lineItem?.pricing?.price_details?.product;
+        isLifetimePaidOutOfBand = invoice.status === 'paid' && invoice.payments?.data.length === 0;
 
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
           productId = product;

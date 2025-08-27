@@ -7,6 +7,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
 import { FastifyBaseLogger } from 'fastify';
 import { TiersService } from '../services/tiers.service';
+import Logger from '../Logger';
 
 interface HandleDisputeResultProps {
   dispute: Stripe.Dispute;
@@ -39,9 +40,28 @@ export async function handleDisputeResult({
   try {
     const charge = await stripe.charges.retrieve(chargeId);
     const customerId = typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id as string);
-    const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : (charge.invoice?.id as string);
+    let invoiceId = null;
 
-    const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
+    if (!charge.payment_intent) {
+      Logger.info(
+        `There is no payment intent for this payment. THe customer is ${customerId} and the charge is ${chargeId}`,
+      );
+      return;
+    }
+
+    const invoicePayments = await paymentService.getInvoicePayment({
+      payment: {
+        type: 'payment_intent',
+        payment_intent: charge.payment_intent as string,
+      },
+    });
+
+    if (invoicePayments.data.length > 0) {
+      invoiceId = invoicePayments.data[0].invoice;
+    }
+
+    const { lines } = await stripe.invoices.retrieve(invoiceId as string);
+    const subscriptionId = lines.data[0].subscription;
     const { lifetime } = await usersService.findUserByCustomerID(customerId);
 
     if (lifetime) {

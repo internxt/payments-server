@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 import { CouponNotBeingTrackedError, UserNotFoundError } from '../../../../../src/services/users.service';
-import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
+import { getCustomer, getInvoice, getPrice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
 import { NotFoundError } from '../../../../../src/errors/Errors';
@@ -54,7 +54,11 @@ describe('Testing the handler when an invoice is completed', () => {
         lines: {
           data: [
             {
-              price: null,
+              pricing: {
+                price_details: {
+                  product: 'prod_1',
+                },
+              },
             },
           ],
         },
@@ -74,24 +78,35 @@ describe('Testing the handler when an invoice is completed', () => {
 
     test('When the user purchases an object storage product, then the object storage conditions are applied', async () => {
       const mockedCustomer = getCustomer();
+      const mockedUser = getUser();
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+          id: 'prod_1',
+        },
+      });
+      const mockedPrice = getPrice({
+        product: mockedProduct.id,
+      });
       const mockedInvoice = getInvoice({
         customer: mockedCustomer.id,
         status: 'paid',
         lines: {
           data: [
             {
-              price: {
-                product: {
-                  metadata: {
-                    type: 'object-storage',
-                  },
-                  id: 'prod_1',
+              pricing: {
+                price_details: {
+                  product: mockedProduct.id,
+                  price: mockedPrice.id,
                 },
               },
             },
           ],
         },
       });
+
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
         customer: mockedCustomer,
         invoice: mockedInvoice,
@@ -100,6 +115,14 @@ describe('Testing the handler when an invoice is completed', () => {
       jest
         .spyOn(paymentService, 'getInvoiceLineItems')
         .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
+      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(usersService, 'findUserByEmail').mockResolvedValue({
+        data: {
+          uuid: mockedUser.uuid,
+          email: mockedCustomer.email as string,
+        },
+      });
       const reactivateObjectStorageAccountSpy = jest
         .spyOn(objectStorageWebhookHandler, 'reactivateObjectStorageAccount')
         .mockResolvedValue();
@@ -118,6 +141,12 @@ describe('Testing the handler when an invoice is completed', () => {
         customer: mockedCustomer.id,
         status: 'paid',
       });
+      const mockedPrice = getPrice({
+        metadata: {
+          maxSpaceBytes: '1000',
+        },
+      });
+      const mockedProduct = getProduct({});
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
         customer: mockedCustomer,
         invoice: mockedInvoice,
@@ -128,6 +157,8 @@ describe('Testing the handler when an invoice is completed', () => {
         .spyOn(paymentService, 'getInvoiceLineItems')
         .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockRejectedValue(unexpectedError);
+      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
 
       await expect(invoiceCompletedHandler.run(invoiceCompletedHandlerPayload)).rejects.toThrow(unexpectedError);
     });
@@ -138,14 +169,23 @@ describe('Testing the handler when an invoice is completed', () => {
         customer: mockedCustomer.id,
         status: 'paid',
       });
+      const mockedPrice = getPrice({
+        metadata: {
+          maxSpaceBytes: '1000',
+        },
+      });
+      const mockedProduct = getProduct({});
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
         customer: mockedCustomer,
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
-      const mockedUser = getUser();
-      const maxSpaceBytes = Number(mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes);
 
+      const mockedUser = getUser();
+      const maxSpaceBytes = Number(mockedPrice?.metadata.maxSpaceBytes);
+
+      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest
         .spyOn(paymentService, 'getInvoiceLineItems')
         .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
@@ -165,7 +205,7 @@ describe('Testing the handler when an invoice is completed', () => {
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
       expect(getTierProductsByProductIdsSpy).toHaveBeenCalledWith(
-        (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        mockedInvoice.lines.data[0].pricing?.price_details?.product,
         'subscription',
       );
       expect(handleOldProductSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
@@ -186,10 +226,14 @@ describe('Testing the handler when an invoice is completed', () => {
       };
       const mockedTier = newTier();
       const mockedUser = getUser();
+      const mockedPrice = getPrice();
+      const mockedProduct = getProduct({});
 
       jest
         .spyOn(paymentService, 'getInvoiceLineItems')
         .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
+      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const getTierProductsByProductIdsSpy = jest
         .spyOn(tiersService, 'getTierProductsByProductsId')
         .mockResolvedValue(mockedTier);
@@ -208,14 +252,14 @@ describe('Testing the handler when an invoice is completed', () => {
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
       expect(getTierProductsByProductIdsSpy).toHaveBeenCalledWith(
-        (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        mockedInvoice.lines.data[0].pricing?.price_details?.product,
         'subscription',
       );
       expect(handleOldProductSpy).not.toHaveBeenCalled();
       expect(handleNewProductSpy).toHaveBeenCalledWith({
         user: { ...mockedUser, email: mockedCustomer.email as string },
         isLifetimePlan: false,
-        productId: (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        productId: mockedInvoice.lines.data[0].pricing?.price_details?.product,
         customer: mockedCustomer,
         tier: mockedTier,
         totalQuantity: 1,
@@ -283,15 +327,20 @@ describe('Testing the handler when an invoice is completed', () => {
 
   describe('Get price data', () => {
     test('When the price data is required, then the needed data is returned', () => {
-      const mockedInvoice = getInvoice();
-      const mockedPrice = mockedInvoice.lines.data[0].price as Stripe.Price;
+      const mockedProduct = getProduct({
+        params: {
+          metadata: {
+            type: 'object-storage',
+          },
+        },
+      });
+      const mockedPrice = getPrice();
 
       const getPriceData = invoiceCompletedHandler['getPriceData'].bind(invoiceCompletedHandler);
-      const result = getPriceData(mockedPrice);
+      const result = getPriceData(mockedPrice, mockedProduct);
 
       expect(result).toStrictEqual({
-        productId: (mockedPrice.product as Stripe.Product).id,
-        productType: (mockedPrice.product as Stripe.Product).metadata.type,
+        productType: mockedProduct.metadata.type,
         planType: mockedPrice.metadata.planType,
         maxSpaceBytes: mockedPrice.metadata.maxSpaceBytes,
       });
@@ -903,9 +952,7 @@ describe('Testing the handler when an invoice is completed', () => {
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
       await handleUserCouponRelationship({
         userUuid: mockedUser.uuid,
-        invoice: mockedInvoice,
         invoiceLineItem: mockedInvoice.lines.data[0],
-        isLifetimePlan: true,
       });
 
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(
@@ -917,12 +964,21 @@ describe('Testing the handler when an invoice is completed', () => {
     test('When subscription plan has discount, then it should store coupon from invoice', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice({
-        discount: {
-          coupon: {
-            id: 'mocked-coupon',
-          },
-        } as any,
+        lines: {
+          data: [
+            {
+              discounts: [
+                {
+                  coupon: {
+                    id: 'mocked-coupon',
+                  },
+                },
+              ],
+            },
+          ],
+        },
       });
+
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockResolvedValue();
 
@@ -930,18 +986,19 @@ describe('Testing the handler when an invoice is completed', () => {
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
       await handleUserCouponRelationship({
         userUuid: mockedUser.uuid,
-        invoice: mockedInvoice,
         invoiceLineItem: mockedInvoice.lines.data[0],
-        isLifetimePlan: false,
       });
 
-      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, mockedInvoice.discount?.coupon.id);
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(
+        mockedUser,
+        (mockedInvoice.lines.data[0].discounts[0] as Stripe.Discount)?.coupon.id,
+      );
     });
 
     test('When no discount exists, then the flow continues', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice({
-        discount: null,
+        discounts: undefined,
       });
       const mockedInvoiceLineItem = {
         ...mockedInvoice.lines.data[0],
@@ -954,9 +1011,7 @@ describe('Testing the handler when an invoice is completed', () => {
         invoiceCompletedHandler['handleUserCouponRelationship'].bind(invoiceCompletedHandler);
       await handleUserCouponRelationship({
         userUuid: mockedUser.uuid,
-        invoice: mockedInvoice,
         invoiceLineItem: mockedInvoiceLineItem,
-        isLifetimePlan: false,
       });
 
       expect(storeCouponUsedByUserSpy).not.toHaveBeenCalled();
@@ -965,11 +1020,19 @@ describe('Testing the handler when an invoice is completed', () => {
     test('When the coupon code is not tracked, then an error is caught and the flow continues without storing the coupon', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice({
-        discount: {
-          coupon: {
-            id: 'mocked-coupon',
-          },
-        } as any,
+        lines: {
+          data: [
+            {
+              discounts: [
+                {
+                  coupon: {
+                    id: 'mocked-coupon',
+                  },
+                },
+              ],
+            },
+          ],
+        },
       });
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest
@@ -982,9 +1045,7 @@ describe('Testing the handler when an invoice is completed', () => {
       await expect(
         handleUserCouponRelationship({
           userUuid: mockedUser.uuid,
-          invoice: mockedInvoice,
           invoiceLineItem: mockedInvoice.lines.data[0],
-          isLifetimePlan: false,
         }),
       ).resolves.not.toThrow();
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
@@ -995,11 +1056,19 @@ describe('Testing the handler when an invoice is completed', () => {
       const randomError = new Error('Random error');
       const mockedUser = getUser();
       const mockedInvoice = getInvoice({
-        discount: {
-          coupon: {
-            id: 'mocked-coupon',
-          },
-        } as any,
+        lines: {
+          data: [
+            {
+              discounts: [
+                {
+                  coupon: {
+                    id: 'mocked-coupon',
+                  },
+                },
+              ],
+            },
+          ],
+        },
       });
       jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const storeCouponUsedByUserSpy = jest.spyOn(usersService, 'storeCouponUsedByUser').mockRejectedValue(randomError);
@@ -1010,9 +1079,7 @@ describe('Testing the handler when an invoice is completed', () => {
       await expect(
         handleUserCouponRelationship({
           userUuid: mockedUser.uuid,
-          invoice: mockedInvoice,
           invoiceLineItem: mockedInvoice.lines.data[0],
-          isLifetimePlan: false,
         }),
       ).rejects.toThrow(randomError);
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
