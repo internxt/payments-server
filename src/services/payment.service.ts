@@ -535,83 +535,6 @@ export class PaymentService {
     };
   }
 
-  /**
-   * @deprecated Use `createInvoice` instead.
-   *
-   * Creates an invoice to purchase a lifetime plan.
-   *
-   * @param customerId - The ID of the customer who is purchasing the plan.
-   * @param priceId - The ID of the price associated with the lifetime plan.
-   * @param currency - The currency in which the purchase is made.
-   * @param promoCodeId - (Optional) The promotion code applied to the purchase, if any.
-   *
-   * @returns {PaymentIntent} An object containing:
-   * - `client_secret`: to be used with Stripe Elements,
-   * - `invoice_id`: the ID of the created invoice,
-   * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
-   */
-
-  async createPaymentIntent(
-    customerId: CustomerId,
-    amount: number,
-    priceId: string,
-    currency?: string,
-    promoCodeId?: Stripe.PromotionCode['id'],
-  ): Promise<OldPaymentIntent> {
-    let couponId;
-    const currencyValue = currency ?? 'eur';
-
-    if (!customerId || !amount || !priceId) {
-      throw new MissingParametersError(['customerId', 'amount', 'priceId']);
-    }
-
-    const price = await this.provider.prices.retrieve(priceId);
-
-    const invoice = await this.provider.invoices.create({
-      customer: customerId,
-      currency: currencyValue,
-      payment_settings: {
-        payment_method_types: ['card', 'paypal'],
-      },
-    });
-
-    if (promoCodeId) {
-      couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
-    }
-
-    await this.provider.invoiceItems.create({
-      customer: customerId,
-      price: price.id,
-      invoice: invoice.id,
-      discounts: [
-        {
-          coupon: couponId,
-        },
-      ],
-    });
-
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-
-    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
-
-    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
-      return {
-        clientSecret: '',
-        id: '',
-        invoiceStatus: finalizedInvoice.status,
-      };
-    }
-
-    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
-      paymentIntentForFinalizedInvoice as string,
-    );
-
-    return {
-      clientSecret: client_secret,
-      id,
-    };
-  }
-
   async updateCustomerBillingInfo(
     customerId: CustomerId,
     payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
@@ -1414,31 +1337,6 @@ export class PaymentService {
   }
 
   /**
-   * @deprecated Use `getPromoCode` instead
-   * @param promoCodeName - The name of the promotion code
-   * @returns The ACTIVE promotion code object
-   */
-  async getPromotionCodeObject(promoCodeName: Stripe.PromotionCode['code']): Promise<Stripe.PromotionCode> {
-    const { data: promotionCodes } = await this.provider.promotionCodes.list({
-      active: true,
-      code: promoCodeName,
-      expand: ['data.coupon.applies_to'],
-    });
-
-    if (!promotionCodes || promotionCodes.length === 0) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    const [lastActiveCoupon] = promotionCodes;
-
-    if (!lastActiveCoupon?.active) {
-      throw new NotFoundPromoCodeByNameError(promoCodeName);
-    }
-
-    return lastActiveCoupon;
-  }
-
-  /**
    * This function is used to get the promotion code object from Stripe.
    * @param promoCodeName - The name of the promotion code
    * @returns The ACTIVE promotion code object
@@ -1499,7 +1397,7 @@ export class PaymentService {
       throw new MissingParametersError(['promoCode', 'priceId']);
     }
 
-    const promoCode = await this.getPromotionCodeObject(promoCodeName);
+    const promoCode = await this.getPromoCode({ promoCodeName });
 
     const product = await this.provider.prices.retrieve(priceId);
 
@@ -1536,108 +1434,6 @@ export class PaymentService {
     if (activeSubscriptions) {
       throw new ExistingSubscriptionError('User already has an active subscription of the same type');
     }
-  }
-
-  async getCheckoutSession({
-    customerId,
-    priceId,
-    successUrl,
-    cancelUrl,
-    prefill,
-    mode,
-    trialDays,
-    couponCode,
-    currency,
-    seats,
-  }: {
-    priceId: string;
-    successUrl: string;
-    cancelUrl: string;
-    prefill: User | string;
-    mode: Stripe.Checkout.SessionCreateParams.Mode;
-    customerId: CustomerId | undefined;
-    trialDays?: number;
-    couponCode?: Stripe.PromotionCode['id'];
-    currency?: string;
-    seats?: number;
-  }): Promise<Stripe.Checkout.Session> {
-    let promoCodeId: Stripe.PromotionCode['id'] | undefined;
-
-    const productCurrency = currency ?? 'eur';
-    const subscriptionData = trialDays ? { subscription_data: { trial_period_days: trialDays } } : {};
-    const invoiceCreation = mode === 'payment' && { invoice_creation: { enabled: true } };
-    const prices = await this.getPricesRaw(productCurrency, true);
-    const selectedPrice = prices.find((price) => price.id === priceId);
-    const product = selectedPrice?.product as Stripe.Product;
-    const paymentMethodTypes: Stripe.Checkout.SessionCreateParams.PaymentMethodType[] = this.getPaymentMethodTypes(
-      productCurrency,
-      selectedPrice?.type === 'one_time',
-    );
-
-    if (!selectedPrice) throw new Error('The product does not exist');
-
-    const customerIsRegistered = customerId ? await this.getCustomer(customerId) : undefined;
-    const newPriceIsNotLifetime = selectedPrice.type !== 'one_time';
-
-    if (customerIsRegistered && newPriceIsNotLifetime && customerId) {
-      await this.checkActiveSubscriptions(customerId, (product.metadata.type as UserType) || UserType.Individual);
-    }
-
-    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: priceId, quantity: 1 }];
-    if (product.metadata?.type === 'business') {
-      const minimumSeats = selectedPrice.metadata?.minimumSeats ? parseInt(selectedPrice.metadata.minimumSeats) : 1;
-      const maximumSeats = selectedPrice.metadata?.maximumSeats ? parseInt(selectedPrice.metadata.maximumSeats) : 100;
-      let seatNumber = seats ?? minimumSeats;
-
-      if (maximumSeats && seatNumber > maximumSeats) {
-        seatNumber = maximumSeats;
-      }
-
-      lineItems = [
-        {
-          price: priceId,
-          adjustable_quantity: {
-            enabled: true,
-            minimum: minimumSeats,
-            maximum: maximumSeats,
-          },
-          quantity: seatNumber,
-        },
-      ];
-    }
-
-    if (couponCode) {
-      const { restrictions } = await this.provider.promotionCodes.retrieve(couponCode as string);
-
-      const isCouponOnlyForFirstPurchase = restrictions.first_time_transaction;
-
-      const userInvoices = await this.provider.invoices.list({
-        customer: customerId,
-      });
-
-      if (!isCouponOnlyForFirstPurchase || (isCouponOnlyForFirstPurchase && !userInvoices)) {
-        promoCodeId = couponCode;
-      }
-    }
-
-    const checkout = await this.provider.checkout.sessions.create({
-      payment_method_types: paymentMethodTypes,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      customer: typeof prefill === 'string' ? undefined : prefill?.customerId,
-      customer_email: typeof prefill === 'string' ? prefill : undefined,
-      line_items: lineItems,
-      automatic_tax: { enabled: false },
-      currency: productCurrency,
-      mode,
-      discounts: promoCodeId ? [{ promotion_code: promoCodeId }] : undefined,
-      allow_promotion_codes: promoCodeId ? undefined : true,
-      billing_address_collection: 'required',
-      ...invoiceCreation,
-      ...subscriptionData,
-    });
-
-    return checkout;
   }
 
   async getCheckoutLineItems(checkoutSessionId: string) {
