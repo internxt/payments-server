@@ -8,7 +8,6 @@ import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import { PaymentService } from '../services/payment.service';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
-import handleCheckoutSessionCompleted from './handleCheckoutSessionCompleted';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
@@ -139,32 +138,8 @@ export default function (
           break;
         }
 
-        case 'checkout.session.completed':
-          await handleCheckoutSessionCompleted(
-            event.data.object,
-            stripe,
-            usersService,
-            paymentService,
-            fastify.log,
-            cacheService,
-            config,
-          );
-          break;
-
         case 'setup_intent.succeeded':
           await handleSetupIntentSucceeded(event.data.object, paymentService);
-          break;
-
-        case 'checkout.session.async_payment_succeeded':
-          await handleCheckoutSessionCompleted(
-            event.data.object,
-            stripe,
-            usersService,
-            paymentService,
-            fastify.log,
-            cacheService,
-            config,
-          );
           break;
 
         case 'charge.refunded':
