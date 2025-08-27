@@ -600,11 +600,13 @@ export class PaymentService {
       return subscription;
     });
 
-    const activeOrTrialingSubscriptions = transformedData.filter(
-      (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
+    const acceptedSubscriptionStatus: Stripe.Subscription['status'][] = ['active', 'past_due', 'trialing'];
+
+    const userSubscription = transformedData.filter((subscription) =>
+      acceptedSubscriptionStatus.includes(subscription.status),
     );
 
-    return activeOrTrialingSubscriptions;
+    return userSubscription;
   }
 
   async getSubscriptionById(subscriptionId: string) {
