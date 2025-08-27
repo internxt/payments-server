@@ -153,26 +153,31 @@ export class DetermineLifetimeConditions {
           return invoiceData;
         }
 
-        if (!invoiceData.payments?.data[0].payment.payment_intent) {
-          Logger.info('There is no payment intent in the invoice');
-          return null;
-        }
+        let chargeId;
+        if (invoiceMetadata?.chargeId) {
+          chargeId = invoiceMetadata?.chargeId;
+        } else {
+          if (!invoiceData.payments?.data[0].payment.payment_intent) {
+            Logger.info('There is no payment intent in the invoice');
+            return null;
+          }
 
-        const paymentIntent = await this.paymentsService.getPaymentIntent(
-          invoiceData.payments?.data[0].payment.payment_intent as string,
-        );
-
-        if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
-          Logger.info(
-            `There is no charge in the payment intent or the status is not succeeded. Payment intent: ${paymentIntent.latest_charge}`,
+          const paymentIntent = await this.paymentsService.getPaymentIntent(
+            invoiceData.payments?.data[0].payment.payment_intent as string,
           );
-          return null;
+
+          if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
+            Logger.info(
+              `There is no charge in the payment intent or the status is not succeeded. Payment intent: ${paymentIntent.latest_charge}`,
+            );
+            return null;
+          }
+          const chargeIdFromPaymentIntent =
+            typeof paymentIntent.latest_charge === 'string'
+              ? paymentIntent.latest_charge
+              : paymentIntent.latest_charge.id;
+          chargeId = invoiceMetadata?.chargeId ?? chargeIdFromPaymentIntent;
         }
-        const chargeIdFromPaymentIntent =
-          typeof paymentIntent.latest_charge === 'string'
-            ? paymentIntent.latest_charge
-            : paymentIntent.latest_charge.id;
-        const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromPaymentIntent;
 
         if (!chargeId) return null;
 

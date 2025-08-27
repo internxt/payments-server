@@ -9,6 +9,7 @@ import {
   getPrice,
   getInvoices,
   getCharge,
+  getPaymentIntent,
 } from '../../fixtures';
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
@@ -105,7 +106,10 @@ describe('Determining Lifetime conditions', () => {
           maxSpaceBytes: '1',
         },
       });
-      const mockedCharge = getCharge();
+      const mockedCharge = getCharge({
+        refunded: false,
+        disputed: false,
+      });
       const mockedLineItems = {
         lines: {
           data: [
@@ -114,6 +118,7 @@ describe('Determining Lifetime conditions', () => {
                 type: 'price_details',
                 price_details: {
                   price: mockedPrice.id,
+                  product: mockedTier.productId,
                 },
               },
             },
@@ -125,39 +130,36 @@ describe('Determining Lifetime conditions', () => {
           data: [
             {
               payment: {
-                type: 'charge',
-                charge: mockedCharge,
+                payment_intent: mockedCharge.payment_intent,
               },
             },
           ],
         },
       };
-      const mockedInvoice = getInvoices(3, [
-        {
-          status: 'paid',
-          ...mockedPayments,
-          ...(mockedLineItems as any),
-        },
-        {
-          status: 'paid',
-          ...mockedPayments,
-          ...(mockedLineItems as any),
-        },
-        {
-          status: 'paid',
-          ...mockedPayments,
-          ...(mockedLineItems as any),
-        },
-      ]);
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+        ...mockedPayments,
+        ...(mockedLineItems as any),
+      });
+      const mockedPaymentIntent = getPaymentIntent({
+        latest_charge: mockedCharge.id,
+        status: 'succeeded',
+      });
+
+      const mockedInvoices = getInvoices(3, [mockedInvoice, mockedInvoice, mockedInvoice]);
 
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'lifetime' });
-      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
       jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([mockedCustomer]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoice);
+      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(paymentService, 'getPaymentIntent')
+        .mockResolvedValue(mockedPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
       jest.spyOn(paymentService, 'retrieveCustomerChargeByChargeId').mockResolvedValue(mockedCharge);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
 
       const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(mockedUser, mockedTier.productId);
 
@@ -210,6 +212,7 @@ describe('Determining Lifetime conditions', () => {
         },
       });
       const mockedCharge = getCharge();
+      const mockedTier = newTier({ billingType: 'lifetime' });
       const mockedInvoice = getInvoice({
         status: 'paid',
         lines: {
@@ -219,6 +222,7 @@ describe('Determining Lifetime conditions', () => {
                 type: 'price_details',
                 price_details: {
                   price: mockedPrice.id,
+                  product: mockedTier.productId,
                 },
               },
             },
@@ -228,14 +232,16 @@ describe('Determining Lifetime conditions', () => {
           data: [
             {
               payment: {
-                type: 'charge',
-                charge: mockedCharge,
+                payment_intent: mockedCharge.payment_intent as string,
               },
             },
           ],
         },
       });
-      const mockedTier = newTier({ billingType: 'lifetime' });
+      const mockedPaymentIntent = getPaymentIntent({
+        latest_charge: mockedCharge.id,
+        status: 'succeeded',
+      });
 
       jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
       jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([mockedCustomer]);
@@ -243,12 +249,16 @@ describe('Determining Lifetime conditions', () => {
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
       jest.spyOn(paymentService, 'retrieveCustomerChargeByChargeId').mockResolvedValue(mockedCharge);
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(paymentService, 'getPaymentIntent')
+        .mockResolvedValue(mockedPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
 
       //@ts-ignore
       const result = await determineLifetimeConditions.handleStackingLifetime(user);
 
       expect(result.tier).toEqual(mockedTier);
-      expect(result.maxSpaceBytes).toBe(parseInt(mockedPrice?.metadata?.maxSpaceBytes));
+      expect(result.maxSpaceBytes).toBe(3);
     });
   });
 
@@ -262,6 +272,7 @@ describe('Determining Lifetime conditions', () => {
         },
       });
 
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(invoice as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
       //@ts-ignore
@@ -277,7 +288,7 @@ describe('Determining Lifetime conditions', () => {
           planType: 'one_time',
         },
       });
-      const invoice = getInvoice({
+      const mockedInvoice = getInvoice({
         status: 'paid',
         payments: {
           data: [],
@@ -295,76 +306,84 @@ describe('Determining Lifetime conditions', () => {
         },
       });
 
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
       //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
+      const result = await determineLifetimeConditions.getPaidInvoices(customer, [mockedInvoice]);
 
-      expect(result).toEqual([invoice]);
+      expect(result).toEqual([mockedInvoice]);
     });
 
     it('When the invoice is paid and it has not been refunded nor disputed, then the invoice is returned', async () => {
       const customer = getCustomer();
-      const invoice = getInvoice();
+      const mockedInvoice = getInvoice();
       const mockedPrice = getPrice({
         metadata: {
           planType: 'one_time',
         },
       });
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.status = 'paid';
+      const mockedCharge = getCharge();
+      const mockedPaymentIntent = getPaymentIntent({
+        latest_charge: mockedCharge.id,
+      });
+      mockedInvoice.metadata = { chargeId: 'ch_123' };
+      mockedInvoice.status = 'paid';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
         .mockResolvedValue({ refunded: false, disputed: false } as any);
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
       //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
+      const result = await determineLifetimeConditions.getPaidInvoices(customer, [mockedInvoice]);
 
-      expect(result).toEqual([invoice]);
+      expect(result).toEqual([mockedInvoice]);
     });
 
     it('When the invoice is paid but it has been refunded, then the invoice is returned', async () => {
       const customer = getCustomer();
-      const invoice = getInvoice();
+      const mockedInvoice = getInvoice();
       const mockedPrice = getPrice({
         metadata: {
           planType: 'one_time',
         },
       });
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.status = 'paid';
+      mockedInvoice.metadata = { chargeId: 'ch_123' };
+      mockedInvoice.status = 'paid';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
         .mockResolvedValue({ refunded: true, disputed: false } as any);
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
       //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
+      const result = await determineLifetimeConditions.getPaidInvoices(customer, [mockedInvoice]);
 
       expect(result).toStrictEqual([]);
     });
 
     it('When the invoice is paid and it has has been disputed, then the invoice is returned', async () => {
       const customer = getCustomer();
-      const invoice = getInvoice();
+      const mockedInvoice = getInvoice();
       const mockedPrice = getPrice({
         metadata: {
           planType: 'one_time',
         },
       });
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.status = 'paid';
+      mockedInvoice.metadata = { chargeId: 'ch_123' };
+      mockedInvoice.status = 'paid';
 
+      jest.spyOn(paymentService, 'getInvoice').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
         .mockResolvedValue({ refunded: false, disputed: true } as any);
-      jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
       //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
+      const result = await determineLifetimeConditions.getPaidInvoices(customer, [mockedInvoice]);
 
       expect(result).toStrictEqual([]);
     });

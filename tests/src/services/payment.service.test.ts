@@ -136,6 +136,9 @@ describe('Payments Service tests', () => {
 
   describe('Creating a user invoice for one time payment products', () => {
     test('When fetching the Payment Intent customer with the correct payload, then returns the client secret', async () => {
+      const mockedPaymentIntent = getPaymentIntentResponse({
+        type: 'fiat',
+      });
       const mockedInvoice = getInvoice({
         lines: {
           data: [
@@ -149,13 +152,21 @@ describe('Payments Service tests', () => {
             },
           ],
         },
+        payments: {
+          data: [
+            {
+              payment: {
+                payment_intent: mockedPaymentIntent.id,
+              },
+            },
+          ],
+        },
+        confirmation_secret: {
+          client_secret: mockedPaymentIntent.clientSecret as string,
+        },
       });
       const mockedPrice = getPrice({
         id: 'mockedPriceId',
-      });
-
-      const mockedPaymentIntent = getPaymentIntentResponse({
-        type: 'fiat',
       });
 
       jest
