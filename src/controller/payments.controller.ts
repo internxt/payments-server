@@ -637,7 +637,6 @@ export default function (
       }
     });
 
-    // !TODO: remove useless endpoint (check if it is used or not, not sure)
     fastify.get<{
       Querystring: { planId: string; currency?: string };
       schema: {
