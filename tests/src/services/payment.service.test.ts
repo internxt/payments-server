@@ -99,6 +99,18 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Get a price given its ID', () => {
+    it('When the price exists, then it is returned', async () => {
+      const mockedPrice = getPrice();
+      const priceSpy = jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+
+      const price = await paymentService.getPriceById(mockedPrice.id);
+
+      expect(priceSpy).toHaveBeenCalledWith(mockedPrice.id);
+      expect(price).toEqual(mockedPrice);
+    });
+  });
+
   describe('Creating an invoice', () => {
     test('When trying to create an invoice with the correct params, then it is successfully created', async () => {
       const mockedPaymentIntent = getPaymentIntentResponse({ type: 'fiat' });
