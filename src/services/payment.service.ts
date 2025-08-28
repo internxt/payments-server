@@ -11,7 +11,7 @@ import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
-import { stripeNewVersion } from './stripe';
+import { getStripeNewVersion } from './stripe';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -425,6 +425,7 @@ export class PaymentService {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
     const paymentMethodTypes = ['card', 'paypal', 'klarna'];
+    const stripeNewVersion = getStripeNewVersion();
 
     const invoice = await stripeNewVersion.invoices.create({
       customer: customerId,

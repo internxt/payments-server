@@ -4,7 +4,6 @@ import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
-import Stripe from 'stripe';
 import {
   PaymentIntent,
   PaymentIntentCrypto,
@@ -27,6 +26,7 @@ import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
 import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
 import { AllowedCryptoCurrencies } from '../../src/utils/currency';
+import Stripe from 'stripe';
 
 const randomDataGenerator = new Chance();
 
@@ -419,6 +419,9 @@ export const getCreatedSubscription = (
       metadata: {},
       object: 'payment_method',
       type: 'card',
+    } as Stripe.PaymentMethod,
+    billing_mode: {
+      type: 'classic',
     },
     default_source: {
       id: `src_${randomDataGenerator.string({ length: 16 })}`,
@@ -523,6 +526,8 @@ export const getCreatedSubscription = (
       data: [
         {
           id: `si_${randomDataGenerator.string({ length: 12 })}`,
+          current_period_end: randomDataGenerator.natural({ length: 10 }),
+          current_period_start: randomDataGenerator.natural({ length: 10 }),
           object: 'subscription_item',
           billing_thresholds: null,
           created: randomDataGenerator.natural({ length: 10 }),
@@ -600,7 +605,7 @@ export const getCreatedSubscription = (
           quantity: 1,
           subscription: `sub_${randomDataGenerator.string({ length: 12 })}`,
           tax_rates: [],
-        },
+        } as Stripe.SubscriptionItem,
       ],
       has_more: false,
       url: '/v1/subscription_items?subscription=sub_1MowQVLkdIwHu7ixeRlqHVzs',
@@ -800,6 +805,7 @@ export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe
   return {
     id: `pi_${randomDataGenerator.string({ length: 14 })}`,
     invoice: `in_${randomDataGenerator.string({ length: 14 })}`,
+    excluded_payment_method_types: [],
     payment_method_configuration_details: {
       id: '',
       parent: '',
@@ -1238,6 +1244,7 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     application_fee_amount: null,
     balance_transaction: `txn_${randomDataGenerator.string({ length: 10 })}`,
     billing_details: {
+      tax_id: null,
       address: {
         city: null,
         country: null,
@@ -1409,6 +1416,7 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
     object: 'payment_method',
     allow_redisplay: 'unspecified',
     billing_details: {
+      tax_id: null,
       address: {
         city: null,
         country: null,

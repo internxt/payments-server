@@ -1,5 +1,15 @@
-import StripeNew from 'stripe-next-version';
+import Stripe from 'stripe-next-version';
+import config from '../config';
 
-export const stripeNewVersion = new StripeNew(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-07-30.basil',
-});
+let stripeNewVersionInstance: typeof Stripe | null = null;
+
+export const getStripeNewVersion = (): typeof Stripe => {
+  if (!stripeNewVersionInstance) {
+    stripeNewVersionInstance = new Stripe(config.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-08-27.basil',
+    });
+  }
+  return stripeNewVersionInstance;
+};
+
+export const stripeNewVersion = getStripeNewVersion();
