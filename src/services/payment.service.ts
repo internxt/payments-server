@@ -11,6 +11,7 @@ import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
+import { stripeNewVersion } from './stripe';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -388,6 +389,10 @@ export class PaymentService {
     }
   }
 
+  async getPrice(priceId: string): Promise<Stripe.Price> {
+    return this.provider.prices.retrieve(priceId);
+  }
+
   /**
    * Creates an invoice to purchase a one time plan.
    *
@@ -419,12 +424,13 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
+    const paymentMethodTypes = ['card', 'paypal', 'klarna'];
 
-    const invoice = await this.provider.invoices.create({
+    const invoice = await stripeNewVersion.invoices.create({
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: paymentMethodTypes,
       },
       ...additionalInvoiceOptions,
     });
@@ -433,10 +439,13 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    const invoiceItem = await this.provider.invoiceItems.create({
+    const invoiceId = invoice.id;
+    const invoiceItem = await stripeNewVersion.invoiceItems.create({
       customer: customerId,
       invoice: invoice.id,
-      price: priceId,
+      pricing: {
+        price: priceId,
+      },
       discounts: [
         {
           coupon: couponId,
@@ -444,12 +453,17 @@ export class PaymentService {
       ],
     });
 
-    const isLifetime = invoiceItem.price?.type === 'one_time';
+    if (!invoiceItem.pricing?.price_details?.price || !invoiceId) {
+      throw new BadRequestError('Invoice item does not have a price.');
+    }
+
+    const price = await this.getPrice(invoiceItem.pricing?.price_details?.price);
+    const isLifetime = price.type === 'one_time';
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
-      const upcomingInvoice = await this.provider.invoices.retrieve(invoice.id);
+      const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
 
@@ -461,22 +475,22 @@ export class PaymentService {
         description: `Payment for lifetime product ${priceId}`,
         priceAmount,
         priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
-        title: `Invoice from Stripe ${invoice.id}`,
+        title: `Invoice from Stripe ${invoiceId}`,
         securityToken: jwt.sign(
           {
-            invoiceId: invoice.id,
+            invoiceId: invoiceId,
             customerId: customerId,
             provider: 'stripe',
           },
           config.JWT_SECRET,
         ),
-        foreignId: invoice.id,
+        foreignId: invoiceId,
         cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
         successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
         purchaserEmail: userEmail,
       });
 
-      await this.updateInvoice(invoice.id, {
+      await this.updateInvoice(invoiceId, {
         metadata: {
           provider: 'bit2me',
           cryptoInvoiceId: cryptoInvoice.invoiceId,
@@ -484,9 +498,12 @@ export class PaymentService {
         description: 'Invoice paid using crypto currencies.',
       });
 
-      const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id, {
+      const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
         auto_advance: false,
+        expand: ['payments', 'confirmation_secret'],
       });
+
+      const paymentIntentForFinalizedInvoice = finalizedInvoice.payments?.data[0].payment.payment_intent;
 
       const checkoutPayload = await this.bit2MeService.checkoutInvoice(
         cryptoInvoice.invoiceId,
@@ -498,7 +515,7 @@ export class PaymentService {
       });
 
       return {
-        id: finalizedInvoice.payment_intent as string,
+        id: paymentIntentForFinalizedInvoice as string,
         type: 'crypto',
         token: secureToken,
         payload: {
@@ -512,10 +529,11 @@ export class PaymentService {
       };
     }
 
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoice.id);
-    const paymentIntentForFinalizedInvoice = finalizedInvoice.payment_intent;
+    const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
+      expand: ['payments', 'confirmation_secret'],
+    });
 
-    if (!paymentIntentForFinalizedInvoice && finalizedInvoice.status === 'paid') {
+    if (finalizedInvoice.status === 'paid') {
       return {
         clientSecret: '',
         id: '',
@@ -524,14 +542,19 @@ export class PaymentService {
       };
     }
 
-    const { client_secret, id } = await this.provider.paymentIntents.retrieve(
-      paymentIntentForFinalizedInvoice as string,
-    );
+    const clientSecret = finalizedInvoice.confirmation_secret?.client_secret;
+    const paymentIntentId = finalizedInvoice.payments?.data[0].payment.payment_intent as string;
+
+    if (!clientSecret) {
+      throw new BadRequestError(
+        `Invoice with Id ${invoiceId} for customer ${customerId} does not have a client secret.`,
+      );
+    }
 
     return {
-      clientSecret: client_secret,
+      id: paymentIntentId ?? '',
+      clientSecret,
       type: 'fiat',
-      id,
     };
   }
 
