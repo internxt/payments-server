@@ -443,7 +443,7 @@ export class PaymentService {
     const invoiceId = invoice.id;
     const invoiceItem = await stripeNewVersion.invoiceItems.create({
       customer: customerId,
-      invoice: invoice.id,
+      invoice: invoiceId,
       pricing: {
         price: priceId,
       },
