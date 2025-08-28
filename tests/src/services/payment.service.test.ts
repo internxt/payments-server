@@ -104,7 +104,7 @@ describe('Payments Service tests', () => {
       const mockedPrice = getPrice();
       const priceSpy = jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
 
-      const price = await paymentService.getPriceById(mockedPrice.id);
+      const price = await paymentService.getPrice(mockedPrice.id);
 
       expect(priceSpy).toHaveBeenCalledWith(mockedPrice.id);
       expect(price).toEqual(mockedPrice);
