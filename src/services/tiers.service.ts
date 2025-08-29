@@ -142,8 +142,9 @@ export class TiersService {
         const invoiceMetadata = invoice.metadata;
         const invoiceMetadataProvider = invoiceMetadata?.provider;
         const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
+        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
 
-        if (invoice.paid_out_of_band && !isBit2MeProvider) {
+        if (isExternalPayment) {
           isLifetimePaidOutOfBand = true;
           break;
         }
