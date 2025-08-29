@@ -51,6 +51,7 @@
     "jsonwebtoken": "^9.0.0",
     "mongodb": "^6.10.0",
     "stripe": "=17.7.0",
+    "stripe-next-version": "npm:stripe@=18.5.0",
     "uuid": "^11.1.0"
   }
 }
