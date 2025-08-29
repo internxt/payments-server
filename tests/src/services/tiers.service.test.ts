@@ -192,24 +192,59 @@ describe('TiersService tests', () => {
       );
     });
 
-    it('When a user has a lifetime plan paid out of band, no products are applied', async () => {
-      const mockedUser = getUser({
-        lifetime: true,
+    describe('Paid out of band invoices', () => {
+      test('When a user has a lifetime plan paid out of band and the provider is different to bit2me, then no products are applied', async () => {
+        const mockedUser = getUser({
+          lifetime: true,
+        });
+        const mockedInvoice = getInvoice({
+          status: 'paid',
+          paid_out_of_band: true,
+        });
+
+        const isLifetime = mockedUser.lifetime as boolean;
+
+        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+
+        const antivirusTier = await tiersService.getProductsTier(mockedUser.customerId, isLifetime);
+
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: false, backups: false },
+        });
       });
-      const mockedInvoice = getInvoice({
-        status: 'paid',
-        paid_out_of_band: true,
-      });
 
-      const isLifetime = mockedUser.lifetime as boolean;
+      test('When a user has a lifetime plan paid out of band and the provider is bit2me, then the products are applied', async () => {
+        const mockedUser = getUser({
+          lifetime: true,
+        });
+        const mockedInvoice = getInvoice({
+          status: 'paid',
+          paid_out_of_band: true,
+          lines: {
+            data: [
+              {
+                price: {
+                  product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0],
+                },
+              },
+            ],
+          },
+          metadata: {
+            provider: 'bit2me',
+          },
+        });
 
-      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
+        const isLifetime = mockedUser.lifetime as boolean;
 
-      const antivirusTier = await tiersService.getProductsTier(mockedUser.customerId, isLifetime);
+        jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice]);
 
-      expect(antivirusTier).toEqual({
-        featuresPerService: { antivirus: false, backups: false },
+        const antivirusTier = await tiersService.getProductsTier(mockedUser.customerId, isLifetime);
+
+        expect(antivirusTier).toEqual({
+          featuresPerService: { antivirus: true, backups: true },
+        });
       });
     });
 
