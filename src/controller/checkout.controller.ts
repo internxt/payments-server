@@ -11,7 +11,7 @@ import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyRecaptcha } from '../utils/validateCaptcha';
+import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
