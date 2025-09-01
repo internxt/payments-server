@@ -884,12 +884,14 @@ export class PaymentService {
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
     subscriptionId?: SubscriptionId,
+    additionalParams?: Stripe.InvoiceListParams,
   ): Promise<Invoice[]> {
     const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
+      ...additionalParams,
     });
 
     return res.data;

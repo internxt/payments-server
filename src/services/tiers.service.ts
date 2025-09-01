@@ -133,14 +133,21 @@ export class TiersService {
     }
 
     if (isLifetime) {
-      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
+      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {}, undefined, {
+        expand: ['data.payments'],
+      });
       const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
 
       for (const invoice of paidInvoices) {
         const lineItem = invoice.lines?.data[0];
         const product = lineItem?.pricing?.price_details?.product;
-        isLifetimePaidOutOfBand =
+        const isLifetimePaidExternally: boolean =
           invoice.status === 'paid' && invoice.payments?.data.length === 0 && invoice.metadata?.provider !== 'bit2me';
+
+        if (isLifetimePaidExternally) {
+          isLifetimePaidOutOfBand = true;
+          break;
+        }
 
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
           productId = product;
