@@ -41,17 +41,17 @@ export class ObjectStorageWebhookHandler {
 
     const [item] = invoice.lines.data;
     const { customer_email } = invoice;
-    const { price } = item;
+    const productId = item.pricing?.price_details?.product;
 
-    if (!price || !price.product) {
+    if (!productId) {
       Logger.info(`The price or the product for the invoice with ID ${invoice.id} are null.`);
       return;
     }
 
-    const product = await this.paymentService.getProduct(price.product as string);
+    const product = await this.paymentService.getProduct(productId as string);
 
     if (!this.isObjectStorageProduct(product)) {
-      Logger.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
+      Logger.info(`Invoice ${invoice.id} for product ${productId as string} is not an object-storage product`);
       return;
     }
 

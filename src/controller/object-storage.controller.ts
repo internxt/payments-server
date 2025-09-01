@@ -13,7 +13,7 @@ import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 
-function signUserToken(customerId: string) {
+function signUserToken(customerId: string): string {
   return jwt.sign({ customerId }, config.JWT_SECRET);
 }
 
@@ -241,7 +241,7 @@ export default function (paymentService: PaymentService) {
       }
 
       const productPromises = userInvoices
-        .map((invoice) => invoice.lines.data[0]?.price?.product)
+        .map((invoice) => invoice.lines.data[0]?.pricing?.price_details?.product)
         .filter(Boolean)
         .map((productId) => paymentService.getProduct(productId as string));
 
@@ -250,13 +250,13 @@ export default function (paymentService: PaymentService) {
       const objectStorageProduct = productDetails.find((product) => product.metadata?.type === 'object-storage');
 
       const objectStorageInvoices = userInvoices
-        .filter((invoice) => invoice.lines.data[0].price?.product === objectStorageProduct?.id)
+        .filter((invoice) => invoice.lines.data[0].pricing?.price_details?.product === objectStorageProduct?.id)
         .map((invoice) => ({
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
           total: invoice.total,
-          product: invoice.lines.data[0].price?.product,
+          product: invoice.lines.data[0].pricing?.price_details?.product,
         }));
 
       return res.status(200).send(objectStorageInvoices);

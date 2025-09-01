@@ -138,16 +138,9 @@ export class TiersService {
 
       for (const invoice of paidInvoices) {
         const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-        const invoiceMetadata = invoice.metadata;
-        const invoiceMetadataProvider = invoiceMetadata?.provider;
-        const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
-        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
-
-        if (isExternalPayment) {
-          isLifetimePaidOutOfBand = true;
-          break;
-        }
+        const product = lineItem?.pricing?.price_details?.product;
+        isLifetimePaidOutOfBand =
+          invoice.status === 'paid' && invoice.payments?.data.length === 0 && invoice.metadata?.provider !== 'bit2me';
 
         if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
           productId = product;
