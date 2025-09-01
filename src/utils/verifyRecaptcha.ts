@@ -2,7 +2,7 @@ import axios from 'axios';
 import { encode } from 'querystring';
 import config, { isProduction } from '../config';
 
-const GOOGLE_RECAPTCHA_V3_ENDPOINT = config.RECAPTCHA_V3_ENDPOINT as string;
+const GOOGLE_RECAPTCHA_V3_ENDPOINT = config.RECAPTCHA_V3_ENDPOINT;
 
 export async function verifyRecaptcha(captcha: string) {
   if (!isProduction) {
