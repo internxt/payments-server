@@ -135,7 +135,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token'],
+            required: ['customerId', 'priceId', 'token', 'captchaToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -215,7 +215,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token', 'currency'],
+            required: ['customerId', 'priceId', 'token', 'currency', 'captchaToken'],
             properties: {
               customerId: {
                 type: 'string',
