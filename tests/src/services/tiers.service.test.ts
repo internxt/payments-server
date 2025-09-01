@@ -199,7 +199,9 @@ describe('TiersService tests', () => {
         });
         const mockedInvoice = getInvoice({
           status: 'paid',
-          paid_out_of_band: true,
+          payments: {
+            data: [],
+          },
         });
 
         const isLifetime = mockedUser.lifetime as boolean;
@@ -220,12 +222,16 @@ describe('TiersService tests', () => {
         });
         const mockedInvoice = getInvoice({
           status: 'paid',
-          paid_out_of_band: true,
+          payments: {
+            data: [],
+          },
           lines: {
             data: [
               {
-                price: {
-                  product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0],
+                pricing: {
+                  price_details: {
+                    product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0],
+                  },
                 },
               },
             ],
@@ -300,13 +306,30 @@ describe('TiersService tests', () => {
       it('When the user has a new valid lifetime product, then returns antivirus and backups enabled', async () => {
         const customerId: CustomerId = getUser().customerId;
         const isLifetime = true;
+        const mockedInvoice = getInvoice({
+          status: 'paid',
+          lines: {
+            data: [
+              {
+                pricing: {
+                  price_details: {
+                    product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0],
+                  },
+                },
+              },
+            ],
+          },
+          payments: {
+            data: [
+              {
+                id: 'payment_id',
+              },
+            ],
+          },
+        });
 
         jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
-        jest
-          .spyOn(paymentService, 'getInvoicesFromUser')
-          .mockResolvedValue([
-            { lines: { data: [{ price: { product: ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS[0] } }] }, status: 'paid' },
-          ] as any);
+        jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoice] as any);
 
         const antivirusTier = await tiersService.getProductsTier(customerId, isLifetime);
 

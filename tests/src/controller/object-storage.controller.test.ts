@@ -40,7 +40,7 @@ describe('Object Storage controller', () => {
         const unexpectedError = new Error('Unexpected error');
         const mockedUser = getUser();
         const token = getValidUserToken({ customerId: mockedUser.customerId });
-        jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockRejectedValue(unexpectedError);
+        jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockRejectedValueOnce(unexpectedError);
 
         const response = await app.inject({
           method: 'GET',
@@ -57,7 +57,7 @@ describe('Object Storage controller', () => {
     it('When the user has no invoices, then an empty array is returned', async () => {
       const mockedUser = getUser();
       const token = getValidUserToken({ customerId: mockedUser.customerId });
-      jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockResolvedValue([]);
+      jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockResolvedValueOnce([]);
 
       const response = await app.inject({
         method: 'GET',
@@ -73,7 +73,7 @@ describe('Object Storage controller', () => {
       expect(responseBody).toStrictEqual([]);
     });
 
-    it('When the user has object storage invoices, then the invoices are returned', async () => {
+    test('When the user has object storage invoices, then the invoices are returned', async () => {
       const mockedUser = getUser();
       const token = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedProduct = getProduct({
@@ -89,8 +89,10 @@ describe('Object Storage controller', () => {
           lines: {
             data: [
               {
-                price: {
-                  product: mockedProduct.id,
+                pricing: {
+                  price_details: {
+                    product: mockedProduct.id,
+                  },
                 },
               },
             ],
@@ -101,8 +103,10 @@ describe('Object Storage controller', () => {
           lines: {
             data: [
               {
-                price: {
-                  product: mockedProduct.id,
+                pricing: {
+                  price_details: {
+                    product: mockedProduct.id,
+                  },
                 },
               },
             ],
@@ -118,7 +122,7 @@ describe('Object Storage controller', () => {
 
       const getInvoicesSpy = jest
         .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
-        .mockResolvedValue(mockedInvoices);
+        .mockResolvedValueOnce(mockedInvoices);
       jest
         .spyOn(PaymentService.prototype, 'getProduct')
         .mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
@@ -139,7 +143,7 @@ describe('Object Storage controller', () => {
       expect(responseBody[0].product).toBe(mockedProduct.id);
     });
 
-    it('When the user has no object invoices invoices, then no invoices are returned', async () => {
+    test('When the user has no object invoices invoices, then no invoices are returned', async () => {
       const mockedUser = getUser();
       const token = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedProduct = getProduct({});
@@ -157,7 +161,7 @@ describe('Object Storage controller', () => {
 
       const getInvoicesSpy = jest
         .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
-        .mockResolvedValue(mockedInvoices);
+        .mockResolvedValueOnce(mockedInvoices);
       jest
         .spyOn(PaymentService.prototype, 'getProduct')
         .mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
