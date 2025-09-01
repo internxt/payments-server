@@ -298,6 +298,33 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(403);
       });
+
+      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+
+        const response = await app.inject({
+          path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: userToken,
+            currency: 'eur',
+            captchaToken: mockedCaptchaToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
+      });
     });
   });
 
@@ -610,6 +637,33 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
+      });
+
+      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: userToken,
+            currency: 'eur',
+            captchaToken: mockedCaptchaToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
       });
     });
   });
