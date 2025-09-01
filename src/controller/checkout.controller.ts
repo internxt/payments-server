@@ -11,6 +11,7 @@ import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
+import { verifyRecaptcha } from '../utils/validateCaptcha';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -38,7 +39,15 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
-    fastify.get<{ Querystring: { customerName: string; country: string; postalCode: string; companyVatId?: string } }>(
+    fastify.get<{
+      Querystring: {
+        customerName: string;
+        country: string;
+        postalCode: string;
+        captchaToken: string;
+        companyVatId?: string;
+      };
+    }>(
       '/customer',
       {
         schema: {
@@ -48,6 +57,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               customerName: { type: 'string' },
               country: { type: 'string' },
               postalCode: { type: 'string' },
+              captchaToken: { type: 'string' },
               companyVatId: { type: 'string' },
             },
           },
@@ -61,8 +71,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { customerName, country, postalCode, companyVatId } = req.query;
+        const { customerName, country, postalCode, companyVatId, captchaToken } = req.query;
         const { uuid: userUuid, email } = req.user.payload;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new BadRequestError('Captcha verification failed');
+        }
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
