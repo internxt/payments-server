@@ -28,6 +28,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       if (skipAuth) {
         return;
       }
+
       try {
         await request.jwtVerify();
       } catch (err) {
@@ -77,7 +78,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
         if (!verifiedCaptcha) {
-          throw new BadRequestError('Captcha verification failed');
+          throw new ForbiddenError('Token verification failed');
         }
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
@@ -123,6 +124,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         customerId: string;
         priceId: string;
         token: string;
+        captchaToken: string;
         currency?: string;
         promoCodeId?: string;
         quantity?: number;
@@ -147,6 +149,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               currency: {
                 type: 'string',
               },
+              captchaToken: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -158,8 +161,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, quantity, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, quantity, captchaToken, token } = req.body;
         let tokenCustomerId;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
 
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
@@ -197,6 +206,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         priceId: string;
         token: string;
         currency: string;
+        captchaToken: string;
         promoCodeId?: string;
       };
     }>(
@@ -219,6 +229,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               currency: {
                 type: 'string',
               },
+              captchaToken: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -235,7 +246,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
 
         if (!isValidCurrency(currency)) {
           const allowedCurrencies = getAllowedCurrencies().join(', ');
