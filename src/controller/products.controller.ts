@@ -39,36 +39,39 @@ export default function (
 
         try {
           user = await usersService.findUserByUuid(userUuid);
-
           const { customerId, lifetime } = user;
-
           const isLifetimeUser = lifetime ?? false;
 
-          const userSubscriptions = await paymentService.getActiveSubscriptions(customerId);
-
-          const hasActiveSubscription = userSubscriptions.length > 0;
-
-          if (!hasActiveSubscription && !isLifetimeUser) {
-            return res.status(200).send({
-              featuresPerService: {
-                antivirus: false,
-                backups: false,
-              },
-            });
-          }
           const mergedFeatures = await productsService.getApplicableTierForUser({
             userUuid,
             ownersId,
           });
 
-          const tier = {
-            featuresPerService: {
-              antivirus: mergedFeatures.featuresPerService.antivirus.enabled,
-              backups: mergedFeatures.featuresPerService.backups.enabled || hasActiveSubscription,
-            },
-          };
+          const antivirusEnabled = mergedFeatures.featuresPerService.antivirus.enabled;
+          let backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
 
-          return res.status(200).send(tier);
+          if (!backupsEnabled) {
+            const userSubscriptions = await paymentService.getActiveSubscriptions(customerId);
+            const hasActiveSubscription = userSubscriptions.length > 0;
+
+            if (!hasActiveSubscription && !isLifetimeUser) {
+              return res.status(200).send({
+                featuresPerService: {
+                  antivirus: false,
+                  backups: false,
+                },
+              });
+            }
+
+            backupsEnabled = true;
+          }
+
+          return res.status(200).send({
+            featuresPerService: {
+              antivirus: antivirusEnabled,
+              backups: backupsEnabled ?? false,
+            },
+          });
         } catch (error) {
           if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
             return res.status(200).send({

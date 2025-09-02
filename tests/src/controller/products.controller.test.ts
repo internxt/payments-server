@@ -42,13 +42,24 @@ describe('Testing products endpoints', () => {
       });
     });
 
-    test('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
+    test('When the user exists but does not have an active subscription or lifetime, then an object with all set to false is returned', async () => {
       const mockedUser = getUser({
         lifetime: false,
       });
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
+      const mockedTier = newTier({
+        featuresPerService: {
+          antivirus: {
+            enabled: false,
+          },
+          backups: {
+            enabled: false,
+          },
+        } as any,
+      });
 
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser').mockResolvedValueOnce(mockedTier);
       const getUserSubscriptionsSpy = jest
         .spyOn(PaymentService.prototype, 'getActiveSubscriptions')
         .mockResolvedValue([]);
