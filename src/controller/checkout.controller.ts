@@ -108,6 +108,12 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               postal_code: postalCode,
             },
           });
+          await usersService.insertUser({
+            customerId: id,
+            uuid: userUuid,
+            lifetime: false,
+          });
+
           customerId = id;
         }
 

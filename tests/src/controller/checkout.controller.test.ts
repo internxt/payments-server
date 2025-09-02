@@ -80,9 +80,10 @@ describe('Checkout controller', () => {
       });
     });
 
-    it('When the user does not exists in Users collection, then the customer is created and the customer Id is returned', async () => {
+    test('When the user does not exists in Users collection, then the customer is created, added in our DB and the customer Id is returned', async () => {
       const mockedUser = getUser();
       const mockedCustomer = getCustomer({
+        id: mockedUser.customerId,
         address: {
           country: 'ES',
           postal_code: '08001',
@@ -94,9 +95,15 @@ describe('Checkout controller', () => {
       });
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedCustomer.id });
+      const insertUserPayload = {
+        customerId: mockedCustomer.id,
+        uuid: mockedUser.uuid,
+        lifetime: false,
+      };
 
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(UserNotFoundError);
       jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
+      const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -117,6 +124,7 @@ describe('Checkout controller', () => {
         customerId: mockedCustomer.id,
         token: userToken,
       });
+      expect(insertUserSpy).toHaveBeenCalledWith(insertUserPayload);
     });
 
     it('When the user provides country and Vat Id, then they are attached to the user correctly', async () => {
