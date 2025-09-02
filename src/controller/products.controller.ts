@@ -1,19 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { NotFoundSubscriptionError } from '../services/payment.service';
+import { NotFoundSubscriptionError, PaymentService } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TiersService } from '../services/tiers.service';
 import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
 
 export default function (
-  tiersService: TiersService,
   usersService: UsersService,
   productsService: ProductsService,
+  paymentService: PaymentService,
   config: AppConfig,
 ) {
   return async function (fastify: FastifyInstance) {
@@ -36,6 +35,7 @@ export default function (
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
         let user: User;
         const userUuid = req.user.payload.uuid;
+        const ownersId = req.user.payload.workspaces?.owners ?? [];
 
         try {
           user = await usersService.findUserByUuid(userUuid);
@@ -44,9 +44,31 @@ export default function (
 
           const isLifetimeUser = lifetime ?? false;
 
-          const antivirusTier = await tiersService.getProductsTier(customerId, isLifetimeUser);
+          const userSubscriptions = await paymentService.getActiveSubscriptions(customerId);
 
-          return res.status(200).send(antivirusTier);
+          const hasActiveSubscription = userSubscriptions.length > 0;
+
+          if (!hasActiveSubscription && !isLifetimeUser) {
+            return res.status(200).send({
+              featuresPerService: {
+                antivirus: false,
+                backups: false,
+              },
+            });
+          }
+          const mergedFeatures = await productsService.getApplicableTierForUser({
+            userUuid,
+            ownersId,
+          });
+
+          const tier = {
+            featuresPerService: {
+              antivirus: mergedFeatures.featuresPerService.antivirus.enabled,
+              backups: mergedFeatures.featuresPerService.backups.enabled ?? hasActiveSubscription,
+            },
+          };
+
+          return res.status(200).send(tier);
         } catch (error) {
           if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
             return res.status(200).send({
