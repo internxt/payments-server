@@ -64,7 +64,7 @@ export default function (
           const tier = {
             featuresPerService: {
               antivirus: mergedFeatures.featuresPerService.antivirus.enabled,
-              backups: mergedFeatures.featuresPerService.backups.enabled ?? hasActiveSubscription,
+              backups: mergedFeatures.featuresPerService.backups.enabled || hasActiveSubscription,
             },
           };
 
