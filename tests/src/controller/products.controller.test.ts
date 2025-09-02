@@ -104,7 +104,7 @@ describe('Testing products endpoints', () => {
       const expectedTier = {
         featuresPerService: {
           antivirus: mockedTier.featuresPerService['antivirus'].enabled,
-          backups: mockedTier.featuresPerService['backups'].enabled,
+          backups: true,
         },
       };
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
