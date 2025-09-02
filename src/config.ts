@@ -24,6 +24,9 @@ const mandatoryVariables = [
   'PC_CLOUD_TRIAL_CODE',
   'CHART_API_URL',
   'DRIVE_WEB_URL',
+  'RECAPTCHA_V3_ENDPOINT',
+  'RECAPTCHA_V3_SCORE_THRESHOLD',
+  'RECAPTCHA_V3',
 ] as const;
 
 type BaseConfig = {

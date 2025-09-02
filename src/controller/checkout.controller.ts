@@ -11,6 +11,7 @@ import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
+import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -27,6 +28,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       if (skipAuth) {
         return;
       }
+
       try {
         await request.jwtVerify();
       } catch (err) {
@@ -38,7 +40,15 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
-    fastify.get<{ Querystring: { customerName: string; country: string; postalCode: string; companyVatId?: string } }>(
+    fastify.get<{
+      Querystring: {
+        customerName: string;
+        country: string;
+        postalCode: string;
+        captchaToken: string;
+        companyVatId?: string;
+      };
+    }>(
       '/customer',
       {
         schema: {
@@ -48,6 +58,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               customerName: { type: 'string' },
               country: { type: 'string' },
               postalCode: { type: 'string' },
+              captchaToken: { type: 'string' },
               companyVatId: { type: 'string' },
             },
           },
@@ -61,8 +72,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { customerName, country, postalCode, companyVatId } = req.query;
+        const { customerName, country, postalCode, companyVatId, captchaToken } = req.query;
         const { uuid: userUuid, email } = req.user.payload;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
@@ -113,6 +130,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         customerId: string;
         priceId: string;
         token: string;
+        captchaToken: string;
         currency?: string;
         promoCodeId?: string;
         quantity?: number;
@@ -123,7 +141,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token'],
+            required: ['customerId', 'priceId', 'token', 'captchaToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -137,6 +155,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               currency: {
                 type: 'string',
               },
+              captchaToken: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -148,8 +167,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, quantity, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, quantity, captchaToken, token } = req.body;
         let tokenCustomerId;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
 
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
@@ -187,6 +212,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         priceId: string;
         token: string;
         currency: string;
+        captchaToken: string;
         promoCodeId?: string;
       };
     }>(
@@ -195,7 +221,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token', 'currency'],
+            required: ['customerId', 'priceId', 'token', 'currency', 'captchaToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -209,6 +235,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               currency: {
                 type: 'string',
               },
+              captchaToken: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -225,7 +252,13 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
 
         if (!isValidCurrency(currency)) {
           const allowedCurrencies = getAllowedCurrencies().join(', ');
