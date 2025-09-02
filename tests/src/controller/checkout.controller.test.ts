@@ -20,6 +20,7 @@ import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
+import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -161,11 +162,13 @@ describe('Checkout controller', () => {
       const mockedUser = getUser();
       const mockedSubscription = getCreatedSubscription();
       const mockedSubscriptionResponse = getCreateSubscriptionResponse();
+      const mockedCaptchaToken = 'captcha_token';
 
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/subscription',
@@ -176,6 +179,7 @@ describe('Checkout controller', () => {
           currency: mockedSubscription.items.data[0].price.currency,
           quantity: 1,
           token: userToken,
+          captchaToken: mockedCaptchaToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -248,6 +252,9 @@ describe('Checkout controller', () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
+        const mockedCaptchaToken = 'captcha_token';
+
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -256,6 +263,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             customerId: mockedUser.customerId,
             token: invalidUserToken,
+            captchaToken: mockedCaptchaToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -269,6 +277,9 @@ describe('Checkout controller', () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -278,6 +289,7 @@ describe('Checkout controller', () => {
             customerId: mockedUser.customerId,
             token: userToken,
             currency: 'eur',
+            captchaToken: mockedCaptchaToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -285,6 +297,33 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
+      });
+
+      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+
+        const response = await app.inject({
+          path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: userToken,
+            currency: 'eur',
+            captchaToken: mockedCaptchaToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
       });
     });
   });
@@ -308,12 +347,14 @@ describe('Checkout controller', () => {
         clientSecret: 'client_secret',
         type: 'fiat',
       } as const;
+      const mockedCaptchaToken = 'captcha_token';
 
       jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
       });
       jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -323,6 +364,7 @@ describe('Checkout controller', () => {
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
           currency: 'eur',
+          captchaToken: mockedCaptchaToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -344,7 +386,7 @@ describe('Checkout controller', () => {
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-
+      const mockedCaptchaToken = 'captcha_token';
       const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
         type: 'crypto',
@@ -364,6 +406,7 @@ describe('Checkout controller', () => {
         canExpand: true,
       });
       jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -373,6 +416,7 @@ describe('Checkout controller', () => {
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
           currency: AllowedCryptoCurrencies['Bitcoin'],
+          captchaToken: mockedCaptchaToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -547,6 +591,9 @@ describe('Checkout controller', () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
+        const mockedCaptchaToken = 'captcha_token';
+
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -556,6 +603,7 @@ describe('Checkout controller', () => {
             customerId: mockedUser.customerId,
             token: invalidUserToken,
             currency: 'eur',
+            captchaToken: mockedCaptchaToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -569,6 +617,9 @@ describe('Checkout controller', () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -578,6 +629,7 @@ describe('Checkout controller', () => {
             customerId: mockedUser.customerId,
             token: userToken,
             currency: 'eur',
+            captchaToken: mockedCaptchaToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -585,6 +637,33 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
+      });
+
+      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
+        const mockedCaptchaToken = 'captcha_token';
+
+        const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: userToken,
+            currency: 'eur',
+            captchaToken: mockedCaptchaToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
       });
     });
   });
