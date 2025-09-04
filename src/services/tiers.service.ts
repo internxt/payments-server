@@ -133,18 +133,18 @@ export class TiersService {
     }
 
     if (isLifetime) {
-      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
+      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {}, undefined, {
+        expand: ['data.payments'],
+      });
       const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
 
       for (const invoice of paidInvoices) {
         const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-        const invoiceMetadata = invoice.metadata;
-        const invoiceMetadataProvider = invoiceMetadata?.provider;
-        const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
-        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
+        const product = lineItem?.pricing?.price_details?.product;
+        const isLifetimePaidExternally: boolean =
+          invoice.status === 'paid' && invoice.payments?.data.length === 0 && invoice.metadata?.provider !== 'bit2me';
 
-        if (isExternalPayment) {
+        if (isLifetimePaidExternally) {
           isLifetimePaidOutOfBand = true;
           break;
         }
