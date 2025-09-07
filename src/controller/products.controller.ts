@@ -48,28 +48,12 @@ export default function (
           });
 
           const antivirusEnabled = mergedFeatures.featuresPerService.antivirus.enabled;
-          let backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
-
-          if (!backupsEnabled) {
-            const userSubscriptions = await paymentService.getActiveSubscriptions(customerId);
-            const hasActiveSubscription = userSubscriptions.length > 0;
-
-            if (!hasActiveSubscription && !isLifetimeUser) {
-              return res.status(200).send({
-                featuresPerService: {
-                  antivirus: false,
-                  backups: false,
-                },
-              });
-            }
-
-            backupsEnabled = true;
-          }
+          const backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
 
           return res.status(200).send({
             featuresPerService: {
               antivirus: antivirusEnabled,
-              backups: backupsEnabled ?? false,
+              backups: backupsEnabled,
             },
           });
         } catch (error) {
