@@ -4,7 +4,6 @@ import { NotFoundSubscriptionError, PaymentService } from '../services/payment.s
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
@@ -33,15 +32,10 @@ export default function (
     fastify.get(
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
-        let user: User;
         const userUuid = req.user.payload.uuid;
         const ownersId = req.user.payload.workspaces?.owners ?? [];
 
         try {
-          user = await usersService.findUserByUuid(userUuid);
-          const { customerId, lifetime } = user;
-          const isLifetimeUser = lifetime ?? false;
-
           const mergedFeatures = await productsService.getApplicableTierForUser({
             userUuid,
             ownersId,
@@ -66,7 +60,7 @@ export default function (
             });
           }
 
-          const userId = (user! && user.uuid) || 'unknown';
+          const userId = userUuid || 'unknown';
 
           req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
           return res.status(500).send({ error: 'Internal server error' });
