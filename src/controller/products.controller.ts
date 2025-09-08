@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { NotFoundSubscriptionError, PaymentService } from '../services/payment.service';
-import { UserNotFoundError, UsersService } from '../services/users.service';
+import { PaymentService } from '../services/payment.service';
+import { UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { ProductsService } from '../services/products.service';
@@ -51,19 +51,15 @@ export default function (
             },
           });
         } catch (error) {
-          if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-            return res.status(200).send({
-              featuresPerService: {
-                antivirus: false,
-                backups: false,
-              },
-            });
-          }
-
           const userId = userUuid || 'unknown';
+          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
 
-          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
-          return res.status(500).send({ error: 'Internal server error' });
+          return res.status(200).send({
+            featuresPerService: {
+              antivirus: false,
+              backups: false,
+            },
+          });
         }
       },
     );
