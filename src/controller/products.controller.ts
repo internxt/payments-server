@@ -51,7 +51,7 @@ export default function (
             },
           });
         } catch (error) {
-          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
+          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message} for user ${userUuid}`);
 
           return res.status(200).send({
             featuresPerService: {
