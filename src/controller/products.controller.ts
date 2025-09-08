@@ -51,8 +51,7 @@ export default function (
             },
           });
         } catch (error) {
-          const userId = userUuid || 'unknown';
-          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
+          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userUuid}`);
 
           return res.status(200).send({
             featuresPerService: {
