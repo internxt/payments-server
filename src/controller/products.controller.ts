@@ -52,13 +52,7 @@ export default function (
           });
         } catch (error) {
           Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message} for user ${userUuid}`);
-
-          return res.status(200).send({
-            featuresPerService: {
-              antivirus: false,
-              backups: false,
-            },
-          });
+          return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
     );

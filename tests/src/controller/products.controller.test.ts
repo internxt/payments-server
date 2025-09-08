@@ -73,12 +73,9 @@ describe('Testing products endpoints', () => {
 
       const responseBody = response.json();
 
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(500);
       expect(responseBody).toStrictEqual({
-        featuresPerService: {
-          antivirus: false,
-          backups: false,
-        },
+        message: 'Internal Server Error',
       });
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         `[PRODUCTS/GET]: Error ${unexpectedError.message} for user ${mockedUser.uuid}`,
