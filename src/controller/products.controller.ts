@@ -1,10 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { NotFoundSubscriptionError, PaymentService } from '../services/payment.service';
-import { UserNotFoundError, UsersService } from '../services/users.service';
+import { PaymentService } from '../services/payment.service';
+import { UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
@@ -33,59 +32,27 @@ export default function (
     fastify.get(
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
-        let user: User;
         const userUuid = req.user.payload.uuid;
         const ownersId = req.user.payload.workspaces?.owners ?? [];
 
         try {
-          user = await usersService.findUserByUuid(userUuid);
-          const { customerId, lifetime } = user;
-          const isLifetimeUser = lifetime ?? false;
-
           const mergedFeatures = await productsService.getApplicableTierForUser({
             userUuid,
             ownersId,
           });
 
           const antivirusEnabled = mergedFeatures.featuresPerService.antivirus.enabled;
-          let backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
-
-          if (!backupsEnabled) {
-            const userSubscriptions = await paymentService.getActiveSubscriptions(customerId);
-            const hasActiveSubscription = userSubscriptions.length > 0;
-
-            if (!hasActiveSubscription && !isLifetimeUser) {
-              return res.status(200).send({
-                featuresPerService: {
-                  antivirus: false,
-                  backups: false,
-                },
-              });
-            }
-
-            backupsEnabled = true;
-          }
+          const backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
 
           return res.status(200).send({
             featuresPerService: {
               antivirus: antivirusEnabled,
-              backups: backupsEnabled ?? false,
+              backups: backupsEnabled,
             },
           });
         } catch (error) {
-          if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-            return res.status(200).send({
-              featuresPerService: {
-                antivirus: false,
-                backups: false,
-              },
-            });
-          }
-
-          const userId = (user! && user.uuid) || 'unknown';
-
-          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
-          return res.status(500).send({ error: 'Internal server error' });
+          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message} for user ${userUuid}`);
+          return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
     );
