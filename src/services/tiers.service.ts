@@ -275,7 +275,6 @@ export class TiersService {
     const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
 
     await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
-    // await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
   async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
@@ -298,12 +297,6 @@ export class TiersService {
         }
       }
     }
-
-    // try {
-    //   await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
-    // } catch (error) {
-    //   log.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
-    // }
 
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
   }

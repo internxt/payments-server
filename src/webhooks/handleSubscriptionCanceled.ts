@@ -117,15 +117,6 @@ export default async function handleSubscriptionCanceled(
       return;
     }
 
-    // try {
-    //   await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    // } catch (err) {
-    //   const error = err as Error;
-    //   log.error(
-    //     `[SUB CANCEL/ERROR]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
-    //   );
-    // }
-
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
   }
 }

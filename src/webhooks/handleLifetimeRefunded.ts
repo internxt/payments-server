@@ -63,15 +63,6 @@ export default async function handleLifetimeRefunded(
     }
     await usersService.updateUser(customerId, { lifetime: false });
 
-    // try {
-    //   await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    // } catch (err) {
-    //   const error = err as Error;
-    //   log.error(
-    //     `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
-    //   );
-    // }
-
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
   }
 }

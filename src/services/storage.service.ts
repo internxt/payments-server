@@ -59,30 +59,6 @@ export async function createOrUpdateUser(maxSpaceBytes: string, email: string, c
   );
 }
 
-export async function updateUserTier(uuid: string, planId: string, config: AppConfig) {
-  try {
-    await axios.put(
-      `${config.DRIVE_GATEWAY_URL}/api/gateway/user/update/tier`,
-      { planId, uuid },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        auth: { username: config.DRIVE_GATEWAY_USER, password: config.DRIVE_GATEWAY_PASSWORD },
-      },
-    );
-  } catch (error) {
-    let errorMessage = error;
-
-    if (isAxiosError(error)) {
-      errorMessage = error.response?.data;
-    }
-
-    Logger.error(`ERROR UPDATING USER TIER: ${JSON.stringify(errorMessage)}`);
-    throw error;
-  }
-}
-
 export async function getUserStorage(
   userUuid: User['uuid'],
   email: string,

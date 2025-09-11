@@ -1,22 +1,13 @@
-import { updateUserTier } from '../../../src/services/storage.service';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { getCreatedSubscription, getCustomer, getLogger, getProduct, getUser } from '../fixtures';
 import config from '../../../src/config';
 import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscriptionCanceled';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
-jest.mock('../../../src/services/storage.service', () => {
-  const actualModule = jest.requireActual('../../../src/services/storage.service');
-
-  return {
-    ...actualModule,
-    updateUserTier: jest.fn(),
-  };
-});
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
@@ -92,7 +83,6 @@ describe('Process when a subscription is cancelled', () => {
     expect(getCustomerSPy).toHaveBeenCalledWith(mockedSubscription.customer);
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedSubscription.customer);
     expect(handleCancelPlan).rejects.toThrow(tierNotFoundError);
-    expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
     expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
   });
 
