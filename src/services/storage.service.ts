@@ -28,7 +28,7 @@ export class StorageService {
     };
 
     try {
-      return this.axios.patch(
+      await this.axios.patch(
         `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${uuid}`,
         { maxSpaceBytes: newStorageBytes },
         params,
@@ -61,7 +61,7 @@ export async function createOrUpdateUser(maxSpaceBytes: string, email: string, c
 
 export async function updateUserTier(uuid: string, planId: string, config: AppConfig) {
   try {
-    return axios.put(
+    await axios.put(
       `${config.DRIVE_GATEWAY_URL}/api/gateway/user/update/tier`,
       { planId, uuid },
       {
