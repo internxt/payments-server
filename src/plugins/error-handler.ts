@@ -14,7 +14,7 @@ export function registerErrorHandler(app: FastifyInstance) {
     let errorMessage = error.message || 'Unknown error';
 
     if (isAxiosError(error)) {
-      errorMessage = error.response?.data?.message || errorMessage;
+      errorMessage = error.response?.data;
     }
 
     request.log.error(
