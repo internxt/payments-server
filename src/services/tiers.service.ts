@@ -1,13 +1,13 @@
 import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
-import { StorageService, updateUserTier } from './storage.service';
+import { StorageService } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
 
@@ -275,7 +275,6 @@ export class TiersService {
     const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
 
     await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
-    await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
   }
 
   async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
@@ -297,12 +296,6 @@ export class TiersService {
           throw error;
         }
       }
-    }
-
-    try {
-      await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
-    } catch (error) {
-      log.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
     }
 
     return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);

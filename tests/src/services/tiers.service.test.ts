@@ -1,23 +1,16 @@
 import { AxiosError } from 'axios';
 
-import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
 } from '../../../src/services/tiers.service';
 import { CustomerId, ExtendedSubscription, NotFoundSubscriptionError } from '../../../src/services/payment.service';
-import { updateUserTier } from '../../../src/services/storage.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-
-jest.mock('../../../src/services/storage.service', () => ({
-  ...jest.requireActual('../../../src/services/storage.service'),
-  updateUserTier: jest.fn().mockResolvedValue(() => {}),
-}));
 
 describe('TiersService tests', () => {
   const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
@@ -595,7 +588,6 @@ describe('TiersService tests', () => {
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].maxSpaceBytes,
       );
-      expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });
   });
 
@@ -608,13 +600,10 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
       const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
-      (updateUserTier as jest.Mock).mockClear();
 
       await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
-
-      expect(updateUserTier).not.toHaveBeenCalled();
     });
 
     it('When workspaces is not enabled, then update the user tier to free and downgrade the storage to the free plan', async () => {
@@ -626,12 +615,10 @@ describe('TiersService tests', () => {
 
       const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
       const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
-      (updateUserTier as jest.Mock).mockClear();
 
       await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
-      expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);
       expect(changeStorageSpy).toHaveBeenCalledWith(uuid, FREE_PLAN_BYTES_SPACE);
     });
   });

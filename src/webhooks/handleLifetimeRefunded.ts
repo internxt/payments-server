@@ -1,7 +1,7 @@
 import { FastifyLoggerInstance } from 'fastify';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
+import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
-import { StorageService, updateUserTier } from '../services/storage.service';
+import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
@@ -62,15 +62,6 @@ export default async function handleLifetimeRefunded(
       throw error;
     }
     await usersService.updateUser(customerId, { lifetime: false });
-
-    try {
-      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    } catch (err) {
-      const error = err as Error;
-      log.error(
-        `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
-      );
-    }
 
     return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
   }
