@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { HttpError } from '../errors/HttpError';
+import { isAxiosError } from 'axios';
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
@@ -10,7 +11,11 @@ export function registerErrorHandler(app: FastifyInstance) {
     }
 
     const statusCode = error.statusCode ?? 500;
-    const errorMessage = error.message || 'Unknown error';
+    let errorMessage = error.message || 'Unknown error';
+
+    if (isAxiosError(error)) {
+      errorMessage = error.response?.data?.message || errorMessage;
+    }
 
     request.log.error(
       {
