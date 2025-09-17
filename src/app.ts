@@ -95,6 +95,7 @@ export async function buildApp({
       'internxt-version',
       'internxt-client',
       'internxt-mnemonic',
+      'x-internxt-workspace',
     ],
     exposedHeaders: ['sessionId'],
     origin: '*',
