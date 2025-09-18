@@ -894,6 +894,11 @@ export const newTier = (params?: Partial<Tier>): Tier => {
           minimumSeats: 3,
           maxSpaceBytesPerSeat: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         },
+        passwordProtectedSharing: { enabled: false },
+        restrictedItemsSharing: { enabled: false },
+      },
+      darkMonitor: {
+        enabled: false,
       },
     },
     ...params,
