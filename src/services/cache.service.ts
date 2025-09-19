@@ -4,8 +4,8 @@ import { type AppConfig } from '../config';
 import { Tier } from '../core/users/Tier';
 
 const FIFTEEN_MINS_EXPIRATION_IN_SECONDS = 15 * 60;
+const FOUR_HOURS_EXPIRATION_IN_SECONDS = 4 * 60 * 60;
 const SIX_HOURS_EXPIRATION_IN_SECONDS = 6 * 60 * 60;
-const TWELVE_HOURS_EXPIRATION_IN_SECONDS = 12 * 60 * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -75,17 +75,12 @@ export default class CacheService {
       this.buildUsedPromoCodesKey(customerId),
       JSON.stringify(promoCodes),
       'EX',
-      SIX_HOURS_EXPIRATION_IN_SECONDS,
+      FOUR_HOURS_EXPIRATION_IN_SECONDS,
     );
   }
 
   async setUserTier(userUuid: string, tier: Tier): Promise<void> {
-    await this.redis.set(
-      this.buildUserTierKey(userUuid),
-      JSON.stringify(tier),
-      'EX',
-      TWELVE_HOURS_EXPIRATION_IN_SECONDS,
-    );
+    await this.redis.set(this.buildUserTierKey(userUuid), JSON.stringify(tier), 'EX', SIX_HOURS_EXPIRATION_IN_SECONDS);
   }
 
   async clearSubscription(customerId: string, userType: UserType = UserType.Individual): Promise<void> {
