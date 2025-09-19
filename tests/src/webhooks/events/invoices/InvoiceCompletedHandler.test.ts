@@ -1025,13 +1025,15 @@ describe('Testing the handler when an invoice is completed', () => {
       const { customerId, uuid: userUuid } = getUser();
       const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
       const clearUsedUserPromoCodesSpy = jest.spyOn(cacheService, 'clearUsedUserPromoCodes').mockResolvedValue();
+      const clearUserTierSpy = jest.spyOn(cacheService, 'clearUserTier').mockResolvedValue();
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
       await clearUserRelatedCache(customerId, userUuid);
 
       expect(clearSubscriptionSpy).toHaveBeenCalledWith(customerId);
-      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(userUuid);
+      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(customerId);
+      expect(clearUserTierSpy).toHaveBeenCalledWith(userUuid);
       expect(loggerSpy).toHaveBeenCalledWith(
         `Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`,
       );

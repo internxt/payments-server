@@ -1,7 +1,7 @@
 import config from '../../../src/config';
 import { UserType } from '../../../src/core/users/User';
 import CacheService from '../../../src/services/cache.service';
-import { getSubscription, getUser } from '../fixtures';
+import { getSubscription, getUser, newTier } from '../fixtures';
 
 let cacheService: CacheService;
 
@@ -97,6 +97,33 @@ describe('Cache Service', () => {
 
         expect(storedPromoCodes).toBeNull();
       });
+    });
+  });
+
+  describe('User tier', () => {
+    const mockedUser = getUser();
+    const mockedTier = newTier();
+
+    test('When the user tier is set, then it is stored in Redis', async () => {
+      await cacheService.setUserTier(mockedUser.uuid, mockedTier);
+
+      const storedTier = await cacheService.getUserTier(mockedUser.uuid);
+
+      expect(storedTier).toStrictEqual(mockedTier);
+    });
+
+    test('When the user has a cached tier, then it is fetched from redis', async () => {
+      const storedTier = await cacheService.getUserTier(mockedUser.uuid);
+
+      expect(storedTier).toStrictEqual(mockedTier);
+    });
+
+    test('When no tier is cached, then no tier is returned', async () => {
+      const mockedNonExistingUserTier = getUser();
+
+      const storedTier = await cacheService.getUserTier(mockedNonExistingUserTier.uuid);
+
+      expect(storedTier).toBeNull();
     });
   });
 });
