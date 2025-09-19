@@ -1,9 +1,11 @@
 import { UserSubscription, UserType } from '../core/users/User';
 import Redis from 'ioredis';
 import { type AppConfig } from '../config';
+import { Tier } from '../core/users/Tier';
 
-const SUBSCRIPTION_EXPIRATION_IN_SECONDS = 15 * 60;
-const USED_COUPON_CODES_EXPIRATION_IN_SECONDS = 6 * 60 * 60;
+const FIFTEEN_MINS_EXPIRATION_IN_SECONDS = 15 * 60;
+const SIX_HOURS_EXPIRATION_IN_SECONDS = 6 * 60 * 60;
+const TWELVE_HOURS_EXPIRATION_IN_SECONDS = 12 * 60 * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -20,6 +22,10 @@ export default class CacheService {
 
   private buildUsedPromoCodesKey(customerId: string): string {
     return `used-promotion-codes-${customerId}`;
+  }
+
+  private buildUserTierKey(userUuid: string): string {
+    return `user-tier-${userUuid}`;
   }
 
   async getSubscription(
@@ -45,12 +51,22 @@ export default class CacheService {
     }
   }
 
+  async getUserTier(userUuid: string): Promise<Tier | null> {
+    const cachedUserTier = await this.redis.get(this.buildUserTierKey(userUuid));
+
+    if (!cachedUserTier) {
+      return null;
+    } else {
+      return JSON.parse(cachedUserTier) as Tier;
+    }
+  }
+
   async setSubscription(customerId: string, userType: UserType, subscription: UserSubscription): Promise<void> {
     await this.redis.set(
       this.buildSubscriptionKey(customerId, userType),
       JSON.stringify(subscription),
       'EX',
-      SUBSCRIPTION_EXPIRATION_IN_SECONDS,
+      FIFTEEN_MINS_EXPIRATION_IN_SECONDS,
     );
   }
 
@@ -59,7 +75,16 @@ export default class CacheService {
       this.buildUsedPromoCodesKey(customerId),
       JSON.stringify(promoCodes),
       'EX',
-      USED_COUPON_CODES_EXPIRATION_IN_SECONDS,
+      SIX_HOURS_EXPIRATION_IN_SECONDS,
+    );
+  }
+
+  async setUserTier(userUuid: string, tier: Tier): Promise<void> {
+    await this.redis.set(
+      this.buildUserTierKey(userUuid),
+      JSON.stringify(tier),
+      'EX',
+      TWELVE_HOURS_EXPIRATION_IN_SECONDS,
     );
   }
 
@@ -69,5 +94,9 @@ export default class CacheService {
 
   async clearUsedUserPromoCodes(customerId: string): Promise<void> {
     await this.redis.del(this.buildUsedPromoCodesKey(customerId));
+  }
+
+  async clearUserTier(userUuid: string): Promise<void> {
+    await this.redis.del(this.buildUserTierKey(userUuid));
   }
 }
