@@ -424,7 +424,8 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
-    const paymentMethodTypes = ['card', 'paypal', 'klarna'];
+    const paymentMethodTypes =
+      normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
     const stripeNewVersion = getStripeNewVersion();
 
     const invoice = await stripeNewVersion.invoices.create({
