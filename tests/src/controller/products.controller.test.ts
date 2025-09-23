@@ -6,11 +6,16 @@ import { TiersService } from '../../../src/services/tiers.service';
 import { ProductsService } from '../../../src/services/products.service';
 import { Service } from '../../../src/core/users/Tier';
 import Logger from '../../../src/Logger';
+import CacheService from '../../../src/services/cache.service';
 
 let app: FastifyInstance;
 
 beforeAll(async () => {
   app = await initializeServerAndDatabase();
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
 afterAll(async () => {
@@ -189,6 +194,28 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedTier);
+    });
+
+    test('When the user has a cached tier, then the cached tier is returned', async () => {
+      const mockedUser = getUser();
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
+      const mockedTier = newTier();
+
+      const cachedTierSPy = jest.spyOn(CacheService.prototype, 'getUserTier').mockResolvedValue(mockedTier);
+      const getTierUserSpy = jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser');
+
+      const response = await app.inject({
+        path: `/products/tier`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${mockedUserToken}` },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedTier);
+      expect(cachedTierSPy).toHaveBeenCalledWith(mockedUser.uuid);
+      expect(getTierUserSpy).not.toHaveBeenCalled();
     });
   });
 });

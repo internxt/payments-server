@@ -480,7 +480,8 @@ export class InvoiceCompletedHandler {
   private async clearUserRelatedCache(customerId: string, userUuid: string): Promise<void> {
     try {
       await this.cacheService.clearSubscription(customerId);
-      await this.cacheService.clearUsedUserPromoCodes(userUuid);
+      await this.cacheService.clearUsedUserPromoCodes(customerId);
+      await this.cacheService.clearUserTier(userUuid);
       Logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
       const error = err as Error;

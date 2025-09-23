@@ -85,6 +85,8 @@ export default async function handleSubscriptionCanceled(
 
   try {
     await cacheService.clearSubscription(customerId, productType);
+    await cacheService.clearUsedUserPromoCodes(customerId);
+    await cacheService.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }

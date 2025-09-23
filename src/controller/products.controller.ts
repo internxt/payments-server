@@ -1,19 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { PaymentService } from '../services/payment.service';
-import { UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
+import CacheService from '../services/cache.service';
 
-export default function (
-  usersService: UsersService,
-  productsService: ProductsService,
-  paymentService: PaymentService,
-  config: AppConfig,
-) {
+export default function (productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -62,10 +56,18 @@ export default function (
       const ownersId = req.user.payload.workspaces?.owners ?? [];
 
       try {
+        const cachedUserTier = await cacheService.getUserTier(userUuid);
+
+        if (cachedUserTier) {
+          return rep.status(200).send(cachedUserTier);
+        }
+
         const mergedFeatures = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
         });
+
+        await cacheService.setUserTier(userUuid, mergedFeatures);
 
         return rep.status(200).send(mergedFeatures);
       } catch (error) {

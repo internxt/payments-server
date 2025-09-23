@@ -41,6 +41,8 @@ export default async function handleLifetimeRefunded(
 
   try {
     await cacheService.clearSubscription(customerId);
+    await cacheService.clearUsedUserPromoCodes(customerId);
+    await cacheService.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleLifetimeRefunded after trying to clear ${customerId} subscription`);
   }
