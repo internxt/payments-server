@@ -36,9 +36,9 @@ export default class CacheService {
 
     if (!cachedSubscription) {
       return null;
-    } else {
-      return JSON.parse(cachedSubscription);
     }
+
+    return JSON.parse(cachedSubscription);
   }
 
   async getUsedUserPromoCodes(customerId: string): Promise<string[] | null> {
@@ -46,9 +46,9 @@ export default class CacheService {
 
     if (!cachedUsedPromoCodesByUser) {
       return null;
-    } else {
-      return JSON.parse(cachedUsedPromoCodesByUser) as string[];
     }
+
+    return JSON.parse(cachedUsedPromoCodesByUser) as string[];
   }
 
   async getUserTier(userUuid: string): Promise<Tier | null> {
@@ -56,9 +56,9 @@ export default class CacheService {
 
     if (!cachedUserTier) {
       return null;
-    } else {
-      return JSON.parse(cachedUserTier) as Tier;
     }
+
+    return JSON.parse(cachedUserTier) as Tier;
   }
 
   async setSubscription(customerId: string, userType: UserType, subscription: UserSubscription): Promise<void> {
