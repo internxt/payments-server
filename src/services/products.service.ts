@@ -92,10 +92,85 @@ export class ProductsService {
     if (!individualTier) return businessTier;
     if (!businessTier) return individualTier;
 
-    const individualStorage = individualTier.featuresPerService[Service.Drive].maxSpaceBytes;
-    const businessStoragePerSeat = businessTier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat;
+    return this.mergeTiers(individualTier, businessTier);
+  }
 
-    return businessStoragePerSeat >= individualStorage ? businessTier : individualTier;
+  private countEnabledProducts(tier: Tier): number {
+    return Object.values(tier.featuresPerService).filter((feature) => feature.enabled).length;
+  }
+
+  private mergeTiers(individualTier: Tier, businessTier: Tier): Tier {
+    const individualEnabledCount = this.countEnabledProducts(individualTier);
+    const businessEnabledCount = this.countEnabledProducts(businessTier);
+
+    const tierWithMostProducts = businessEnabledCount > individualEnabledCount ? businessTier : individualTier;
+
+    const mergedFeatures = {
+      [Service.Drive]: {
+        enabled:
+          individualTier.featuresPerService[Service.Drive].enabled ||
+          businessTier.featuresPerService[Service.Drive].enabled,
+        maxSpaceBytes: individualTier.featuresPerService[Service.Drive].maxSpaceBytes,
+        workspaces: businessTier.featuresPerService[Service.Drive].workspaces,
+        passwordProtectedSharing: {
+          enabled:
+            individualTier.featuresPerService[Service.Drive].passwordProtectedSharing.enabled ||
+            businessTier.featuresPerService[Service.Drive].passwordProtectedSharing.enabled,
+        },
+        restrictedItemsSharing: {
+          enabled:
+            individualTier.featuresPerService[Service.Drive].restrictedItemsSharing.enabled ||
+            businessTier.featuresPerService[Service.Drive].restrictedItemsSharing.enabled,
+        },
+      },
+      [Service.Backups]: {
+        enabled:
+          individualTier.featuresPerService[Service.Backups].enabled ||
+          businessTier.featuresPerService[Service.Backups].enabled,
+      },
+      [Service.Antivirus]: {
+        enabled:
+          individualTier.featuresPerService[Service.Antivirus].enabled ||
+          businessTier.featuresPerService[Service.Antivirus].enabled,
+      },
+      [Service.Meet]: {
+        enabled:
+          individualTier.featuresPerService[Service.Meet].enabled ||
+          businessTier.featuresPerService[Service.Meet].enabled,
+        paxPerCall: Math.max(
+          individualTier.featuresPerService[Service.Meet].paxPerCall,
+          businessTier.featuresPerService[Service.Meet].paxPerCall,
+        ),
+      },
+      [Service.Mail]: {
+        enabled:
+          individualTier.featuresPerService[Service.Mail].enabled ||
+          businessTier.featuresPerService[Service.Mail].enabled,
+        addressesPerUser: Math.max(
+          individualTier.featuresPerService[Service.Mail].addressesPerUser,
+          businessTier.featuresPerService[Service.Mail].addressesPerUser,
+        ),
+      },
+      [Service.Vpn]: tierWithMostProducts.featuresPerService[Service.Vpn],
+      [Service.Cleaner]: {
+        enabled:
+          individualTier.featuresPerService[Service.Cleaner].enabled ||
+          businessTier.featuresPerService[Service.Cleaner].enabled,
+      },
+      [Service.darkMonitor]: {
+        enabled:
+          individualTier.featuresPerService[Service.darkMonitor].enabled ||
+          businessTier.featuresPerService[Service.darkMonitor].enabled,
+      },
+    };
+
+    return {
+      id: tierWithMostProducts.id,
+      label: tierWithMostProducts.label,
+      productId: tierWithMostProducts.productId,
+      billingType: tierWithMostProducts.billingType,
+      featuresPerService: mergedFeatures as Tier['featuresPerService'],
+    };
   }
 
   private async determineUserTier(userUuid: User['uuid'], ownersId?: string[]): Promise<Tier | undefined> {
