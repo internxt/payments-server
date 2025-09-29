@@ -12,12 +12,14 @@ export class ProductsService {
   private async collectAllAvailableTiers(userUuid: string, ownersId?: string[]): Promise<Tier[]> {
     const availableTiers: Tier[] = [];
 
-    const user = await this.usersService.findUserByUuid(userUuid);
-    const userDirectTiers = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
-      if (err instanceof TierNotFoundError) return [];
-      throw err;
-    });
-    availableTiers.push(...userDirectTiers);
+    try {
+      const user = await this.usersService.findUserByUuid(userUuid);
+      const userDirectTiers = await this.tiersService.getTiersProductsByUserId(user.id);
+      availableTiers.push(...userDirectTiers);
+    } catch (error) {
+      if (error instanceof UserNotFoundError || error instanceof TierNotFoundError) return [];
+      throw error;
+    }
 
     if (ownersId && ownersId.length > 0) {
       const ownerTierPromises = ownersId.map(async (ownerUuid) => {
