@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { FastifyLoggerInstance } from 'fastify';
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
+import { UsersService } from '../services/users.service';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -38,10 +39,25 @@ export default async function handleInvoicePaymentFailed(
   invoice: Stripe.Invoice,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
+  usersService: UsersService,
   logger: FastifyLoggerInstance,
 ): Promise<void> {
   if (!invoice.customer) {
     throw new Error('No customer found for this payment');
+  }
+
+  const customer = (await paymentService.getCustomer(invoice.customer as string)) as Stripe.Customer;
+
+  try {
+    const user = await usersService.findUserByCustomerID(customer.id);
+    if (user) {
+      await usersService.notifyFailedPayment(user.uuid);
+      logger.info(`Failed payment notification sent for customer ${customer.id} (user UUID: ${user.uuid})`);
+    } else {
+      logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
+    }
+  } catch (error) {
+    logger.error(`Failed to send payment notification for customer ${customer.id}`);
   }
 
   const relevantLineItem = await findObjectStorageLineItem(invoice, paymentService);
@@ -50,8 +66,6 @@ export default async function handleInvoicePaymentFailed(
     logger.info(`Invoice ${invoice.id} does not contain an object storage product. Skipping...`);
     return;
   }
-
-  const customer = (await paymentService.getCustomer(invoice.customer as string)) as Stripe.Customer;
 
   logger.info(
     `Handling invoice not paid ${invoice.id} for customer ${customer.id} > Suspending object storage account..`,
