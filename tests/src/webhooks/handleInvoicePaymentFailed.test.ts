@@ -14,24 +14,24 @@ beforeEach(() => {
 
 describe('Handle Invoice Payment Failed', () => {
   describe('When processing valid payment failure', () => {
-    it('When payment fails for object storage invoice, then should notify gateway service and suspend account', async () => {
+    it('When payment fails for object storage invoice, then should only suspend account without Drive notification', async () => {
     const customerId = 'cus_test123';
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
     const mockedInvoice = getInvoice({ customer: customerId });
     const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
-    const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
     const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     const getProductSpy = jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
-    const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment').mockResolvedValue();
+    const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
+    const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
     const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
 
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(getCustomerSpy).toHaveBeenCalledWith(customerId);
-    expect(findUserByCustomerIDSpy).toHaveBeenCalledWith(customerId);
-    expect(notifyFailedPaymentSpy).toHaveBeenCalledWith('test-uuid-123');
+    expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
+    expect(notifyFailedPaymentSpy).not.toHaveBeenCalled();
+    expect(suspendAccountSpy).toHaveBeenCalledWith({ customerId });
     });
   });
 
@@ -73,7 +73,7 @@ describe('Handle Invoice Payment Failed', () => {
     );
   });
 
-  it('When error is not an Error instance, then should log stringified error', async () => {
+  it('When an unexpected error occurs while notifying payment failure, then it is logged and processing continues', async () => {
     const customerId = 'cus_test123';
     const nonErrorObject = { code: 500, message: 'Server error' };
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
@@ -94,17 +94,16 @@ describe('Handle Invoice Payment Failed', () => {
     );
   });
 
-  it('When findUserByCustomerID throws error, then should log error and continue', async () => {
+  it('When an error happens while looking for the user, then it is logged and goes to the next step', async () => {
     const customerId = 'cus_test123';
     const errorMessage = 'Database connection failed';
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
     const mockedInvoice = getInvoice({ customer: customerId });
-    const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
+    const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
 
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(new Error(errorMessage));
-    jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
     const loggerErrorSpy = jest.spyOn(logger, 'error');
 
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
@@ -122,7 +121,7 @@ describe('Handle Invoice Payment Failed', () => {
     ).rejects.toThrow('No customer found for this payment');
   });
 
-  it('When user is not found in payments database, then should skip notification and suspend account', async () => {
+  it('When object storage payment fails, then should skip notification and suspend account', async () => {
     const customerId = 'cus_test123';
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
     const mockedInvoice = getInvoice({ customer: customerId });
@@ -130,12 +129,13 @@ describe('Handle Invoice Payment Failed', () => {
 
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(new Error('User not found'));
+    const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
     const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
     const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
 
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
+    expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
     expect(notifyFailedPaymentSpy).not.toHaveBeenCalled();
     expect(suspendAccountSpy).toHaveBeenCalledWith({ customerId });
   });
@@ -144,20 +144,19 @@ describe('Handle Invoice Payment Failed', () => {
     const customerId = 'cus_test123';
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
     const mockedInvoice = getInvoice({ customer: customerId });
-    const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
+    const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockResolvedValue();
-    jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
     const loggerInfoSpy = jest.spyOn(logger, 'info');
 
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerInfoSpy).toHaveBeenCalledWith(
-      `Failed payment notification sent for customer ${customerId} (user UUID: ${mockedUser.uuid})`
+      `Drive payment failure notification sent for customer ${customerId} (user UUID: ${mockedUser.uuid})`
     );
   });
 
@@ -165,12 +164,11 @@ describe('Handle Invoice Payment Failed', () => {
     const customerId = 'cus_test123';
     const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
     const mockedInvoice = getInvoice({ customer: customerId });
-    const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
+    const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
 
     jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(null as any);
-    jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
     const loggerWarnSpy = jest.spyOn(logger, 'warn');
 
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);

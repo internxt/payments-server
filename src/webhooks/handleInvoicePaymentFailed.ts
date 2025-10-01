@@ -29,10 +29,14 @@ async function findObjectStorageLineItem(
 }
 
 /**
- * This function only handles the Object Storage sub payment failed
+ * Handles payment failures for Drive and Object Storage products
+ * - Drive failures: sends notification to Drive users
+ * - Object Storage failures: suspends Object Storage account only
  * @param invoice
  * @param objectStorageService
  * @param paymentService
+ * @param usersService
+ * @param logger
  * @returns
  */
 export default async function handleInvoicePaymentFailed(
@@ -48,23 +52,22 @@ export default async function handleInvoicePaymentFailed(
 
   const customer = (await paymentService.getCustomer(invoice.customer as string)) as Stripe.Customer;
 
-  try {
-    const user = await usersService.findUserByCustomerID(customer.id);
-    if (user) {
-      await usersService.notifyFailedPayment(user.uuid);
-      logger.info(`Failed payment notification sent for customer ${customer.id} (user UUID: ${user.uuid})`);
-    } else {
-      logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`Failed to send payment notification for customer ${customer.id}. Error: ${errorMessage}`);
-  }
-
   const relevantLineItem = await findObjectStorageLineItem(invoice, paymentService);
 
   if (!relevantLineItem) {
-    logger.info(`Invoice ${invoice.id} does not contain an object storage product. Skipping...`);
+    try {
+      const user = await usersService.findUserByCustomerID(customer.id);
+      if (user) {
+        await usersService.notifyFailedPayment(user.uuid);
+        logger.info(`Drive payment failure notification sent for customer ${customer.id} (user UUID: ${user.uuid})`);
+      } else {
+        logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to send payment notification for customer ${customer.id}. Error: ${errorMessage}`);
+    }
+    logger.info(`Invoice ${invoice.id} does not contain an object storage product. Skipping object storage suspension...`);
     return;
   }
 
