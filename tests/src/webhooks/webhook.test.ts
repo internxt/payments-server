@@ -91,6 +91,7 @@ describe('Webhook events', () => {
         event.data.object,
         expect.any(ObjectStorageService),
         expect.any(PaymentService),
+        expect.any(Object),
         app.log,
       );
     });
