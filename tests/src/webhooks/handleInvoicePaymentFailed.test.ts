@@ -52,6 +52,27 @@ describe('Handle Invoice Payment Failed', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('When gateway notification fails, then should log error with message details', async () => {
+    const customerId = 'cus_test123';
+    const errorMessage = 'Gateway connection timeout';
+    const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
+    const mockedInvoice = getInvoice({ customer: customerId });
+    const mockedProduct = getProduct({ params: { metadata: { type: 'non-object-storage' } } });
+    const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
+
+    jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+    jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
+    jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
+    jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error(errorMessage));
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`
+    );
+  });
+
   it('When customer is not found in invoice, then should throw error', async () => {
     const mockedInvoice = getInvoice({ customer: null });
 

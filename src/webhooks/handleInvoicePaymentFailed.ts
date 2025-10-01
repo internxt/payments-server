@@ -57,7 +57,8 @@ export default async function handleInvoicePaymentFailed(
       logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
     }
   } catch (error) {
-    logger.error(`Failed to send payment notification for customer ${customer.id}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Failed to send payment notification for customer ${customer.id}. Error: ${errorMessage}`);
   }
 
   const relevantLineItem = await findObjectStorageLineItem(invoice, paymentService);
