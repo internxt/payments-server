@@ -282,12 +282,20 @@ describe('Tests for License Codes service', () => {
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
+        const mockedFreeTier = newTier({
+          featuresPerService: {
+            drive: {
+              foreignTierId: 'free',
+            },
+          } as any,
+        });
         const user = {
           uuid: mockedUser.uuid,
           email: mockedCustomer.email as string,
         };
         const maxSpaceBytes = 100;
 
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
         const updateStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
         await licenseCodesService.applyProductFeatures({
           user,
@@ -297,7 +305,11 @@ describe('Tests for License Codes service', () => {
           tierProduct: null,
         });
 
-        expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes, '');
+        expect(updateStorageSpy).toHaveBeenCalledWith(
+          mockedUser.uuid,
+          maxSpaceBytes,
+          mockedFreeTier.featuresPerService.drive.foreignTierId,
+        );
       });
 
       test('When an unexpected error occurs while applying the storage, then an error indicating so is thrown', async () => {
@@ -305,12 +317,20 @@ describe('Tests for License Codes service', () => {
         const mockedCustomer = getCustomer();
         const mockedLogger = getLogger();
         const mockedUser = getUser();
+        const mockedFreeTier = newTier({
+          featuresPerService: {
+            drive: {
+              foreignTierId: 'free',
+            },
+          } as any,
+        });
         const user = {
           uuid: mockedUser.uuid,
           email: mockedCustomer.email as string,
         };
         const maxSpaceBytes = 100;
 
+        jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
         jest.spyOn(storageService, 'updateUserStorageAndTier').mockRejectedValue(unexpectedError);
         await expect(
           licenseCodesService.applyProductFeatures({

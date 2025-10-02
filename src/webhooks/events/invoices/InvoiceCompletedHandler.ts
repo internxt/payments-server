@@ -271,8 +271,13 @@ export class InvoiceCompletedHandler {
    * @param userUuid The uuid of the user
    * @param maxSpaceBytes The new max space bytes
    */
-  private handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
-    return this.storageService.updateUserStorageAndTier(userUuid, maxSpaceBytes, '');
+  private async handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
+    const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+    return this.storageService.updateUserStorageAndTier(
+      userUuid,
+      maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   /**
