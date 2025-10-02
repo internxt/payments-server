@@ -288,7 +288,7 @@ describe('Tests for License Codes service', () => {
         };
         const maxSpaceBytes = 100;
 
-        const updateStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+        const updateStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
         await licenseCodesService.applyProductFeatures({
           user,
           customer: mockedCustomer,
@@ -297,7 +297,7 @@ describe('Tests for License Codes service', () => {
           tierProduct: null,
         });
 
-        expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
+        expect(updateStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes, '');
       });
 
       test('When an unexpected error occurs while applying the storage, then an error indicating so is thrown', async () => {
@@ -311,7 +311,7 @@ describe('Tests for License Codes service', () => {
         };
         const maxSpaceBytes = 100;
 
-        jest.spyOn(storageService, 'changeStorage').mockRejectedValue(unexpectedError);
+        jest.spyOn(storageService, 'updateUserStorageAndTier').mockRejectedValue(unexpectedError);
         await expect(
           licenseCodesService.applyProductFeatures({
             user,

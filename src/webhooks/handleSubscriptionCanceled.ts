@@ -1,6 +1,5 @@
 import { UserType } from './../core/users/User';
 import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
-import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
@@ -10,6 +9,7 @@ import Stripe from 'stripe';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { Service } from '../core/users/Tier';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -119,6 +119,12 @@ export default async function handleSubscriptionCanceled(
       return;
     }
 
-    return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
+    const freeTier = await tiersService.getTierProductsByProductsId('free');
+
+    return storageService.updateUserStorageAndTier(
+      uuid,
+      freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 }

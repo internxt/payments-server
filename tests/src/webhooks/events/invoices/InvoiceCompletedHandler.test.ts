@@ -367,12 +367,12 @@ describe('Testing the handler when an invoice is completed', () => {
     test('When processing old product, then it should call storage service with correct parameters', async () => {
       const mockedUser = getUser();
       const mockedMaxSpaceBytes = 100;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
 
       const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
       await handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
 
-      expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
+      expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes, '');
     });
   });
 

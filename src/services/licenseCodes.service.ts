@@ -186,7 +186,7 @@ export class LicenseCodesService {
           await this.tiersService.insertTierToUser(userId, tierProduct.id);
         }
       } else {
-        await this.storageService.changeStorage(user.uuid, maxSpaceBytes);
+        await this.storageService.updateUserStorageAndTier(user.uuid, maxSpaceBytes, '');
       }
     } catch (error) {
       const err = error as Error;

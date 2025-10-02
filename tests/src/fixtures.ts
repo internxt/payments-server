@@ -887,6 +887,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
       cleaner: { enabled: false },
       drive: {
         enabled: false,
+        foreignTierId: randomUUID(),
         maxSpaceBytes: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         workspaces: {
           enabled: false,

@@ -18,7 +18,7 @@ export class StorageService {
     private readonly axios: Axios,
   ) {}
 
-  async changeStorage(uuid: string, newStorageBytes: number): Promise<void> {
+  async updateUserStorageAndTier(uuid: string, newStorageBytes: number, foreignTierId: string): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
@@ -30,7 +30,7 @@ export class StorageService {
     try {
       await this.axios.patch(
         `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${uuid}`,
-        { maxSpaceBytes: newStorageBytes },
+        { maxSpaceBytes: newStorageBytes, tierId: foreignTierId },
         params,
       );
     } catch (error) {

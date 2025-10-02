@@ -272,7 +272,7 @@ export class InvoiceCompletedHandler {
    * @param maxSpaceBytes The new max space bytes
    */
   private handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
-    return this.storageService.changeStorage(userUuid, maxSpaceBytes);
+    return this.storageService.updateUserStorageAndTier(userUuid, maxSpaceBytes, '');
   }
 
   /**
