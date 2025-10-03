@@ -298,6 +298,23 @@ export class UsersService {
 
     return this.axios.delete(`${this.config.VPN_URL}/gateway/users/${userUuid}/tiers/${featureId}`, requestConfig);
   }
+
+  async notifyFailedPayment(userUuid: string): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+    
+    await this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/failed-payment`,
+      { userId: userUuid },
+      requestConfig,
+    );
+  }
 }
 
 export class UserNotFoundError extends HttpError {

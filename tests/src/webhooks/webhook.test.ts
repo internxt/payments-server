@@ -5,6 +5,7 @@ import { getCustomer, getInvoice, getPaymentIntent } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { PaymentService } from '../../../src/services/payment.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
+import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 
@@ -91,6 +92,7 @@ describe('Webhook events', () => {
         event.data.object,
         expect.any(ObjectStorageService),
         expect.any(PaymentService),
+        expect.any(UsersService),
         app.log,
       );
     });
