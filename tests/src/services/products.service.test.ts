@@ -102,6 +102,7 @@ describe('Products Service Tests', () => {
             [Service.Drive]: {
               enabled: true,
               maxSpaceBytes: 1000,
+              foreignTierId: 'individual-random-id',
               workspaces: { enabled: false } as any,
               passwordProtectedSharing: { enabled: true },
               restrictedItemsSharing: { enabled: true },
@@ -132,6 +133,7 @@ describe('Products Service Tests', () => {
             [Service.Drive]: {
               enabled: true,
               maxSpaceBytes: 500,
+              foreignTierId: 'business-random-id',
               workspaces: {
                 enabled: true,
                 maxSpaceBytesPerSeat: 1000,

@@ -1,8 +1,9 @@
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import config from '../../../src/config';
-import { getUser, voidPromise } from '../fixtures';
+import { getUser, newTier, voidPromise } from '../fixtures';
 import { getUserStorage, StorageService } from '../../../src/services/storage.service';
+import { Service } from '../../../src/core/users/Tier';
 
 jest.mock('axios');
 
@@ -27,18 +28,23 @@ describe('Storage service tests', () => {
 
     it('When the user updates the storage, then it should be called with the necessary data and resolves', async () => {
       const mockedUserUuid = getUser().uuid;
-      const newStorageBytes = 100000;
+      const mockedTier = newTier();
+      const driveFeatures = mockedTier.featuresPerService[Service.Drive];
 
       mockedAxios.patch.mockImplementation(voidPromise);
 
-      await storageService.changeStorage(mockedUserUuid, newStorageBytes);
+      await storageService.updateUserStorageAndTier(
+        mockedUserUuid,
+        driveFeatures.maxSpaceBytes,
+        driveFeatures.foreignTierId,
+      );
 
       expect(jwt.sign).toHaveBeenCalledTimes(1);
       expect(jwt.sign).toHaveBeenCalledWith({}, expect.any(String), expect.any(Object));
       expect(mockedAxios.patch).toHaveBeenCalledTimes(1);
       expect(mockedAxios.patch).toHaveBeenCalledWith(
         `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${mockedUserUuid}`,
-        { maxSpaceBytes: newStorageBytes },
+        { maxSpaceBytes: driveFeatures.maxSpaceBytes, tierId: driveFeatures.foreignTierId },
         expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: expect.stringContaining('Bearer '),
@@ -46,16 +52,29 @@ describe('Storage service tests', () => {
           }),
         }),
       );
-      await expect(storageService.changeStorage(mockedUserUuid, newStorageBytes)).resolves.toBeUndefined();
+      await expect(
+        storageService.updateUserStorageAndTier(
+          mockedUserUuid,
+          driveFeatures.maxSpaceBytes,
+          driveFeatures.foreignTierId,
+        ),
+      ).resolves.toBeUndefined();
     });
 
     it('When the API request to update the user storage fails, then an error indicating so is thrown', async () => {
       const mockedUserUuid = getUser().uuid;
-      const newStorageBytes = 100000;
+      const mockedTier = newTier();
+      const driveFeatures = mockedTier.featuresPerService[Service.Drive];
       const randomError = new Error('API request failed');
       mockedAxios.patch.mockRejectedValue(randomError);
 
-      await expect(storageService.changeStorage(mockedUserUuid, newStorageBytes)).rejects.toThrow(randomError);
+      await expect(
+        storageService.updateUserStorageAndTier(
+          mockedUserUuid,
+          driveFeatures.maxSpaceBytes,
+          driveFeatures.foreignTierId,
+        ),
+      ).rejects.toThrow(randomError);
       expect(mockedAxios.patch).toHaveBeenCalledTimes(1);
     });
   });

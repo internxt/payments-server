@@ -580,13 +580,14 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(changeStorageSpy).toHaveBeenCalledWith(
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].maxSpaceBytes,
+        tier.featuresPerService[Service.Drive].foreignTierId,
       );
     });
   });
@@ -609,17 +610,31 @@ describe('TiersService tests', () => {
     it('When workspaces is not enabled, then update the user tier to free and downgrade the storage to the free plan', async () => {
       const { uuid } = getUser();
       const tier = newTier();
+      const freeTier = newTier({
+        featuresPerService: {
+          [Service.Drive]: {
+            enabled: true,
+            maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+            foreignTierId: 'free',
+          },
+        } as any,
+      });
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(freeTier);
       const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
       await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
-      expect(changeStorageSpy).toHaveBeenCalledWith(uuid, FREE_PLAN_BYTES_SPACE);
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        uuid,
+        freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+        freeTier.featuresPerService[Service.Drive].foreignTierId,
+      );
     });
   });
 

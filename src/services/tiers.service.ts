@@ -7,7 +7,6 @@ import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
-import { FREE_PLAN_BYTES_SPACE } from '../constants';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
 
@@ -274,10 +273,15 @@ export class TiersService {
 
     const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
 
-    await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
+    await this.storageService.updateUserStorageAndTier(
+      userWithEmail.uuid,
+      maxSpaceBytes,
+      tier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
+    const freeTier = await this.getTierProductsByProductsId('free');
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
@@ -298,7 +302,11 @@ export class TiersService {
       }
     }
 
-    return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
+    return this.storageService.updateUserStorageAndTier(
+      userUuid,
+      freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   async applyVpnFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {

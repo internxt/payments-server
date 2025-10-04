@@ -186,7 +186,12 @@ export class LicenseCodesService {
           await this.tiersService.insertTierToUser(userId, tierProduct.id);
         }
       } else {
-        await this.storageService.changeStorage(user.uuid, maxSpaceBytes);
+        const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+        await this.storageService.updateUserStorageAndTier(
+          user.uuid,
+          maxSpaceBytes,
+          freeTier.featuresPerService[Service.Drive].foreignTierId,
+        );
       }
     } catch (error) {
       const err = error as Error;

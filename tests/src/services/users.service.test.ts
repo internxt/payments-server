@@ -120,6 +120,14 @@ describe('UsersService tests', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plan is cancelled and the storage is restored', async () => {
         const mockedUser = getUser();
         const mockedSubscriptions = getActiveSubscriptions();
+        const mockedFreeTier = newTier({
+          featuresPerService: {
+            drive: {
+              maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+              foreignTierId: 'free-id',
+            },
+          } as any,
+        });
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
           .mockImplementation(() =>
@@ -131,10 +139,14 @@ describe('UsersService tests', () => {
           );
 
         const cancelSubscriptionSpy = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
-        const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+        const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
         await usersService.cancelUserIndividualSubscriptions(mockedUser.customerId);
-        await storageService.changeStorage(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        await storageService.updateUserStorageAndTier(
+          mockedUser.uuid,
+          mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+          mockedFreeTier.featuresPerService.drive.foreignTierId,
+        );
 
         const individualSubscriptions = mockedSubscriptions.filter(
           (sub) => (sub.items.data[0].plan.product as Stripe.Product).metadata.type !== 'business',
@@ -142,7 +154,11 @@ describe('UsersService tests', () => {
         expect(cancelSubscriptionSpy).toHaveBeenCalledTimes(individualSubscriptions.length);
 
         expect(changeStorageSpy).toHaveBeenCalledTimes(1);
-        expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        expect(changeStorageSpy).toHaveBeenCalledWith(
+          mockedUser.uuid,
+          mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+          mockedFreeTier.featuresPerService.drive.foreignTierId,
+        );
       });
     });
 
@@ -150,16 +166,28 @@ describe('UsersService tests', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plans are cancelled', async () => {
         const mockedUser = getUser();
         const mockedSubscriptions = getActiveSubscriptions();
+        const mockedFreeTier = newTier({
+          featuresPerService: {
+            drive: {
+              maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+              foreignTierId: 'free-id',
+            },
+          } as any,
+        });
         jest
           .spyOn(paymentService, 'getActiveSubscriptions')
           .mockImplementation(() => Promise.resolve(mockedSubscriptions as unknown as ExtendedSubscription[]));
 
         const cancelSubscriptionSpy = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
-        const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+        const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
         await usersService.cancelUserB2BSuscriptions(mockedUser.customerId);
-        await storageService.changeStorage(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        await storageService.updateUserStorageAndTier(
+          mockedUser.uuid,
+          mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+          mockedFreeTier.featuresPerService.drive.foreignTierId,
+        );
 
         const b2bSubscriptions = mockedSubscriptions.filter(
           (sub) => (sub.items.data[0].plan.product as Stripe.Product).metadata.type === 'business',
@@ -172,7 +200,11 @@ describe('UsersService tests', () => {
         });
 
         expect(changeStorageSpy).toHaveBeenCalledTimes(1);
-        expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+        expect(changeStorageSpy).toHaveBeenCalledWith(
+          mockedUser.uuid,
+          mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+          mockedFreeTier.featuresPerService.drive.foreignTierId,
+        );
       });
     });
   });
