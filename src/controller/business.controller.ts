@@ -12,8 +12,15 @@ import { assertUser } from '../utils/assertUser';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import Stripe from 'stripe';
+import { TiersService } from '../services/tiers.service';
+import { Service } from '../core/users/Tier';
 
-export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
+export default function (
+  paymentService: PaymentService,
+  usersService: UsersService,
+  tiersService: TiersService,
+  config: AppConfig,
+) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -92,7 +99,16 @@ export default function (paymentService: PaymentService, usersService: UsersServ
             },
           });
 
-          await usersService.updateWorkspaceStorage(user.uuid, Number(maxSpaceBytes), workspaceUpdatedSeats);
+          const price = updatedSub.items.data[0]?.price;
+          const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
+          const tier = await tiersService.getTierProductsByProductsId(productId as string, 'subscription');
+
+          await usersService.updateWorkspace({
+            ownerId: user.uuid,
+            tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+            maxSpaceBytes: Number(maxSpaceBytes),
+            seats: workspaceUpdatedSeats,
+          });
 
           return res.status(200).send(updatedSub);
         } catch (err) {

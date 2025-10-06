@@ -248,9 +248,15 @@ export class TiersService {
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
       const address = customer.address?.line1 ?? undefined;
       const phoneNumber = customer.phone ?? undefined;
+      const driveTierId = tier.featuresPerService[Service.Drive].foreignTierId;
 
       try {
-        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
+        await this.usersService.updateWorkspace({
+          ownerId: userWithEmail.uuid,
+          maxSpaceBytes: Number(maxSpaceBytes),
+          seats: subscriptionSeats,
+          tierId: driveTierId,
+        });
         log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
       } catch (err) {
         if (isAxiosError(err) && err.response?.status === 404) {
@@ -260,6 +266,7 @@ export class TiersService {
           await this.usersService.initializeWorkspace(userWithEmail.uuid, {
             newStorageBytes: Number(maxSpaceBytes),
             seats: subscriptionSeats,
+            tierId: driveTierId,
             address,
             phoneNumber,
           });

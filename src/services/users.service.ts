@@ -168,7 +168,7 @@ export class UsersService {
 
   async initializeWorkspace(
     ownerId: string,
-    payload: { newStorageBytes: number; seats: number; address?: string; phoneNumber?: string },
+    payload: { newStorageBytes: number; seats: number; tierId: string; address?: string; phoneNumber?: string },
   ): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
@@ -182,6 +182,7 @@ export class UsersService {
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
       {
         ownerId,
+        tierId: payload.tierId,
         maxSpaceBytes: payload.newStorageBytes * payload.seats,
         address: payload.address,
         numberOfSeats: payload.seats,
@@ -216,7 +217,17 @@ export class UsersService {
     );
   }
 
-  async updateWorkspaceStorage(ownerId: string, maxSpaceBytes: number, seats: number): Promise<void> {
+  async updateWorkspace({
+    ownerId,
+    tierId,
+    maxSpaceBytes,
+    seats,
+  }: {
+    ownerId: string;
+    tierId: string;
+    maxSpaceBytes: number;
+    seats: number;
+  }): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -225,12 +236,13 @@ export class UsersService {
       },
     };
 
-    return this.axios.put(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/storage`,
+    return this.axios.patch(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
       {
         ownerId,
         maxSpaceBytes: maxSpaceBytes * seats,
         numberOfSeats: seats,
+        tierId,
       },
       requestConfig,
     );
