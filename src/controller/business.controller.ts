@@ -101,7 +101,7 @@ export default function (
 
           const price = updatedSub.items.data[0]?.price;
           const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
-          const tier = await tiersService.getTierProductsByProductsId(productId as string, 'subscription');
+          const tier = await tiersService.getTierProductsByProductsId(productId, 'subscription');
 
           await usersService.updateWorkspace({
             ownerId: user.uuid,
