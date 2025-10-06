@@ -483,7 +483,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(usersService, 'updateWorkspace')
         .mockImplementation(() => Promise.resolve());
 
       await expect(
@@ -504,7 +504,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(usersService, 'updateWorkspace')
         .mockImplementation(() => Promise.resolve());
 
       await tiersService.applyTier(
@@ -515,11 +515,12 @@ describe('TiersService tests', () => {
         logger,
       );
 
-      expect(updateWorkspaceStorage).toHaveBeenCalledWith(
-        userWithEmail.uuid,
-        tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        mockedInvoiceLineItem.quantity,
-      );
+      expect(updateWorkspaceStorage).toHaveBeenCalledWith({
+        ownerId: userWithEmail.uuid,
+        maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+        seats: mockedInvoiceLineItem.quantity,
+        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+      });
     });
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
@@ -538,7 +539,7 @@ describe('TiersService tests', () => {
         toJSON: () => ({}),
       } as AxiosError;
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(axiosError404));
+      jest.spyOn(usersService, 'updateWorkspace').mockImplementation(() => Promise.reject(axiosError404));
 
       const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
 
@@ -549,6 +550,7 @@ describe('TiersService tests', () => {
         seats: amountOfSeats,
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
+        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
       });
     });
 
@@ -564,7 +566,7 @@ describe('TiersService tests', () => {
 
       const unexpectedError = new Error('Unexpected error');
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
+      jest.spyOn(usersService, 'updateWorkspace').mockRejectedValue(unexpectedError);
 
       await expect(
         tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
