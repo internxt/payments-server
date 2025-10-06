@@ -225,10 +225,15 @@ export class UsersService {
   }: {
     ownerId: string;
     tierId: string;
-    maxSpaceBytes: number;
-    seats: number;
+    maxSpaceBytes?: number;
+    seats?: number;
   }): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    let totalMaxSpaceBytes: number | undefined = undefined;
+
+    if (maxSpaceBytes && seats) {
+      totalMaxSpaceBytes = maxSpaceBytes * seats;
+    }
     const requestConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -240,7 +245,7 @@ export class UsersService {
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
       {
         ownerId,
-        maxSpaceBytes: maxSpaceBytes * seats,
+        maxSpaceBytes: totalMaxSpaceBytes,
         numberOfSeats: seats,
         tierId,
       },
