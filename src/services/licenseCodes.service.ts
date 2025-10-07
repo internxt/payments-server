@@ -173,6 +173,8 @@ export class LicenseCodesService {
       if (tierProduct) {
         await this.tiersService.applyTier(user, customer, 1, tierProduct.productId, logger);
 
+        Logger.info(`Tier with ID ${tierProduct.id} applied for user with Id ${user.uuid}`);
+
         const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
         const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
           if (error instanceof TierNotFoundError) {
@@ -198,6 +200,8 @@ export class LicenseCodesService {
           freeTier.featuresPerService[Service.Drive].foreignTierId,
         );
       }
+
+      Logger.info(`Product features applied for user with Id ${user.uuid}`);
     } catch (error) {
       const err = error as Error;
       logger.error(`Error while applying the product features to the user: ${user.uuid}. ERROR: ${err.message}`);
