@@ -1351,16 +1351,6 @@ export class PaymentService {
     }
   }
 
-  private getPaymentMethodTypes(
-    currency: string,
-    isOneTime: boolean,
-  ): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
-    const commonPaymentTypes = commonPaymentMethodTypes[currency];
-    const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
-
-    return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
-  }
-
   /**
    * This function is used to get the promotion code object from Stripe.
    * @param promoCodeName - The name of the promotion code
