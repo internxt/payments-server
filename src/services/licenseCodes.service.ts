@@ -8,6 +8,7 @@ import { TierNotFoundError, TiersService } from './tiers.service';
 import { UsersService } from './users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { Service, Tier } from '../core/users/Tier';
+import Logger from '../Logger';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
@@ -127,6 +128,8 @@ export class LicenseCodesService {
 
     const tierProduct = await this.getTierProduct(licenseCode);
 
+    Logger.info(`Tier with Id ${tierProduct?.id} has been found for license code ${licenseCode.code}`);
+
     await this.applyProductFeatures({
       user,
       customer,
@@ -145,6 +148,8 @@ export class LicenseCodesService {
   async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
     const price = await this.paymentService.getPrice(licenseCode.priceId);
     const productId = typeof price.product === 'string' ? price.product : price.product.id;
+
+    Logger.info(`Getting tier for product ${productId}`);
 
     const tierProduct = await this.tiersService.getTierProductsByProductsId(productId, 'lifetime').catch((error) => {
       if (error instanceof TierNotFoundError) {
