@@ -71,7 +71,7 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
           $project: {
             _id: 0,
             userUuid: '$user.uuid',
-            foreignTierId: '$tier.foreignTierId',
+            foreignTierId: '$tier.featuresPerService.drive.foreignTierId',
           },
         },
       ])
