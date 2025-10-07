@@ -54,7 +54,10 @@ export async function updateBusinessUsers(usersTiersRepository: UsersTiersReposi
   return { total: userIdsAndForeignTierId.length, failed: errors.length, errors };
 }
 
-export async function updatePersonalUsers(usersTiersRepository: UsersTiersRepository, storageService: StorageService) {
+export async function updateIndividualUsers(
+  usersTiersRepository: UsersTiersRepository,
+  storageService: StorageService,
+) {
   const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(false);
   const errors: Array<{ userUuid: string; error: string }> = [];
 
@@ -113,7 +116,7 @@ async function main() {
     if (isBusiness) {
       result = await updateBusinessUsers(usersTiersRepository, usersService);
     } else {
-      result = await updatePersonalUsers(usersTiersRepository, storageService);
+      result = await updateIndividualUsers(usersTiersRepository, storageService);
     }
 
     console.log(`\n✓ Sync completed: ${result.total - result.failed}/${result.total} users updated successfully`);
