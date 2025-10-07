@@ -366,13 +366,25 @@ describe('Testing the handler when an invoice is completed', () => {
   describe('Old Product Management', () => {
     test('When processing old product, then it should call storage service with correct parameters', async () => {
       const mockedUser = getUser();
+      const mockedFreeTier = newTier({
+        featuresPerService: {
+          drive: {
+            foreignTierId: 'free',
+          },
+        } as any,
+      });
       const mockedMaxSpaceBytes = 100;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
 
       const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
       await handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
 
-      expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        mockedUser.uuid,
+        mockedMaxSpaceBytes,
+        mockedFreeTier.featuresPerService.drive.foreignTierId,
+      );
     });
   });
 

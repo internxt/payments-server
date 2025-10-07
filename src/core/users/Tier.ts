@@ -7,6 +7,7 @@ interface BackupsFeatures {
 }
 
 export interface DriveFeatures {
+  foreignTierId: string;
   enabled: boolean;
   maxSpaceBytes: number;
   workspaces: {
