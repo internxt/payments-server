@@ -24,6 +24,7 @@ export class StorageService {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
+        'x-internxt-payments-header': process.env.X_INTERNXT_PAYMENTS_HEADER,
       },
     };
 

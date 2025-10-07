@@ -9,7 +9,10 @@ export interface UserTier {
 }
 
 export interface UsersTiersRepository {
-  getUserTierMappings(isBusiness?: boolean): Promise<Array<{ userUuid: string; foreignTierId: string }>>;
+  getUserTierMappings(
+    isBusiness?: boolean,
+    userId?: string,
+  ): Promise<Array<{ userUuid: string; foreignTierId: string }>>;
   insertTierToUser(userId: User['id'], tierId: Tier['id']): Promise<void>;
   updateUserTier(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<boolean>;
   deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<boolean>;
@@ -31,20 +34,35 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
     this.collection = mongo.db('payments').collection<Omit<UserTier, 'id'>>('users_tiers');
   }
 
-  async getUserTierMappings(isBusiness = false): Promise<Array<{ userUuid: string; foreignTierId: string }>> {
+  async getUserTierMappings(
+    isBusiness = false,
+    userId?: string,
+  ): Promise<Array<{ userUuid: string; foreignTierId: string }>> {
+    const matchStage: any = {
+      'featuresPerService.drive.workspaces.enabled': isBusiness,
+    };
+
+    if (userId) {
+      matchStage.uuid = userId;
+    }
+
     const results = await this.collection
       .aggregate([
-        {
-          $match: {
-            'featuresPerService.drive.workspaces.enabled': isBusiness,
-          },
-        },
         {
           $addFields: {
             userIdObj: { $toObjectId: '$userId' },
             tierIdObj: { $toObjectId: '$tierId' },
           },
         },
+        ...(userId
+          ? [
+              {
+                $match: {
+                  userId: userId,
+                },
+              },
+            ]
+          : []),
         {
           $lookup: {
             from: 'users',
@@ -66,6 +84,11 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
         },
         {
           $unwind: '$tier',
+        },
+        {
+          $match: {
+            'tier.featuresPerService.drive.workspaces.enabled': isBusiness,
+          },
         },
         {
           $project: {
