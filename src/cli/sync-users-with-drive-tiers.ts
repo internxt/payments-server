@@ -58,7 +58,7 @@ export async function updateIndividualUsers(
   usersTiersRepository: UsersTiersRepository,
   storageService: StorageService,
 ) {
-  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(false);
+  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(false, '6842cc7e370958d12dcb2246');
   const errors: Array<{ userUuid: string; error: string }> = [];
 
   for (const { userUuid, foreignTierId } of userIdsAndForeignTierId) {
