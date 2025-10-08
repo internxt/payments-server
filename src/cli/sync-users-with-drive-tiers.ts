@@ -21,12 +21,12 @@ import { MongoDBProductsRepository } from '../core/users/MongoDBProductsReposito
 import { Bit2MeService } from '../services/bit2me.service';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
-const [, , subType] = process.argv;
+const [, , subType, userId] = process.argv;
 
 const isBusiness = subType?.toLowerCase() === 'business';
 
 export async function updateBusinessUsers(usersTiersRepository: UsersTiersRepository, usersService: UsersService) {
-  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(true);
+  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(true, userId);
   const errors: Array<{ userUuid: string; error: string }> = [];
 
   for (const { userUuid, foreignTierId } of userIdsAndForeignTierId) {
@@ -58,7 +58,7 @@ export async function updateIndividualUsers(
   usersTiersRepository: UsersTiersRepository,
   storageService: StorageService,
 ) {
-  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(false);
+  const userIdsAndForeignTierId = await usersTiersRepository.getUserTierMappings(false, userId);
   const errors: Array<{ userUuid: string; error: string }> = [];
 
   for (const { userUuid, foreignTierId } of userIdsAndForeignTierId) {
