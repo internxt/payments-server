@@ -4,10 +4,18 @@ import { UserNotFoundError } from '../../../src/services/users.service';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { getCustomer, getLicenseCode, getLogger, getPrice, getProduct, getUser, newTier } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
+import { UserType } from '../../../src/core/users/User';
 
 describe('Tests for License Codes service', () => {
-  const { licenseCodesRepository, licenseCodesService, usersService, tiersService, paymentService, storageService } =
-    createTestServices();
+  const {
+    licenseCodesRepository,
+    licenseCodesService,
+    cacheService,
+    usersService,
+    tiersService,
+    paymentService,
+    storageService,
+  } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -356,6 +364,8 @@ describe('Tests for License Codes service', () => {
         jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
         jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
         jest.spyOn(tiersService, 'insertTierToUser').mockResolvedValue();
+        const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
+        const clearUserTierSpy = jest.spyOn(cacheService, 'clearUserTier').mockResolvedValue();
 
         await licenseCodesService.applyProductFeatures({
           user,
@@ -366,6 +376,8 @@ describe('Tests for License Codes service', () => {
         });
 
         expect(applyTierSpy).toHaveBeenCalledWith(user, mockedCustomer, 1, mockedTier.productId, mockedLogger);
+        expect(clearSubscriptionSpy).toHaveBeenCalledWith(mockedUser.customerId, UserType.Individual);
+        expect(clearUserTierSpy).toHaveBeenCalledWith(user.uuid);
       });
 
       test('When the user does not have any tier, then the tier-user relationship is inserted into the collection after applying the features', async () => {

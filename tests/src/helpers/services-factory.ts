@@ -94,6 +94,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
+    cacheService,
     storageService,
     licenseCodesRepository: repositories.licenseCodesRepository,
     tiersService,
