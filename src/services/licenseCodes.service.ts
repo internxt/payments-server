@@ -1,18 +1,20 @@
 import Stripe from 'stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
-import { User } from '../core/users/User';
+import { User, UserType } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { StorageService } from './storage.service';
 import { TierNotFoundError, TiersService } from './tiers.service';
 import { UsersService } from './users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { Service, Tier } from '../core/users/Tier';
+import CacheService from './cache.service';
 import Logger from '../Logger';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
   usersService: UsersService;
+  cacheService: CacheService;
   storageService: StorageService;
   licenseCodesRepository: LicenseCodesRepository;
   tiersService: TiersService;
@@ -45,6 +47,7 @@ export class LicenseCodeAlreadyAppliedError extends Error {
 export class LicenseCodesService {
   private readonly paymentService: PaymentService;
   private readonly usersService: UsersService;
+  private readonly cacheService: CacheService;
   private readonly storageService: StorageService;
   private readonly licenseCodesRepository: LicenseCodesRepository;
   private readonly tiersService: TiersService;
@@ -52,12 +55,14 @@ export class LicenseCodesService {
   constructor({
     paymentService,
     usersService,
+    cacheService,
     storageService,
     licenseCodesRepository,
     tiersService,
   }: LicenseCodesServiceDeps) {
     this.paymentService = paymentService;
     this.usersService = usersService;
+    this.cacheService = cacheService;
     this.storageService = storageService;
     this.licenseCodesRepository = licenseCodesRepository;
     this.tiersService = tiersService;
@@ -175,7 +180,8 @@ export class LicenseCodesService {
 
         Logger.info(`Tier with ID ${tierProduct.id} applied for user with Id ${user.uuid}`);
 
-        const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
+        const userByUuid = await this.usersService.findUserByUuid(user.uuid);
+        const userId = userByUuid.id;
         const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
           if (error instanceof TierNotFoundError) {
             return [];
@@ -192,6 +198,9 @@ export class LicenseCodesService {
         } else {
           await this.tiersService.insertTierToUser(userId, tierProduct.id);
         }
+
+        await this.cacheService.clearSubscription(userByUuid.customerId, UserType.Individual);
+        await this.cacheService.clearUserTier(user.uuid);
       } else {
         const freeTier = await this.tiersService.getTierProductsByProductsId('free');
         await this.storageService.updateUserStorageAndTier(
