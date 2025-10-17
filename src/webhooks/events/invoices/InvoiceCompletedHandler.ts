@@ -271,8 +271,13 @@ export class InvoiceCompletedHandler {
    * @param userUuid The uuid of the user
    * @param maxSpaceBytes The new max space bytes
    */
-  private handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
-    return this.storageService.changeStorage(userUuid, maxSpaceBytes);
+  private async handleOldProduct(userUuid: string, maxSpaceBytes: number): Promise<void> {
+    const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+    return this.storageService.updateUserStorageAndTier(
+      userUuid,
+      maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   /**
@@ -480,7 +485,8 @@ export class InvoiceCompletedHandler {
   private async clearUserRelatedCache(customerId: string, userUuid: string): Promise<void> {
     try {
       await this.cacheService.clearSubscription(customerId);
-      await this.cacheService.clearUsedUserPromoCodes(userUuid);
+      await this.cacheService.clearUsedUserPromoCodes(customerId);
+      await this.cacheService.clearUserTier(userUuid);
       Logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
       const error = err as Error;

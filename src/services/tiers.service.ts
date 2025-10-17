@@ -1,13 +1,12 @@
 import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
-import { StorageService, updateUserTier } from './storage.service';
+import { StorageService } from './storage.service';
 import { AppConfig } from '../config';
 import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
 
@@ -249,9 +248,15 @@ export class TiersService {
       const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
       const address = customer.address?.line1 ?? undefined;
       const phoneNumber = customer.phone ?? undefined;
+      const driveTierId = tier.featuresPerService[Service.Drive].foreignTierId;
 
       try {
-        await this.usersService.updateWorkspaceStorage(userWithEmail.uuid, Number(maxSpaceBytes), subscriptionSeats);
+        await this.usersService.updateWorkspace({
+          ownerId: userWithEmail.uuid,
+          maxSpaceBytes: Number(maxSpaceBytes),
+          seats: subscriptionSeats,
+          tierId: driveTierId,
+        });
         log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
       } catch (err) {
         if (isAxiosError(err) && err.response?.status === 404) {
@@ -261,6 +266,7 @@ export class TiersService {
           await this.usersService.initializeWorkspace(userWithEmail.uuid, {
             newStorageBytes: Number(maxSpaceBytes),
             seats: subscriptionSeats,
+            tierId: driveTierId,
             address,
             phoneNumber,
           });
@@ -274,11 +280,15 @@ export class TiersService {
 
     const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
 
-    await this.storageService.changeStorage(userWithEmail.uuid, maxSpaceBytes);
-    await updateUserTier(userWithEmail.uuid, tier.productId, this.config);
+    await this.storageService.updateUserStorageAndTier(
+      userWithEmail.uuid,
+      maxSpaceBytes,
+      tier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
+    const freeTier = await this.getTierProductsByProductsId('free');
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
@@ -299,13 +309,11 @@ export class TiersService {
       }
     }
 
-    try {
-      await updateUserTier(userUuid, FREE_INDIVIDUAL_TIER, this.config);
-    } catch (error) {
-      log.error(`[TIER/SUB_CANCELED]: Error while updating user tier. User Id: ${userUuid}`);
-    }
-
-    return this.storageService.changeStorage(userUuid, FREE_PLAN_BYTES_SPACE);
+    return this.storageService.updateUserStorageAndTier(
+      userUuid,
+      freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 
   async applyVpnFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {

@@ -1,14 +1,21 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUser, getValidAuthToken, newTier } from '../fixtures';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { UsersService } from '../../../src/services/users.service';
 import { TiersService } from '../../../src/services/tiers.service';
-import { NotFoundSubscriptionError } from '../../../src/services/payment.service';
+import { ProductsService } from '../../../src/services/products.service';
+import { Service } from '../../../src/core/users/Tier';
+import Logger from '../../../src/Logger';
+import CacheService from '../../../src/services/cache.service';
 
 let app: FastifyInstance;
 
 beforeAll(async () => {
   app = await initializeServerAndDatabase();
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
 afterAll(async () => {
@@ -19,8 +26,21 @@ describe('Testing products endpoints', () => {
   describe('Fetching products available for user', () => {
     test('When the user is not found, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
+      const mockedTier = newTier({
+        id: 'free',
+        label: 'free',
+        productId: 'free',
+        featuresPerService: {
+          antivirus: {
+            enabled: false,
+          },
+          backups: {
+            enabled: false,
+          },
+        } as any,
+      });
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError('User not found'));
+      jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser').mockResolvedValueOnce(mockedTier);
 
       const response = await app.inject({
         path: `/products`,
@@ -39,41 +59,14 @@ describe('Testing products endpoints', () => {
           backups: false,
         },
       });
-    });
-
-    test('When the user exists but does not have an active subscription or lifetime, then an error indicating so is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const getProductsTierSpy = jest
-        .spyOn(TiersService.prototype, 'getProductsTier')
-        .mockRejectedValue(new NotFoundSubscriptionError('User has no active subscriptions'));
-
-      const response = await app.inject({
-        path: `/products`,
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual({
-        featuresPerService: {
-          antivirus: false,
-          backups: false,
-        },
-      });
-      expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
     });
 
     test('When an unexpected error occurs, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(mockedUser);
-      jest.spyOn(TiersService.prototype, 'getProductsTier').mockRejectedValue(new Error('Unexpected error'));
+      const unexpectedError = new Error('Unexpected error');
+      jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser').mockRejectedValueOnce(unexpectedError);
+      const loggerErrorSpy = jest.spyOn(Logger, 'error');
 
       const response = await app.inject({
         path: `/products`,
@@ -86,22 +79,26 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(500);
-      expect(responseBody).toStrictEqual({ error: 'Internal server error' });
+      expect(responseBody).toStrictEqual({
+        message: 'Internal Server Error',
+      });
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        `[PRODUCTS/GET]: Error ${unexpectedError.message} for user ${mockedUser.uuid}`,
+      );
     });
 
-    test('When the user is found and has a valid subscription, then the user is able to use the products', async () => {
-      const mockedAvailableUserProducts = {
-        featuresPerService: {
-          antivirus: true,
-          backups: true,
-        },
-      };
+    test('When the user has a tier, then the tier products are returned', async () => {
       const mockedUser = getUser();
+      const mockedTier = newTier();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const getProductsTierSpy = jest
-        .spyOn(TiersService.prototype, 'getProductsTier')
-        .mockResolvedValue(mockedAvailableUserProducts);
+      jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser').mockResolvedValueOnce(mockedTier);
+      const mockedApiResponse = {
+        featuresPerService: {
+          antivirus: mockedTier.featuresPerService[Service.Antivirus].enabled,
+          backups: mockedTier.featuresPerService[Service.Backups].enabled,
+        },
+      };
 
       const response = await app.inject({
         path: `/products`,
@@ -114,8 +111,7 @@ describe('Testing products endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedAvailableUserProducts);
-      expect(getProductsTierSpy).toHaveBeenCalledWith(mockedUser.customerId, mockedUser.lifetime);
+      expect(responseBody).toStrictEqual(mockedApiResponse);
     });
   });
 
@@ -198,6 +194,28 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedTier);
+    });
+
+    test('When the user has a cached tier, then the cached tier is returned', async () => {
+      const mockedUser = getUser();
+      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
+      const mockedTier = newTier();
+
+      const cachedTierSPy = jest.spyOn(CacheService.prototype, 'getUserTier').mockResolvedValue(mockedTier);
+      const getTierUserSpy = jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser');
+
+      const response = await app.inject({
+        path: `/products/tier`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${mockedUserToken}` },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual(mockedTier);
+      expect(cachedTierSPy).toHaveBeenCalledWith(mockedUser.uuid);
+      expect(getTierUserSpy).not.toHaveBeenCalled();
     });
   });
 });

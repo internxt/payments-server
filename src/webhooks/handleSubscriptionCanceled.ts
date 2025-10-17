@@ -1,8 +1,7 @@
 import { UserType } from './../core/users/User';
 import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
-import { StorageService, updateUserTier } from '../services/storage.service';
+import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { AppConfig } from '../config';
@@ -10,6 +9,7 @@ import Stripe from 'stripe';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { Service } from '../core/users/Tier';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -85,6 +85,8 @@ export default async function handleSubscriptionCanceled(
 
   try {
     await cacheService.clearSubscription(customerId, productType);
+    await cacheService.clearUsedUserPromoCodes(customerId);
+    await cacheService.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
@@ -117,15 +119,12 @@ export default async function handleSubscriptionCanceled(
       return;
     }
 
-    try {
-      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    } catch (err) {
-      const error = err as Error;
-      log.error(
-        `[SUB CANCEL/ERROR]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
-      );
-    }
+    const freeTier = await tiersService.getTierProductsByProductsId('free');
 
-    return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
+    return storageService.updateUserStorageAndTier(
+      uuid,
+      freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 }

@@ -1,17 +1,20 @@
 import Stripe from 'stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
-import { User } from '../core/users/User';
+import { User, UserType } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { StorageService } from './storage.service';
 import { TierNotFoundError, TiersService } from './tiers.service';
 import { UsersService } from './users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { Service, Tier } from '../core/users/Tier';
+import CacheService from './cache.service';
+import Logger from '../Logger';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
   usersService: UsersService;
+  cacheService: CacheService;
   storageService: StorageService;
   licenseCodesRepository: LicenseCodesRepository;
   tiersService: TiersService;
@@ -44,6 +47,7 @@ export class LicenseCodeAlreadyAppliedError extends Error {
 export class LicenseCodesService {
   private readonly paymentService: PaymentService;
   private readonly usersService: UsersService;
+  private readonly cacheService: CacheService;
   private readonly storageService: StorageService;
   private readonly licenseCodesRepository: LicenseCodesRepository;
   private readonly tiersService: TiersService;
@@ -51,12 +55,14 @@ export class LicenseCodesService {
   constructor({
     paymentService,
     usersService,
+    cacheService,
     storageService,
     licenseCodesRepository,
     tiersService,
   }: LicenseCodesServiceDeps) {
     this.paymentService = paymentService;
     this.usersService = usersService;
+    this.cacheService = cacheService;
     this.storageService = storageService;
     this.licenseCodesRepository = licenseCodesRepository;
     this.tiersService = tiersService;
@@ -127,6 +133,8 @@ export class LicenseCodesService {
 
     const tierProduct = await this.getTierProduct(licenseCode);
 
+    Logger.info(`Tier with Id ${tierProduct?.id} has been found for license code ${licenseCode.code}`);
+
     await this.applyProductFeatures({
       user,
       customer,
@@ -143,8 +151,10 @@ export class LicenseCodesService {
   }
 
   async getTierProduct(licenseCode: LicenseCode): Promise<Tier | null> {
-    const price = await this.paymentService.getPriceById(licenseCode.priceId);
-    const productId = price.product;
+    const price = await this.paymentService.getPrice(licenseCode.priceId);
+    const productId = typeof price.product === 'string' ? price.product : price.product.id;
+
+    Logger.info(`Getting tier for product ${productId}`);
 
     const tierProduct = await this.tiersService.getTierProductsByProductsId(productId, 'lifetime').catch((error) => {
       if (error instanceof TierNotFoundError) {
@@ -168,7 +178,10 @@ export class LicenseCodesService {
       if (tierProduct) {
         await this.tiersService.applyTier(user, customer, 1, tierProduct.productId, logger);
 
-        const userId = (await this.usersService.findUserByUuid(user.uuid)).id;
+        Logger.info(`Tier with ID ${tierProduct.id} applied for user with Id ${user.uuid}`);
+
+        const userByUuid = await this.usersService.findUserByUuid(user.uuid);
+        const userId = userByUuid.id;
         const existingTiersForUser = await this.tiersService.getTiersProductsByUserId(userId).catch((error) => {
           if (error instanceof TierNotFoundError) {
             return [];
@@ -185,9 +198,19 @@ export class LicenseCodesService {
         } else {
           await this.tiersService.insertTierToUser(userId, tierProduct.id);
         }
+
+        await this.cacheService.clearSubscription(userByUuid.customerId, UserType.Individual);
+        await this.cacheService.clearUserTier(user.uuid);
       } else {
-        await this.storageService.changeStorage(user.uuid, maxSpaceBytes);
+        const freeTier = await this.tiersService.getTierProductsByProductsId('free');
+        await this.storageService.updateUserStorageAndTier(
+          user.uuid,
+          maxSpaceBytes,
+          freeTier.featuresPerService[Service.Drive].foreignTierId,
+        );
       }
+
+      Logger.info(`Product features applied for user with Id ${user.uuid}`);
     } catch (error) {
       const err = error as Error;
       logger.error(`Error while applying the product features to the user: ${user.uuid}. ERROR: ${err.message}`);

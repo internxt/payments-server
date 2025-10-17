@@ -54,7 +54,7 @@ export default function (
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, fastify.log);
+          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, usersService, fastify.log);
           break;
 
         case 'payment_intent.amount_capturable_updated':

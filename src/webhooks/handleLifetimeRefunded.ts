@@ -1,13 +1,13 @@
 import { FastifyLoggerInstance } from 'fastify';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../constants';
 import CacheService from '../services/cache.service';
-import { StorageService, updateUserTier } from '../services/storage.service';
+import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
+import { Service } from '../core/users/Tier';
 
 export default async function handleLifetimeRefunded(
   storageService: StorageService,
@@ -41,6 +41,8 @@ export default async function handleLifetimeRefunded(
 
   try {
     await cacheService.clearSubscription(customerId);
+    await cacheService.clearUsedUserPromoCodes(customerId);
+    await cacheService.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleLifetimeRefunded after trying to clear ${customerId} subscription`);
   }
@@ -63,15 +65,12 @@ export default async function handleLifetimeRefunded(
     }
     await usersService.updateUser(customerId, { lifetime: false });
 
-    try {
-      await updateUserTier(uuid, FREE_INDIVIDUAL_TIER, config);
-    } catch (err) {
-      const error = err as Error;
-      log.error(
-        `[LIFETIME REFUNDED]: Error while updating user tier: uuid: ${uuid}. [ERROR STACK]: ${error.stack ?? error.message} `,
-      );
-    }
+    const freeTier = await tiersService.getTierProductsByProductsId('free');
 
-    return storageService.changeStorage(uuid, FREE_PLAN_BYTES_SPACE);
+    return storageService.updateUserStorageAndTier(
+      uuid,
+      freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+      freeTier.featuresPerService[Service.Drive].foreignTierId,
+    );
   }
 }

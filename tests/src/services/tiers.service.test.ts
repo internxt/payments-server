@@ -1,23 +1,16 @@
 import { AxiosError } from 'axios';
 
-import config from '../../../src/config';
 import {
   ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS,
   NoSubscriptionSeatsProvidedError,
   TierNotFoundError,
 } from '../../../src/services/tiers.service';
 import { CustomerId, ExtendedSubscription, NotFoundSubscriptionError } from '../../../src/services/payment.service';
-import { updateUserTier } from '../../../src/services/storage.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-
-jest.mock('../../../src/services/storage.service', () => ({
-  ...jest.requireActual('../../../src/services/storage.service'),
-  updateUserTier: jest.fn().mockResolvedValue(() => {}),
-}));
 
 describe('TiersService tests', () => {
   const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
@@ -513,7 +506,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(usersService, 'updateWorkspace')
         .mockImplementation(() => Promise.resolve());
 
       await expect(
@@ -534,7 +527,7 @@ describe('TiersService tests', () => {
 
       jest.spyOn(tiersRepository, 'findByProductId').mockImplementation(() => Promise.resolve(tier));
       const updateWorkspaceStorage = jest
-        .spyOn(usersService, 'updateWorkspaceStorage')
+        .spyOn(usersService, 'updateWorkspace')
         .mockImplementation(() => Promise.resolve());
 
       await tiersService.applyTier(
@@ -545,11 +538,12 @@ describe('TiersService tests', () => {
         logger,
       );
 
-      expect(updateWorkspaceStorage).toHaveBeenCalledWith(
-        userWithEmail.uuid,
-        tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        mockedInvoiceLineItem.quantity,
-      );
+      expect(updateWorkspaceStorage).toHaveBeenCalledWith({
+        ownerId: userWithEmail.uuid,
+        maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+        seats: mockedInvoiceLineItem.quantity,
+        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+      });
     });
 
     it('When workspaces is enabled and the workspace do not exist, then it is initialized', async () => {
@@ -568,7 +562,7 @@ describe('TiersService tests', () => {
         toJSON: () => ({}),
       } as AxiosError;
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockImplementation(() => Promise.reject(axiosError404));
+      jest.spyOn(usersService, 'updateWorkspace').mockImplementation(() => Promise.reject(axiosError404));
 
       const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
 
@@ -579,6 +573,7 @@ describe('TiersService tests', () => {
         seats: amountOfSeats,
         address: mockedCustomer.address?.line1 ?? undefined,
         phoneNumber: mockedCustomer.phone ?? undefined,
+        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
       });
     });
 
@@ -594,7 +589,7 @@ describe('TiersService tests', () => {
 
       const unexpectedError = new Error('Unexpected error');
 
-      jest.spyOn(usersService, 'updateWorkspaceStorage').mockRejectedValue(unexpectedError);
+      jest.spyOn(usersService, 'updateWorkspace').mockRejectedValue(unexpectedError);
 
       await expect(
         tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
@@ -610,15 +605,15 @@ describe('TiersService tests', () => {
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
       await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
 
       expect(changeStorageSpy).toHaveBeenCalledWith(
         userWithEmail.uuid,
         tier.featuresPerService[Service.Drive].maxSpaceBytes,
+        tier.featuresPerService[Service.Drive].foreignTierId,
       );
-      expect(updateUserTier).toHaveBeenCalledWith(userWithEmail.uuid, tier.productId, config);
     });
   });
 
@@ -631,31 +626,40 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].workspaces.enabled = true;
 
       const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
-      (updateUserTier as jest.Mock).mockClear();
 
       await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
-
-      expect(updateUserTier).not.toHaveBeenCalled();
     });
 
     it('When workspaces is not enabled, then update the user tier to free and downgrade the storage to the free plan', async () => {
       const { uuid } = getUser();
       const tier = newTier();
+      const freeTier = newTier({
+        featuresPerService: {
+          [Service.Drive]: {
+            enabled: true,
+            maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+            foreignTierId: 'free',
+          },
+        } as any,
+      });
 
       tier.featuresPerService[Service.Drive].enabled = true;
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
 
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(freeTier);
       const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockImplementation(voidPromise);
-      (updateUserTier as jest.Mock).mockClear();
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
       await tiersService.removeDriveFeatures(uuid, tier, getLogger());
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
-      expect(updateUserTier).toHaveBeenCalledWith(uuid, FREE_INDIVIDUAL_TIER, config);
-      expect(changeStorageSpy).toHaveBeenCalledWith(uuid, FREE_PLAN_BYTES_SPACE);
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        uuid,
+        freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
+        freeTier.featuresPerService[Service.Drive].foreignTierId,
+      );
     });
   });
 

@@ -66,6 +66,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
+    cacheService,
     usersService,
     storageService,
     licenseCodesRepository,

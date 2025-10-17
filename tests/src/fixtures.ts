@@ -584,7 +584,9 @@ export const getCreatedSubscription = (
             custom_unit_amount: null,
             livemode: false,
             lookup_key: null,
-            metadata: {},
+            metadata: {
+              maxSpaceBytes: '100',
+            },
             nickname: null,
             product: `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
@@ -887,6 +889,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
       cleaner: { enabled: false },
       drive: {
         enabled: false,
+        foreignTierId: randomUUID(),
         maxSpaceBytes: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         workspaces: {
           enabled: false,
@@ -894,6 +897,11 @@ export const newTier = (params?: Partial<Tier>): Tier => {
           minimumSeats: 3,
           maxSpaceBytesPerSeat: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         },
+        passwordProtectedSharing: { enabled: false },
+        restrictedItemsSharing: { enabled: false },
+      },
+      darkMonitor: {
+        enabled: false,
       },
     },
     ...params,
