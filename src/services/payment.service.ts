@@ -892,6 +892,7 @@ export class PaymentService {
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
+      expand: ['data.payments'],
       ...additionalParams,
     });
 

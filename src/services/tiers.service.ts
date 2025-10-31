@@ -9,6 +9,7 @@ import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository'
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
+import { isInvoicePaidOutOfBand } from '../utils/isInvoicePaidOutOfBand';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -133,15 +134,14 @@ export class TiersService {
 
     if (isLifetime) {
       const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {}, undefined, {
-        expand: ['data.payments'],
+        status: 'paid',
       });
-      const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
 
-      for (const invoice of paidInvoices) {
+      for (const invoice of lifetimeInvoices) {
         const lineItem = invoice.lines?.data[0];
         const product = lineItem?.pricing?.price_details?.product;
         const isLifetimePaidExternally: boolean =
-          invoice.status === 'paid' && invoice.payments?.data.length === 0 && invoice.metadata?.provider !== 'bit2me';
+          isInvoicePaidOutOfBand(invoice) && invoice.metadata?.provider !== 'bit2me';
 
         if (isLifetimePaidExternally) {
           isLifetimePaidOutOfBand = true;
