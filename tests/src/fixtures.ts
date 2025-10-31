@@ -4,6 +4,7 @@ import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
+import Stripe from 'stripe';
 import {
   PaymentIntent,
   PaymentIntentCrypto,
@@ -26,7 +27,6 @@ import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
 import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
 import { AllowedCryptoCurrencies } from '../../src/utils/currency';
-import Stripe from 'stripe';
 
 const randomDataGenerator = new Chance();
 
@@ -420,9 +420,6 @@ export const getCreatedSubscription = (
       metadata: {},
       object: 'payment_method',
       type: 'card',
-    } as Stripe.PaymentMethod,
-    billing_mode: {
-      type: 'classic',
     },
     default_source: {
       id: `src_${randomDataGenerator.string({ length: 16 })}`,
@@ -528,8 +525,6 @@ export const getCreatedSubscription = (
           current_period_end: randomDataGenerator.natural({ length: 10 }),
           current_period_start: randomDataGenerator.natural({ length: 10 }),
           id: `si_${randomDataGenerator.string({ length: 12 })}`,
-          current_period_end: randomDataGenerator.natural({ length: 10 }),
-          current_period_start: randomDataGenerator.natural({ length: 10 }),
           object: 'subscription_item',
           billing_thresholds: null,
           created: randomDataGenerator.natural({ length: 10 }),
@@ -585,9 +580,7 @@ export const getCreatedSubscription = (
             custom_unit_amount: null,
             livemode: false,
             lookup_key: null,
-            metadata: {
-              maxSpaceBytes: '100',
-            },
+            metadata: {},
             nickname: null,
             product: `prod_${randomDataGenerator.string({ length: 12 })}`,
             recurring: {
@@ -607,7 +600,7 @@ export const getCreatedSubscription = (
           quantity: 1,
           subscription: `sub_${randomDataGenerator.string({ length: 12 })}`,
           tax_rates: [],
-        } as Stripe.SubscriptionItem,
+        },
       ],
       has_more: false,
       url: '/v1/subscription_items?subscription=sub_1MowQVLkdIwHu7ixeRlqHVzs',
@@ -805,9 +798,8 @@ export function getParsedCreatedInvoiceResponse(
 
 export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe.PaymentIntent => {
   return {
-    id: `pi_${randomDataGenerator.string({ length: 14 })}`,
-    invoice: `in_${randomDataGenerator.string({ length: 14 })}`,
     excluded_payment_method_types: [],
+    id: `pi_${randomDataGenerator.string({ length: 14 })}`,
     payment_method_configuration_details: {
       id: '',
       parent: '',
@@ -887,9 +879,18 @@ export const newTier = (params?: Partial<Tier>): Tier => {
       antivirus: { enabled: false },
       backups: { enabled: false },
       cleaner: { enabled: false },
-      drive: {
+      darkMonitor: {
         enabled: false,
-        foreignTierId: randomUUID(),
+      },
+      drive: {
+        foreignTierId: randomDataGenerator.string({ length: 10 }),
+        passwordProtectedSharing: {
+          enabled: false,
+        },
+        restrictedItemsSharing: {
+          enabled: false,
+        },
+        enabled: false,
         maxSpaceBytes: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         workspaces: {
           enabled: false,
@@ -897,11 +898,6 @@ export const newTier = (params?: Partial<Tier>): Tier => {
           minimumSeats: 3,
           maxSpaceBytesPerSeat: randomDataGenerator.integer({ min: 1024 * 1024 * 1024, max: 5 * 1024 * 1024 * 1024 }),
         },
-        passwordProtectedSharing: { enabled: false },
-        restrictedItemsSharing: { enabled: false },
-      },
-      darkMonitor: {
-        enabled: false,
       },
     },
     ...params,

@@ -394,10 +394,6 @@ export class PaymentService {
     }
   }
 
-  async getPrice(priceId: string): Promise<Stripe.Price> {
-    return this.provider.prices.retrieve(priceId);
-  }
-
   /**
    * Creates an invoice to purchase a one time plan.
    *
