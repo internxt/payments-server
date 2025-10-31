@@ -415,13 +415,25 @@ describe('Testing the handler when an invoice is completed', () => {
   describe('Old Product Management', () => {
     test('When processing old product, then it should call storage service with correct parameters', async () => {
       const mockedUser = getUser();
+      const mockedFreeTier = newTier({
+        featuresPerService: {
+          drive: {
+            foreignTierId: 'free',
+          },
+        } as any,
+      });
       const mockedMaxSpaceBytes = 100;
-      const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
 
       const handleOldProduct = invoiceCompletedHandler['handleOldProduct'].bind(invoiceCompletedHandler);
       await handleOldProduct(mockedUser.uuid, mockedMaxSpaceBytes);
 
-      expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, mockedMaxSpaceBytes);
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        mockedUser.uuid,
+        mockedMaxSpaceBytes,
+        mockedFreeTier.featuresPerService.drive.foreignTierId,
+      );
     });
   });
 
@@ -1092,13 +1104,15 @@ describe('Testing the handler when an invoice is completed', () => {
       const { customerId, uuid: userUuid } = getUser();
       const clearSubscriptionSpy = jest.spyOn(cacheService, 'clearSubscription').mockResolvedValue();
       const clearUsedUserPromoCodesSpy = jest.spyOn(cacheService, 'clearUsedUserPromoCodes').mockResolvedValue();
+      const clearUserTierSpy = jest.spyOn(cacheService, 'clearUserTier').mockResolvedValue();
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
       await clearUserRelatedCache(customerId, userUuid);
 
       expect(clearSubscriptionSpy).toHaveBeenCalledWith(customerId);
-      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(userUuid);
+      expect(clearUsedUserPromoCodesSpy).toHaveBeenCalledWith(customerId);
+      expect(clearUserTierSpy).toHaveBeenCalledWith(userUuid);
       expect(loggerSpy).toHaveBeenCalledWith(
         `Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`,
       );

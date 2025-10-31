@@ -1,22 +1,13 @@
-import { updateUserTier } from '../../../src/services/storage.service';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
-import { getCreatedSubscription, getCustomer, getLogger, getProduct, getUser } from '../fixtures';
+import { getCreatedSubscription, getCustomer, getLogger, getProduct, getUser, newTier } from '../fixtures';
 import config from '../../../src/config';
 import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscriptionCanceled';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
-jest.mock('../../../src/services/storage.service', () => {
-  const actualModule = jest.requireActual('../../../src/services/storage.service');
-
-  return {
-    ...actualModule,
-    updateUserTier: jest.fn(),
-  };
-});
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
@@ -68,12 +59,21 @@ describe('Process when a subscription is cancelled', () => {
     const mockedSubscription = getCreatedSubscription();
     const mockedProduct = getProduct({});
     const mockedCustomer = getCustomer();
+    const mockedFreeTier = newTier({
+      featuresPerService: {
+        drive: {
+          maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+          foreignTierId: 'free',
+        },
+      } as any,
+    });
     const tierNotFoundError = new TierNotFoundError('Tier not found');
 
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
     const getProductSpy = jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     const getCustomerSPy = jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
-    const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+    const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
     (handleCancelPlan as jest.Mock).mockRejectedValue(tierNotFoundError);
 
     await handleSubscriptionCanceled(
@@ -92,8 +92,11 @@ describe('Process when a subscription is cancelled', () => {
     expect(getCustomerSPy).toHaveBeenCalledWith(mockedSubscription.customer);
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedSubscription.customer);
     expect(handleCancelPlan).rejects.toThrow(tierNotFoundError);
-    expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
-    expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+    expect(changeStorageSpy).toHaveBeenCalledWith(
+      mockedUser.uuid,
+      mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+      mockedFreeTier.featuresPerService.drive.foreignTierId,
+    );
   });
 
   it('When the cancellation of a subscription has a Tier but an unknown error occurs, then an error indicating so is thrown', async () => {

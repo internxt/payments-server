@@ -1,21 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { NotFoundSubscriptionError } from '../services/payment.service';
-import { UserNotFoundError, UsersService } from '../services/users.service';
 import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
-import { TiersService } from '../services/tiers.service';
-import { User } from '../core/users/User';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
+import CacheService from '../services/cache.service';
 
-export default function (
-  tiersService: TiersService,
-  usersService: UsersService,
-  productsService: ProductsService,
-  config: AppConfig,
-) {
+export default function (productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -34,33 +26,27 @@ export default function (
     fastify.get(
       '/',
       async (req, res): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } } | Error> => {
-        let user: User;
         const userUuid = req.user.payload.uuid;
+        const ownersId = req.user.payload.workspaces?.owners ?? [];
 
         try {
-          user = await usersService.findUserByUuid(userUuid);
+          const mergedFeatures = await productsService.getApplicableTierForUser({
+            userUuid,
+            ownersId,
+          });
 
-          const { customerId, lifetime } = user;
+          const antivirusEnabled = mergedFeatures.featuresPerService.antivirus.enabled;
+          const backupsEnabled = mergedFeatures.featuresPerService.backups.enabled;
 
-          const isLifetimeUser = lifetime ?? false;
-
-          const antivirusTier = await tiersService.getProductsTier(customerId, isLifetimeUser);
-
-          return res.status(200).send(antivirusTier);
+          return res.status(200).send({
+            featuresPerService: {
+              antivirus: antivirusEnabled,
+              backups: backupsEnabled,
+            },
+          });
         } catch (error) {
-          if (error instanceof UserNotFoundError || error instanceof NotFoundSubscriptionError) {
-            return res.status(200).send({
-              featuresPerService: {
-                antivirus: false,
-                backups: false,
-              },
-            });
-          }
-
-          const userId = (user! && user.uuid) || 'unknown';
-
-          req.log.error(`[PRODUCTS/GET]: Error ${(error as Error).message || error} for user ${userId}`);
-          return res.status(500).send({ error: 'Internal server error' });
+          Logger.error(`[PRODUCTS/GET]: Error ${(error as Error).message} for user ${userUuid}`);
+          return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
     );
@@ -70,10 +56,18 @@ export default function (
       const ownersId = req.user.payload.workspaces?.owners ?? [];
 
       try {
+        const cachedUserTier = await cacheService.getUserTier(userUuid);
+
+        if (cachedUserTier) {
+          return rep.status(200).send(cachedUserTier);
+        }
+
         const mergedFeatures = await productsService.getApplicableTierForUser({
           userUuid,
           ownersId,
         });
+
+        await cacheService.setUserTier(userUuid, mergedFeatures);
 
         return rep.status(200).send(mergedFeatures);
       } catch (error) {

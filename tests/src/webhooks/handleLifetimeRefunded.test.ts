@@ -1,21 +1,12 @@
-import { updateUserTier } from '../../../src/services/storage.service';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { getCharge, getInvoice, getInvoicePayment, getLogger, getUser } from '../fixtures';
+import { getCharge, getInvoice, getInvoicePayment, getLogger, getUser, newTier } from '../fixtures';
 import config from '../../../src/config';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { FREE_INDIVIDUAL_TIER, FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
-jest.mock('../../../src/services/storage.service', () => {
-  const actualModule = jest.requireActual('../../../src/services/storage.service');
-
-  return {
-    ...actualModule,
-    updateUserTier: jest.fn(),
-  };
-});
 
 const logger = getLogger();
 const { paymentService, usersService, storageService, tiersService, cacheService } = createTestServices();
@@ -71,12 +62,21 @@ describe('Process when a lifetime is refunded', () => {
     const mockedCharge = getCharge();
     const mockedInvoiceLineItems = getInvoice().lines;
     const mockedInvoicePayment = getInvoicePayment();
+    const mockedFreeTier = newTier({
+      featuresPerService: {
+        drive: {
+          maxSpaceBytes: FREE_PLAN_BYTES_SPACE,
+          foreignTierId: 'free',
+        },
+      } as any,
+    });
 
+    jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
     const getInvoiceLineItemsSpy = jest
       .spyOn(paymentService, 'getInvoiceLineItems')
       .mockResolvedValue(mockedInvoiceLineItems as any);
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
-    const changeStorageSpy = jest.spyOn(storageService, 'changeStorage').mockResolvedValue();
+    const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
     const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation();
     (handleCancelPlan as jest.Mock).mockRejectedValue(tierNotFoundError);
     jest.spyOn(paymentService, 'getInvoicePayment').mockResolvedValue(mockedInvoicePayment);
@@ -96,8 +96,11 @@ describe('Process when a lifetime is refunded', () => {
     expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedInvoicePayment.data[0].invoice);
     expect(handleCancelPlan).rejects.toThrow(tierNotFoundError);
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCharge.customer, { lifetime: false });
-    expect(updateUserTier).toHaveBeenCalledWith(mockedUser.uuid, FREE_INDIVIDUAL_TIER, config);
-    expect(changeStorageSpy).toHaveBeenCalledWith(mockedUser.uuid, FREE_PLAN_BYTES_SPACE);
+    expect(changeStorageSpy).toHaveBeenCalledWith(
+      mockedUser.uuid,
+      mockedFreeTier.featuresPerService.drive.maxSpaceBytes,
+      mockedFreeTier.featuresPerService.drive.foreignTierId,
+    );
   });
 
   it('When the cancellation of a subscription that has a Tier is requested and a random error occur, then an error indicating so is thrown', async () => {

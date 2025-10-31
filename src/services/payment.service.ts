@@ -11,6 +11,7 @@ import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
+import { getStripeNewVersion } from './stripe';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -393,6 +394,10 @@ export class PaymentService {
     }
   }
 
+  async getPrice(priceId: string): Promise<Stripe.Price> {
+    return this.provider.prices.retrieve(priceId);
+  }
+
   /**
    * Creates an invoice to purchase a one time plan.
    *
@@ -424,12 +429,15 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
+    const paymentMethodTypes =
+      normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
+    const stripeNewVersion = getStripeNewVersion();
 
-    const invoice = await this.provider.invoices.create({
+    const invoice = await stripeNewVersion.invoices.create({
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: paymentMethodTypes,
       },
       ...additionalInvoiceOptions,
     });
@@ -439,9 +447,9 @@ export class PaymentService {
     }
 
     const invoiceId = invoice.id;
-    const invoiceItem = await this.provider.invoiceItems.create({
+    const invoiceItem = await stripeNewVersion.invoiceItems.create({
       customer: customerId,
-      invoice: invoice.id,
+      invoice: invoiceId,
       pricing: {
         price: priceId,
       },
@@ -462,7 +470,7 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
-      const upcomingInvoice = await this.provider.invoices.retrieve(invoiceId);
+      const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
 
@@ -497,7 +505,7 @@ export class PaymentService {
         description: 'Invoice paid using crypto currencies.',
       });
 
-      const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
+      const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
         auto_advance: false,
         expand: ['payments', 'confirmation_secret'],
       });
@@ -528,7 +536,7 @@ export class PaymentService {
       };
     }
 
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 
@@ -897,12 +905,15 @@ export class PaymentService {
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
     subscriptionId?: SubscriptionId,
+    additionalParams?: Stripe.InvoiceListParams,
   ): Promise<Invoice[]> {
     const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
+      expand: ['data.payments'],
+      ...additionalParams,
     });
 
     return res.data;
@@ -1386,16 +1397,6 @@ export class PaymentService {
         throw new NotFoundPlanByIdError(priceId);
       throw new Error('Interval Server Error');
     }
-  }
-
-  private getPaymentMethodTypes(
-    currency: string,
-    isOneTime: boolean,
-  ): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
-    const commonPaymentTypes = commonPaymentMethodTypes[currency];
-    const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
-
-    return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
   /**

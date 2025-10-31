@@ -13,7 +13,7 @@ import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 
-function signUserToken(customerId: string) {
+function signUserToken(customerId: string): string {
   return jwt.sign({ customerId }, config.JWT_SECRET);
 }
 
@@ -250,7 +250,10 @@ export default function (paymentService: PaymentService) {
       const objectStorageProduct = productDetails.find((product) => product.metadata?.type === 'object-storage');
 
       const objectStorageInvoices = userInvoices
-        .filter((invoice) => invoice.lines.data[0].pricing?.price_details?.product === objectStorageProduct?.id)
+        .filter((invoice) => {
+          const productId = invoice.lines.data[0]?.pricing?.price_details?.product;
+          return objectStorageProduct?.id && productId === objectStorageProduct.id;
+        })
         .map((invoice) => ({
           id: invoice.id,
           created: invoice.created,
