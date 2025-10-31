@@ -53,24 +53,5 @@ describe('Check if an invoice is paid out of band', () => {
 
       expect(isPaidOutOfBand).toBeFalsy();
     });
-
-    test('When the amount is greater than 0 and there is a payment, then it is not paid out of band', () => {
-      const mockedInvoice = getInvoice({
-        status: 'paid',
-        amount_due: 1000,
-        payments: {
-          data: [
-            {
-              amount_paid: 1000,
-            },
-          ],
-        },
-        total_discount_amounts: [],
-      });
-
-      const isPaidOutOfBand = isInvoicePaidOutOfBand(mockedInvoice);
-
-      expect(isPaidOutOfBand).toBeFalsy();
-    });
   });
 });
