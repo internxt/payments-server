@@ -192,6 +192,7 @@ describe('TiersService tests', () => {
         });
         const mockedInvoice = getInvoice({
           status: 'paid',
+          amount_due: 1000,
           payments: {
             data: [],
           },
