@@ -257,6 +257,10 @@ export class PaymentService {
     }
   }
 
+  async getPrice(priceId: string): Promise<Stripe.Price> {
+    return this.provider.prices.retrieve(priceId);
+  }
+
   async getBusinessSubscriptionSeats(priceId: string) {
     const price = await this.provider.prices.retrieve(priceId);
     const minimumSeats = price.metadata.minimumSeats ?? 1;
@@ -274,7 +278,7 @@ export class PaymentService {
       priceId: string;
       seatsForBusinessSubscription?: number;
       currency?: string;
-      promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+      promoCodeId?: string;
       companyName?: string;
       companyVatId?: string;
     },
@@ -308,7 +312,7 @@ export class PaymentService {
     priceId: string;
     seatsForBusinessSubscription?: number;
     currency?: string;
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+    promoCodeId?: string;
     companyName?: string;
     companyVatId?: string;
     trialEnd?: number;
@@ -368,7 +372,7 @@ export class PaymentService {
         payment_method_types: ['card', 'paypal'],
         save_default_payment_method: 'on_subscription',
       },
-      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      expand: ['latest_invoice.confirmation_secret', 'latest_invoice.payments', 'pending_setup_intent'],
       trial_end: trialEnd ? trialEnd : undefined,
       ...additionalOptions,
     });
@@ -382,15 +386,12 @@ export class PaymentService {
     } else {
       return {
         type: 'payment',
-        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        clientSecret: (subscription.latest_invoice as Stripe.Invoice).confirmation_secret?.client_secret ?? '',
         subscriptionId: subscription.id,
-        paymentIntentId: (subscription.latest_invoice as any).payment_intent.id,
+        paymentIntentId: (subscription.latest_invoice as Stripe.Invoice).payments?.data[0].payment
+          .payment_intent as string,
       };
     }
-  }
-
-  async getPrice(priceId: string): Promise<Stripe.Price> {
-    return this.provider.prices.retrieve(priceId);
   }
 
   /**
@@ -591,12 +592,14 @@ export class PaymentService {
 
       await this.provider.invoiceItems.create({
         customer: customerId,
-        price: priceId,
+        pricing: {
+          price: priceId,
+        },
         description: 'One-time charge',
         invoice: invoice.id,
       });
 
-      await this.provider.invoices.pay(invoice.id, {
+      await this.provider.invoices.pay(invoice.id as string, {
         paid_out_of_band: true,
       });
     }
@@ -632,6 +635,10 @@ export class PaymentService {
     );
 
     return userSubscription;
+  }
+
+  async getPaymentIntent(paymentIntentId: string): Promise<Stripe.Response<Stripe.PaymentIntent>> {
+    return this.provider.paymentIntents.retrieve(paymentIntentId);
   }
 
   async getSubscriptionById(subscriptionId: string) {
@@ -749,7 +756,7 @@ export class PaymentService {
     const [lastActiveSub] = data;
 
     if (reason.name in reasonFreeMonthsMap) {
-      const date = new Date(lastActiveSub.current_period_end * 1000);
+      const date = new Date(lastActiveSub.items.data[0].current_period_end * 1000);
       trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
     }
 
@@ -791,7 +798,11 @@ export class PaymentService {
             customerId: customerId,
             priceId: priceId,
             additionalOptions: {
-              coupon: couponCode,
+              discounts: [
+                {
+                  coupon: couponCode,
+                },
+              ],
               billing_cycle_anchor: 'now',
             },
           })
@@ -799,16 +810,21 @@ export class PaymentService {
             customerId: customerId,
             priceId: priceId,
             additionalOptions: {
-              coupon: couponCode,
+              discounts: [
+                {
+                  coupon: couponCode,
+                },
+              ],
               billing_cycle_anchor: 'now',
             },
           });
 
     const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+    const paymentIntent = getLatestInvoice.payments?.data[0].payment.payment_intent;
 
-    if (getLatestInvoice.payment_intent) {
+    if (paymentIntent) {
       const getPaymentIntent: Stripe.PaymentIntent = await this.provider.paymentIntents.retrieve(
-        getLatestInvoice.payment_intent as string,
+        paymentIntent as string,
       );
       if (
         getPaymentIntent.status === 'requires_action' &&
@@ -899,10 +915,8 @@ export class PaymentService {
     return res.data;
   }
 
-  private invoiceType(invoice: Stripe.Invoice, userType: UserType) {
-    return userType === UserType.Business
-      ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
-      : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+  private invoiceType(price: Stripe.Price, userType: UserType) {
+    return userType === UserType.Business ? price?.metadata?.type === 'business' : price?.metadata?.type !== 'business';
   }
 
   async getDriveInvoices(
@@ -912,32 +926,55 @@ export class PaymentService {
     subscriptionId?: SubscriptionId,
   ) {
     const { limit, startingAfter } = pagination;
-
     const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId);
 
+    const pricesMap = new Map();
+
+    for (const invoice of invoices) {
+      const priceId = invoice.lines?.data?.[0]?.pricing?.price_details?.price;
+      if (priceId && !pricesMap.has(priceId)) {
+        const price = await this.getPrice(priceId);
+        pricesMap.set(priceId, price);
+      }
+    }
+
     const invoicesMapped = invoices
-      .filter((invoice) =>
-        invoice.created &&
-        invoice.invoice_pdf &&
-        invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
-        invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
-        subscriptionId
-          ? true
-          : this.invoiceType(invoice, userType),
-      )
+      .filter((invoice) => {
+        if (!invoice.created || !invoice.invoice_pdf) return false;
+
+        const priceId = invoice.lines?.data?.[0]?.pricing?.price_details?.price;
+        if (!priceId) return false;
+
+        const price = pricesMap.get(priceId);
+
+        return (
+          price?.metadata?.maxSpaceBytes &&
+          price?.metadata?.type !== 'object-storage' &&
+          (subscriptionId ? true : this.invoiceType(price, userType))
+        );
+      })
       .map((invoice) => {
+        const priceId = invoice.lines.data[0].pricing?.price_details?.price as string;
+        const price = pricesMap.get(priceId);
+
         return {
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+          bytesInPlan: price.metadata.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
-          product: invoice.lines.data[0].price?.product,
+          product: price?.product,
         };
       });
 
     return invoicesMapped;
+  }
+
+  async getInvoicePayment(params?: Stripe.InvoicePaymentListParams): Promise<Stripe.ApiList<Stripe.InvoicePayment>> {
+    return this.provider.invoicePayments.list({
+      ...params,
+    });
   }
 
   async isUserElegibleForTrial(user: User, reason: Reason): Promise<HasUserAppliedCouponResponse> {
@@ -1039,7 +1076,7 @@ export class PaymentService {
   }
 
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
-    let subscription: any;
+    let subscription: Stripe.Subscription;
     try {
       if (userType === UserType.ObjectStorage) {
         subscription = await this.findObjectStorageActiveSubscription(customerId);
@@ -1056,44 +1093,48 @@ export class PaymentService {
       }
     }
 
-    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
+    const upcomingInvoice = await this.provider.invoices.createPreview({
+      customer: customerId,
+      subscription: subscription.id,
+    });
+
+    const item = subscription.items.data[0];
+    const price = item.price;
+    const product = await this.getProduct(price.product as string);
 
     const storageLimit =
       Number(
-        subscription.plan.product.metadata.size_bytes ||
-          subscription.plan.product.metadata.maxSpaceBytes ||
-          subscription.plan.metadata.size_bytes ||
-          subscription.plan.metadata.maxSpaceBytes,
+        product.metadata.size_bytes ||
+          product.metadata.maxSpaceBytes ||
+          price.metadata.size_bytes ||
+          price.metadata.maxSpaceBytes,
       ) || 0;
-    const item = subscription.items.data[0] as Stripe.SubscriptionItem;
 
     const plan: PlanSubscription = {
       status: subscription.status,
-      planId: subscription.plan.id,
-      productId: subscription.plan.product.id,
-      name: subscription.plan.product.name,
-      simpleName: subscription.plan.product.metadata.simple_name,
-      type: subscription.plan.product.metadata.type || UserType.Individual,
-      price: subscription.plan.amount * 0.01,
+      planId: price.id,
+      productId: product.id,
+      name: product.name,
+      simpleName: product.metadata.simple_name,
+      type: (product.metadata.type as UserType) || UserType.Individual,
+      price: price.unit_amount! * 0.01,
       monthlyPrice: this.getMonthlyAmount(
-        subscription.plan.amount * 0.01,
-        subscription.plan.interval_count,
-        subscription.plan.interval,
+        price.unit_amount! * 0.01,
+        price.recurring!.interval_count,
+        price.recurring!.interval,
       ),
-      currency: subscription.plan.currency,
-      isTeam: !!subscription.plan.product.metadata.is_teams,
-      paymentInterval: subscription.plan.nickname,
+      currency: price.currency,
+      isTeam: !!product.metadata.is_teams,
+      paymentInterval: price.nickname ?? '',
       isLifetime: false,
-      renewalPeriod: this.getRenewalPeriod(subscription.plan.intervalCount, subscription.plan.interval),
+      renewalPeriod: this.getRenewalPeriod(price.recurring!.interval_count, price.recurring!.interval),
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
       seats: {
-        minimumSeats: Number(item.price.metadata.minimumSeats) ?? 3,
-        maximumSeats: Number(item.price.metadata.maximumSeats) ?? 10,
+        minimumSeats: Number(price.metadata.minimumSeats) ?? 3,
+        maximumSeats: Number(price.metadata.maximumSeats) ?? 10,
       },
     };
-
-    const { price } = subscription.items.data[0];
 
     return {
       type: 'subscription',
@@ -1101,10 +1142,10 @@ export class PaymentService {
       amount: price.unit_amount!,
       currency: price.currency,
       interval: price.recurring!.interval as 'year' | 'month',
-      nextPayment: subscription.current_period_end,
+      nextPayment: item.current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
-      productId: price?.product as string,
+      productId: product.id,
       userType,
       plan,
     };
@@ -1471,7 +1512,9 @@ export class PaymentService {
   }
 
   getInvoice(invoiceId: Stripe.Invoice['id']) {
-    return this.provider.invoices.retrieve(invoiceId);
+    return this.provider.invoices.retrieve(invoiceId as string, {
+      expand: ['payments'],
+    });
   }
 
   getProduct(productId: Stripe.Product['id']) {
@@ -1497,7 +1540,7 @@ export class PaymentService {
 
   private validateInvoiceId(invoiceId: Invoice['id']): boolean {
     const regex = /^in_[a-zA-Z0-9]+$/;
-    return regex.test(invoiceId);
+    return regex.test(invoiceId as string);
   }
 
   async markInvoiceAsPaid(invoiceId: Invoice['id']): Promise<void> {
@@ -1507,13 +1550,13 @@ export class PaymentService {
       throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
     }
 
-    await this.provider.invoices.pay(invoiceId, {
+    await this.provider.invoices.pay(invoiceId as string, {
       paid_out_of_band: true,
     });
   }
 
   async updateInvoice(invoiceId: Invoice['id'], data: Stripe.InvoiceUpdateParams) {
-    return this.provider.invoices.update(invoiceId, data);
+    return this.provider.invoices.update(invoiceId as string, data);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

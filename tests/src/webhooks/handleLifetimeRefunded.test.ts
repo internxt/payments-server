@@ -1,6 +1,5 @@
-import Stripe from 'stripe';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { getCharge, getInvoice, getLogger, getUser, newTier } from '../fixtures';
+import { getCharge, getInvoice, getInvoicePayment, getLogger, getUser, newTier } from '../fixtures';
 import config from '../../../src/config';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
@@ -25,10 +24,12 @@ describe('Process when a lifetime is refunded', () => {
     const mockedUser = getUser({ lifetime: true });
     const mockedCharge = getCharge();
     const mockedInvoiceLineItems = getInvoice().lines;
+    const mockedInvoicePayment = getInvoicePayment();
 
     const getInvoiceLineItemsSpy = jest
       .spyOn(paymentService, 'getInvoiceLineItems')
       .mockResolvedValue(mockedInvoiceLineItems as any);
+    jest.spyOn(paymentService, 'getInvoicePayment').mockResolvedValue(mockedInvoicePayment);
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
 
     await handleLifetimeRefunded(
@@ -43,11 +44,11 @@ describe('Process when a lifetime is refunded', () => {
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
-    expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedCharge.invoice);
+    expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedInvoicePayment.data[0].invoice);
     expect(handleCancelPlan).toHaveBeenCalledWith({
       customerId: mockedCharge.customer,
       customerEmail: mockedCharge.receipt_email,
-      productId: (mockedInvoiceLineItems.data[0].price?.product as Stripe.Product).id,
+      productId: mockedInvoiceLineItems.data[0].pricing?.price_details?.product,
       isLifetime: mockedUser.lifetime,
       usersService: usersService,
       tiersService: tiersService,
@@ -60,6 +61,7 @@ describe('Process when a lifetime is refunded', () => {
     const mockedUser = getUser();
     const mockedCharge = getCharge();
     const mockedInvoiceLineItems = getInvoice().lines;
+    const mockedInvoicePayment = getInvoicePayment();
     const mockedFreeTier = newTier({
       featuresPerService: {
         drive: {
@@ -77,6 +79,7 @@ describe('Process when a lifetime is refunded', () => {
     const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
     const updateUserSpy = jest.spyOn(usersService, 'updateUser').mockImplementation();
     (handleCancelPlan as jest.Mock).mockRejectedValue(tierNotFoundError);
+    jest.spyOn(paymentService, 'getInvoicePayment').mockResolvedValue(mockedInvoicePayment);
 
     await handleLifetimeRefunded(
       storageService,
@@ -90,7 +93,7 @@ describe('Process when a lifetime is refunded', () => {
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
-    expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedCharge.invoice);
+    expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedInvoicePayment.data[0].invoice);
     expect(handleCancelPlan).rejects.toThrow(tierNotFoundError);
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCharge.customer, { lifetime: false });
     expect(changeStorageSpy).toHaveBeenCalledWith(
@@ -105,9 +108,13 @@ describe('Process when a lifetime is refunded', () => {
     const mockedUser = getUser();
     const mockedCharge = getCharge();
     const mockedInvoiceLineItems = getInvoice().lines;
+    const mockedInvoicePayment = getInvoicePayment({
+      invoice: mockedInvoiceLineItems.data[0].invoice as string,
+    });
 
-    jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoiceLineItems as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    jest.spyOn(paymentService, 'getInvoicePayment').mockResolvedValue(mockedInvoicePayment);
+    jest.spyOn(paymentService, 'getInvoiceLineItems').mockResolvedValue(mockedInvoiceLineItems as any);
     (handleCancelPlan as jest.Mock).mockRejectedValue(randomError);
 
     await expect(

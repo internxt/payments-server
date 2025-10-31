@@ -61,7 +61,7 @@ function loadFromExcel(): LicenseCode[] {
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
-    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
+    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-07-30.basil' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const storageService = new StorageService(envVariablesConfig, axios);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);

@@ -92,15 +92,24 @@ export class DetermineLifetimeConditions {
       const filteredPaidInvoices = await this.getPaidInvoices(customer, invoices);
 
       filteredPaidInvoices.forEach((invoice) => {
-        const price = invoice.lines.data[0].price;
-        const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
+        const pricing = invoice.lines.data[0].pricing;
+        const productId = pricing?.price_details?.product;
         productIds.push(productId ?? '');
       });
 
-      totalMaxSpaceBytes += filteredPaidInvoices.reduce(
-        (accum, invoice) => parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
-        0,
-      );
+      const pricePromises = filteredPaidInvoices.map(async (invoice) => {
+        const pricing = invoice.lines.data[0].pricing;
+        if (pricing?.type === 'price_details' && pricing.price_details?.price) {
+          const priceId = pricing.price_details.price;
+          const price = await this.paymentsService.getPrice(priceId);
+          return parseInt(price?.metadata?.maxSpaceBytes ?? '0');
+        }
+        return 0;
+      });
+
+      const spaceBytesArray = await Promise.all(pricePromises);
+      const customerTotalBytes = spaceBytesArray.reduce((accum, bytes) => accum + bytes, 0);
+      totalMaxSpaceBytes += customerTotalBytes;
     }
 
     const userTier = await this.tiersService.getTiersProductsByUserId(user.id).catch((err) => {
@@ -126,24 +135,48 @@ export class DetermineLifetimeConditions {
   private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
     const paidInvoices = await Promise.all(
       invoices.map(async (invoice) => {
-        const line = invoice.lines.data[0];
+        const invoiceData = await this.paymentsService.getInvoice(invoice.id);
+        const line = invoiceData.lines.data[0];
+        const price = await this.paymentsService.getPrice(line.pricing?.price_details?.price as string);
 
-        if (!line?.price?.metadata) {
+        if (!price?.metadata) {
           Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
           return null;
         }
 
-        const isLifetime = line.price?.metadata?.planType === 'one_time';
-        const isPaid = invoice.paid;
-        const invoiceMetadata = invoice.metadata;
-        const isOutOfBand = invoice.paid_out_of_band;
+        const isLifetime = price?.metadata?.planType === 'one_time';
+        const isPaid = invoiceData.status === 'paid';
+        const invoiceMetadata = invoiceData.metadata;
+        const isPaidOutOfBand = isPaid && invoiceData.payments?.data.length === 0;
 
-        const chargeIdFromInvoice = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
-        const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromInvoice;
-        const paidExternally = isOutOfBand || !chargeId;
+        if (isLifetime && isPaid && isPaidOutOfBand) {
+          return invoiceData;
+        }
 
-        if (isLifetime && isPaid && paidExternally) {
-          return invoice;
+        let chargeId;
+        if (invoiceMetadata?.chargeId) {
+          chargeId = invoiceMetadata?.chargeId;
+        } else {
+          if (!invoiceData.payments?.data[0].payment.payment_intent) {
+            Logger.info('There is no payment intent in the invoice');
+            return null;
+          }
+
+          const paymentIntent = await this.paymentsService.getPaymentIntent(
+            invoiceData.payments?.data[0].payment.payment_intent as string,
+          );
+
+          if (!paymentIntent.latest_charge || paymentIntent.status !== 'succeeded') {
+            Logger.info(
+              `There is no charge in the payment intent or the status is not succeeded. Payment intent: ${paymentIntent.latest_charge}`,
+            );
+            return null;
+          }
+          const chargeIdFromPaymentIntent =
+            typeof paymentIntent.latest_charge === 'string'
+              ? paymentIntent.latest_charge
+              : paymentIntent.latest_charge.id;
+          chargeId = invoiceMetadata?.chargeId ?? chargeIdFromPaymentIntent;
         }
 
         if (!chargeId) return null;
@@ -153,14 +186,14 @@ export class DetermineLifetimeConditions {
         const isDisputed = charge.disputed;
 
         if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
-          return invoice;
+          return invoiceData;
         }
 
         return null;
       }),
     );
 
-    return paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+    return paidInvoices.filter((invoice): invoice is Stripe.Response<Stripe.Invoice> => invoice !== null);
   }
 
   private async getHigherTier(productIds: string[], userTier: Tier[] | null) {
