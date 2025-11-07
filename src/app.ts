@@ -21,6 +21,7 @@ import { TiersService } from './services/tiers.service';
 import { ProductsService } from './services/products.service';
 import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
+import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -31,6 +32,7 @@ interface AppDependencies {
   licenseCodesService: LicenseCodesService;
   objectStorageService: ObjectStorageService;
   productsService: ProductsService;
+  userTierOverridesService: UserFeaturesOverridesService;
   stripe: Stripe;
   config: AppConfig;
 }
@@ -44,6 +46,7 @@ export async function buildApp({
   licenseCodesService,
   objectStorageService,
   productsService,
+  userTierOverridesService,
   stripe,
   config,
 }: AppDependencies): Promise<FastifyInstance> {
@@ -56,7 +59,9 @@ export async function buildApp({
   fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
   fastify.register(objStorageController(paymentService), { prefix: '/object-storage' });
   fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
-  fastify.register(productsController(productsService, cacheService, config), { prefix: '/products' });
+  fastify.register(productsController(productsService, userTierOverridesService, usersService, cacheService, config), {
+    prefix: '/products',
+  });
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(controllerMigration(paymentService, usersService, config));
