@@ -82,7 +82,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
   const productsService = new ProductsService(tiersService, usersService);
-  const userTierOverridesService = new UserFeaturesOverridesService(userFeatureOverridesRepository);
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(userFeatureOverridesRepository);
 
   const fastify = await buildApp({
     paymentService,
@@ -93,7 +93,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     licenseCodesService,
     objectStorageService,
     productsService,
-    userTierOverridesService,
+    userFeaturesOverridesService,
     stripe,
     config: envVariablesConfig,
   });
