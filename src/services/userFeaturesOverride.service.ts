@@ -1,17 +1,17 @@
 import { UserFeatureOverridesRepository } from '../core/users/MongoDBUserFeatureOverridesRepository';
+import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
-import { AllowedServicesToOverride } from '../core/users/UserFeatureOverrides';
-import Logger from '../Logger';
+import { UserFeatureOverrides } from '../core/users/UserFeatureOverrides';
+import { BadRequestError } from '../errors/Errors';
 
-export class SupportService {
+export class UserFeaturesOverridesService {
   constructor(private readonly userFeatureOverridesRepository: UserFeatureOverridesRepository) {}
 
-  async updateUserFeaturesOverrides(userId: User['id'], allowedServices: AllowedServicesToOverride) {
-    allowedServices;
+  async upsertCustomUserFeatures(userId: User['id'], allowedServices: Service | 'cli') {
     switch (allowedServices) {
-      case 'antivirus':
-      case 'backups':
-      case 'cleaner':
+      case Service.Antivirus:
+      case Service.Backups:
+      case Service.Cleaner:
         await this.userFeatureOverridesRepository.upsert({
           userId: userId,
           featuresPerService: {
@@ -27,11 +27,14 @@ export class SupportService {
         break;
 
       default:
-        Logger.info(`Service ${allowedServices} is not allowed to be enabled manually`);
+        throw new BadRequestError(
+          `Service ${allowedServices} is not supported. Try with one of the following: antivirus, backups, cleaner, cli`,
+        );
+        break;
     }
   }
 
-  async getUserFeaturesOverrides(userId: User['id']) {
+  async getCustomUserFeatures(userId: User['id']): Promise<UserFeatureOverrides | null> {
     return this.userFeatureOverridesRepository.findByUserId(userId);
   }
 }
