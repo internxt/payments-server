@@ -30,7 +30,6 @@ export class UserFeaturesOverridesService {
         throw new BadRequestError(
           `Service ${allowedServices} is not supported. Try with one of the following: antivirus, backups, cleaner, cli`,
         );
-        break;
     }
   }
 

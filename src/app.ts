@@ -5,7 +5,7 @@ import { AppConfig } from './config';
 import controller from './controller/payments.controller';
 import objStorageController from './controller/object-storage.controller';
 import businessController from './controller/business.controller';
-import productsController from './controller/products.controller';
+import { productsController } from './controller/products.controller';
 import checkoutController from './controller/checkout.controller';
 import customerController from './controller/customer.controller';
 import controllerMigration from './controller-migration';

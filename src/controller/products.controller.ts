@@ -11,7 +11,7 @@ import { User } from '../core/users/User';
 import { NotFoundError } from '../errors/Errors';
 import { UsersService } from '../services/users.service';
 
-export default function (
+export function productsController(
   productsService: ProductsService,
   userFeaturesOverridesService: UserFeaturesOverridesService,
   usersService: UsersService,
@@ -110,6 +110,7 @@ export default function (
         try {
           user = await usersService.findUserByUuid(userUuid);
         } catch (error) {
+          Logger.error(`[PRODUCTS/ACTIVATE]: Error ${(error as Error).message} for user ${userUuid}`);
           throw new NotFoundError(`User with uuid ${userUuid} was not found`);
         }
 
