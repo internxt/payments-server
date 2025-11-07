@@ -223,7 +223,8 @@ export class ProductsService {
 
     try {
       const user = await this.usersService.findUserByUuid(userUuid);
-      return await this.applyUserFeatureOverrides(baseTier, user.id);
+      const mergedFeatures = await this.applyUserFeatureOverrides(baseTier, user.id);
+      return mergedFeatures;
     } catch {
       return baseTier;
     }
