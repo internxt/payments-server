@@ -230,7 +230,7 @@ describe('Products Service Tests', () => {
   });
 
   describe('Custom user features overrides', () => {
-    test('When user has custom feature overrides, then they are applied to the base tier', async () => {
+    test('When user has custom feature overrides, then they are merged to the base tier', async () => {
       const mockedUser = getUser();
       const mockedFreeTier = newTier({ productId: 'free' });
       const mockedBaseTier = newTier();
@@ -306,7 +306,7 @@ describe('Products Service Tests', () => {
       expect(userTier).toStrictEqual(mockedBaseTier);
     });
 
-    test('When user has only free tier and custom overrides, then overrides are applied to free tier', async () => {
+    test('When user has only free tier and custom overrides, then overrides are merged to free tier', async () => {
       const mockedUser = getUser();
       const mockedFreeTier = newTier({
         productId: 'free',
