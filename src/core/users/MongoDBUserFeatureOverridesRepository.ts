@@ -6,15 +6,10 @@ export interface UserFeatureOverridesRepository {
   upsert(userFeatureOverrides: Omit<UserFeatureOverrides, 'id'>): Promise<void>;
 }
 
-function toDomain(userFeatureOverrides: WithId<Omit<UserFeatureOverrides, 'id'>>): UserFeatureOverrides & {
-  id: string;
-} {
+function toDomain(userFeatureOverrides: WithId<Omit<UserFeatureOverrides, 'id'>>): UserFeatureOverrides {
   const { _id, ...features } = userFeatureOverrides;
 
-  return {
-    ...features,
-    id: _id.toString(),
-  };
+  return features;
 }
 
 export class MongoDBUserFeatureOverridesRepository implements UserFeatureOverridesRepository {
