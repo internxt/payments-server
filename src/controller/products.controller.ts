@@ -4,10 +4,20 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyLimit from '@fastify/rate-limit';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
-import { Tier } from '../core/users/Tier';
+import { Service, Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
+import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
+import { User } from '../core/users/User';
+import { NotFoundError } from '../errors/Errors';
+import { UsersService } from '../services/users.service';
 
-export default function (productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
+export function productsController(
+  productsService: ProductsService,
+  userFeaturesOverridesService: UserFeaturesOverridesService,
+  usersService: UsersService,
+  cacheService: CacheService,
+  config: AppConfig,
+) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -75,5 +85,39 @@ export default function (productsService: ProductsService, cacheService: CacheSe
         return rep.status(500).send({ message: 'Internal server error' });
       }
     });
+
+    fastify.post<{ Body: { feature: Service } }>(
+      '/activate',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['feature'],
+            properties: {
+              feature: {
+                type: 'string',
+                enum: [...Object.values(Service), 'cli'] as const,
+              },
+            },
+          },
+        },
+      },
+      async (request, response) => {
+        let user: User;
+        const { feature } = request.body;
+        const userUuid = request.user?.payload?.uuid;
+
+        try {
+          user = await usersService.findUserByUuid(userUuid);
+        } catch (error) {
+          Logger.error(`[PRODUCTS/ACTIVATE]: Error ${(error as Error).message} for user ${userUuid}`);
+          throw new NotFoundError(`User with uuid ${userUuid} was not found`);
+        }
+
+        await userFeaturesOverridesService.upsertCustomUserFeatures(user.id, feature);
+
+        return response.status(204).send();
+      },
+    );
   };
 }

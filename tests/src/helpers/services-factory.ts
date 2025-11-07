@@ -23,6 +23,8 @@ import { DetermineLifetimeConditions } from '../../../src/core/users/DetermineLi
 import { ObjectStorageWebhookHandler } from '../../../src/webhooks/events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getLogger } from '../fixtures';
+import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
+import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 
 export interface TestServices {
   stripe: Stripe;
@@ -38,6 +40,7 @@ export interface TestServices {
   determineLifetimeConditions: DetermineLifetimeConditions;
   objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;
+  userFeaturesOverridesService: UserFeaturesOverridesService;
 }
 
 export interface TestRepositories {
@@ -49,6 +52,7 @@ export interface TestRepositories {
   usersTiersRepository: UsersTiersRepository;
   productsRepository: ProductsRepository;
   licenseCodesRepository: LicenseCodesRepository;
+  userFeatureOverridesRepository: UserFeatureOverridesRepository;
 }
 
 export interface TestServiceOverrides {
@@ -64,6 +68,7 @@ const createRepositories = (): TestRepositories => ({
   usersTiersRepository: testFactory.getUsersTiersRepository(),
   productsRepository: testFactory.getProductsRepositoryForTest(),
   licenseCodesRepository: testFactory.getLicenseCodesRepositoryForTest(),
+  userFeatureOverridesRepository: testFactory.getUserFeaturesOverridesRepositoryForTest(),
 });
 
 export const createTestServices = (overrides: TestServiceOverrides = {}): TestServices & TestRepositories => {
@@ -113,6 +118,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     usersService,
     cacheService,
   });
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(repositories.userFeatureOverridesRepository);
 
   return {
     stripe,
@@ -128,6 +134,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     determineLifetimeConditions,
     objectStorageWebhookHandler,
     invoiceCompletedHandler,
+    userFeaturesOverridesService,
     ...repositories,
   };
 };
