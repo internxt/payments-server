@@ -115,6 +115,7 @@ export function productsController(
         }
 
         await userFeaturesOverridesService.upsertCustomUserFeatures(user.id, feature);
+        await cacheService.clearUserTier(userUuid);
 
         return response.status(204).send();
       },
