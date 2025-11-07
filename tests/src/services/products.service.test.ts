@@ -5,7 +5,7 @@ import { getUser, newTier } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
 describe('Products Service Tests', () => {
-  const { productsService, usersService, tiersService } = createTestServices();
+  const { productsService, usersService, tiersService, userFeaturesOverridesService } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -226,6 +226,132 @@ describe('Products Service Tests', () => {
         expect(userTier).toStrictEqual(mockedIndividualTier);
         expect(userTier.featuresPerService[Service.Drive].workspaces.enabled).toBeFalsy();
       });
+    });
+  });
+
+  describe('Custom user features overrides', () => {
+    test('When user has custom feature overrides, then they are applied to the base tier', async () => {
+      const mockedUser = getUser();
+      const mockedFreeTier = newTier({ productId: 'free' });
+      const mockedBaseTier = newTier();
+
+      const customOverrides = {
+        featuresPerService: {
+          [Service.Antivirus]: {
+            enabled: true,
+          },
+          [Service.Backups]: {
+            enabled: true,
+          },
+        },
+      };
+
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBaseTier]);
+      jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(customOverrides as any);
+
+      const userTier = await productsService.getApplicableTierForUser({
+        userUuid: mockedUser.uuid,
+      });
+
+      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.id);
+      expect(userTier.featuresPerService[Service.Antivirus]).toStrictEqual(
+        customOverrides.featuresPerService[Service.Antivirus],
+      );
+      expect(userTier.featuresPerService[Service.Backups]).toStrictEqual(
+        customOverrides.featuresPerService[Service.Backups],
+      );
+    });
+
+    test('When user has no custom feature overrides, then base tier is returned unchanged', async () => {
+      const mockedUser = getUser();
+      const mockedFreeTier = newTier({ productId: 'free' });
+      const mockedBaseTier = newTier({
+        productId: 'individual-premium',
+      });
+
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBaseTier]);
+      jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(null);
+
+      const userTier = await productsService.getApplicableTierForUser({
+        userUuid: mockedUser.uuid,
+      });
+
+      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.id);
+      expect(userTier).toStrictEqual(mockedBaseTier);
+    });
+
+    test('When fetching user for overrides fails, then base tier is returned without overrides', async () => {
+      const mockedUser = getUser();
+      const userNotFoundError = new UserNotFoundError('User not found');
+      const mockedFreeTier = newTier({ productId: 'free' });
+      const mockedBaseTier = newTier({
+        productId: 'individual-premium',
+      });
+
+      jest
+        .spyOn(usersService, 'findUserByUuid')
+        .mockResolvedValueOnce(mockedUser)
+        .mockRejectedValueOnce(userNotFoundError);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBaseTier]);
+
+      const userTier = await productsService.getApplicableTierForUser({
+        userUuid: mockedUser.uuid,
+      });
+
+      expect(userTier).toStrictEqual(mockedBaseTier);
+    });
+
+    test('When user has only free tier and custom overrides, then overrides are applied to free tier', async () => {
+      const mockedUser = getUser();
+      const mockedFreeTier = newTier({
+        productId: 'free',
+        featuresPerService: {
+          [Service.Drive]: {
+            enabled: true,
+            maxSpaceBytes: 100,
+            foreignTierId: 'free-tier-id',
+            workspaces: { enabled: false } as any,
+            passwordProtectedSharing: { enabled: false },
+            restrictedItemsSharing: { enabled: false },
+          },
+          [Service.Mail]: { enabled: false, addressesPerUser: 0 },
+          [Service.Vpn]: { enabled: false, featureId: 'vpn-free' },
+          [Service.Meet]: { enabled: false, paxPerCall: 0 },
+          [Service.Backups]: { enabled: false },
+          [Service.Antivirus]: { enabled: false },
+          [Service.darkMonitor]: { enabled: false },
+          [Service.Cleaner]: { enabled: false },
+        },
+      });
+
+      const customOverrides = {
+        featuresPerService: {
+          [Service.Backups]: {
+            enabled: true,
+          },
+          [Service.Antivirus]: {
+            enabled: true,
+          },
+        },
+      };
+
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
+      jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(customOverrides as any);
+
+      const userTier = await productsService.getApplicableTierForUser({
+        userUuid: mockedUser.uuid,
+      });
+
+      expect(userTier.productId).toBe('free');
+      expect(userTier.featuresPerService[Service.Antivirus].enabled).toBeTruthy();
+      expect(userTier.featuresPerService[Service.Backups].enabled).toBeTruthy();
     });
   });
 });
