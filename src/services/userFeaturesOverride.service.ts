@@ -13,7 +13,7 @@ export class UserFeaturesOverridesService {
       case Service.Backups:
       case Service.Cleaner:
         await this.userFeatureOverridesRepository.upsert({
-          userUuid: userUuid,
+          userUuid,
           featuresPerService: {
             [allowedServices]: {
               enabled: true,
@@ -33,7 +33,7 @@ export class UserFeaturesOverridesService {
     }
   }
 
-  async getCustomUserFeatures(userId: User['uuid']): Promise<UserFeatureOverrides | null> {
-    return this.userFeatureOverridesRepository.findByUserUuid(userId);
+  async getCustomUserFeatures(userUuid: User['uuid']): Promise<UserFeatureOverrides | null> {
+    return this.userFeatureOverridesRepository.findByUserUuid(userUuid);
   }
 }
