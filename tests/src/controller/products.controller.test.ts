@@ -251,6 +251,7 @@ describe('Testing products endpoints', () => {
       const upsertSpy = jest
         .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
         .mockResolvedValue();
+      const clearUserTierSpy = jest.spyOn(CacheService.prototype, 'clearUserTier').mockResolvedValue();
 
       const response = await app.inject({
         path: `/products/activate`,
@@ -265,6 +266,7 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(204);
       expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
+      expect(clearUserTierSpy).toHaveBeenCalled();
     });
 
     test('When activating antivirus feature, then it is processed correctly', async () => {
@@ -276,6 +278,7 @@ describe('Testing products endpoints', () => {
       const upsertSpy = jest
         .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
         .mockResolvedValue();
+      const clearUserTierSpy = jest.spyOn(CacheService.prototype, 'clearUserTier').mockResolvedValue();
 
       const response = await app.inject({
         path: `/products/activate`,
@@ -290,6 +293,7 @@ describe('Testing products endpoints', () => {
 
       expect(response.statusCode).toBe(204);
       expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
+      expect(clearUserTierSpy).toHaveBeenCalled();
     });
 
     test('When the request body is missing the feature field, then a validation error is returned', async () => {

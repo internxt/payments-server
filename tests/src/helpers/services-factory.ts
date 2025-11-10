@@ -105,7 +105,6 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     tiersService,
   });
   const objectStorageService = new ObjectStorageService(paymentService, config, axios);
-  const productsService = new ProductsService(tiersService, usersService);
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
@@ -119,6 +118,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     cacheService,
   });
   const userFeaturesOverridesService = new UserFeaturesOverridesService(repositories.userFeatureOverridesRepository);
+  const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
 
   return {
     stripe,
