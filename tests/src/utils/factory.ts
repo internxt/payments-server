@@ -79,7 +79,7 @@ const getLicenseCodesRepositoryForTest = (): LicenseCodesRepository => {
 
 const getUserFeaturesOverridesRepositoryForTest = (): UserFeatureOverridesRepository => {
   return {
-    findByUserId: jest.fn(),
+    findByUserUuid: jest.fn(),
     upsert: jest.fn(),
   };
 };

@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUser, getValidAuthToken, newTier } from '../fixtures';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { UsersService } from '../../../src/services/users.service';
 import { TiersService } from '../../../src/services/tiers.service';
 import { ProductsService } from '../../../src/services/products.service';
 import { Service } from '../../../src/core/users/Tier';
@@ -221,33 +221,11 @@ describe('Testing products endpoints', () => {
   });
 
   describe('Activate a product', () => {
-    test('When the user is not found, then an error indicating so is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      const feature = Service.Antivirus;
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        payload: {
-          feature,
-        },
-      });
-
-      expect(response.statusCode).toBe(404);
-    });
-
     test('When the feature is successfully activated, then it is processed correctly', async () => {
       const mockedUser = getUser();
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       const feature = Service.Backups;
 
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const upsertSpy = jest
         .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
         .mockResolvedValue();
@@ -265,7 +243,7 @@ describe('Testing products endpoints', () => {
       });
 
       expect(response.statusCode).toBe(204);
-      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
+      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.uuid, feature);
       expect(clearUserTierSpy).toHaveBeenCalled();
     });
 
@@ -274,7 +252,6 @@ describe('Testing products endpoints', () => {
       const mockedUserToken = getValidAuthToken(mockedUser.uuid);
       const feature = Service.Antivirus;
 
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const upsertSpy = jest
         .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
         .mockResolvedValue();
@@ -292,7 +269,7 @@ describe('Testing products endpoints', () => {
       });
 
       expect(response.statusCode).toBe(204);
-      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
+      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.uuid, feature);
       expect(clearUserTierSpy).toHaveBeenCalled();
     });
 

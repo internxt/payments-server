@@ -2,7 +2,7 @@ import { Collection, MongoClient, WithId } from 'mongodb';
 import { UserFeatureOverrides } from './UserFeatureOverrides';
 
 export interface UserFeatureOverridesRepository {
-  findByUserId(userId: string): Promise<UserFeatureOverrides | null>;
+  findByUserUuid(userId: string): Promise<UserFeatureOverrides | null>;
   upsert(userFeatureOverrides: Omit<UserFeatureOverrides, 'id'>): Promise<void>;
 }
 
@@ -19,8 +19,8 @@ export class MongoDBUserFeatureOverridesRepository implements UserFeatureOverrid
     this.collection = mongo.db('payments').collection<UserFeatureOverrides>('user_feature_overrides');
   }
 
-  async findByUserId(userId: string): Promise<UserFeatureOverrides | null> {
-    const userFeatureOverrides = await this.collection.findOne({ userId });
+  async findByUserUuid(userUuid: string): Promise<UserFeatureOverrides | null> {
+    const userFeatureOverrides = await this.collection.findOne({ userUuid });
 
     return userFeatureOverrides ? toDomain(userFeatureOverrides) : null;
   }
@@ -28,7 +28,7 @@ export class MongoDBUserFeatureOverridesRepository implements UserFeatureOverrid
   async upsert(userFeatureOverrides: Omit<UserFeatureOverrides, 'id'>): Promise<void> {
     await this.collection.updateOne(
       {
-        userId: userFeatureOverrides.userId,
+        userUuid: userFeatureOverrides.userUuid,
       },
       [
         {

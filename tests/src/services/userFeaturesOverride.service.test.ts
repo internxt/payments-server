@@ -11,7 +11,7 @@ describe('User Tier Override', () => {
       const nonAllowedService = Service.Meet;
 
       await expect(
-        userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, nonAllowedService),
+        userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.uuid, nonAllowedService),
       ).rejects.toThrow(BadRequestError);
     });
 
@@ -19,7 +19,7 @@ describe('User Tier Override', () => {
       const mockedUser = getUser();
       const antivirusService = Service.Antivirus;
       const upsertPayload = {
-        userId: mockedUser.id,
+        userUuid: mockedUser.uuid,
         featuresPerService: {
           [antivirusService]: {
             enabled: true,
@@ -28,7 +28,7 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, antivirusService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.uuid, antivirusService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
     });
@@ -37,7 +37,7 @@ describe('User Tier Override', () => {
       const mockedUser = getUser();
       const backupsService = Service.Backups;
       const upsertPayload = {
-        userId: mockedUser.id,
+        userUuid: mockedUser.uuid,
         featuresPerService: {
           [backupsService]: {
             enabled: true,
@@ -46,7 +46,7 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, backupsService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.uuid, backupsService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
     });
@@ -55,7 +55,7 @@ describe('User Tier Override', () => {
       const mockedUser = getUser();
       const cleanerService = Service.Cleaner;
       const upsertPayload = {
-        userId: mockedUser.id,
+        userUuid: mockedUser.uuid,
         featuresPerService: {
           [cleanerService]: {
             enabled: true,
@@ -64,7 +64,7 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, cleanerService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.uuid, cleanerService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
     });
@@ -72,9 +72,9 @@ describe('User Tier Override', () => {
 
   describe('Get the custom user features', () => {
     test('When the features are requested by a given user and he has custom features, then they are returned', async () => {
-      const mockedUserId = getUser().id;
+      const mockedUserId = getUser().uuid;
       const mockedResponse = {
-        userId: mockedUserId,
+        userUuid: mockedUserId,
         featuresPerService: {
           [Service.Antivirus]: {
             enabled: true,
@@ -87,7 +87,7 @@ describe('User Tier Override', () => {
           },
         },
       };
-      jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(mockedResponse);
+      jest.spyOn(userFeatureOverridesRepository, 'findByUserUuid').mockResolvedValue(mockedResponse);
 
       const customUserFeatures = await userFeaturesOverridesService.getCustomUserFeatures(mockedUserId);
 
@@ -95,8 +95,8 @@ describe('User Tier Override', () => {
     });
 
     test('When the features are requested by a given user and he does not have custom features, then nothing is returned', async () => {
-      const mockedUserId = getUser().id;
-      jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+      const mockedUserId = getUser().uuid;
+      jest.spyOn(userFeatureOverridesRepository, 'findByUserUuid').mockResolvedValue(null);
 
       const customUserFeatures = await userFeaturesOverridesService.getCustomUserFeatures(mockedUserId);
 

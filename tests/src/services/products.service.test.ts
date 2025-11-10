@@ -246,7 +246,6 @@ describe('Products Service Tests', () => {
         },
       };
 
-      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBaseTier]);
       jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(customOverrides as any);
@@ -255,7 +254,7 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.id);
+      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.uuid);
       expect(userTier.featuresPerService[Service.Antivirus]).toStrictEqual(
         customOverrides.featuresPerService[Service.Antivirus],
       );
@@ -271,8 +270,8 @@ describe('Products Service Tests', () => {
         productId: 'individual-premium',
       });
 
-      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedBaseTier]);
       jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(null);
 
@@ -280,7 +279,7 @@ describe('Products Service Tests', () => {
         userUuid: mockedUser.uuid,
       });
 
-      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.id);
+      expect(userFeaturesOverridesService.getCustomUserFeatures).toHaveBeenCalledWith(mockedUser.uuid);
       expect(userTier).toStrictEqual(mockedBaseTier);
     });
 
@@ -340,7 +339,6 @@ describe('Products Service Tests', () => {
         },
       };
 
-      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
       jest.spyOn(userFeaturesOverridesService, 'getCustomUserFeatures').mockResolvedValue(customOverrides as any);

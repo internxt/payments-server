@@ -27,16 +27,16 @@ describe('User Features OVerrides Repository', () => {
     await collection.deleteMany({});
   });
 
-  it('When the user does not have any custom feature, then nothing is returned', async () => {
-    const result = await repository.findByUserId('non-existent-user-id');
+  test('When the user does not have any custom feature, then nothing is returned', async () => {
+    const result = await repository.findByUserUuid('non-existent-user-id');
 
     expect(result).toBeNull();
   });
 
-  it('When the user does not exists in the collection, then a new one is created with the given custom features', async () => {
+  test('When the user does not exists in the collection, then a new one is created with the given custom features', async () => {
     const mockedUser = getUser();
     const mockOverrides: Omit<UserFeatureOverrides, 'id'> = {
-      userId: mockedUser.id,
+      userUuid: mockedUser.uuid,
       featuresPerService: {
         antivirus: { enabled: true },
         backups: { enabled: false },
@@ -45,15 +45,15 @@ describe('User Features OVerrides Repository', () => {
 
     await repository.upsert(mockOverrides);
 
-    const foundOverrides = await repository.findByUserId(mockedUser.id);
+    const foundOverrides = await repository.findByUserUuid(mockedUser.uuid);
 
     expect(foundOverrides).toStrictEqual(mockOverrides);
   });
 
-  it('When the user does exists in the collection, then the new features are added and the existing one should be kept', async () => {
+  test('When the user does exists in the collection, then the new features are added and the existing one should be kept', async () => {
     const mockedUser = getUser();
     const initialOverrides: Omit<UserFeatureOverrides, 'id'> = {
-      userId: mockedUser.id,
+      userUuid: mockedUser.uuid,
       featuresPerService: {
         antivirus: { enabled: true },
       },
@@ -62,7 +62,7 @@ describe('User Features OVerrides Repository', () => {
     await repository.upsert(initialOverrides);
 
     const updatedOverrides: Omit<UserFeatureOverrides, 'id'> = {
-      userId: mockedUser.id,
+      userUuid: mockedUser.uuid,
       featuresPerService: {
         backups: { enabled: true },
       },
@@ -70,10 +70,10 @@ describe('User Features OVerrides Repository', () => {
 
     await repository.upsert(updatedOverrides);
 
-    const foundOverrides = await repository.findByUserId(mockedUser.id);
+    const foundOverrides = await repository.findByUserUuid(mockedUser.uuid);
 
     expect(foundOverrides).toStrictEqual({
-      userId: mockedUser.id,
+      userUuid: mockedUser.uuid,
       featuresPerService: {
         ...initialOverrides.featuresPerService,
         ...updatedOverrides.featuresPerService,
@@ -81,31 +81,31 @@ describe('User Features OVerrides Repository', () => {
     });
   });
 
-  it('when updating user feature overrides multiple times, then it should keep merging features', async () => {
-    const userId = getUser().id;
+  test('when updating user feature overrides multiple times, then it should keep merging features', async () => {
+    const userUuid = getUser().uuid;
 
     await repository.upsert({
-      userId,
+      userUuid,
       featuresPerService: {
         antivirus: { enabled: true },
       },
     });
 
     await repository.upsert({
-      userId,
+      userUuid,
       featuresPerService: {
         backups: { enabled: false },
       },
     });
 
     await repository.upsert({
-      userId,
+      userUuid,
       featuresPerService: {
         antivirus: { enabled: false },
       },
     });
 
-    const foundOverrides = await repository.findByUserId(userId);
+    const foundOverrides = await repository.findByUserUuid(userUuid);
 
     expect(foundOverrides?.featuresPerService).toStrictEqual({
       antivirus: { enabled: false },
@@ -113,11 +113,11 @@ describe('User Features OVerrides Repository', () => {
     });
   });
 
-  it('when updating the user features with an empty features, then it should not override existing features', async () => {
-    const userId = getUser().id;
+  test('when updating the user features with an empty features, then it should not override existing features', async () => {
+    const userUuid = getUser().uuid;
 
     const existingPayload = {
-      userId,
+      userUuid,
       featuresPerService: {
         antivirus: { enabled: true },
       },
@@ -126,11 +126,11 @@ describe('User Features OVerrides Repository', () => {
     await repository.upsert(existingPayload);
 
     await repository.upsert({
-      userId,
+      userUuid,
       featuresPerService: {},
     });
 
-    const foundOverrides = await repository.findByUserId(userId);
+    const foundOverrides = await repository.findByUserUuid(userUuid);
 
     expect(foundOverrides).toStrictEqual(existingPayload);
   });

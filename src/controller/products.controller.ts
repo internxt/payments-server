@@ -7,8 +7,6 @@ import Logger from '../Logger';
 import { Service, Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
-import { User } from '../core/users/User';
-import { NotFoundError } from '../errors/Errors';
 import { UsersService } from '../services/users.service';
 
 export function productsController(
@@ -103,18 +101,10 @@ export function productsController(
         },
       },
       async (request, response) => {
-        let user: User;
         const { feature } = request.body;
         const userUuid = request.user?.payload?.uuid;
 
-        try {
-          user = await usersService.findUserByUuid(userUuid);
-        } catch (error) {
-          Logger.error(`[PRODUCTS/ACTIVATE]: Error ${(error as Error).message} for user ${userUuid}`);
-          throw new NotFoundError(`User with uuid ${userUuid} was not found`);
-        }
-
-        await userFeaturesOverridesService.upsertCustomUserFeatures(user.id, feature);
+        await userFeaturesOverridesService.upsertCustomUserFeatures(userUuid, feature);
         await cacheService.clearUserTier(userUuid);
 
         return response.status(204).send();

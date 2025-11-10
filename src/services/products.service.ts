@@ -222,8 +222,7 @@ export class ProductsService {
     const baseTier = availableTier ?? freeTier;
 
     try {
-      const user = await this.usersService.findUserByUuid(userUuid);
-      const mergedFeatures = await this.applyUserFeatureOverrides(baseTier, user.id);
+      const mergedFeatures = await this.applyUserFeatureOverrides(baseTier, userUuid);
       return mergedFeatures;
     } catch {
       return baseTier;

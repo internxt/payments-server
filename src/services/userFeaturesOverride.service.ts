@@ -7,13 +7,13 @@ import { BadRequestError } from '../errors/Errors';
 export class UserFeaturesOverridesService {
   constructor(private readonly userFeatureOverridesRepository: UserFeatureOverridesRepository) {}
 
-  async upsertCustomUserFeatures(userId: User['id'], allowedServices: Service | 'cli') {
+  async upsertCustomUserFeatures(userUuid: User['uuid'], allowedServices: Service | 'cli') {
     switch (allowedServices) {
       case Service.Antivirus:
       case Service.Backups:
       case Service.Cleaner:
         await this.userFeatureOverridesRepository.upsert({
-          userId: userId,
+          userUuid: userUuid,
           featuresPerService: {
             [allowedServices]: {
               enabled: true,
@@ -33,7 +33,7 @@ export class UserFeaturesOverridesService {
     }
   }
 
-  async getCustomUserFeatures(userId: User['id']): Promise<UserFeatureOverrides | null> {
-    return this.userFeatureOverridesRepository.findByUserId(userId);
+  async getCustomUserFeatures(userId: User['uuid']): Promise<UserFeatureOverrides | null> {
+    return this.userFeatureOverridesRepository.findByUserUuid(userId);
   }
 }
