@@ -27,7 +27,15 @@ export function gatewayController({
   config,
 }: GatewayControllerPayload) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.GATEWAY_JWT_SECRET });
+    fastify.register(fastifyJwt, {
+      secret: {
+        public: config.DRIVE_GATEWAY_PUBLIC_SECRET,
+      },
+      verify: {
+        algorithms: ['RS256'],
+      },
+    });
+
     fastify.register(fastifyLimit, {
       max: 20,
       timeWindow: '1 minute',
