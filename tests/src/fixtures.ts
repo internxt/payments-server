@@ -99,6 +99,10 @@ export const getValidAuthToken = (
   return jwt.sign({ payload: { uuid: userUuid, workspaces, ...params } }, config.JWT_SECRET);
 };
 
+export const getValidGatewayToken = () => {
+  return jwt.sign({ payload: { value: 'valid-token' } }, config.GATEWAY_JWT_SECRET);
+};
+
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
   return jwt.sign(payload, config.JWT_SECRET);
 };

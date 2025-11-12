@@ -7,17 +7,25 @@ import { NotFoundError, UnauthorizedError } from '../errors/Errors';
 import Logger from '../Logger';
 import CacheService from '../services/cache.service';
 import { ProductsService } from '../services/products.service';
-import { Service, Tier } from '../core/users/Tier';
+import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 
-export function gatewayController(
-  productsService: ProductsService,
-  cacheService: CacheService,
-  usersService: UsersService,
-  userFeaturesOverridesService: UserFeaturesOverridesService,
-  config: AppConfig,
-) {
+interface GatewayControllerPayload {
+  productsService: ProductsService;
+  cacheService: CacheService;
+  usersService: UsersService;
+  userFeaturesOverridesService: UserFeaturesOverridesService;
+  config: AppConfig;
+}
+
+export function gatewayController({
+  productsService,
+  cacheService,
+  usersService,
+  userFeaturesOverridesService,
+  config,
+}: GatewayControllerPayload) {
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, { secret: config.GATEWAY_JWT_SECRET });
     fastify.register(fastifyLimit, {
@@ -33,26 +41,6 @@ export function gatewayController(
       }
     });
 
-    fastify.get('/tier', async (req, rep): Promise<Tier> => {
-      const userUuid = req.user.payload.uuid;
-      const ownersId = req.user.payload.workspaces?.owners ?? [];
-
-      const cachedUserTier = await cacheService.getUserTier(userUuid);
-
-      if (cachedUserTier) {
-        return rep.status(200).send(cachedUserTier);
-      }
-
-      const mergedFeatures = await productsService.getApplicableTierForUser({
-        userUuid,
-        ownersId,
-      });
-
-      await cacheService.setUserTier(userUuid, mergedFeatures);
-
-      return rep.status(200).send(mergedFeatures);
-    });
-
     fastify.post<{ Body: { feature: Service; userUuid: string } }>(
       '/activate',
       {
@@ -63,7 +51,7 @@ export function gatewayController(
             properties: {
               feature: {
                 type: 'string',
-                enum: [...Object.values(Service), 'cli'] as const,
+                enum: [Service.Antivirus, Service.Backups, Service.Cleaner, Service.Cli],
               },
               userUuid: {
                 type: 'string',

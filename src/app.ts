@@ -22,6 +22,7 @@ import { ProductsService } from './services/products.service';
 import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
 import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
+import { gatewayController } from './controller/gateway.controller';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -67,6 +68,18 @@ export async function buildApp({
   );
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
+  fastify.register(
+    gatewayController({
+      usersService,
+      productsService,
+      userFeaturesOverridesService,
+      cacheService,
+      config,
+    }),
+    {
+      prefix: '/gateway',
+    },
+  );
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
