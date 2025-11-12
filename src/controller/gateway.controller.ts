@@ -52,7 +52,7 @@ export function gatewayController({
         schema: {
           body: {
             type: 'object',
-            required: ['feature'],
+            required: ['userUuid', 'feature'],
             properties: {
               feature: {
                 type: 'string',
