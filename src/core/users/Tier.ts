@@ -47,6 +47,10 @@ interface DarkMonitorFeatures {
   enabled: boolean;
 }
 
+interface CliFeatures {
+  enabled: boolean;
+}
+
 export enum Service {
   Drive = 'drive',
   Backups = 'backups',
@@ -54,6 +58,7 @@ export enum Service {
   Meet = 'meet',
   Mail = 'mail',
   Vpn = 'vpn',
+  Cli = 'cli',
   Cleaner = 'cleaner',
   darkMonitor = 'darkMonitor',
 }
@@ -72,5 +77,6 @@ export interface Tier {
     [Service.Vpn]: VpnFeatures;
     [Service.Cleaner]: CleanerFeatures;
     [Service.darkMonitor]: DarkMonitorFeatures;
+    [Service.Cli]: CliFeatures;
   };
 }

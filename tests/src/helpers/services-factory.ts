@@ -117,7 +117,10 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     usersService,
     cacheService,
   });
-  const userFeaturesOverridesService = new UserFeaturesOverridesService(repositories.userFeatureOverridesRepository);
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(
+    usersService,
+    repositories.userFeatureOverridesRepository,
+  );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
 
   return {

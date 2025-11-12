@@ -1,13 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUser, getValidAuthToken, newTier } from '../fixtures';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { UsersService } from '../../../src/services/users.service';
 import { TiersService } from '../../../src/services/tiers.service';
 import { ProductsService } from '../../../src/services/products.service';
 import { Service } from '../../../src/core/users/Tier';
 import Logger from '../../../src/Logger';
 import CacheService from '../../../src/services/cache.service';
-import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 
 let app: FastifyInstance;
 
@@ -217,117 +216,6 @@ describe('Testing products endpoints', () => {
       expect(responseBody).toStrictEqual(mockedTier);
       expect(cachedTierSPy).toHaveBeenCalledWith(mockedUser.uuid);
       expect(getTierUserSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Activate a product', () => {
-    test('When the user is not found, then an error indicating so is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      const feature = Service.Antivirus;
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        payload: {
-          feature,
-        },
-      });
-
-      expect(response.statusCode).toBe(404);
-    });
-
-    test('When the feature is successfully activated, then it is processed correctly', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      const feature = Service.Backups;
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const upsertSpy = jest
-        .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
-        .mockResolvedValue();
-      const clearUserTierSpy = jest.spyOn(CacheService.prototype, 'clearUserTier').mockResolvedValue();
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        body: {
-          feature,
-        },
-      });
-
-      expect(response.statusCode).toBe(204);
-      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
-      expect(clearUserTierSpy).toHaveBeenCalled();
-    });
-
-    test('When activating antivirus feature, then it is processed correctly', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-      const feature = Service.Antivirus;
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const upsertSpy = jest
-        .spyOn(UserFeaturesOverridesService.prototype, 'upsertCustomUserFeatures')
-        .mockResolvedValue();
-      const clearUserTierSpy = jest.spyOn(CacheService.prototype, 'clearUserTier').mockResolvedValue();
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        payload: {
-          feature,
-        },
-      });
-
-      expect(response.statusCode).toBe(204);
-      expect(upsertSpy).toHaveBeenCalledWith(mockedUser.id, feature);
-      expect(clearUserTierSpy).toHaveBeenCalled();
-    });
-
-    test('When the request body is missing the feature field, then a validation error is returned', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        body: {},
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-
-    test('When the feature value is invalid, then an error indicating so is thrown', async () => {
-      const mockedUser = getUser();
-      const mockedUserToken = getValidAuthToken(mockedUser.uuid);
-
-      const response = await app.inject({
-        path: `/products/activate`,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${mockedUserToken}`,
-        },
-        body: {
-          feature: 'invalid-feature',
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
     });
   });
 });

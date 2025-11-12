@@ -81,7 +81,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     tiersService,
   });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
-  const userFeaturesOverridesService = new UserFeaturesOverridesService(userFeatureOverridesRepository);
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
 
   const fastify = await buildApp({
