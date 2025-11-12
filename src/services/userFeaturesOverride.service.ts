@@ -3,11 +3,17 @@ import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeatureOverrides } from '../core/users/UserFeatureOverrides';
 import { BadRequestError } from '../errors/Errors';
+import { UsersService } from './users.service';
 
 export class UserFeaturesOverridesService {
-  constructor(private readonly userFeatureOverridesRepository: UserFeatureOverridesRepository) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly userFeatureOverridesRepository: UserFeatureOverridesRepository,
+  ) {}
 
-  async upsertCustomUserFeatures(userId: User['id'], allowedServices: Service | 'cli') {
+  async upsertCustomUserFeatures(user: User, allowedServices: Service) {
+    const { id: userId, uuid: userUuid } = user;
+
     switch (allowedServices) {
       case Service.Antivirus:
       case Service.Backups:
@@ -22,8 +28,17 @@ export class UserFeaturesOverridesService {
         });
         break;
 
-      case 'cli':
-        // Activate product through Drive Server using an EP
+      case Service.Cli:
+        await this.userFeatureOverridesRepository.upsert({
+          userId: userId,
+          featuresPerService: {
+            [Service.Cli]: {
+              enabled: true,
+            },
+          },
+        });
+
+        await this.usersService.overrideDriveLimit({ userUuid, feature: Service.Cli, enabled: true });
         break;
 
       default:

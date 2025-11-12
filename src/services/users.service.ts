@@ -9,7 +9,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
-import { VpnFeatures } from '../core/users/Tier';
+import { Service, VpnFeatures } from '../core/users/Tier';
 import { HttpError } from '../errors/HttpError';
 
 function signToken(duration: string, secret: string) {
@@ -27,6 +27,8 @@ export class CouponNotBeingTrackedError extends Error {
     Object.setPrototypeOf(this, CouponNotBeingTrackedError.prototype);
   }
 }
+
+type OverrideServiceAvailable = Service.Cli;
 
 export class UsersService {
   constructor(
@@ -320,10 +322,37 @@ export class UsersService {
         Authorization: `Bearer ${jwt}`,
       },
     };
-    
+
     await this.axios.post(
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/failed-payment`,
       { userId: userUuid },
+      requestConfig,
+    );
+  }
+
+  async overrideDriveLimit({
+    userUuid,
+    feature,
+    enabled,
+  }: {
+    userUuid: User['uuid'];
+    feature: OverrideServiceAvailable;
+    enabled: boolean;
+  }): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
+
+      { feature, value: String(enabled) },
+
       requestConfig,
     );
   }

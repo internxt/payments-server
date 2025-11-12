@@ -3,7 +3,7 @@ import { BadRequestError } from '../../../src/errors/Errors';
 import { getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
-const { userFeaturesOverridesService, userFeatureOverridesRepository } = createTestServices();
+const { usersService, userFeaturesOverridesService, userFeatureOverridesRepository } = createTestServices();
 describe('User Tier Override', () => {
   describe('Insert or update the custom user features', () => {
     test('When the service is not allowed, then an error indicating so is thrown', async () => {
@@ -11,7 +11,7 @@ describe('User Tier Override', () => {
       const nonAllowedService = Service.Meet;
 
       await expect(
-        userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, nonAllowedService),
+        userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, nonAllowedService),
       ).rejects.toThrow(BadRequestError);
     });
 
@@ -28,7 +28,7 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, antivirusService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, antivirusService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
     });
@@ -46,7 +46,7 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, backupsService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, backupsService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
     });
@@ -64,9 +64,33 @@ describe('User Tier Override', () => {
       };
       const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
 
-      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser.id, cleanerService);
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, cleanerService);
 
       expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
+    });
+
+    test('When the service is Cleaner, then the service should be enabled', async () => {
+      const mockedUser = getUser();
+      const cleanerService = Service.Cli;
+      const upsertPayload = {
+        userId: mockedUser.id,
+        featuresPerService: {
+          [cleanerService]: {
+            enabled: true,
+          },
+        },
+      };
+      const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
+      const overrideDriveLimitSpy = jest.spyOn(usersService, 'overrideDriveLimit').mockResolvedValue();
+
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, cleanerService);
+
+      expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
+      expect(overrideDriveLimitSpy).toHaveBeenCalledWith({
+        userUuid: mockedUser.uuid,
+        feature: Service.Cli,
+        enabled: true,
+      });
     });
   });
 

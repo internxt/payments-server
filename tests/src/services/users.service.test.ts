@@ -424,4 +424,31 @@ describe('UsersService tests', () => {
       });
     });
   });
+
+  describe('Override Drive Limit', () => {
+    test('When called with a feature, then overrides the drive limit for the user', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const feature = Service.Cli;
+
+      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({});
+
+      await usersService.overrideDriveLimit({ userUuid, feature, enabled: true });
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
+        {
+          feature,
+          value: 'true',
+        },
+        {
+          headers: {
+            Authorization: 'Bearer undefined',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    });
+  });
 });

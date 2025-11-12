@@ -123,6 +123,7 @@ describe('Products Service Tests', () => {
             [Service.Antivirus]: { enabled: true },
             [Service.darkMonitor]: { enabled: false },
             [Service.Cleaner]: { enabled: false },
+            [Service.Cli]: { enabled: false },
           },
         });
 
@@ -159,6 +160,7 @@ describe('Products Service Tests', () => {
             [Service.Antivirus]: { enabled: true },
             [Service.darkMonitor]: { enabled: true },
             [Service.Cleaner]: { enabled: true },
+            [Service.Cli]: { enabled: true },
           },
         });
 
@@ -326,6 +328,7 @@ describe('Products Service Tests', () => {
           [Service.Antivirus]: { enabled: false },
           [Service.darkMonitor]: { enabled: false },
           [Service.Cleaner]: { enabled: false },
+          [Service.Cli]: { enabled: false },
         },
       });
 
