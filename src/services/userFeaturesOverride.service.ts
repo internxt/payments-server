@@ -11,17 +11,22 @@ export class UserFeaturesOverridesService {
     private readonly userFeatureOverridesRepository: UserFeatureOverridesRepository,
   ) {}
 
-  async upsertCustomUserFeatures(user: User, allowedServices: Service) {
-    const { id: userId, uuid: userUuid } = user;
+  async upsertCustomUserFeatures(user: User, service: Service) {
+    const { id: userId, uuid: userUuid, customerId } = user;
+    const overrideUserFeatures = await this.userFeatureOverridesRepository.findByUserId(userId);
 
-    switch (allowedServices) {
+    if (overrideUserFeatures?.featuresPerService?.[service]?.enabled) {
+      return;
+    }
+
+    switch (service) {
       case Service.Antivirus:
       case Service.Backups:
       case Service.Cleaner:
         await this.userFeatureOverridesRepository.upsert({
           userId: userId,
           featuresPerService: {
-            [allowedServices]: {
+            [service]: {
               enabled: true,
             },
           },
@@ -29,6 +34,8 @@ export class UserFeaturesOverridesService {
         break;
 
       case Service.Cli:
+        await this.usersService.overrideDriveLimit({ userUuid, feature: Service.Cli, enabled: true });
+
         await this.userFeatureOverridesRepository.upsert({
           userId: userId,
           featuresPerService: {
@@ -38,12 +45,11 @@ export class UserFeaturesOverridesService {
           },
         });
 
-        await this.usersService.overrideDriveLimit({ userUuid, feature: Service.Cli, enabled: true });
         break;
 
       default:
         throw new BadRequestError(
-          `Service ${allowedServices} is not supported. Try with one of the following: antivirus, backups, cleaner, cli`,
+          `Service ${service} is not supported. Try with one of the following: antivirus, backups, cleaner, cli`,
         );
     }
   }
