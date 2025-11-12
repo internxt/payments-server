@@ -26,7 +26,7 @@ export function gatewayController({
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, {
       secret: {
-        public: Buffer.from(config.DRIVE_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf-8'),
+        public: Buffer.from(config.PAYMENTS_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf-8'),
       },
       verify: {
         algorithms: ['RS256'],

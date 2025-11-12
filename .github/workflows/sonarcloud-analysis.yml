@@ -30,8 +30,9 @@ jobs:
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
-      - run: echo DRIVE_NEW_GATEWAY_SECRET=${{secrets.DRIVE_NEW_GATEWAY_SECRET}} >> ./.env
-      - run: echo DRIVE_GATEWAY_PUBLIC_SECRET=${{secrets.DRIVE_NEW_GATEWAY_SECRET}} >> ./.env
+      - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
+      - run: echo PAYMENTS_GATEWAY_SECRET=${{secrets.PAYMENTS_GATEWAY_SECRET}} >> ./.env
+      - run: echo PAYMENTS_GATEWAY_PUBLIC_SECRET=${{secrets.PAYMENTS_GATEWAY_PUBLIC_SECRET}} >> ./.env
       - run: echo PC_CLOUD_TRIAL_CODE=my_code >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
