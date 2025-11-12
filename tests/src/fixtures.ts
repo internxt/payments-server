@@ -100,7 +100,11 @@ export const getValidAuthToken = (
 };
 
 export const getValidGatewayToken = () => {
-  return jwt.sign({ payload: { value: 'valid-token' } }, config.GATEWAY_JWT_SECRET);
+  return jwt.sign({}, Buffer.from(config.DRIVE_NEW_GATEWAY_SECRET, 'base64').toString('utf8'), {
+    algorithm: 'RS256',
+    expiresIn: '15m',
+    allowInsecureKeySizes: true,
+  });
 };
 
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {

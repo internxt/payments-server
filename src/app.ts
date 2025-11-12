@@ -71,7 +71,6 @@ export async function buildApp({
   fastify.register(
     gatewayController({
       usersService,
-      productsService,
       userFeaturesOverridesService,
       cacheService,
       config,

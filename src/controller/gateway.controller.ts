@@ -6,13 +6,11 @@ import fastifyLimit from '@fastify/rate-limit';
 import { NotFoundError, UnauthorizedError } from '../errors/Errors';
 import Logger from '../Logger';
 import CacheService from '../services/cache.service';
-import { ProductsService } from '../services/products.service';
 import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 
 interface GatewayControllerPayload {
-  productsService: ProductsService;
   cacheService: CacheService;
   usersService: UsersService;
   userFeaturesOverridesService: UserFeaturesOverridesService;
@@ -20,7 +18,6 @@ interface GatewayControllerPayload {
 }
 
 export function gatewayController({
-  productsService,
   cacheService,
   usersService,
   userFeaturesOverridesService,
@@ -29,7 +26,7 @@ export function gatewayController({
   return async function (fastify: FastifyInstance) {
     fastify.register(fastifyJwt, {
       secret: {
-        public: config.DRIVE_GATEWAY_PUBLIC_SECRET,
+        public: Buffer.from(config.DRIVE_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf-8'),
       },
       verify: {
         algorithms: ['RS256'],
