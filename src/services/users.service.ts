@@ -348,7 +348,7 @@ export class UsersService {
       },
     };
 
-    await this.axios.post(
+    await this.axios.put(
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
 
       { feature, value: String(enabled) },

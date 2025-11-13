@@ -431,7 +431,7 @@ describe('UsersService tests', () => {
       const userUuid = mockedUser.uuid;
       const feature = Service.Cli;
 
-      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({});
+      const axiosPostSpy = jest.spyOn(axios, 'put').mockResolvedValue({});
 
       await usersService.overrideDriveLimit({ userUuid, feature, enabled: true });
 
