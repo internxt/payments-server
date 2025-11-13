@@ -15,7 +15,7 @@ import {
   voidPromise,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { CustomerNotFoundError, PaymentService } from '../../../src/services/payment.service';
+import { CustomerNotFoundError, NotFoundPlanByIdError, PaymentService } from '../../../src/services/payment.service';
 import config from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
@@ -84,6 +84,7 @@ describe('Payment controller e2e tests', () => {
             decimalAmount: expect.anything(),
           },
         };
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.subscription.exists}`,
@@ -97,6 +98,8 @@ describe('Payment controller e2e tests', () => {
 
       it('When the subscription priceId is not valid, then it returns 404 status code', async () => {
         const mockedPrice = getPrices();
+        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.subscription.doesNotExist}`,
@@ -121,6 +124,7 @@ describe('Payment controller e2e tests', () => {
             decimalAmount: expect.anything(),
           },
         };
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.lifetime.exists}`,
@@ -135,6 +139,8 @@ describe('Payment controller e2e tests', () => {
 
       it('When the lifetime priceId is not valid, then returns 404 status code', async () => {
         const mockedPrice = getPrices();
+        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.lifetime.doesNotExist}`,

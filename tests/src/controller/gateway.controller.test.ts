@@ -19,7 +19,7 @@ afterAll(async () => {
   await closeServerAndDatabase();
 });
 
-describe('Testing gateway endpoints', () => {
+describe('Gateway endpoints', () => {
   describe('Activating a feature/product', () => {
     test('When a feature is passed, then the product should be activated if it is allowed', async () => {
       const mockedUser = getUser();
