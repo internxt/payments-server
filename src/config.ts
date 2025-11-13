@@ -31,7 +31,6 @@ const DEFAULT_REQUIRED_VARIABLES = [
   'RECAPTCHA_V3',
   'REDIS_HOST',
   'REDIS_PASSWORD',
-type AllVariables = (typeof allVariables)[number];
 ];
 
 const TEST_REQUIRED_VARIABLES = [
