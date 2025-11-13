@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-const DEFAULT_REQUIRED_VARIABLES = [
+const BASE_REQUIRED_VARIABLES = [
   'NODE_ENV',
   'SERVER_PORT',
   'MONGO_URI',
@@ -44,8 +44,8 @@ const TEST_REQUIRED_VARIABLES = [
 ];
 
 const allVariables = [
-  ...DEFAULT_REQUIRED_VARIABLES,
-  ...TEST_REQUIRED_VARIABLES.filter((variable) => !DEFAULT_REQUIRED_VARIABLES.includes(variable)),
+  ...BASE_REQUIRED_VARIABLES,
+  ...TEST_REQUIRED_VARIABLES.filter((variable) => !BASE_REQUIRED_VARIABLES.includes(variable)),
 ];
 
 type AllVariables = (typeof allVariables)[number];
@@ -54,7 +54,7 @@ export type AppConfig = {
   [K in AllVariables]: string;
 };
 
-const variablesToCheck = process.env.NODE_ENV === 'test' ? TEST_REQUIRED_VARIABLES : DEFAULT_REQUIRED_VARIABLES;
+const variablesToCheck = process.env.NODE_ENV === 'test' ? TEST_REQUIRED_VARIABLES : BASE_REQUIRED_VARIABLES;
 
 const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
 
