@@ -99,6 +99,14 @@ export const getValidAuthToken = (
   return jwt.sign({ payload: { uuid: userUuid, workspaces, ...params } }, config.JWT_SECRET);
 };
 
+export const getValidGatewayToken = () => {
+  return jwt.sign({}, Buffer.from(config.PAYMENTS_GATEWAY_SECRET, 'base64').toString('utf8'), {
+    algorithm: 'RS256',
+    expiresIn: '15m',
+    allowInsecureKeySizes: true,
+  });
+};
+
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
   return jwt.sign(payload, config.JWT_SECRET);
 };

@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-          registry-url: 'https://npm.pkg.github.com'
+          registry-url: "https://npm.pkg.github.com"
       - run: echo NODE_ENV=test >> ./.env
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
@@ -31,6 +31,10 @@ jobs:
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
       - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
       - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
+      - run: echo DRIVE_NEW_GATEWAY_URL=http://localhost:8003 >> ./.env
+      - run: echo CHART_API_URL=api_url >> ./.env
+      - run: echo PAYMENTS_GATEWAY_SECRET=${{secrets.PAYMENTS_GATEWAY_SECRET}} >> ./.env
+      - run: echo PAYMENTS_GATEWAY_PUBLIC_SECRET=${{secrets.PAYMENTS_GATEWAY_PUBLIC_SECRET}} >> ./.env
       - run: echo PC_CLOUD_TRIAL_CODE=my_code >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
