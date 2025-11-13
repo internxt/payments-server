@@ -201,6 +201,7 @@ describe('Products Service Tests', () => {
             antivirus: { enabled: true },
             cleaner: { enabled: true },
             darkMonitor: { enabled: true },
+            cli: { enabled: true },
           },
         });
       });
