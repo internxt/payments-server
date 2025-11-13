@@ -166,6 +166,11 @@ export class ProductsService {
           individualTier.featuresPerService[Service.darkMonitor].enabled ||
           businessTier.featuresPerService[Service.darkMonitor].enabled,
       },
+      [Service.Cli]: {
+        enabled:
+          individualTier.featuresPerService[Service.Cli].enabled ||
+          businessTier.featuresPerService[Service.Cli].enabled,
+      },
     };
 
     return {
