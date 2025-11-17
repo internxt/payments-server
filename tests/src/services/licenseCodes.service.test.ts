@@ -89,7 +89,7 @@ describe('Tests for License Codes service', () => {
       expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
       expect(getCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId);
       expect(findUserByUuidSpy).toHaveBeenCalledWith(mockedUser.uuid);
-      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId);
+      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId, mockedLicenseCode);
       expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
         lifetime: true,
       });
@@ -149,7 +149,7 @@ describe('Tests for License Codes service', () => {
         email: mockedCustomer.email,
       });
       expect(findUserByUuidSpy).toHaveBeenCalledWith(mockedUser.uuid);
-      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId);
+      expect(subscribeSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedLicenseCode.priceId, mockedLicenseCode);
       expect(insertUserSpy).toHaveBeenCalledWith({
         customerId: mockedCustomer.id,
         uuid: mockedUser.uuid,

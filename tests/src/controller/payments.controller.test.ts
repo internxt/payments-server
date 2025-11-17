@@ -4,7 +4,6 @@ import {
   getCreateSubscriptionResponse,
   getCustomer,
   getLicenseCode,
-  getLogger,
   getPaymentIntent,
   getPrices,
   getUniqueCodes,
@@ -588,7 +587,6 @@ describe('Payment controller e2e tests', () => {
     test('When the code and provider are valid, then the code is redeemed', async () => {
       const mockedUser = getUser();
       const mockedLicenseCode = getLicenseCode();
-      const mockedLogger = getLogger();
       const mockedToken = getValidAuthToken(
         mockedUser.uuid,
         { owners: [] },
