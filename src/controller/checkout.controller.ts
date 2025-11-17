@@ -40,6 +40,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
+    /**
+     * @deprecated use `POST /customer` instead
+     */
     fastify.get<{
       Querystring: {
         customerName: string;
@@ -106,6 +109,100 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             address: {
               country,
               postal_code: postalCode,
+            },
+          });
+          await usersService.insertUser({
+            customerId: id,
+            uuid: userUuid,
+            lifetime: false,
+          });
+
+          customerId = id;
+        }
+
+        if (country && companyVatId) {
+          await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
+        }
+
+        return res.send({ customerId, token: signUserToken({ customerId }) });
+      },
+    );
+
+    /**
+     * This EP allows the creation of the user customer in our provider (Stripe)
+     */
+    fastify.post<{
+      Body: {
+        customerName: string;
+        address: string;
+        city: string;
+        country: string;
+        postalCode: string;
+        captchaToken: string;
+        companyVatId?: string;
+      };
+    }>(
+      '/customer',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            properties: {
+              customerName: { type: 'string' },
+              country: { type: 'string' },
+              postalCode: { type: 'string' },
+              captchaToken: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 hour',
+          },
+        },
+      },
+      async (req, res): Promise<{ customerId: string; token: string }> => {
+        let customerId: Stripe.Customer['id'];
+        const { customerName, address: userAddress, city, country, postalCode, companyVatId, captchaToken } = req.body;
+        const { uuid: userUuid, email } = req.user.payload;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
+
+        const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
+
+        if (userExists) {
+          await paymentsService.updateCustomer(
+            userExists.customerId,
+            {
+              customer: {
+                name: customerName,
+              },
+            },
+            {
+              address: {
+                line1: userAddress,
+                city,
+                postal_code: postalCode,
+                country,
+              },
+            },
+          );
+          customerId = userExists.customerId;
+        } else {
+          const { id } = await paymentsService.createCustomer({
+            name: customerName,
+            email,
+            address: {
+              line1: userAddress,
+              country,
+              postal_code: postalCode,
+              city,
             },
           });
           await usersService.insertUser({

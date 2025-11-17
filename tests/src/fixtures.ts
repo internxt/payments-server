@@ -20,7 +20,7 @@ import {
   ParsedInvoiceResponse,
   RawCreateInvoiceResponse,
   RawInvoiceResponse,
-} from '../../src/services/bit2me.service';
+} from '../../src/types/bit2me';
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';

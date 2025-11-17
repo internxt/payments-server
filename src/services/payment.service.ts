@@ -468,6 +468,7 @@ export class PaymentService {
       const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
+      const customer = await this.getCustomer(customerId);
 
       Logger.info(
         `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
