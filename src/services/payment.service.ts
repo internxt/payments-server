@@ -592,6 +592,7 @@ export class PaymentService {
       await this.provider.invoiceItems.create({
         customer: customerId,
         price: priceId,
+        quantity: 0,
         description: 'One-time charge',
         invoice: invoice.id,
       });
