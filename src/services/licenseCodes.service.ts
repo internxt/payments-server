@@ -119,7 +119,7 @@ export class LicenseCodesService {
       customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
     }
 
-    const productMetadata = await this.paymentService.subscribe(customer.id, licenseCode.priceId);
+    const productMetadata = await this.paymentService.subscribe(customer.id, licenseCode.priceId, licenseCode);
 
     if (!maybeExistingUser) {
       await this.usersService.insertUser({
