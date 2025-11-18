@@ -1,12 +1,13 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { BadRequestError } from '../../../src/errors/Errors';
 import { randomUUID } from 'crypto';
+import { Bit2MeAPIError } from '../../../src/types/bit2me';
 
 let bit2MeService: Bit2MeService;
 
