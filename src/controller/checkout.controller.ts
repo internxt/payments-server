@@ -12,6 +12,7 @@ import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
+import Logger from '../Logger';
 
 export default function (usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -316,6 +317,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         token: string;
         currency: string;
         captchaToken: string;
+        userAddress: string;
         promoCodeId?: string;
       };
     }>(
@@ -339,6 +341,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
                 type: 'string',
               },
               captchaToken: { type: 'string' },
+              userAddress: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -355,7 +358,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
+
+        Logger.info(`USER ADDRESS WHEN CREATING INVOICE: ${userAddress}`);
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -401,6 +406,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           userEmail: email,
           currency: currency.trim(),
           promoCodeId,
+          userAddress,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: true,
