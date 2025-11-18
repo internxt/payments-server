@@ -165,6 +165,231 @@ describe('Checkout controller', () => {
     });
   });
 
+  describe('Create customer (POST method)', () => {
+    test('when the user exists, then the customer is updated and the id of the customer with its auth token are returned', async () => {
+      const mockedUser = getUser();
+      const userEmail = 'test@internxt.com';
+      const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: userEmail });
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
+      const captchaToken = 'valid_captcha_token';
+      const customerData = {
+        customerName: 'John Doe',
+        lineAddress1: 'Street 123',
+        lineAddress2: 'Apt 4B',
+        city: 'Barcelona',
+        country: 'ES',
+        postalCode: '08001',
+        captchaToken,
+      };
+
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      const updateCustomerSpy = jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: customerData,
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        customerId: mockedUser.customerId,
+        token: userToken,
+      });
+      expect(updateCustomerSpy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        {
+          customer: {
+            name: customerData.customerName,
+          },
+        },
+        {
+          email: userEmail,
+          address: {
+            line1: customerData.lineAddress1,
+            line2: customerData.lineAddress2,
+            city: customerData.city,
+            postal_code: customerData.postalCode,
+            country: customerData.country,
+          },
+        },
+      );
+    });
+
+    test('when the user does not exist, then a new customer is created and saved in the database and the customer id and its token are returned', async () => {
+      const mockedUser = getUser();
+      const userEmail = 'newuser@internxt.com';
+      const mockedCustomer = getCustomer({
+        id: 'new_customer_id',
+        name: 'John Doe',
+        email: userEmail,
+      });
+      const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: userEmail });
+      const userToken = getValidUserToken({ customerId: mockedCustomer.id });
+      const captchaToken = 'valid_captcha_token';
+      const customerData = {
+        customerName: 'John Doe',
+        lineAddress1: 'Street 123',
+        lineAddress2: 'Apt 4B',
+        city: 'Barcelona',
+        country: 'ES',
+        postalCode: '08001',
+        captchaToken,
+      };
+
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
+      const createCustomerSpy = jest
+        .spyOn(PaymentService.prototype, 'createCustomer')
+        .mockResolvedValue(mockedCustomer);
+      const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: customerData,
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        customerId: mockedCustomer.id,
+        token: userToken,
+      });
+      expect(createCustomerSpy).toHaveBeenCalledWith({
+        name: customerData.customerName,
+        email: userEmail,
+        address: {
+          line1: customerData.lineAddress1,
+          line2: customerData.lineAddress2,
+          city: customerData.city,
+          postal_code: customerData.postalCode,
+          country: customerData.country,
+        },
+      });
+      expect(insertUserSpy).toHaveBeenCalledWith({
+        customerId: mockedCustomer.id,
+        uuid: mockedUser.uuid,
+        lifetime: false,
+      });
+    });
+
+    test('when country and vat ID are provided, then the VAT ID is attached to the customer', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
+      const captchaToken = 'valid_captcha_token';
+      const customerData = {
+        customerName: 'Company SL',
+        lineAddress1: 'Street 123',
+        lineAddress2: 'Floor 2',
+        city: 'Madrid',
+        country: 'ES',
+        postalCode: '28001',
+        captchaToken,
+        companyVatId: 'ESB12345678',
+      };
+
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+      const attachVatIdSpy = jest
+        .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
+        .mockResolvedValue();
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: customerData,
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({
+        customerId: mockedUser.customerId,
+        token: userToken,
+      });
+      expect(attachVatIdSpy).toHaveBeenCalledWith(
+        mockedUser.customerId,
+        customerData.country,
+        customerData.companyVatId,
+      );
+    });
+
+    test('when country is provided but VAT ID is not, then VAT ID attachment is skipped', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const captchaToken = 'valid_captcha_token';
+      const customerData = {
+        customerName: 'John Doe',
+        lineAddress1: 'Street 123',
+        lineAddress2: 'Apt 4B',
+        city: 'Barcelona',
+        country: 'ES',
+        postalCode: '08001',
+        captchaToken,
+      };
+
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+      const attachVatIdSpy = jest.spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer');
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: customerData,
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(attachVatIdSpy).not.toHaveBeenCalled();
+    });
+
+    test('when captcha verification fails, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid);
+      const captchaToken = 'invalid_captcha_token';
+      const customerData = {
+        customerName: 'John Doe',
+        lineAddress1: 'Street 123',
+        lineAddress2: 'Apt 4B',
+        city: 'Barcelona',
+        country: 'ES',
+        postalCode: '08001',
+        captchaToken,
+      };
+
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+      const findUserSpy = jest.spyOn(UsersService.prototype, 'findUserByUuid');
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: customerData,
+        headers: {
+          Authorization: `Bearer ${userAuthToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(findUserSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Creating a subscription', () => {
     it('When the user wants to create a subscription, it is created successfully', async () => {
       const mockedUser = getUser();

@@ -40,6 +40,9 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       }
     });
 
+    /**
+     * @deprecated This Endpoint has been deprecated, use `POST /customer` instead
+     */
     fastify.get<{
       Querystring: {
         customerName: string;
@@ -106,6 +109,106 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             address: {
               country,
               postal_code: postalCode,
+            },
+          });
+          await usersService.insertUser({
+            customerId: id,
+            uuid: userUuid,
+            lifetime: false,
+          });
+
+          customerId = id;
+        }
+
+        if (country && companyVatId) {
+          await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
+        }
+
+        return res.send({ customerId, token: signUserToken({ customerId }) });
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        customerName: string;
+        lineAddress1: string;
+        lineAddress2: string;
+        city: string;
+        country: string;
+        postalCode: string;
+        captchaToken: string;
+        companyVatId?: string;
+      };
+    }>(
+      '/customer',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['customerName', 'lineAddress1', 'city', 'country', 'postalCode', 'captchaToken'],
+            properties: {
+              customerName: { type: 'string' },
+              lineAddress1: { type: 'string' },
+              lineAddress2: { type: 'string' },
+              city: { type: 'string' },
+              country: { type: 'string' },
+              postalCode: { type: 'string' },
+              captchaToken: { type: 'string' },
+              companyVatId: { type: 'string' },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 hour',
+          },
+        },
+      },
+      async (req, res): Promise<{ customerId: string; token: string }> => {
+        let customerId: Stripe.Customer['id'];
+        const { customerName, lineAddress1, lineAddress2, city, country, postalCode, companyVatId, captchaToken } =
+          req.body;
+        const { uuid: userUuid, email } = req.user.payload;
+
+        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
+
+        if (!verifiedCaptcha) {
+          throw new ForbiddenError('Token verification failed');
+        }
+
+        const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
+
+        if (userExists) {
+          await paymentsService.updateCustomer(
+            userExists.customerId,
+            {
+              customer: {
+                name: customerName,
+              },
+            },
+            {
+              email,
+              address: {
+                line1: lineAddress1,
+                line2: lineAddress2,
+                city,
+                postal_code: postalCode,
+                country,
+              },
+            },
+          );
+          customerId = userExists.customerId;
+        } else {
+          const { id } = await paymentsService.createCustomer({
+            name: customerName,
+            email,
+            address: {
+              line1: lineAddress1,
+              line2: lineAddress2,
+              city,
+              postal_code: postalCode,
+              country,
             },
           });
           await usersService.insertUser({
