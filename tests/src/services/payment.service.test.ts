@@ -130,6 +130,7 @@ describe('Payments Service tests', () => {
         currency: mockedInvoice.lines.data[0].price?.currency as string,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       };
 
       const paymentIntentSpy = jest
@@ -197,6 +198,7 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toStrictEqual({
@@ -252,6 +254,7 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toEqual(mockedPaymentIntent);
