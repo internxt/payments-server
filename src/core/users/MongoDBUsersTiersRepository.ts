@@ -9,6 +9,10 @@ export interface UserTier {
 }
 
 export interface UsersTiersRepository {
+  getUserTierMappings(
+    isBusiness?: boolean,
+    userId?: string,
+  ): Promise<Array<{ userUuid: string; foreignTierId: string }>>;
   insertTierToUser(userId: User['id'], tierId: Tier['id']): Promise<void>;
   updateUserTier(userId: User['id'], oldTierId: Tier['id'], newTierId: Tier['id']): Promise<boolean>;
   deleteTierFromUser(userId: User['id'], tierId: Tier['id']): Promise<boolean>;
@@ -28,6 +32,75 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
 
   constructor(mongo: MongoClient) {
     this.collection = mongo.db('payments').collection<Omit<UserTier, 'id'>>('users_tiers');
+  }
+
+  async getUserTierMappings(
+    isBusiness = false,
+    userId?: string,
+  ): Promise<Array<{ userUuid: string; foreignTierId: string }>> {
+    const matchStage: any = {
+      'featuresPerService.drive.workspaces.enabled': isBusiness,
+    };
+
+    if (userId) {
+      matchStage.uuid = userId;
+    }
+
+    const results = await this.collection
+      .aggregate([
+        {
+          $addFields: {
+            userIdObj: { $toObjectId: '$userId' },
+            tierIdObj: { $toObjectId: '$tierId' },
+          },
+        },
+        ...(userId
+          ? [
+              {
+                $match: {
+                  userId: userId,
+                },
+              },
+            ]
+          : []),
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userIdObj',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        {
+          $unwind: '$user',
+        },
+        {
+          $lookup: {
+            from: 'tiers',
+            localField: 'tierIdObj',
+            foreignField: '_id',
+            as: 'tier',
+          },
+        },
+        {
+          $unwind: '$tier',
+        },
+        {
+          $match: {
+            'tier.featuresPerService.drive.workspaces.enabled': isBusiness,
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            userUuid: '$user.uuid',
+            foreignTierId: '$tier.featuresPerService.drive.foreignTierId',
+          },
+        },
+      ])
+      .toArray();
+
+    return results as Array<{ userUuid: string; foreignTierId: string }>;
   }
 
   async insertTierToUser(userId: User['id'], tierId: Tier['id']): Promise<void> {
