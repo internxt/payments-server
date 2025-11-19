@@ -9,6 +9,7 @@ import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository'
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
+import { isInvoicePaidOutOfBand } from '../utils/isInvoicePaidOutOfBand';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -132,18 +133,17 @@ export class TiersService {
     }
 
     if (isLifetime) {
-      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
-      const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
+      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {}, undefined, {
+        status: 'paid',
+      });
 
-      for (const invoice of paidInvoices) {
+      for (const invoice of lifetimeInvoices) {
         const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-        const invoiceMetadata = invoice.metadata;
-        const invoiceMetadataProvider = invoiceMetadata?.provider;
-        const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
-        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
+        const product = lineItem?.pricing?.price_details?.product;
+        const isLifetimePaidExternally: boolean =
+          isInvoicePaidOutOfBand(invoice) && invoice.metadata?.provider !== 'bit2me';
 
-        if (isExternalPayment) {
+        if (isLifetimePaidExternally) {
           isLifetimePaidOutOfBand = true;
           break;
         }
