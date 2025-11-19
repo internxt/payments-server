@@ -412,6 +412,7 @@ export class PaymentService {
     customerId,
     priceId,
     userEmail,
+    userAddress,
     currency,
     promoCodeId,
     additionalInvoiceOptions,
@@ -419,6 +420,7 @@ export class PaymentService {
     customerId: string;
     priceId: string;
     userEmail: string;
+    userAddress: string;
     currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
