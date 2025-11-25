@@ -467,11 +467,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         if (promoCodeName) {
           const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
           if (couponCode.amountOff) {
-            amount = price.amount - couponCode.amountOff;
+            amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
             const discount = Math.floor((price.amount * couponCode.percentOff) / 100);
             const discountedPrice = price.amount - discount;
-            amount = discountedPrice;
+            amount = Math.max(0, discountedPrice);
           }
         }
 
