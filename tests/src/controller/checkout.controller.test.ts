@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 describe('Checkout controller', () => {
-  it('When the jwt verify fails, then an error indicating so is thrown', async () => {
+  test('When the jwt verify fails, then an error indicating so is thrown', async () => {
     const userAuthToken = 'invalid_token';
 
     const response = await app.inject({
@@ -55,7 +55,7 @@ describe('Checkout controller', () => {
   });
 
   describe('Get customer ID', () => {
-    it('When the user exists in Users collection, then the customer Id associated to the user is returned', async () => {
+    test('When the user exists in Users collection, then the customer Id associated to the user is returned', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
@@ -127,7 +127,7 @@ describe('Checkout controller', () => {
       expect(insertUserSpy).toHaveBeenCalledWith(insertUserPayload);
     });
 
-    it('When the user provides country and Vat Id, then they are attached to the user correctly', async () => {
+    test('When the user provides country and Vat Id, then they are attached to the user correctly', async () => {
       const country = 'ES';
       const companyVatId = 'vat_id';
 
@@ -391,7 +391,7 @@ describe('Checkout controller', () => {
   });
 
   describe('Creating a subscription', () => {
-    it('When the user wants to create a subscription, it is created successfully', async () => {
+    test('When the user wants to create a subscription, test is created successfully', async () => {
       const mockedUser = getUser();
       const mockedSubscription = getCreatedSubscription();
       const mockedSubscriptionResponse = getCreateSubscriptionResponse();
@@ -426,7 +426,7 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling errors', () => {
-      it('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -444,7 +444,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the id of the customer is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the id of the customer is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -462,7 +462,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the user token is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the user token is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -481,7 +481,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
+      test('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
@@ -506,7 +506,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(403);
       });
 
-      it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
+      test('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: 'invalid_customer_id' });
@@ -566,7 +566,7 @@ describe('Checkout controller', () => {
       jest.clearAllMocks();
     });
 
-    it('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
+    test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
       const mockedPrice = priceById({
@@ -690,7 +690,7 @@ describe('Checkout controller', () => {
       expect(response.statusCode).toBe(400);
     });
 
-    it('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
+    test('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
       const mockedPrice = priceById({
@@ -765,7 +765,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -783,7 +783,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the id of the customer is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the id of the customer is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -801,7 +801,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the user token is not present in the body, then an error indicating so is thrown', async () => {
+      test('When the user token is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
 
@@ -820,7 +820,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      it('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
+      test('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
@@ -846,7 +846,7 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(403);
       });
 
-      it('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
+      test('When the provided token contains a customerId that does not match the provided customerId, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
@@ -902,7 +902,7 @@ describe('Checkout controller', () => {
   });
 
   describe('Get Price by its ID', () => {
-    it('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
+    test('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
       const mockedPrice = priceById({
         bytes: 123456789,
         interval: 'year',
@@ -938,7 +938,7 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling promo codes', () => {
-      it('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
+      test('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,
           interval: 'year',
@@ -982,7 +982,7 @@ describe('Checkout controller', () => {
         });
       });
 
-      it('When the user provides a promo code with percent off, then the price is returned with the discount applied', async () => {
+      test('When the user provides a promo code with percent off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,
           interval: 'year',
@@ -1026,10 +1026,59 @@ describe('Checkout controller', () => {
           },
         });
       });
+
+      test('When the user provides a promo code with a discount that is more than the product price, then the price should be 0 instead of a negative price', async () => {
+        const mockedPrice = {
+          ...priceById({
+            bytes: 123456789,
+            interval: 'year',
+          }),
+          amount: 14000,
+          decimalAmount: 140,
+        };
+        const promoCode = {
+          promoCodeName: 'promo_code_name',
+          amountOff: 15000,
+          percentOff: null,
+          codeId: 'promo_code_id',
+        };
+
+        const discountedAmount = 0;
+        const taxes = mockCalculateTaxFor(discountedAmount);
+
+        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest
+          .spyOn(PaymentService.prototype, 'calculateTax')
+          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
+
+        const response = await app.inject({
+          path: `/checkout/price-by-id`,
+          query: {
+            priceId: mockedPrice.id,
+            promoCodeName: promoCode.promoCodeName,
+            userAddress: '123.12.12.12',
+          },
+          method: 'GET',
+        });
+
+        const responseBody = response.json();
+
+        expect(response.statusCode).toBe(200);
+        expect(responseBody).toStrictEqual({
+          price: mockedPrice,
+          taxes: {
+            tax: taxes.tax_amount_exclusive,
+            decimalTax: taxes.tax_amount_exclusive / 100,
+            amountWithTax: taxes.amount_total,
+            decimalAmountWithTax: taxes.amount_total / 100,
+          },
+        });
+      });
     });
 
     describe('Handling errors', () => {
-      it('When the priceId is not present in the query, then an error indicating so is thrown', async () => {
+      test('When the priceId is not present in the query, then an error indicating so is thrown', async () => {
         const response = await app.inject({
           path: '/checkout/price-by-id',
           method: 'GET',
@@ -1040,7 +1089,7 @@ describe('Checkout controller', () => {
     });
 
     describe('User address, country and postal code are not provided', () => {
-      it('When any of user location params are provided, then the price is returned with taxes to 0', async () => {
+      test('When any of user location params are provided, then the price is returned with taxes to 0', async () => {
         const mockedPrice = priceById({
           bytes: 123456789,
           interval: 'year',
