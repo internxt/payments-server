@@ -27,6 +27,7 @@ import { Bit2MeService } from '../services/bit2me.service';
 import { TiersService } from '../services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import CacheService from '../services/cache.service';
 
 const [, , filePath, provider] = process.argv;
 
@@ -96,9 +97,11 @@ async function main() {
       storageService,
       envVariablesConfig,
     );
+    const cacheService = new CacheService(envVariablesConfig);
     const licenseCodesService = new LicenseCodesService({
       paymentService,
       usersService,
+      cacheService,
       storageService,
       licenseCodesRepository,
       tiersService,
