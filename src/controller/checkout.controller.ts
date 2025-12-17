@@ -41,7 +41,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
     });
 
     /**
-     * @deprecated use `POST /customer` instead
+     * @deprecated This Endpoint has been deprecated, use `POST /customer` instead
      */
     fastify.get<{
       Querystring: {
@@ -128,13 +128,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
     );
 
-    /**
-     * This EP allows the creation of the user customer in our provider (Stripe)
-     */
     fastify.post<{
       Body: {
         customerName: string;
-        address: string;
+        lineAddress1: string;
+        lineAddress2: string;
         city: string;
         country: string;
         postalCode: string;
@@ -147,8 +145,12 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         schema: {
           body: {
             type: 'object',
+            required: ['customerName', 'lineAddress1', 'city', 'country', 'postalCode', 'captchaToken'],
             properties: {
               customerName: { type: 'string' },
+              lineAddress1: { type: 'string' },
+              lineAddress2: { type: 'string' },
+              city: { type: 'string' },
               country: { type: 'string' },
               postalCode: { type: 'string' },
               captchaToken: { type: 'string' },
@@ -165,7 +167,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { customerName, address: userAddress, city, country, postalCode, companyVatId, captchaToken } = req.body;
+        const { customerName, lineAddress1, lineAddress2, city, country, postalCode, companyVatId, captchaToken } =
+          req.body;
         const { uuid: userUuid, email } = req.user.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -185,8 +188,10 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
               },
             },
             {
+              email,
               address: {
-                line1: userAddress,
+                line1: lineAddress1,
+                line2: lineAddress2,
                 city,
                 postal_code: postalCode,
                 country,
@@ -199,10 +204,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
             name: customerName,
             email,
             address: {
-              line1: userAddress,
-              country,
-              postal_code: postalCode,
+              line1: lineAddress1,
+              line2: lineAddress2,
               city,
+              postal_code: postalCode,
+              country,
             },
           });
           await usersService.insertUser({
@@ -310,6 +316,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         token: string;
         currency: string;
         captchaToken: string;
+        userAddress: string;
         promoCodeId?: string;
       };
     }>(
@@ -333,6 +340,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
                 type: 'string',
               },
               captchaToken: { type: 'string' },
+              userAddress: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -349,7 +357,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -395,6 +403,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           userEmail: email,
           currency: currency.trim(),
           promoCodeId,
+          userAddress,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: true,
@@ -458,11 +467,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         if (promoCodeName) {
           const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
           if (couponCode.amountOff) {
-            amount = price.amount - couponCode.amountOff;
+            amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
             const discount = Math.floor((price.amount * couponCode.percentOff) / 100);
             const discountedPrice = price.amount - discount;
-            amount = discountedPrice;
+            amount = Math.max(0, discountedPrice);
           }
         }
 

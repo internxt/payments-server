@@ -44,11 +44,18 @@ db.tiers.insertMany([
       },
       drive: {
         enabled: true,
-        maxSpaceBytes: NumberLong('1099511627776'),
+        foreignTierId: '47d76ff1-a6df-4334-a300-b11f50ea6bfd',
+        maxSpaceBytes: 1099511627776,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: false,
         },
       },
       meet: {
@@ -62,6 +69,15 @@ db.tiers.insertMany([
       vpn: {
         enabled: true,
         featureId: 'c9534015-dfa0-41df-8c0c-e93812fa2c1f',
+      },
+      cleaner: {
+        enabled: false,
+      },
+      cli: {
+        enabled: false,
+      },
+      darkMonitor: {
+        enabled: false,
       },
     },
   },
@@ -78,12 +94,19 @@ db.tiers.insertMany([
         enabled: false,
       },
       drive: {
+        foreignTierId: 'f9a0c809-33b3-49b6-b8d3-957d95575bb2',
         enabled: true,
         maxSpaceBytes: 1073741824,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
+        },
+        passwordProtectedSharing: {
+          enabled: false,
+        },
+        restrictedItemsSharing: {
+          enabled: false,
         },
       },
       meet: {
@@ -95,8 +118,16 @@ db.tiers.insertMany([
         addressesPerUser: 0,
       },
       vpn: {
-        enabled: true,
-        locationsAvailable: 1,
+        enabled: false,
+      },
+      cleaner: {
+        enabled: false,
+      },
+      cli: {
+        enabled: false,
+      },
+      darkMonitor: {
+        enabled: false,
       },
     },
   },
@@ -113,25 +144,41 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: '899e07f7-0e8c-427b-9613-dee0c5c705a7',
         enabled: true,
-        maxSpaceBytes: NumberLong('3298534883328'),
+        maxSpaceBytes: 3298534883328,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
         },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
+        },
       },
       meet: {
-        enabled: true,
-        paxPerCall: 3,
+        enabled: false,
+        paxPerCall: 0,
       },
       mail: {
-        enabled: true,
-        addressesPerUser: 3,
+        enabled: false,
+        addressesPerUser: 0,
       },
       vpn: {
         enabled: true,
         featureId: '6d06f11b-9854-49db-a38b-56ca4aab1658',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: false,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },
@@ -148,12 +195,19 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: '23bd8f2c-ae81-4f18-b18a-55a36e66547d',
         enabled: true,
-        maxSpaceBytes: NumberLong('5497558138880'),
+        maxSpaceBytes: 5497558138880,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
         },
       },
       meet: {
@@ -167,6 +221,15 @@ db.tiers.insertMany([
       vpn: {
         enabled: true,
         featureId: '8efbba36-f3a1-4cf2-8f70-29326fab54f4',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: true,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },
@@ -182,26 +245,42 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: 'f9760f5c-4eb5-4400-b7ed-92763659269c',
         enabled: true,
-        maxSpaceBytes: NumberLong('1099511627776'),
+        maxSpaceBytes: 1099511627776,
         workspaces: {
           enabled: true,
           minimumSeats: 0,
           maximumSeats: 0,
-          maxSpaceBytesPerSeat: NumberLong('1099511627776'),
+          maxSpaceBytesPerSeat: 1099511627776,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
         },
       },
       meet: {
-        enabled: true,
-        paxPerCall: 5,
+        enabled: false,
+        paxPerCall: 0,
       },
       mail: {
-        enabled: true,
-        addressesPerUser: 1,
+        enabled: false,
+        addressesPerUser: 0,
       },
       vpn: {
         enabled: true,
         featureId: 'cd4f81a4-6c51-4991-b24f-7219dfbbadfd',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: true,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },
@@ -219,11 +298,18 @@ db.tiers.insertMany([
       },
       drive: {
         enabled: true,
-        maxSpaceBytes: NumberLong('1099511627776'),
+        foreignTierId: '47d76ff1-a6df-4334-a300-b11f50ea6bfd',
+        maxSpaceBytes: 1099511627776,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: false,
         },
       },
       meet: {
@@ -237,6 +323,15 @@ db.tiers.insertMany([
       vpn: {
         enabled: true,
         featureId: 'c9534015-dfa0-41df-8c0c-e93812fa2c1f',
+      },
+      cleaner: {
+        enabled: false,
+      },
+      cli: {
+        enabled: false,
+      },
+      darkMonitor: {
+        enabled: false,
       },
     },
   },
@@ -253,25 +348,41 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: '899e07f7-0e8c-427b-9613-dee0c5c705a7',
         enabled: true,
-        maxSpaceBytes: NumberLong('3298534883328'),
+        maxSpaceBytes: 3298534883328,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
         },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
+        },
       },
       meet: {
-        enabled: true,
-        paxPerCall: 3,
+        enabled: false,
+        paxPerCall: 0,
       },
       mail: {
-        enabled: true,
-        addressesPerUser: 3,
+        enabled: false,
+        addressesPerUser: 0,
       },
       vpn: {
         enabled: true,
         featureId: '6d06f11b-9854-49db-a38b-56ca4aab1658',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: false,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },
@@ -288,12 +399,19 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: '23bd8f2c-ae81-4f18-b18a-55a36e66547d',
         enabled: true,
-        maxSpaceBytes: NumberLong('5497558138880'),
+        maxSpaceBytes: 5497558138880,
         workspaces: {
           enabled: false,
           minimumSeats: 0,
           maximumSeats: 0,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
         },
       },
       meet: {
@@ -307,6 +425,15 @@ db.tiers.insertMany([
       vpn: {
         enabled: true,
         featureId: '8efbba36-f3a1-4cf2-8f70-29326fab54f4',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: true,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },
@@ -322,13 +449,20 @@ db.tiers.insertMany([
         enabled: true,
       },
       drive: {
+        foreignTierId: '746b5656-fe1a-47a1-9547-ee410c4010e8',
         enabled: true,
-        maxSpaceBytes: NumberLong('2199023255552'),
+        maxSpaceBytes: 2199023255552,
         workspaces: {
           enabled: true,
           minimumSeats: 0,
           maximumSeats: 0,
-          maxSpaceBytesPerSeat: NumberLong('2199023255552'),
+          maxSpaceBytesPerSeat: 2199023255552,
+        },
+        passwordProtectedSharing: {
+          enabled: true,
+        },
+        restrictedItemsSharing: {
+          enabled: true,
         },
       },
       meet: {
@@ -342,6 +476,15 @@ db.tiers.insertMany([
       vpn: {
         enabled: true,
         featureId: '1b3d5f0a-459b-4189-84b9-29933fba1aa0',
+      },
+      cleaner: {
+        enabled: true,
+      },
+      cli: {
+        enabled: true,
+      },
+      darkMonitor: {
+        enabled: true,
       },
     },
   },

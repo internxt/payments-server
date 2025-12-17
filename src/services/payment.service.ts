@@ -12,6 +12,7 @@ import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normaliz
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
 import { getStripeNewVersion } from './stripe';
+import { LicenseCode } from '../core/users/LicenseCode';
 
 type Customer = Stripe.Customer;
 export type CustomerId = Customer['id'];
@@ -411,6 +412,7 @@ export class PaymentService {
     customerId,
     priceId,
     userEmail,
+    userAddress,
     currency,
     promoCodeId,
     additionalInvoiceOptions,
@@ -418,6 +420,7 @@ export class PaymentService {
     customerId: string;
     priceId: string;
     userEmail: string;
+    userAddress: string;
     currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
@@ -570,7 +573,11 @@ export class PaymentService {
     return customer;
   }
 
-  async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
+  async subscribe(
+    customerId: CustomerId,
+    priceId: PriceId,
+    licenseCode?: Pick<LicenseCode, 'code' | 'provider'>,
+  ): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
     const price = await this.provider.prices.retrieve(priceId);
     const isRecurring = price.type === 'recurring';
 
@@ -588,12 +595,17 @@ export class PaymentService {
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': licenseCode?.code ?? null,
+          'affiliate-provider': licenseCode?.provider ?? null,
+        },
       });
 
       await this.provider.invoiceItems.create({
         customer: customerId,
         price: priceId,
-        description: 'One-time charge',
+        quantity: 0,
+        description: licenseCode?.provider ? `Affiliate sale via ${licenseCode.provider}` : 'One-time charge',
         invoice: invoice.id,
       });
 

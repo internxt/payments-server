@@ -130,6 +130,7 @@ describe('Payments Service tests', () => {
         currency: mockedInvoice.lines.data[0].price?.currency as string,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       };
 
       const paymentIntentSpy = jest
@@ -197,6 +198,7 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toStrictEqual({
@@ -252,6 +254,7 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toEqual(mockedPaymentIntent);
@@ -900,6 +903,158 @@ describe('Payments Service tests', () => {
       const invoice = await paymentService.getInvoice(mockedInvoice.id);
 
       expect(invoice).toStrictEqual(mockedInvoice);
+    });
+  });
+
+  describe('Subscribe', () => {
+    const customerId = 'cus_test_123';
+    const recurringPriceId = 'price_recurring_123';
+    const oneTimePriceId = 'price_onetime_123';
+
+    test('When subscribing with a recurring price, then it creates a subscription and returns the correct data', async () => {
+      const maxSpaceBytes = '107374182400';
+      const mockedPrice = getPrice({
+        id: recurringPriceId,
+        type: 'recurring',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedSubscription = getCreatedSubscription({
+        customer: customerId,
+        items: {
+          data: [
+            {
+              price: mockedPrice,
+            },
+          ],
+        } as any,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const subscriptionCreateSpy = jest
+        .spyOn(stripe.subscriptions, 'create')
+        .mockResolvedValue(mockedSubscription as Stripe.Response<Stripe.Subscription>);
+
+      const result = await paymentService.subscribe(customerId, recurringPriceId);
+
+      expect(stripe.prices.retrieve).toHaveBeenCalledWith(recurringPriceId);
+      expect(subscriptionCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        items: [
+          {
+            price: recurringPriceId,
+          },
+        ],
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: true,
+      });
+    });
+
+    test('When subscribing with a one-time price, then it creates an invoice, adds invoice items, pays out of band and returns the correct data', async () => {
+      const maxSpaceBytes = '107374182400';
+      const mockedPrice = getPrice({
+        id: oneTimePriceId,
+        type: 'one_time',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedInvoice = getInvoice({
+        id: 'inv_test_123',
+        customer: customerId,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const invoiceCreateSpy = jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      const invoiceItemCreateSpy = jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
+      const invoicePaySpy = jest
+        .spyOn(stripe.invoices, 'pay')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const result = await paymentService.subscribe(customerId, oneTimePriceId);
+
+      expect(stripe.prices.retrieve).toHaveBeenCalledWith(oneTimePriceId);
+      expect(invoiceCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        auto_advance: false,
+        pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': null,
+          'affiliate-provider': null,
+        },
+      });
+      expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        price: oneTimePriceId,
+        quantity: 0,
+        description: 'One-time charge',
+        invoice: mockedInvoice.id,
+      });
+      expect(invoicePaySpy).toHaveBeenCalledWith(mockedInvoice.id, {
+        paid_out_of_band: true,
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: false,
+      });
+    });
+
+    test('When subscribing with a one-time price and license code, then it includes license code information in the invoice metadata', async () => {
+      const maxSpaceBytes = '107374182400';
+      const licenseCode = {
+        code: 'AFFILIATE123',
+        provider: 'PartnerCompany',
+      };
+      const mockedPrice = getPrice({
+        id: oneTimePriceId,
+        type: 'one_time',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedInvoice = getInvoice({
+        id: 'inv_test_456',
+        customer: customerId,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const invoiceCreateSpy = jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      const invoiceItemCreateSpy = jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
+      jest.spyOn(stripe.invoices, 'pay').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const result = await paymentService.subscribe(customerId, oneTimePriceId, licenseCode);
+
+      expect(invoiceCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        auto_advance: false,
+        pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': licenseCode.code,
+          'affiliate-provider': licenseCode.provider,
+        },
+      });
+      expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        price: oneTimePriceId,
+        quantity: 0,
+        description: expect.stringContaining(licenseCode.provider),
+        invoice: mockedInvoice.id,
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: false,
+      });
     });
   });
 });
