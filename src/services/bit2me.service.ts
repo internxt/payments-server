@@ -54,7 +54,7 @@ export class Bit2MeService {
     return securityToken;
   }
 
-  async generateInvoicePayload({
+  public generateInvoicePayload({
     priceId,
     priceAmount,
     currency,
