@@ -26,7 +26,7 @@ export interface CreateCryptoInvoicePayload {
   cancelUrl: string;
   purchaserEmail: string;
   securityToken: string;
-  shopper: {
+  shopper?: {
     type: 'personal';
     ipAddress: string;
     email: string;
