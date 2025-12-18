@@ -85,18 +85,18 @@ export class Bit2MeService {
       cancelUrl: `${this.config.DRIVE_WEB_URL}/checkout/cancel`,
       successUrl: `${this.config.DRIVE_WEB_URL}/checkout/success`,
       purchaserEmail: email,
-      shopper: {
-        type: 'personal',
-        ipAddress: userPublicAddress,
-        email,
-        firstName: name,
-        lastName: '',
-        dateOfBirth: '',
-        countryOfResidence: country,
-        addressLine: address,
-        postalCode: postalCode,
-        city,
-      },
+      // shopper: {
+      //   type: 'personal',
+      //   ipAddress: userPublicAddress,
+      //   email,
+      //   firstName: name,
+      //   lastName: '',
+      //   dateOfBirth: '',
+      //   countryOfResidence: country,
+      //   addressLine: address,
+      //   postalCode: postalCode,
+      //   city,
+      // },
     };
   }
 
