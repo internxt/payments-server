@@ -267,6 +267,73 @@ describe('Payments Service tests', () => {
     });
 
     describe('Crypto payments', () => {
+      test('When the user address information is not complete, then an error indicating so is thrown', async () => {
+        const mockInvoiceTotal = 1000;
+        const mockedCustomer = getCustomer({
+          address: undefined,
+        });
+        const mockedCustomerEmail = mockedCustomer.email as string;
+        const mockedCustomerId = mockedCustomer.id as string;
+        const mockedPrice = getPrice({
+          type: 'one_time',
+        });
+        const mockedPriceId = mockedPrice.id as string;
+        const mockInvoiceId = 'in_test_456';
+        const mockCurrency = 'BTC';
+
+        const mockedInvoice = getInvoice({
+          id: mockInvoiceId,
+          customer: mockedCustomerId,
+          customer_email: mockedCustomerEmail,
+          status: 'open',
+          payments: {
+            data: [
+              {
+                payment: {
+                  payment_intent: 'payment_intent_id',
+                },
+              },
+            ],
+          },
+          total: mockInvoiceTotal,
+          amount_remaining: mockInvoiceTotal,
+          lines: {
+            data: [
+              {
+                amount: mockInvoiceTotal,
+                pricing: {
+                  price_details: {
+                    price: mockedPriceId,
+                  },
+                },
+                currency: 'eth',
+              },
+            ],
+          },
+        });
+
+        jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+        jest
+          .spyOn(paymentService, 'getCustomer')
+          .mockResolvedValueOnce(mockedCustomer as Stripe.Response<Stripe.Customer>);
+        jest
+          .spyOn(stripeNewVersion.invoices, 'create')
+          .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+        jest
+          .spyOn(stripeNewVersion.invoiceItems, 'create')
+          .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
+
+        await expect(
+          paymentService.createInvoice({
+            customerId: mockedCustomerId,
+            priceId: mockedPriceId,
+            currency: mockCurrency,
+            userEmail: mockedCustomerEmail as string,
+            userAddress: '1.1.1.1',
+          }),
+        ).rejects.toThrow(BadRequestError);
+      });
+
       test('When trying to purchase a product using a crypto currency, then the QR code link is returned', async () => {
         const mockInvoiceTotal = 1000;
         const mockedCustomer = getCustomer();

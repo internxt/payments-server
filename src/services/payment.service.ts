@@ -465,14 +465,7 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
-      const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
-
-      const priceAmount = upcomingInvoice.total / 100;
       const customer = await this.getCustomer(customerId);
-
-      Logger.info(
-        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
-      );
 
       if (customer.deleted) {
         throw new BadRequestError('Customer is deleted');
@@ -487,6 +480,13 @@ export class PaymentService {
       if (!customerName || !customerAddress || !customerCity || !customerCountry || !customerPostalCode) {
         throw new BadRequestError('Customer address information is incomplete');
       }
+
+      const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
+
+      const priceAmount = upcomingInvoice.total / 100;
+      Logger.info(
+        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
+      );
 
       const cryptoInvoicePayload = this.bit2MeService.generateInvoicePayload({
         currency: normalizedCurrencyForBit2Me,
