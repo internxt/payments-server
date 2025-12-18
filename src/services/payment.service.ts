@@ -489,7 +489,7 @@ export class PaymentService {
       );
 
       const cryptoInvoicePayload = this.bit2MeService.generateInvoicePayload({
-        currency: normalizedCurrencyForBit2Me,
+        currency: normalizedCurrencyForStripe.toUpperCase(),
         customerId,
         priceAmount: priceAmount,
         priceId,

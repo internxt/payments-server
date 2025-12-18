@@ -69,6 +69,13 @@ export class Bit2MeService {
     userData,
   }: InvoicePayload): CreateCryptoInvoicePayload {
     const { userPublicAddress, name, email, address, country, city, postalCode } = userData;
+    const nameParts = name.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+    if (!lastName) {
+      throw new BadRequestError('Last name is required. Please provide your full name (first and last name).');
+    }
 
     const securityToken = this.signSecurityToken({
       stripeInvoiceId,
@@ -85,18 +92,17 @@ export class Bit2MeService {
       cancelUrl: `${this.config.DRIVE_WEB_URL}/checkout/cancel`,
       successUrl: `${this.config.DRIVE_WEB_URL}/checkout/success`,
       purchaserEmail: email,
-      // shopper: {
-      //   type: 'personal',
-      //   ipAddress: userPublicAddress,
-      //   email,
-      //   firstName: name,
-      //   lastName: '',
-      //   dateOfBirth: '',
-      //   countryOfResidence: country,
-      //   addressLine: address,
-      //   postalCode: postalCode,
-      //   city,
-      // },
+      shopper: {
+        type: 'personal',
+        ipAddress: userPublicAddress,
+        email,
+        firstName,
+        lastName,
+        countryOfResidence: country,
+        addressLine: address,
+        postalCode: postalCode,
+        city,
+      },
     };
   }
 

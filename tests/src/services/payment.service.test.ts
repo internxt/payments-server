@@ -441,25 +441,24 @@ describe('Payments Service tests', () => {
         expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
           description: `Payment for lifetime product ${mockedPriceId}`,
           priceAmount: mockInvoiceTotal / 100,
-          priceCurrency: 'BTC',
+          priceCurrency: 'EUR',
           title: `Invoice from Stripe ${mockInvoiceId}`,
           securityToken: expectedSecurityToken,
           foreignId: mockInvoiceId,
           cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
           successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
           purchaserEmail: mockedCustomerEmail,
-          // shopper: {
-          //   addressLine: mockedCustomer.address?.line1,
-          //   city: mockedCustomer.address?.city,
-          //   countryOfResidence: mockedCustomer.address?.country,
-          //   dateOfBirth: '',
-          //   email: mockedCustomerEmail,
-          //   firstName: mockedCustomer.name,
-          //   ipAddress: '1.1.1.1',
-          //   lastName: '',
-          //   postalCode: mockedCustomer.address?.postal_code,
-          //   type: 'personal',
-          // },
+          shopper: {
+            addressLine: mockedCustomer.address?.line1,
+            city: mockedCustomer.address?.city,
+            countryOfResidence: mockedCustomer.address?.country,
+            email: mockedCustomerEmail,
+            firstName: mockedCustomer.name?.split(' ')[0],
+            ipAddress: '1.1.1.1',
+            lastName: mockedCustomer.name?.split(' ')[1],
+            postalCode: mockedCustomer.address?.postal_code,
+            type: 'personal',
+          },
         });
 
         expect(checkoutInvoiceSpy).toHaveBeenCalledWith(
