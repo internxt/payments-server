@@ -55,6 +55,11 @@ export class Bit2MeService {
     return securityToken;
   }
 
+  /**
+   * Generate the payload for the Bit2Me create crypto invoice API call.
+   * @param {InvoicePayload} payload - The payload containing the required information for generating the invoice payload.
+   * @returns {CreateCryptoInvoicePayload} - The payload to be sent to the Bit2Me create crypto invoice API call.
+   */
   public generateInvoicePayload({
     priceId,
     priceAmount,

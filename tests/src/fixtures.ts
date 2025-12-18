@@ -934,7 +934,7 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
 export const getPayloadForCryptoInvoice = (
   params?: Partial<CreateCryptoInvoicePayload>,
 ): CreateCryptoInvoicePayload => {
-  const payload = {
+  const payload: CreateCryptoInvoicePayload = {
     foreignId: 'invoice-123',
     priceAmount: 100,
     priceCurrency: AllowedCryptoCurrencies['Bitcoin'],
@@ -944,6 +944,18 @@ export const getPayloadForCryptoInvoice = (
     cancelUrl: 'https://cancel.url',
     purchaserEmail: 'test@internxt.com',
     securityToken: 'secure-token',
+    shopper: {
+      type: 'personal',
+      email: 'test@internxt.com',
+      firstName: 'John',
+      lastName: 'Doe',
+      dateOfBirth: '1990-01-01',
+      ipAddress: '127.0.0.1',
+      addressLine: '123 Main St',
+      city: 'New York',
+      countryOfResidence: 'US',
+      postalCode: '10001',
+    },
     ...params,
   };
 
