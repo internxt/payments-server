@@ -441,7 +441,7 @@ describe('Payments Service tests', () => {
         expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
           description: `Payment for lifetime product ${mockedPriceId}`,
           priceAmount: mockInvoiceTotal / 100,
-          priceCurrency: 'BTC',
+          priceCurrency: 'EUR',
           title: `Invoice from Stripe ${mockInvoiceId}`,
           securityToken: expectedSecurityToken,
           foreignId: mockInvoiceId,
