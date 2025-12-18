@@ -10,6 +10,7 @@ import {
   Bit2MeAPIError,
   CreateCryptoInvoicePayload,
   Currency,
+  InvoicePayload,
   ParsedCreatedInvoiceResponse,
   ParsedInvoiceResponse,
   RawCreateInvoiceResponse,
@@ -61,23 +62,7 @@ export class Bit2MeService {
     stripeInvoiceId,
     customerId,
     userData,
-  }: {
-    priceId: string;
-    priceAmount: number;
-    currency: string;
-    stripeInvoiceId: string;
-    customerId: string;
-    userEmail: string;
-    userData: {
-      userPublicAddress: string;
-      name: string;
-      email: string;
-      postalCode: string;
-      city: string;
-      address: string;
-      country: string;
-    };
-  }) {
+  }: InvoicePayload): CreateCryptoInvoicePayload {
     const { userPublicAddress, name, email, address, country, city, postalCode } = userData;
 
     const securityToken = this.signSecurityToken({

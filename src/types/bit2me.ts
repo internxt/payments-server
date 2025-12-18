@@ -26,6 +26,18 @@ export interface CreateCryptoInvoicePayload {
   cancelUrl: string;
   purchaserEmail: string;
   securityToken: string;
+  shopper: {
+    type: 'personal';
+    ipAddress: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    countryOfResidence: string;
+    addressLine: string;
+    postalCode: string;
+    city: string;
+  };
 }
 
 export interface RawInvoiceResponse {
@@ -70,8 +82,27 @@ export type ParsedInvoiceResponse = Omit<
 };
 
 export type RawCreateInvoiceResponse = Omit<RawInvoiceResponse, 'expiredAt' | 'underpaidAmount' | 'overpaidAmount'>;
+
 export type ParsedCreatedInvoiceResponse = Omit<RawCreateInvoiceResponse, 'createdAt' | 'updatedAt' | 'priceAmount'> & {
   createdAt: Date;
   updatedAt: Date;
   priceAmount: number;
 };
+
+export interface InvoicePayload {
+  priceId: string;
+  priceAmount: number;
+  currency: string;
+  stripeInvoiceId: string;
+  customerId: string;
+  userEmail: string;
+  userData: {
+    userPublicAddress: string;
+    name: string;
+    email: string;
+    postalCode: string;
+    city: string;
+    address: string;
+    country: string;
+  };
+}
