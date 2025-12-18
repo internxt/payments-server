@@ -1,17 +1,15 @@
 import Stripe from 'stripe';
-import jwt from 'jsonwebtoken';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
-import config from '../config';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
-import { getStripeNewVersion } from './stripe';
+import { stripeNewVersion } from './stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 
 type Customer = Stripe.Customer;
@@ -429,7 +427,6 @@ export class PaymentService {
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
     const paymentMethodTypes =
       normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
-    const stripeNewVersion = getStripeNewVersion();
 
     const invoice = await stripeNewVersion.invoices.create({
       customer: customerId,
@@ -468,32 +465,50 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
+      const customer = await this.getCustomer(customerId);
+
+      if (customer.deleted) {
+        throw new BadRequestError('Customer is deleted');
+      }
+
+      const customerName = customer.name;
+      const customerAddress = customer.address?.line1;
+      const customerCity = customer.address?.city;
+      const customerCountry = customer.address?.country;
+      const customerPostalCode = customer.address?.postal_code;
+
+      if (!customerName || !customerAddress || !customerCity || !customerCountry || !customerPostalCode) {
+        throw new BadRequestError('Customer address information is incomplete');
+      }
+
       const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
-
       Logger.info(
         `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
       );
 
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
-        description: `Payment for lifetime product ${priceId}`,
-        priceAmount,
-        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
-        title: `Invoice from Stripe ${invoiceId}`,
-        securityToken: jwt.sign(
-          {
-            invoiceId: invoiceId,
-            customerId: customerId,
-            provider: 'stripe',
-          },
-          config.JWT_SECRET,
-        ),
-        foreignId: invoiceId,
-        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
-        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
-        purchaserEmail: userEmail,
+      const cryptoInvoicePayload = this.bit2MeService.generateInvoicePayload({
+        currency: normalizedCurrencyForBit2Me,
+        customerId,
+        priceAmount: priceAmount,
+        priceId,
+        stripeInvoiceId: invoiceId,
+        userData: {
+          name: customerName,
+          email: userEmail,
+          userPublicAddress: userAddress,
+          address: customerAddress,
+          city: customerCity,
+          country: customerCountry,
+          postalCode: customerPostalCode,
+        },
+        userEmail,
       });
+
+      Logger.info(`Crypto invoice payload for customer ${customer.id}: ${JSON.stringify(cryptoInvoicePayload)}`);
+
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice(cryptoInvoicePayload);
 
       await this.updateInvoice(invoiceId, {
         metadata: {
