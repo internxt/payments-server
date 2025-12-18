@@ -267,10 +267,6 @@ describe('Payments Service tests', () => {
     });
 
     describe('Crypto payments', () => {
-      beforeEach(() => {
-        jest.clearAllMocks();
-      });
-
       test('When trying to purchase a product using a crypto currency, then the QR code link is returned', async () => {
         const mockInvoiceTotal = 1000;
         const mockedCustomer = getCustomer();
