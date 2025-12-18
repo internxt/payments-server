@@ -32,7 +32,7 @@ export interface CreateCryptoInvoicePayload {
     email: string;
     firstName: string;
     lastName: string;
-    dateOfBirth: string;
+    dateOfBirth?: string;
     countryOfResidence: string;
     addressLine: string;
     postalCode: string;
