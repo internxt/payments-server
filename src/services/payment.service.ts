@@ -506,6 +506,8 @@ export class PaymentService {
         userEmail,
       });
 
+      Logger.info(`Crypto invoice payload for customer ${customer.id}: ${JSON.stringify(cryptoInvoicePayload)}`);
+
       const cryptoInvoice = await this.bit2MeService.createCryptoInvoice(cryptoInvoicePayload);
 
       await this.updateInvoice(invoiceId, {

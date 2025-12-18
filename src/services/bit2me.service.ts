@@ -101,20 +101,10 @@ export class Bit2MeService {
   }
 
   /**
-   * Creates a new invoice in the Bit2Me system.
-   *
-   * @param {Object} payload - The data required to create the invoice.
-   * @param {string} payload.foreignId - Unique ID for the invoice in your system.
-   * @param {string} payload.priceAmount - The amount to be invoiced.
-   * @param {string} payload.priceCurrency - The currency of the invoice (e.g., EUR).
-   * @param {string} payload.title - The title of the invoice displayed to the customer.
-   * @param {string} payload.description - A brief description of the invoice.
-   * @param {string} payload.successUrl - The URL to redirect on successful payment.
-   * @param {string} payload.cancelUrl - The URL to redirect on failed payment.
-   * @param {string} payload.purchaserEmail - The email address of the customer.
-   * @param {string} payload.securityToken - A unique token for securing callbacks.
-   * @returns {Promise<ParsedInvoiceCheckoutResponse>} The parsed invoice data with updated fields.
-   * @throws {Error} If the API call fails or the payload is invalid.
+   * Create a new invoice using the provided payload
+   * @param {CreateCryptoInvoicePayload} payload - The payload to create the invoice with
+   * @returns {Promise<ParsedCreateInvoiceResponse>} - The parsed response from the Bit2Me API containing the created invoice
+   * @throws {HttpError} - If the API returns an error status code
    */
   async createCryptoInvoice(payload: CreateCryptoInvoicePayload): Promise<ParsedCreatedInvoiceResponse> {
     const payloadReq = {
