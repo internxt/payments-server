@@ -10,6 +10,7 @@
     "start": "node .",
     "build": "tsc",
     "test": "jest --detectOpenHandles",
+    "find-deadcode": "ts-prune -e",
     "test:cov": "jest --coverage",
     "spec": "jest --testMatch='**/*.spec.ts'",
     "cli": "nodemon src/cli/load-license-codes.ts"
@@ -36,6 +37,7 @@
     "prettier": "^3.3.3",
     "ts-jest": "29.2.5",
     "ts-node": "^10.9.2",
+    "ts-prune": "^0.10.3",
     "typescript": "^5.6.3",
     "xlsx": "^0.18.5"
   },

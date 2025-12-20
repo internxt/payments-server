@@ -30,7 +30,7 @@ import { VERIFICATION_CHARGE } from '../constants';
 
 type AllowedMethods = 'GET' | 'POST';
 
-export const allowedCurrency = ['eur', 'usd'];
+const allowedCurrency = ['eur', 'usd'];
 
 const ALLOWED_PATHS: {
   [key: string]: AllowedMethods[];
