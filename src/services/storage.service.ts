@@ -46,19 +46,6 @@ export class StorageService {
   }
 }
 
-export async function createOrUpdateUser(maxSpaceBytes: string, email: string, config: AppConfig) {
-  return axios.post(
-    `${config.DRIVE_GATEWAY_URL}/api/gateway/user/updateOrCreate`,
-    { maxSpaceBytes, email },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      auth: { username: config.DRIVE_GATEWAY_USER, password: config.DRIVE_GATEWAY_PASSWORD },
-    },
-  );
-}
-
 export async function getUserStorage(
   userUuid: User['uuid'],
   email: string,

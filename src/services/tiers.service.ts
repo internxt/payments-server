@@ -3,7 +3,7 @@ import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
 import { AppConfig } from '../config';
-import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
+import { PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
@@ -33,14 +33,6 @@ export class NoSubscriptionSeatsProvidedError extends Error {
     Object.setPrototypeOf(this, NoSubscriptionSeatsProvidedError.prototype);
   }
 }
-
-export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = [
-  'prod_RY24Z7Axqaz1tG',
-  'prod_RY27zjzWZWuzEO',
-  'prod_RY29StsWXwy8Wu',
-  'prod_QRYvMG6BX0TUoU',
-  'prod_QRYtuEtAKhHqIN',
-];
 
 export class TiersService {
   constructor(
@@ -108,62 +100,6 @@ export class TiersService {
     }
 
     return tier;
-  }
-
-  // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
-  async getProductsTier(
-    customerId: CustomerId,
-    isLifetime: boolean,
-  ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } }> {
-    let productId;
-    let isLifetimePaidOutOfBand = false;
-    const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
-    const activeUserSubscription = userSubscriptions.find(
-      (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
-    );
-    const hasActiveSubscription = !!activeUserSubscription;
-
-    if (!hasActiveSubscription && !isLifetime) {
-      throw new NotFoundSubscriptionError('User has no active subscriptions');
-    }
-
-    if (activeUserSubscription?.product?.id) {
-      productId = activeUserSubscription?.product?.id;
-    }
-
-    if (isLifetime) {
-      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
-      const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
-
-      for (const invoice of paidInvoices) {
-        const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-        const invoiceMetadata = invoice.metadata;
-        const invoiceMetadataProvider = invoiceMetadata?.provider;
-        const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
-        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
-
-        if (isExternalPayment) {
-          isLifetimePaidOutOfBand = true;
-          break;
-        }
-
-        if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
-          productId = product;
-          break;
-        }
-      }
-    }
-
-    const hasToolsAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
-    const hasBackupsAccess = (isLifetime && !isLifetimePaidOutOfBand) || hasActiveSubscription;
-
-    return {
-      featuresPerService: {
-        antivirus: hasToolsAccess,
-        backups: hasBackupsAccess,
-      },
-    };
   }
 
   async applyTier(

@@ -20,7 +20,7 @@ type Price = Stripe.Price;
 type Plan = Stripe.Plan;
 
 type PriceId = Price['id'];
-export type PlanId = Plan['id'];
+type PlanId = Plan['id'];
 
 type Subscription = Stripe.Subscription;
 type SubscriptionId = Subscription['id'];
@@ -49,7 +49,7 @@ type RequestedPlanData = DisplayPrice & {
   type?: UserType;
 };
 
-export interface RequestedPlan {
+interface RequestedPlan {
   selectedPlan: RequestedPlanData;
   upsellPlan?: RequestedPlanData;
 }
@@ -90,24 +90,8 @@ export interface PaymentIntentFiat {
 
 export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 
-export interface OldPaymentIntent {
-  clientSecret: string | null;
-  id: string;
-  invoiceStatus?: string;
-}
-
 export type Reason = {
   name: 'prevent-cancellation' | 'pc-cloud-25';
-};
-
-const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: [],
-  eur: ['bancontact', 'ideal', 'sofort'],
-};
-
-const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: [],
-  eur: ['alipay', 'eps', 'giropay'],
 };
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
