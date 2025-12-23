@@ -98,7 +98,7 @@ export class DetermineLifetimeConditions {
       });
 
       totalMaxSpaceBytes += filteredPaidInvoices.reduce(
-        (accum, invoice) => parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
+        (accum, invoice) => Number.parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
         0,
       );
     }
@@ -114,7 +114,7 @@ export class DetermineLifetimeConditions {
     const userFinalTier = await this.getHigherTier(productIds, userTier);
 
     if (!userFinalTier) {
-      throw new Error(`Tier not found for user ${user.uuid} when stacking lifetime`);
+      throw new TierNotFoundError(`Tier not found for user ${user.uuid} when stacking lifetime`);
     }
 
     return {

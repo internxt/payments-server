@@ -180,7 +180,7 @@ describe('Determining Lifetime conditions', () => {
       const result = await determineLifetimeConditions.handleStackingLifetime(user);
 
       expect(result.tier).toEqual(mockedTier);
-      expect(result.maxSpaceBytes).toBe(parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'));
+      expect(result.maxSpaceBytes).toBe(Number.parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'));
     });
   });
 

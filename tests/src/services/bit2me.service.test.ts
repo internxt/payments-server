@@ -106,7 +106,7 @@ describe('Bit2Me Service tests', () => {
 
       jest.spyOn(axios, 'request').mockRejectedValue(unexpectedError);
 
-      await expect(bit2MeService.createCryptoInvoice(mockPayload)).rejects.toThrowError('Unexpected failure');
+      await expect(bit2MeService.createCryptoInvoice(mockPayload)).rejects.toThrow(unexpectedError);
     });
   });
 
@@ -125,9 +125,9 @@ describe('Bit2Me Service tests', () => {
         createdAt: new Date(rawResponse.createdAt),
         updatedAt: new Date(rawResponse.updatedAt),
         expiredAt: new Date(rawResponse.expiredAt),
-        priceAmount: parseFloat(rawResponse.priceAmount),
-        underpaidAmount: parseFloat(rawResponse.underpaidAmount),
-        overpaidAmount: parseFloat(rawResponse.overpaidAmount),
+        priceAmount: Number.parseFloat(rawResponse.priceAmount),
+        underpaidAmount: Number.parseFloat(rawResponse.underpaidAmount),
+        overpaidAmount: Number.parseFloat(rawResponse.overpaidAmount),
       };
 
       const result = await bit2MeService.checkoutInvoice(invoiceId, currencyId);
