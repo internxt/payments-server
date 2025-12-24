@@ -1,7 +1,5 @@
 import Stripe from 'stripe';
 import { FastifyInstance } from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import fastifyLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
@@ -27,22 +25,11 @@ import { assertUser } from '../utils/assertUser';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
-
-type AllowedMethods = 'GET' | 'POST';
+import { withAuth } from '../plugins/withAuth.plugin';
 
 const allowedCurrency = ['eur', 'usd'];
 
-const ALLOWED_PATHS: {
-  [key: string]: AllowedMethods[];
-} = {
-  '/prices': ['GET'],
-  '/is-unique-code-available': ['GET'],
-  '/plan-by-id': ['GET'],
-  '/promo-code-by-name': ['GET'],
-  '/promo-code-info': ['GET'],
-};
-
-export default function (
+export function paymentsController(
   paymentService: PaymentService,
   usersService: UsersService,
   config: AppConfig,
@@ -51,35 +38,7 @@ export default function (
   tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        const skipAuth = request.routeOptions?.config?.skipAuth;
-        const config: { url?: string; method?: AllowedMethods } = {
-          url: request.url.split('?')[0],
-          method: request.method as AllowedMethods,
-        };
-
-        if (
-          (config.method &&
-            config.url &&
-            ALLOWED_PATHS[config.url] &&
-            ALLOWED_PATHS[config.url].includes(config.method)) ||
-          skipAuth
-        ) {
-          return;
-        }
-
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
+    await withAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.post<{
       Body: {
@@ -588,18 +547,26 @@ export default function (
           };
         };
       };
-    }>('/prices', async (req, rep) => {
-      const { currency } = req.query;
-      const userType = (req.query.userType as UserType) || UserType.Individual;
+    }>(
+      '/prices',
+      {
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, rep) => {
+        const { currency } = req.query;
+        const userType = (req.query.userType as UserType) || UserType.Individual;
 
-      const { currencyValue, isError, errorMessage } = checkCurrency(currency);
+        const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
-      if (isError) {
-        return rep.status(400).send({ message: errorMessage });
-      }
+        if (isError) {
+          return rep.status(400).send({ message: errorMessage });
+        }
 
-      return paymentService.getPrices(currencyValue, userType);
-    });
+        return paymentService.getPrices(currencyValue, userType);
+      },
+    );
 
     fastify.get('/request-prevent-cancellation', async (req) => {
       const { uuid } = req.user.payload;
@@ -651,23 +618,31 @@ export default function (
           timeWindow: '1 minute';
         };
       };
-    }>('/plan-by-id', async (req, rep) => {
-      const { planId, currency } = req.query;
+    }>(
+      '/plan-by-id',
+      {
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, rep) => {
+        const { planId, currency } = req.query;
 
-      try {
-        const planObject = await paymentService.getPlanById(planId, currency);
+        try {
+          const planObject = await paymentService.getPlanById(planId, currency);
 
-        return rep.status(200).send(planObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPlanByIdError) {
-          return rep.status(404).send(err.message);
+          return rep.status(200).send(planObject);
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof NotFoundPlanByIdError) {
+            return rep.status(404).send(err.message);
+          }
+
+          req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
         }
-
-        req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
+      },
+    );
 
     fastify.get<{
       Querystring: { priceId: string; promotionCode: string };
@@ -683,27 +658,35 @@ export default function (
           timeWindow: '1 minute';
         };
       };
-    }>('/promo-code-by-name', async (req, rep) => {
-      const { priceId, promotionCode } = req.query;
+    }>(
+      '/promo-code-by-name',
+      {
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, rep) => {
+        const { priceId, promotionCode } = req.query;
 
-      try {
-        const promoCodeObject = await paymentService.getPromotionCodeByName(priceId, promotionCode);
+        try {
+          const promoCodeObject = await paymentService.getPromotionCodeByName(priceId, promotionCode);
 
-        return rep.status(200).send(promoCodeObject);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError) {
-          return rep.status(404).send(err.message);
+          return rep.status(200).send(promoCodeObject);
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof NotFoundPromoCodeByNameError) {
+            return rep.status(404).send(err.message);
+          }
+
+          if (err instanceof MissingParametersError || err instanceof PromoCodeIsNotValidError) {
+            return rep.status(400).send(err.message);
+          }
+
+          req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
         }
-
-        if (err instanceof MissingParametersError || err instanceof PromoCodeIsNotValidError) {
-          return rep.status(400).send(err.message);
-        }
-
-        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
+      },
+    );
 
     fastify.get<{
       Querystring: { promotionCode: string };
@@ -719,34 +702,42 @@ export default function (
           timeWindow: '1 minute';
         };
       };
-    }>('/promo-code-info', async (req, rep) => {
-      const { promotionCode } = req.query;
+    }>(
+      '/promo-code-info',
+      {
+        config: {
+          skipAuth: true,
+        },
+      },
+      async (req, rep) => {
+        const { promotionCode } = req.query;
 
-      try {
-        const promoCode = await paymentService.getPromoCode({ promoCodeName: promotionCode });
+        try {
+          const promoCode = await paymentService.getPromoCode({ promoCodeName: promotionCode });
 
-        const promoCodeObj = {
-          promoCodeName: promotionCode,
-          codeId: promoCode.id,
-          amountOff: promoCode.coupon.amount_off,
-          percentOff: promoCode.coupon.percent_off,
-        };
+          const promoCodeObj = {
+            promoCodeName: promotionCode,
+            codeId: promoCode.id,
+            amountOff: promoCode.coupon.amount_off,
+            percentOff: promoCode.coupon.percent_off,
+          };
 
-        return rep.status(200).send(promoCodeObj);
-      } catch (error) {
-        const err = error as Error;
-        if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
-          return rep.status(404).send(err.message);
+          return rep.status(200).send(promoCodeObj);
+        } catch (error) {
+          const err = error as Error;
+          if (err instanceof NotFoundPromoCodeByNameError || err instanceof PromoCodeIsNotValidError) {
+            return rep.status(404).send(err.message);
+          }
+
+          if (err instanceof MissingParametersError) {
+            return rep.status(400).send(err.message);
+          }
+
+          req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          return rep.status(500).send({ message: 'Internal Server Error' });
         }
-
-        if (err instanceof MissingParametersError) {
-          return rep.status(400).send(err.message);
-        }
-
-        req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-        return rep.status(500).send({ message: 'Internal Server Error' });
-      }
-    });
+      },
+    );
 
     fastify.get<{ Querystring: { code: string; provider: string } }>(
       '/is-unique-code-available',
@@ -762,6 +753,7 @@ export default function (
             max: 5,
             timeWindow: '1 minute',
           },
+          skipAuth: true,
         },
       },
       async (req, res) => {
