@@ -4,6 +4,7 @@ import { FastifyInstance } from 'fastify';
 import { UnauthorizedError } from '../errors/Errors';
 import { isTest } from '../config';
 import { Algorithm } from 'jsonwebtoken';
+import Logger from '../Logger';
 
 interface RateLimitOptions {
   max: number;
@@ -52,7 +53,7 @@ export async function withAuth(fastify: FastifyInstance, options: WithAuthOption
       if (allowAnonymous) {
         return;
       }
-      request.log.warn(`JWT verification failed: ${(err as Error).message}`);
+      Logger.warn(`JWT verification failed: ${(err as Error).message}`);
       throw new UnauthorizedError();
     }
   });
