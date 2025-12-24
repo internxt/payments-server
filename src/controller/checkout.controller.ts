@@ -1,44 +1,20 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
-import fastifyJwt from '@fastify/jwt';
-import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
 import { PaymentIntent, PaymentService } from '../services/payment.service';
-import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { BadRequestError, ForbiddenError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
+import { withAuth } from '../plugins/withAuth.plugin';
 
-export default function (usersService: UsersService, paymentsService: PaymentService) {
+export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyRateLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-
-    fastify.addHook('onRequest', async (request) => {
-      const skipAuth = request.routeOptions?.config?.skipAuth;
-      const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
-
-      if (skipAuth) {
-        return;
-      }
-
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        if (allowAnonymous) {
-          return;
-        }
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        throw new UnauthorizedError();
-      }
-    });
+    await withAuth(fastify, { secret: config.JWT_SECRET });
 
     /**
      * @deprecated This Endpoint has been deprecated, use `POST /customer` instead
