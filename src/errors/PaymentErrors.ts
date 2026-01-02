@@ -61,12 +61,6 @@ export class ExistingSubscriptionError extends ConflictError {
   }
 }
 
-export class UserAlreadyExistsError extends ConflictError {
-  constructor(email: string) {
-    super(`User with email ${email} already exists.`);
-  }
-}
-
 export class InvalidTaxIdError extends BadRequestError {
   constructor() {
     super('The provided Tax ID is invalid');

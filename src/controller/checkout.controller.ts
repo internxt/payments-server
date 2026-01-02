@@ -100,6 +100,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               country,
             },
           });
+
           await usersService.insertUser({
             customerId: id,
             uuid: userUuid,
