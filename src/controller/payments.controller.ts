@@ -11,9 +11,8 @@ import {
   MissingParametersError,
   NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
-  PaymentService,
   PromoCodeIsNotValidError,
-} from '../services/payment.service';
+} from '../errors/PaymentErrors';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
 import {
@@ -26,6 +25,7 @@ import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
 import { withAuth } from '../plugins/withAuth.plugin';
+import { PaymentService } from '../services/payment.service';
 
 const allowedCurrency = ['eur', 'usd'];
 

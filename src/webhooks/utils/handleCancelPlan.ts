@@ -1,4 +1,4 @@
-import { CustomerId } from '../../services/payment.service';
+import { CustomerId } from '../../types/stripe';
 import { UsersService } from '../../services/users.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import Stripe from 'stripe';

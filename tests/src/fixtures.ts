@@ -4,14 +4,8 @@ import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
-import {
-  PaymentIntent,
-  PaymentIntentCrypto,
-  PaymentIntentFiat,
-  PromotionCode,
-  RenewalPeriod,
-  SubscriptionCreated,
-} from '../../src/services/payment.service';
+import { PaymentIntent, PaymentIntentCrypto, PaymentIntentFiat, PromotionCode } from '../../src/types/payment';
+import { RenewalPeriod, SubscriptionCreated } from '../../src/types/subscription';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
   CreateCryptoInvoicePayload,

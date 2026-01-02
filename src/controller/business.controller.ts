@@ -4,15 +4,15 @@ import {
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
   NotFoundSubscriptionError,
-  PaymentService,
   UpdateWorkspaceError,
-} from '../services/payment.service';
+} from '../errors/PaymentErrors';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import Stripe from 'stripe';
 import { TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
 import { withAuth } from '../plugins/withAuth.plugin';
+import { PaymentService } from '../services/payment.service';
 
 export function businessController(
   paymentService: PaymentService,

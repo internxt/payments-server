@@ -14,7 +14,8 @@ import {
   voidPromise,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { CustomerNotFoundError, NotFoundPlanByIdError, PaymentService } from '../../../src/services/payment.service';
+import { PaymentService } from '../../../src/services/payment.service';
+import { CustomerNotFoundError, NotFoundPlanByIdError } from '../../../src/errors/PaymentErrors';
 import config from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';

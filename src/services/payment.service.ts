@@ -4,154 +4,52 @@ import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
-import { BadRequestError, NotFoundError } from '../errors/Errors';
+import { BadRequestError, InternalServerError, NotFoundError } from '../errors/Errors';
+import {
+  NotFoundSubscriptionError,
+  CouponCodeError,
+  InvalidSeatNumberError,
+  IncompatibleSubscriptionTypesError,
+  CustomerNotFoundError,
+  MissingParametersError,
+  NotFoundPlanByIdError,
+  PromoCodeIsNotValidError,
+  ExistingSubscriptionError,
+  InvalidTaxIdError,
+} from '../errors/PaymentErrors';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
 import { stripeNewVersion } from './stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
-
-type Customer = Stripe.Customer;
-export type CustomerId = Customer['id'];
-type CustomerEmail = Customer['email'];
-
-type Price = Stripe.Price;
-type Plan = Stripe.Plan;
-
-type PriceId = Price['id'];
-type PlanId = Plan['id'];
-
-type Subscription = Stripe.Subscription;
-type SubscriptionId = Subscription['id'];
-
-type Invoice = Stripe.Invoice;
-
-type SetupIntent = Stripe.SetupIntent;
-
-type PaymentMethod = Stripe.PaymentMethod;
-
-type CustomerSource = Stripe.CustomerSource;
-
-type HasUserAppliedCouponResponse = {
-  elegible: boolean;
-  reason?: Reason;
-};
-
-export interface ExtendedSubscription extends Subscription {
-  product?: Stripe.Product;
-}
-
-type RequestedPlanData = DisplayPrice & {
-  decimalAmount: number;
-  minimumSeats?: number;
-  maximumSeats?: number;
-  type?: UserType;
-};
-
-interface RequestedPlan {
-  selectedPlan: RequestedPlanData;
-  upsellPlan?: RequestedPlanData;
-}
-
-export interface PromotionCode {
-  codeId: Stripe.PromotionCode['id'];
-  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
-  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
-}
-
-export interface SubscriptionCreated {
-  type: 'setup' | 'payment';
-  clientSecret: string;
-  subscriptionId?: string;
-  paymentIntentId?: string;
-}
-
-export interface PaymentIntentCrypto {
-  type: 'crypto';
-  id: string;
-  token: string;
-  payload: {
-    paymentRequestUri: string;
-    payAmount: number;
-    payCurrency: string;
-    paymentAddress: string;
-    url: string;
-    qrUrl: string;
-  };
-}
-
-export interface PaymentIntentFiat {
-  type: 'fiat';
-  clientSecret: string | null;
-  id: string;
-  invoiceStatus?: string;
-}
-
-export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
-
-export type Reason = {
-  name: 'prevent-cancellation' | 'pc-cloud-25';
-};
+import {
+  CustomerId,
+  CustomerEmail,
+  ExtendedSubscription,
+  PriceId,
+  PlanId,
+  Subscription,
+  SubscriptionId,
+  Invoice,
+  SetupIntent,
+  PaymentMethod,
+  CustomerSource,
+  Customer,
+} from '../types/stripe';
+import { PaymentIntent, PromotionCode, PriceByIdResponse, Reason } from '../types/payment';
+import {
+  RenewalPeriod,
+  PlanSubscription,
+  SubscriptionCreated,
+  RequestedPlan,
+  HasUserAppliedCouponResponse,
+} from '../types/subscription';
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
   'pc-cloud-25': 6,
 };
-
-export type PriceMetadata = {
-  maxSpaceBytes: string;
-  planType: 'subscription' | 'one_time';
-};
-
-export enum RenewalPeriod {
-  Monthly = 'monthly',
-  Semiannually = 'semiannually',
-  Annually = 'annually',
-  Lifetime = 'lifetime',
-}
-
-export interface PlanSubscription {
-  status: string;
-  planId: string;
-  productId: string;
-  name: string;
-  simpleName: string;
-  type: UserType;
-  price: number;
-  monthlyPrice: number;
-  currency: string;
-  isTeam: boolean;
-  paymentInterval: string;
-  isLifetime: boolean;
-  renewalPeriod: RenewalPeriod;
-  storageLimit: number;
-  amountOfSeats: number;
-  seats?: {
-    minimumSeats: number;
-    maximumSeats: number;
-  };
-}
-
-export interface PromotionCode {
-  promoCodeName: Stripe.PromotionCode['code'];
-  codeId: Stripe.PromotionCode['id'];
-  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
-  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
-}
-
-export interface PriceByIdResponse {
-  minimumSeats?: number;
-  maximumSeats?: number;
-  id: string;
-  currency: string;
-  amount: number;
-  bytes: number;
-  interval: string | undefined;
-  decimalAmount: number;
-  type: UserType;
-  product: string;
-}
 
 export class PaymentService {
   constructor(
@@ -1332,9 +1230,10 @@ export class PaymentService {
       };
     } catch (err) {
       const error = err as Error;
-      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price'))
+      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price')) {
         throw new NotFoundPlanByIdError(priceId);
-      throw new Error('Interval Server Error');
+      }
+      throw new InternalServerError();
     }
   }
 
@@ -1791,107 +1690,5 @@ export class PaymentService {
     const invoice = await this.bit2MeService.getInvoice(invoiceId);
 
     return invoice.status === 'paid';
-  }
-}
-
-export class NotFoundSubscriptionError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, NotFoundSubscriptionError.prototype);
-  }
-}
-export class CouponCodeError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, CouponCodeError.prototype);
-  }
-}
-
-export class InvalidSeatNumberError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, InvalidSeatNumberError.prototype);
-  }
-}
-
-export class IncompatibleSubscriptionTypesError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, IncompatibleSubscriptionTypesError.prototype);
-  }
-}
-export class CustomerNotFoundError extends Error {
-  constructor(email: string) {
-    super(`Customer with email ${email} does not exist`);
-    Object.setPrototypeOf(this, CustomerNotFoundError.prototype);
-  }
-}
-
-export class MissingParametersError extends Error {
-  constructor(params: string[]) {
-    const missingParams = params.concat(', ');
-    super(`You must provide the following parameters: ${missingParams}`);
-
-    Object.setPrototypeOf(this, MissingParametersError.prototype);
-  }
-}
-
-export class NotFoundPlanByIdError extends Error {
-  constructor(priceId: string) {
-    super(`Plan with an id ${priceId} does not exist`);
-
-    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
-  }
-}
-
-export class NotFoundPromoCodeByNameError extends Error {
-  constructor(promoCodeId: string) {
-    super(`Promotion code with an id ${promoCodeId} does not exist`);
-
-    Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
-  }
-}
-
-export class PromoCodeIsNotValidError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, PromoCodeIsNotValidError.prototype);
-  }
-}
-
-export class ExistingSubscriptionError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
-  }
-}
-
-export class UserAlreadyExistsError extends Error {
-  constructor(email: string) {
-    super(`User with email ${email} already exists.`);
-
-    Object.setPrototypeOf(this, UserAlreadyExistsError.prototype);
-  }
-}
-
-export class InvalidTaxIdError extends Error {
-  constructor() {
-    super('The provided Tax ID is invalid');
-
-    Object.setPrototypeOf(this, InvalidTaxIdError.prototype);
-  }
-}
-
-export class UpdateWorkspaceError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, UpdateWorkspaceError.prototype);
   }
 }

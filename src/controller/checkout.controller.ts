@@ -3,7 +3,8 @@ import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 
 import { UsersService } from '../services/users.service';
-import { PaymentIntent, PaymentService } from '../services/payment.service';
+import { PaymentService } from '../services/payment.service';
+import { PaymentIntent } from '../types/payment';
 import { BadRequestError, ForbiddenError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
