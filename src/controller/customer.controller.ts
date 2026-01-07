@@ -5,7 +5,7 @@ import config from '../config';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 export function customerController(
   usersService: UsersService,
@@ -13,7 +13,7 @@ export function customerController(
   cacheService: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get(
       '/redeemed-promotion-codes',
