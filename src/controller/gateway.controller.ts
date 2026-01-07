@@ -8,7 +8,7 @@ import CacheService from '../services/cache.service';
 import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 interface GatewayControllerPayload {
   cacheService: CacheService;
@@ -24,7 +24,7 @@ export function gatewayController({
   config,
 }: GatewayControllerPayload) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, {
+    await setupAuth(fastify, {
       jwtOptions: {
         algorithms: ['RS256'],
       },

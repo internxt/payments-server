@@ -24,7 +24,7 @@ const DEFAULT_RATE_LIMIT: RateLimitOptions = {
   timeWindow: '1 minute',
 };
 
-export async function withAuth(fastify: FastifyInstance, options: WithAuthOptions): Promise<void> {
+export async function setupAuth(fastify: FastifyInstance, options: WithAuthOptions): Promise<void> {
   const jwtConfig: Parameters<typeof fastifyJwt>[1] = {
     secret: options.secret,
   };

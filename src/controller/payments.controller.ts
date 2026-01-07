@@ -25,7 +25,7 @@ import { assertUser } from '../utils/assertUser';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 const allowedCurrency = ['eur', 'usd'];
 
@@ -38,7 +38,7 @@ export function paymentsController(
   tiersService: TiersService,
 ) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.post<{
       Body: {
