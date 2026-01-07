@@ -14,7 +14,7 @@ import {
   priceById,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { UsersService } from '../../../src/services/users.service';
 import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
@@ -45,124 +45,13 @@ describe('Checkout controller', () => {
 
     const response = await app.inject({
       path: '/checkout/customer',
-      method: 'GET',
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${userAuthToken}`,
       },
     });
 
     expect(response.statusCode).toBe(401);
-  });
-
-  describe('Get customer ID', () => {
-    test('When the user exists in Users collection, then the customer Id associated to the user is returned', async () => {
-      const mockedUser = getUser();
-      const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
-
-      const response = await app.inject({
-        path: '/checkout/customer',
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${userAuthToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual({
-        customerId: mockedUser.customerId,
-        token: userToken,
-      });
-    });
-
-    test('When the user does not exists in Users collection, then the customer is created, added in our DB and the customer Id is returned', async () => {
-      const mockedUser = getUser();
-      const mockedCustomer = getCustomer({
-        id: mockedUser.customerId,
-        address: {
-          country: 'ES',
-          postal_code: '08001',
-          city: 'Barcelona',
-          line1: 'Carrer de la Pau',
-          line2: '08001',
-          state: 'Catalonia',
-        },
-      });
-      const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken({ customerId: mockedCustomer.id });
-      const insertUserPayload = {
-        customerId: mockedCustomer.id,
-        uuid: mockedUser.uuid,
-        lifetime: false,
-      };
-
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(UserNotFoundError);
-      jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
-      const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
-
-      const response = await app.inject({
-        path: '/checkout/customer',
-        method: 'GET',
-        query: {
-          country: 'ES',
-          postalCode: '08001',
-        },
-        headers: {
-          Authorization: `Bearer ${userAuthToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual({
-        customerId: mockedCustomer.id,
-        token: userToken,
-      });
-      expect(insertUserSpy).toHaveBeenCalledWith(insertUserPayload);
-    });
-
-    test('When the user provides country and Vat Id, then they are attached to the user correctly', async () => {
-      const country = 'ES';
-      const companyVatId = 'vat_id';
-
-      const mockedUser = getUser();
-      const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-
-      const attachCustomerAndVatIdToCustomerSpy = jest
-        .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
-        .mockResolvedValue();
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
-
-      const response = await app.inject({
-        path: '/checkout/customer',
-        method: 'GET',
-        query: {
-          country,
-          companyVatId,
-        },
-        headers: {
-          Authorization: `Bearer ${userAuthToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(attachCustomerAndVatIdToCustomerSpy).toHaveBeenCalledTimes(1);
-      expect(attachCustomerAndVatIdToCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId, country, companyVatId);
-      expect(responseBody).toStrictEqual({
-        customerId: mockedUser.customerId,
-        token: userToken,
-      });
-    });
   });
 
   describe('Create customer (POST method)', () => {

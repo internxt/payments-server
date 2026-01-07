@@ -185,30 +185,6 @@ export class PaymentService {
     }
   }
 
-  // TODO: Remove this useless function
-  async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
-    if (!payload.email) {
-      throw new MissingParametersError(['email']);
-    }
-
-    const { data: customer } = await this.provider.customers.search({
-      query: `email:'${payload.email}'`,
-    });
-    const userExists = !!customer.length;
-
-    if (userExists) {
-      await this.getVatIdAndAttachTaxIdToCustomer(customer[0].id, country, companyVatId);
-
-      return customer[0];
-    }
-
-    const newCustomer = await this.createCustomer(payload);
-
-    await this.getVatIdAndAttachTaxIdToCustomer(newCustomer.id, country, companyVatId);
-
-    return newCustomer;
-  }
-
   public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
     const userInvoices = await this.getInvoicesFromUser(customerId, {});
     const hasUserExistingInvoices = userInvoices.length > 0;
@@ -1040,12 +1016,6 @@ export class PaymentService {
     );
   }
 
-  getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
-    return typeof paymentMethod === 'string'
-      ? this.provider.paymentMethods.retrieve(paymentMethod)
-      : this.provider.paymentMethods.retrieve(paymentMethod.id);
-  }
-
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
     let subscription: any;
     try {
@@ -1444,24 +1414,6 @@ export class PaymentService {
     };
   }
 
-  async checkActiveSubscriptions(customerId: string, productType: UserType): Promise<void> {
-    let activeSubscriptions;
-    try {
-      activeSubscriptions =
-        productType === 'business'
-          ? await this.findBusinessActiveSubscription(customerId)
-          : await this.findIndividualActiveSubscription(customerId);
-    } catch (error) {
-      if (!(error instanceof NotFoundSubscriptionError)) {
-        throw error;
-      }
-    }
-
-    if (activeSubscriptions) {
-      throw new ExistingSubscriptionError('User already has an active subscription of the same type');
-    }
-  }
-
   async getCheckoutLineItems(checkoutSessionId: string) {
     return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
       expand: ['data.price.product'],
@@ -1619,52 +1571,6 @@ export class PaymentService {
     });
   }
 
-  async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
-    const methods = paymentMethodId
-      ? [
-          {
-            id: paymentMethodId,
-          },
-        ]
-      : await this.getCustomerPaymentMethods(customerId);
-
-    if (methods.length === 0) {
-      throw new Error(`No payment methods found for customer ${customerId}`);
-    }
-    const [firstMethod] = methods;
-
-    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`);
-
-    const { data: charges } = await this.provider.charges.list({
-      customer: customerId,
-      limit: 100,
-    });
-    const oneTimeChargesWithThatPaymentMethod = charges.filter(
-      (c) => c.paid && c.metadata.type === 'object-storage' && c.payment_method === firstMethod.id,
-    );
-    const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
-
-    if (paymentMethodAlreadyVerified) {
-      console.info(`Payment method ${firstMethod.id} has been already verified, skipping one time charge`);
-      return;
-    }
-
-    console.log(`Payment method ${firstMethod.id} is going to be charged in order to verify it`);
-
-    await this.provider.paymentIntents.create({
-      amount: 100,
-      currency,
-      metadata: {
-        type: 'object-storage',
-      },
-      customer: customerId,
-      description: 'Card verification charge',
-      payment_method: firstMethod.id,
-      off_session: true,
-      confirm: true,
-    });
-  }
-
   async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
     return this.provider.charges.retrieve(chargeId);
   }
@@ -1795,14 +1701,6 @@ export class PaymentService {
         value: updatableAttributes.tax.id,
       });
     }
-  }
-
-  async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
-    const res = await this.provider.paymentMethods.list({
-      customer: customerId,
-    });
-
-    return res.data;
   }
 
   async getCryptoCurrencies() {
