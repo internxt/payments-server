@@ -54,7 +54,13 @@ export default function (
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, usersService, fastify.log);
+          await handleInvoicePaymentFailed(
+            event.data.object,
+            objectStorageService,
+            paymentService,
+            usersService,
+            fastify.log,
+          );
           break;
 
         case 'payment_intent.amount_capturable_updated':
@@ -108,7 +114,7 @@ export default function (
           break;
         }
 
-        case 'invoice.payment_succeeded': {
+        case 'invoice.paid': {
           const invoice = event.data.object;
           const customer = await paymentService.getCustomer(invoice.customer as string);
 
