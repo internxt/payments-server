@@ -9,32 +9,19 @@ import {
 } from '../services/payment.service';
 import { UserNotFoundError, UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
-import fastifyJwt from '@fastify/jwt';
-import fastifyLimit from '@fastify/rate-limit';
 import Stripe from 'stripe';
 import { TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
+import { setupAuth } from '../plugins/auth';
 
-export default function (
+export function businessController(
   paymentService: PaymentService,
   usersService: UsersService,
   tiersService: TiersService,
   config: AppConfig,
 ) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.patch<{ Body: { workspaceId: string; subscriptionId: string; workspaceUpdatedSeats: number } }>(
       '/subscription',

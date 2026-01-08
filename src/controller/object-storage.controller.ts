@@ -1,7 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
-import fastifyJwt from '@fastify/jwt';
-import fastifyRateLimit from '@fastify/rate-limit';
 
 import {
   CustomerNotFoundError,
@@ -12,36 +10,15 @@ import {
 import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
+import { setupAuth } from '../plugins/auth';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
 }
 
-export default function (paymentService: PaymentService) {
+export function objectStorageController(paymentService: PaymentService) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyRateLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-
-    fastify.addHook('onRequest', async (request) => {
-      const skipAuth = request.routeOptions?.config?.skipAuth;
-      const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
-
-      if (skipAuth) {
-        return;
-      }
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        if (allowAnonymous) {
-          return;
-        }
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        throw new UnauthorizedError();
-      }
-    });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get<{
       Querystring: { email: string; customerName: string; country: string; postalCode: string; companyVatId?: string };

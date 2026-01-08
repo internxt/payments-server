@@ -1,14 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
-import fastifyJwt from '@fastify/jwt';
-import fastifyLimit from '@fastify/rate-limit';
-import { NotFoundError, UnauthorizedError } from '../errors/Errors';
+import { NotFoundError } from '../errors/Errors';
 import Logger from '../Logger';
 import CacheService from '../services/cache.service';
 import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
+import { setupAuth } from '../plugins/auth';
 
 interface GatewayControllerPayload {
   cacheService: CacheService;
@@ -24,26 +23,13 @@ export function gatewayController({
   config,
 }: GatewayControllerPayload) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, {
+    await setupAuth(fastify, {
+      jwtOptions: {
+        algorithms: ['RS256'],
+      },
       secret: {
         public: Buffer.from(config.PAYMENTS_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf-8'),
       },
-      verify: {
-        algorithms: ['RS256'],
-      },
-    });
-
-    fastify.register(fastifyLimit, {
-      max: 20,
-      timeWindow: '1 minute',
-    });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        Logger.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        throw new UnauthorizedError();
-      }
     });
 
     fastify.post<{ Body: { feature: Service; userUuid: string } }>(

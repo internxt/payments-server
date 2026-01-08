@@ -2,12 +2,12 @@ import Stripe from 'stripe';
 import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
 import { AppConfig } from './config';
-import controller from './controller/payments.controller';
-import objStorageController from './controller/object-storage.controller';
-import businessController from './controller/business.controller';
+import { paymentsController } from './controller/payments.controller';
+import { objectStorageController } from './controller/object-storage.controller';
+import { businessController } from './controller/business.controller';
 import { productsController } from './controller/products.controller';
-import checkoutController from './controller/checkout.controller';
-import customerController from './controller/customer.controller';
+import { checkoutController } from './controller/checkout.controller';
+import { customerController } from './controller/customer.controller';
 import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
@@ -57,15 +57,14 @@ export async function buildApp({
 
   registerErrorHandler(fastify);
 
-  fastify.register(controller(paymentService, usersService, config, cacheService, licenseCodesService, tiersService));
-  fastify.register(objStorageController(paymentService), { prefix: '/object-storage' });
-  fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
   fastify.register(
-    productsController(productsService, userFeaturesOverridesService, usersService, cacheService, config),
-    {
-      prefix: '/products',
-    },
+    paymentsController(paymentService, usersService, config, cacheService, licenseCodesService, tiersService),
   );
+  fastify.register(objectStorageController(paymentService), { prefix: '/object-storage' });
+  fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
+  fastify.register(productsController(productsService, cacheService, config), {
+    prefix: '/products',
+  });
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
