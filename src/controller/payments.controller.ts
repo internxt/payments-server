@@ -807,7 +807,6 @@ export function paymentsController(
             user: { email, uuid, name: `${name} ${lastname}` },
             code,
             provider,
-            logger: req.log,
           });
 
           return rep.status(200).send({ message: 'Code redeemed' });
