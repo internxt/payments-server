@@ -619,7 +619,6 @@ describe('Payment controller e2e tests', () => {
         },
         code: mockedLicenseCode.code,
         provider: mockedLicenseCode.provider,
-        logger: expect.any(Object),
       });
     });
   });

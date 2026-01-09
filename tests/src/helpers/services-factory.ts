@@ -99,10 +99,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
-    cacheService,
-    storageService,
     licenseCodesRepository: repositories.licenseCodesRepository,
-    tiersService,
   });
   const objectStorageService = new ObjectStorageService(paymentService, config, axios);
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);

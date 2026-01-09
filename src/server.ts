@@ -74,11 +74,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
-    cacheService,
     usersService,
-    storageService,
     licenseCodesRepository,
-    tiersService,
   });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);

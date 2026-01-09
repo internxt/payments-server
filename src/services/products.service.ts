@@ -198,7 +198,7 @@ export class ProductsService {
   private async applyUserFeatureOverrides(tier: Tier, userId: string): Promise<Tier> {
     const userOverrides = await this.userFeatureOverridesService.getCustomUserFeatures(userId);
 
-    if (!userOverrides || !userOverrides.featuresPerService) {
+    if (!userOverrides?.featuresPerService) {
       return tier;
     }
 
