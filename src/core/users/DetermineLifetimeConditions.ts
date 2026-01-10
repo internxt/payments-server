@@ -91,6 +91,8 @@ export class DetermineLifetimeConditions {
 
       const filteredPaidInvoices = await this.getPaidInvoices(customer, invoices);
 
+      Logger.info(`Found ${filteredPaidInvoices.length} paid invoices for customer ${customer.id}`);
+
       filteredPaidInvoices.forEach((invoice) => {
         const price = invoice.lines.data[0].price;
         const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
@@ -125,49 +127,54 @@ export class DetermineLifetimeConditions {
 
   private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
     const paidInvoices = await Promise.all(
-      invoices.map(async (invoice) => {
-        const line = invoice.lines.data[0];
+      invoices
+        .filter((invoice) => invoice.paid)
+        .map(async (invoice) => {
+          const line = invoice.lines.data[0];
 
-        if (!line?.price?.metadata) {
-          Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+          if (!line?.price?.metadata) {
+            Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
+            return null;
+          }
+
+          const isLifetime = line.price?.metadata?.planType.trim() === 'one_time';
+          const invoiceMetadata = invoice.metadata;
+          const isOutOfBand = invoice.paid_out_of_band;
+
+          const chargeIdFromInvoice = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
+          const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromInvoice;
+          const paidExternally = isOutOfBand || !chargeId;
+
+          Logger.info(
+            `Found invoice ${invoice.id} for customer ${customer.id} which is ${isLifetime ? 'lifetime' : 'not lifetime'} and ${paidExternally ? 'paid externally' : 'not paid internally'}`,
+          );
+
+          if (isLifetime && paidExternally) {
+            return invoice;
+          }
+
+          if (!chargeId) return null;
+
+          const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
+          const isFullyRefunded = charge.refunded;
+          const isDisputed = charge.disputed;
+
+          if (isLifetime && !isFullyRefunded && !isDisputed) {
+            return invoice;
+          }
+
           return null;
-        }
-
-        const isLifetime = line.price?.metadata?.planType === 'one_time';
-        const isPaid = invoice.paid;
-        const invoiceMetadata = invoice.metadata;
-        const isOutOfBand = invoice.paid_out_of_band;
-
-        const chargeIdFromInvoice = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
-        const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromInvoice;
-        const paidExternally = isOutOfBand || !chargeId;
-
-        if (isLifetime && isPaid && paidExternally) {
-          return invoice;
-        }
-
-        if (!chargeId) return null;
-
-        const charge = await this.paymentsService.retrieveCustomerChargeByChargeId(chargeId);
-        const isFullyRefunded = charge.refunded;
-        const isDisputed = charge.disputed;
-
-        if (isLifetime && isPaid && !isFullyRefunded && !isDisputed) {
-          return invoice;
-        }
-
-        return null;
-      }),
+        }),
     );
 
     return paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
   }
 
   private async getHigherTier(productIds: string[], userTier: Tier[] | null) {
-    let userFinalTier;
+    let userFinalTier: Tier | undefined = undefined;
 
     if (userTier) {
-      userFinalTier = userTier.filter((tier) => tier.billingType === 'lifetime').at(0);
+      userFinalTier = userTier.find((tier) => tier.billingType === 'lifetime');
     }
 
     for (const productId of productIds) {

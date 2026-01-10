@@ -11,11 +11,11 @@ import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.post<{
       Body: {

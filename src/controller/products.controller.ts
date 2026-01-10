@@ -4,11 +4,11 @@ import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 export function productsController(productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get(
       '/',

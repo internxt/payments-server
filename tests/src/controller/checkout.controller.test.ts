@@ -15,8 +15,7 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
-import { PaymentService } from '../../../src/services/payment.service';
-import { PaymentIntent } from '../../../src/types/payment';
+import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';

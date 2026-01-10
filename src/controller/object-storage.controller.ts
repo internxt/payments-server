@@ -10,7 +10,7 @@ import {
 import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
-import { withAuth } from '../plugins/withAuth.plugin';
+import { setupAuth } from '../plugins/auth';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -18,7 +18,7 @@ function signUserToken(customerId: string) {
 
 export function objectStorageController(paymentService: PaymentService) {
   return async function (fastify: FastifyInstance) {
-    await withAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get<{
       Querystring: { email: string; customerName: string; country: string; postalCode: string; companyVatId?: string };
