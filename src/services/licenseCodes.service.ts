@@ -6,6 +6,7 @@ import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { Tier } from '../core/users/Tier';
+import { paymentAdapter } from '../infrastructure/payment.adapter';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
@@ -91,7 +92,7 @@ export class LicenseCodesService {
     if (maybeExistingUser) {
       customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
     } else {
-      customer = await this.paymentService.createCustomer({
+      customer = await paymentAdapter.createCustomer({
         name: user.name || 'Internxt User',
         email: user.email,
       });

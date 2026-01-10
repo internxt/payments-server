@@ -3,6 +3,7 @@ import { InvalidLicenseCodeError, LicenseCodeAlreadyAppliedError } from '../../.
 import { UserNotFoundError } from '../../../src/services/users.service';
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
+import { paymentAdapter } from '../../../src/infrastructure/payment.adapter';
 
 describe('Tests for License Codes service', () => {
   const { licenseCodesRepository, licenseCodesService, usersService, paymentService } = createTestServices();
@@ -93,7 +94,7 @@ describe('Tests for License Codes service', () => {
         .mockResolvedValue(mockedLicenseCode);
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
-        .spyOn(paymentService, 'createCustomer')
+        .spyOn(paymentAdapter, 'createCustomer')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,

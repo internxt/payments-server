@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import config from '../config';
 import { UserNotFoundError } from '../services/users.service';
 
-export class Provider {
+export class PaymentAdapter {
   private readonly provider: Stripe = new Stripe(config.STRIPE_SECRET_KEY, {
     apiVersion: '2025-02-24.acacia',
   });
@@ -123,4 +123,4 @@ export class Provider {
   }
 }
 
-export const provider = new Provider();
+export const paymentAdapter = new PaymentAdapter();

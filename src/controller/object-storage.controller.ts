@@ -2,15 +2,12 @@ import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 
 import { PaymentService } from '../services/payment.service';
-import {
-  CustomerNotFoundError,
-  ExistingSubscriptionError,
-  NotFoundPlanByIdError,
-} from '../errors/PaymentErrors';
+import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError } from '../errors/PaymentErrors';
 import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
+import { paymentAdapter } from '../infrastructure/payment.adapter';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -61,7 +58,7 @@ export function objectStorageController(paymentService: PaymentService) {
         if (userExists) {
           customerId = userExists.id;
         } else {
-          const { id } = await paymentService.createCustomer({
+          const { id } = await paymentAdapter.createCustomer({
             name: customerName,
             email,
             address: {

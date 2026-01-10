@@ -38,25 +38,6 @@ describe('Payments Service tests', () => {
     jest.restoreAllMocks();
   });
 
-  describe('Creating a customer', () => {
-    it('When trying to create a customer with the correct params, then the customer is created successfully', async () => {
-      const mockedCustomer = getCustomer();
-
-      const createCustomerPayload = {
-        email: mockedCustomer.email as string,
-        name: mockedCustomer.name as string,
-      };
-
-      const customerCreatedSpy = jest
-        .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mockedCustomer));
-
-      await paymentService.createCustomer(createCustomerPayload);
-
-      expect(customerCreatedSpy).toHaveBeenCalledWith(createCustomerPayload);
-    });
-  });
-
   describe('Fetching the promotion code object', () => {
     it('When requesting the Promotion Code with the correct params, then returns the promoCodeId, name, amount off and/or discount off', async () => {
       const mockedPromoCode = getPromotionCodeResponse();

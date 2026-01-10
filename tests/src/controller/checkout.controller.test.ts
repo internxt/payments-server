@@ -15,12 +15,14 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
-import { PaymentIntent, PaymentService } from '../../../src/services/payment.service';
+import { PaymentService } from '../../../src/services/payment.service';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
+import { paymentAdapter } from '../../../src/infrastructure/payment.adapter';
+import { PaymentIntent } from '../../../src/types/payment';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -133,9 +135,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
-      const createCustomerSpy = jest
-        .spyOn(PaymentService.prototype, 'createCustomer')
-        .mockResolvedValue(mockedCustomer);
+      const createCustomerSpy = jest.spyOn(paymentAdapter, 'createCustomer').mockResolvedValue(mockedCustomer);
       const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
       const response = await app.inject({

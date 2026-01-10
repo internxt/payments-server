@@ -12,6 +12,7 @@ import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
+import { paymentAdapter } from '../infrastructure/payment.adapter';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -89,7 +90,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           );
           customerId = userExists.customerId;
         } else {
-          const { id } = await paymentsService.createCustomer({
+          const { id } = await paymentAdapter.createCustomer({
             name: customerName,
             email,
             address: {
