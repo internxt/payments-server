@@ -1,21 +1,17 @@
 import axios from 'axios';
 import { MongoClient } from 'mongodb';
-import XLSX from 'xlsx';
 import Stripe from 'stripe';
 
 import envVariablesConfig from '../config';
-import { LicenseCodesService } from '../services/licenseCodes.service';
 import { PaymentService } from '../services/payment.service';
 import { UsersService } from '../services/users.service';
 import { UsersRepository } from '../core/users/UsersRepository';
 import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
-import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
-import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
-import { LicenseCode } from '../core/users/LicenseCode';
 import {
   DisplayBillingRepository,
   MongoDBDisplayBillingRepository,
 } from '../core/users/MongoDBDisplayBillingRepository';
+import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
@@ -23,43 +19,18 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 import { Bit2MeService } from '../services/bit2me.service';
+import { TiersService } from '../services/tiers.service';
+import { MongoDBTiersRepository } from '../core/users/MongoDBTiersRepository';
+import { MongoDBUsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import { StorageService } from '../services/storage.service';
 
-const [, , filePath, provider] = process.argv;
-
-if (!filePath || !provider) {
-  throw new Error('Missing "filePath" or "provider" params');
-}
-
-function loadFromExcel(): LicenseCode[] {
-  const licenseCodes: LicenseCode[] = [];
-
-  const workbook = XLSX.readFile(filePath);
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-  jsonData.forEach((_row) => {
-    const row = _row as Record<Stripe.Price['id'], number>;
-
-    for (const priceId of Object.keys(row)) {
-      licenseCodes.push({
-        code: row[priceId].toString(),
-        priceId,
-        provider: provider,
-        redeemed: false,
-      });
-    }
-  });
-
-  return licenseCodes;
-}
+const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
     const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-    const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
@@ -83,15 +54,25 @@ async function main() {
       axios,
     );
 
-    const licenseCodesService = new LicenseCodesService({
-      paymentService,
-      usersService,
-      licenseCodesRepository,
-    });
+    const tiersRepository = new MongoDBTiersRepository(mongoClient);
+    const usersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
+    const storageService = new StorageService(envVariablesConfig, axios);
 
-    for (const licenseCode of loadFromExcel()) {
-      await licenseCodesService.insertLicenseCode(licenseCode);
-    }
+    const tiersService = new TiersService(
+      usersService,
+      paymentService,
+      tiersRepository,
+      usersTiersRepository,
+      storageService,
+      envVariablesConfig,
+    );
+
+    const determineLifetimeUserCondition = new DetermineLifetimeConditions(paymentService, tiersService);
+    const user = await usersService.findUserByCustomerID(customerId);
+
+    const userLifetime = await determineLifetimeUserCondition.determine(user, lastPurchasedTierProductId);
+
+    console.log(JSON.stringify(userLifetime));
   } finally {
     await mongoClient.close();
   }
@@ -99,8 +80,8 @@ async function main() {
 
 main()
   .then(() => {
-    console.log('License codes loaded');
+    console.log('User lifetime conditions determined');
   })
   .catch((err) => {
-    console.error('Error loading license codes', err.message);
+    console.error('Error determining user lifetime conditions', err.message);
   });

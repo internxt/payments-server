@@ -98,14 +98,14 @@ describe('Webhook events', () => {
     });
 
     describe('Invoice Payment completed', () => {
-      test('When the event invoice.payment_succeeded is triggered but the customer is deleted, then an error indicating so is thrown', async () => {
+      test('When the event invoice.paid is triggered but the customer is deleted, then an error indicating so is thrown', async () => {
         const mockedInvoice = getInvoice({
           status: 'paid',
         });
         const mockedCustomer = getCustomer();
         const event = {
           id: 'evt_2',
-          type: 'invoice.payment_succeeded',
+          type: 'invoice.paid',
           data: { object: mockedInvoice },
         };
         const payloadToString = JSON.stringify(event);
@@ -138,14 +138,14 @@ describe('Webhook events', () => {
         expect(response.statusCode).toBe(400);
       });
 
-      test('When the event invoice.payment_succeeded is triggered, then the correct function is called', async () => {
+      test('When the event invoice.paid is triggered, then the correct function is called', async () => {
         const mockedInvoice = getInvoice({
           status: 'paid',
         });
         const mockedCustomer = getCustomer();
         const event = {
           id: 'evt_2',
-          type: 'invoice.payment_succeeded',
+          type: 'invoice.paid',
           data: { object: mockedInvoice },
         };
         const payloadToString = JSON.stringify(event);
