@@ -5,6 +5,7 @@ import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { BadRequestError, ConflictError, GoneError, InternalServerError } from '../../../src/errors/Errors';
 import { UserSubscription, UserType } from '../../../src/core/users/User';
 import { createTestServices } from '../helpers/services-factory';
+import { objectStorageService } from '../../../src/services/objectStorage.service';
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
@@ -13,7 +14,7 @@ const stripeMock = {
     cancel: jest.fn(),
   },
 };
-const { paymentService, objectStorageService, stripe } = createTestServices({
+const { paymentService, stripe } = createTestServices({
   stripe: stripeMock,
 });
 

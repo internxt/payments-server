@@ -5,14 +5,12 @@ import { getCustomer, getInvoice, getPaymentIntent } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { PaymentService } from '../../../src/services/payment.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
-import { UsersService } from '../../../src/services/users.service';
-import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
+import { InvoiceFailedHandler } from '../../../src/webhooks/events/invoices/InvoiceFailedHandler';
 
 let app: FastifyInstance;
 
 jest.mock('../../../src/webhooks/handleFundsCaptured');
-jest.mock('../../../src/webhooks/handleInvoicePaymentFailed');
 
 const secret = 'whsec_lorim_ipsum_etc_etc';
 
@@ -76,6 +74,8 @@ describe('Webhook events', () => {
         secret,
       });
 
+      const invoiceFailedHandlerSpy = jest.spyOn(InvoiceFailedHandler.prototype, 'run').mockResolvedValue();
+
       const response = await app.inject({
         method: 'POST',
         path: 'webhook',
@@ -87,14 +87,7 @@ describe('Webhook events', () => {
       });
 
       expect(response.statusCode).toBe(204);
-      expect(handleInvoicePaymentFailed).toHaveBeenCalled();
-      expect(handleInvoicePaymentFailed).toHaveBeenCalledWith(
-        event.data.object,
-        expect.any(ObjectStorageService),
-        expect.any(PaymentService),
-        expect.any(UsersService),
-        app.log,
-      );
+      expect(invoiceFailedHandlerSpy).toHaveBeenCalledWith(event.data.object);
     });
 
     describe('Invoice Payment completed', () => {

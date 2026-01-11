@@ -8,6 +8,7 @@ import { NotFoundError } from '../../../../../src/errors/Errors';
 import Logger from '../../../../../src/Logger';
 import { Service } from '../../../../../src/core/users/Tier';
 import { createTestServices } from '../../../helpers/services-factory';
+import { objectStorageWebhookHandler } from '../../../../../src/webhooks/events/ObjectStorageWebhookHandler';
 
 const {
   invoiceCompletedHandler,
@@ -15,7 +16,6 @@ const {
   tiersService,
   usersService,
   determineLifetimeConditions,
-  objectStorageWebhookHandler,
   cacheService,
   storageService,
 } = createTestServices();

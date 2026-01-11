@@ -2,10 +2,11 @@ import { FastifyBaseLogger } from 'fastify';
 import { getCustomer, getInvoice, getLogger, getProduct } from '../fixtures';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { createTestServices } from '../helpers/services-factory';
+import { objectStorageService } from '../../../src/services/objectStorage.service';
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
-const { paymentService, usersService, objectStorageService } = createTestServices();
+const { paymentService, usersService } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -15,23 +16,29 @@ beforeEach(() => {
 describe('Handle Invoice Payment Failed', () => {
   describe('When processing valid payment failure', () => {
     it('When payment fails for object storage invoice, then should only suspend account without Drive notification', async () => {
-    const customerId = 'cus_test123';
-    const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
-    const mockedInvoice = getInvoice({ customer: customerId });
-    const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
+      const customerId = 'cus_test123';
+      const mockedCustomer = getCustomer({ id: customerId, email: 'test@internxt.com' });
+      const mockedInvoice = getInvoice({ customer: customerId });
+      const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
 
-    const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
-    const getProductSpy = jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
-    const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
-    const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
+      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
+      const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
+      const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
+      const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+      await handleInvoicePaymentFailed(
+        mockedInvoice as any,
+        objectStorageService,
+        paymentService,
+        usersService,
+        logger,
+      );
 
-    expect(getCustomerSpy).toHaveBeenCalledWith(customerId);
-    expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
-    expect(notifyFailedPaymentSpy).not.toHaveBeenCalled();
-    expect(suspendAccountSpy).toHaveBeenCalledWith({ customerId });
+      expect(getCustomerSpy).toHaveBeenCalledWith(customerId);
+      expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
+      expect(notifyFailedPaymentSpy).not.toHaveBeenCalled();
+      expect(suspendAccountSpy).toHaveBeenCalledWith({ customerId });
     });
   });
 
@@ -48,7 +55,7 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error('Gateway error'));
 
     await expect(
-      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger)
+      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger),
     ).resolves.toBeUndefined();
   });
 
@@ -69,7 +76,7 @@ describe('Handle Invoice Payment Failed', () => {
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
-      `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`
+      `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`,
     );
   });
 
@@ -90,7 +97,7 @@ describe('Handle Invoice Payment Failed', () => {
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
-      `Failed to send payment notification for customer ${customerId}. Error: ${String(nonErrorObject)}`
+      `Failed to send payment notification for customer ${customerId}. Error: ${String(nonErrorObject)}`,
     );
   });
 
@@ -109,7 +116,7 @@ describe('Handle Invoice Payment Failed', () => {
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
-      `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`
+      `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`,
     );
   });
 
@@ -117,7 +124,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedInvoice = getInvoice({ customer: null });
 
     await expect(
-      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger)
+      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger),
     ).rejects.toThrow('No customer found for this payment');
   });
 
@@ -156,7 +163,7 @@ describe('Handle Invoice Payment Failed', () => {
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerInfoSpy).toHaveBeenCalledWith(
-      `Drive payment failure notification sent for customer ${customerId} (user UUID: ${mockedUser.uuid})`
+      `Drive payment failure notification sent for customer ${customerId} (user UUID: ${mockedUser.uuid})`,
     );
   });
 
@@ -174,7 +181,7 @@ describe('Handle Invoice Payment Failed', () => {
     await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
 
     expect(loggerWarnSpy).toHaveBeenCalledWith(
-      `User not found for customer ${customerId}. Skipping failed payment notification.`
+      `User not found for customer ${customerId}. Skipping failed payment notification.`,
     );
   });
 

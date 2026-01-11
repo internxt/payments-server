@@ -5,7 +5,6 @@ import { PaymentService } from '../../../src/services/payment.service';
 import { UsersService } from '../../../src/services/users.service';
 import { StorageService } from '../../../src/services/storage.service';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
-import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { ProductsService } from '../../../src/services/products.service';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 import CacheService from '../../../src/services/cache.service';
@@ -20,7 +19,6 @@ import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRe
 import testFactory from '../utils/factory';
 import config from '../../../src/config';
 import { DetermineLifetimeConditions } from '../../../src/core/users/DetermineLifetimeConditions';
-import { ObjectStorageWebhookHandler } from '../../../src/webhooks/events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getLogger } from '../fixtures';
 import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
@@ -33,12 +31,10 @@ export interface TestServices {
   usersService: UsersService;
   storageService: StorageService;
   bit2MeService: Bit2MeService;
-  objectStorageService: ObjectStorageService;
   productsService: ProductsService;
   licenseCodesService: LicenseCodesService;
   cacheService: CacheService;
   determineLifetimeConditions: DetermineLifetimeConditions;
-  objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;
   userFeaturesOverridesService: UserFeaturesOverridesService;
 }
@@ -101,13 +97,10 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     usersService,
     licenseCodesRepository: repositories.licenseCodesRepository,
   });
-  const objectStorageService = new ObjectStorageService(paymentService, config, axios);
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
-  const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
     logger: getLogger(),
     determineLifetimeConditions,
-    objectStorageWebhookHandler,
     paymentService,
     storageService,
     tiersService,
@@ -127,12 +120,10 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     usersService,
     storageService,
     bit2MeService,
-    objectStorageService,
     productsService,
     licenseCodesService,
     cacheService,
     determineLifetimeConditions,
-    objectStorageWebhookHandler,
     invoiceCompletedHandler,
     userFeaturesOverridesService,
     ...repositories,

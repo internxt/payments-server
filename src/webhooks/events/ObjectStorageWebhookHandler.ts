@@ -1,15 +1,10 @@
 import Stripe from 'stripe';
-import { ObjectStorageService } from '../../services/objectStorage.service';
-import { PaymentService } from '../../services/payment.service';
+import { objectStorageService } from '../../services/objectStorage.service';
 import { AxiosError, isAxiosError } from 'axios';
 import Logger from '../../Logger';
+import { paymentAdapter } from '../../infrastructure/payment.adapter';
 
 export class ObjectStorageWebhookHandler {
-  constructor(
-    private readonly objectStorageService: ObjectStorageService,
-    private readonly paymentService: PaymentService,
-  ) {}
-
   /**
    * Determines if the given product is an object storage product
    * @param product The product object to check
@@ -48,7 +43,7 @@ export class ObjectStorageWebhookHandler {
       return;
     }
 
-    const product = await this.paymentService.getProduct(price.product as string);
+    const product = await paymentAdapter.getProduct(price.product as string);
 
     if (!this.isObjectStorageProduct(product)) {
       Logger.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
@@ -56,7 +51,7 @@ export class ObjectStorageWebhookHandler {
     }
 
     try {
-      await this.objectStorageService.reactivateAccount({ customerId: customer.id });
+      await objectStorageService.reactivateAccount({ customerId: customer.id });
     } catch (error) {
       if (isAxiosError(error)) {
         const axiosError = error as AxiosError;
@@ -78,3 +73,5 @@ export class ObjectStorageWebhookHandler {
     );
   }
 }
+
+export const objectStorageWebhookHandler = new ObjectStorageWebhookHandler();

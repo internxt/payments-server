@@ -11,7 +11,6 @@ import { TiersService } from '../../../services/tiers.service';
 import { BadRequestError } from '../../../errors/Errors';
 import { InvoiceCompletedHandler } from '../../events/invoices/InvoiceCompletedHandler';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
-import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
 import Logger from '../../../Logger';
 
 export interface CryptoWebhookDependencies {
@@ -106,12 +105,9 @@ export default function ({
 
       const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
 
-      const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
-
       const handler = new InvoiceCompletedHandler({
         logger: fastify.log,
         determineLifetimeConditions,
-        objectStorageWebhookHandler,
         paymentService,
         cacheService,
         tiersService,

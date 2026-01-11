@@ -4,7 +4,6 @@ import { FastifyBaseLogger } from 'fastify';
 import { PaymentService } from '../../../services/payment.service';
 import { PriceMetadata } from '../../../types/stripe';
 import { User, UserType } from '../../../core/users/User';
-import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
 import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
@@ -12,6 +11,7 @@ import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
+import { objectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 
 export interface InvoiceCompletedHandlerPayload {
   customer: Stripe.Customer;
@@ -22,7 +22,6 @@ export interface InvoiceCompletedHandlerPayload {
 export class InvoiceCompletedHandler {
   private readonly logger: FastifyBaseLogger;
   private readonly determineLifetimeConditions: DetermineLifetimeConditions;
-  private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   private readonly paymentService: PaymentService;
   private readonly storageService: StorageService;
   private readonly tiersService: TiersService;
@@ -32,7 +31,6 @@ export class InvoiceCompletedHandler {
   constructor({
     logger,
     determineLifetimeConditions,
-    objectStorageWebhookHandler,
     paymentService,
     storageService,
     tiersService,
@@ -41,7 +39,6 @@ export class InvoiceCompletedHandler {
   }: {
     logger: FastifyBaseLogger;
     determineLifetimeConditions: DetermineLifetimeConditions;
-    objectStorageWebhookHandler: ObjectStorageWebhookHandler;
     paymentService: PaymentService;
     storageService: StorageService;
     tiersService: TiersService;
@@ -50,7 +47,6 @@ export class InvoiceCompletedHandler {
   }) {
     this.logger = logger;
     this.determineLifetimeConditions = determineLifetimeConditions;
-    this.objectStorageWebhookHandler = objectStorageWebhookHandler;
     this.paymentService = paymentService;
     this.storageService = storageService;
     this.tiersService = tiersService;
@@ -94,7 +90,7 @@ export class InvoiceCompletedHandler {
 
     if (isObjStoragePlan) {
       Logger.info(`Invoice ${invoiceId} is for object storage, reactivating account if needed...`);
-      return this.objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
+      return objectStorageWebhookHandler.reactivateObjectStorageAccount(customer, invoice);
     }
 
     const tierBillingType = isLifetimePlan ? 'lifetime' : 'subscription';
