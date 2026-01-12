@@ -1,4 +1,4 @@
-import { Reason } from '../../../src/services/payment.service';
+import { Reason } from '../../../src/types/payment';
 import { UserType } from '../../../src/core/users/User';
 import {
   getCharge,

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import Stripe from 'stripe';
 
-import { ExtendedSubscription } from '../../../src/services/payment.service';
+import { ExtendedSubscription } from '../../../src/types/stripe';
 import { CouponNotBeingTrackedError, UserNotFoundError } from '../../../src/services/users.service';
 import config from '../../../src/config';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';

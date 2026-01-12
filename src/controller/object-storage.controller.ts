@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 
+import { PaymentService } from '../services/payment.service';
 import {
   CustomerNotFoundError,
   ExistingSubscriptionError,
   NotFoundPlanByIdError,
-  PaymentService,
-} from '../services/payment.service';
+} from '../errors/PaymentErrors';
 import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
