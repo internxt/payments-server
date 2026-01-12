@@ -16,13 +16,13 @@ import {
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
+import { PaymentIntent } from '../../../src/types/payment';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { paymentAdapter } from '../../../src/infrastructure/payment.adapter';
-import { PaymentIntent } from '../../../src/types/payment';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
