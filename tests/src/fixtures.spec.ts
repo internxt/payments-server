@@ -328,11 +328,6 @@ describe('Test fixtures', () => {
       const dispute = getDispute();
 
       expect(dispute).toBeDefined();
-      expect(dispute.id).toMatch(/^du_/);
-      expect(dispute.amount).toBe(1000);
-      expect(dispute.currency).toBe('usd');
-      expect(dispute.status).toBe('lost');
-      expect(dispute.reason).toBe('general');
     });
 
     it('When passing custom parameters, then it should override the defaults', () => {

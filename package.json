@@ -14,7 +14,8 @@
     "test:cov": "jest --coverage",
     "spec": "jest --testMatch='**/*.spec.ts'",
     "cli": "nodemon src/cli/load-license-codes.ts",
-    "cli:determine-lifetime": "nodemon src/cli/determine-lifetime-user.ts"
+    "cli:determine-lifetime": "nodemon src/cli/determine-lifetime-user.ts",
+    "generate:stripe-fixtures": "npx ts-node scripts/generate-stripe-fixtures.ts"
   },
   "engines": {
     "node": ">=22.12.0"
