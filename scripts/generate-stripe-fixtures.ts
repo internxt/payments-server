@@ -6,8 +6,8 @@
  * the corresponding OpenAPI fixtures to ensure compatibility.
  *
  * Usage:
- *   npm run generate:stripe-fixtures
- *   npm run generate:stripe-fixtures -- --version v1505
+ *   yarn run generate:stripe-fixtures
+ *   yarn run generate:stripe-fixtures -- --version v1505
  *
  * How it works:
  * 1. Reads the installed stripe SDK version from node_modules
@@ -127,7 +127,6 @@ function generateTypeScript(objects: Record<string, unknown>, sdkVersion: string
 }
 
 async function main() {
-  // Parse command line arguments
   const args = process.argv.slice(2);
   let openapiVersion: string | undefined;
 
@@ -137,21 +136,17 @@ async function main() {
     }
   }
 
-  // Get SDK version
   const sdkVersion = getInstalledStripeVersion();
   console.log(`Installed Stripe SDK: v${sdkVersion}`);
 
-  // Get or use provided OpenAPI version
   if (!openapiVersion) {
     openapiVersion = await getOpenAPIVersion(sdkVersion);
   } else {
     console.log(`Using provided OpenAPI version: ${openapiVersion}`);
   }
 
-  // Fetch fixtures
   const fixtures = await fetchFixtures(openapiVersion);
 
-  // Extract resources
   console.log('\nExtracting resources...');
   const baseObjects: Record<string, unknown> = {};
   const missingResources: string[] = [];
@@ -171,11 +166,9 @@ async function main() {
     console.warn(`\nWarning: ${missingResources.length} resources not found in fixtures`);
   }
 
-  // Generate TypeScript
   console.log('\nGenerating TypeScript...');
   const output = generateTypeScript(baseObjects, sdkVersion, openapiVersion);
 
-  // Write file
   const outputPath = path.join(__dirname, '../tests/src/fixtures/stripe-base.generated.ts');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, output);

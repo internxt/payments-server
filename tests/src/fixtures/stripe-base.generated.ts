@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
-// Run: npm run generate:stripe-fixtures
+// Run: yarn run generate:stripe-fixtures
 // Generated: 2026-01-12T10:26:29.194Z
 // Stripe SDK: v17.7.0
 // OpenAPI Version: v1505
