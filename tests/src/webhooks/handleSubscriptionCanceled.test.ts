@@ -6,13 +6,13 @@ import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscription
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
+import { objectStorageService } from '../../../src/services/objectStorage.service';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
-const { paymentService, usersService, storageService, cacheService, objectStorageService, tiersService } =
-  createTestServices();
+const { paymentService, usersService, storageService, cacheService, tiersService } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();

@@ -2,9 +2,9 @@ import Stripe from 'stripe';
 import axios from 'axios';
 import { getCustomer, getInvoice, getProduct } from '../../fixtures';
 import Logger from '../../../../src/Logger';
-import { createTestServices } from '../../helpers/services-factory';
-
-const { objectStorageWebhookHandler, paymentService, objectStorageService } = createTestServices();
+import { objectStorageWebhookHandler } from '../../../../src/webhooks/events/ObjectStorageWebhookHandler';
+import { objectStorageService } from '../../../../src/services/objectStorage.service';
+import { paymentAdapter } from '../../../../src/infrastructure/payment.adapter';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -70,7 +70,7 @@ describe('Object Storage Webhook Handler', () => {
           ],
         },
       });
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
@@ -103,7 +103,7 @@ describe('Object Storage Webhook Handler', () => {
           ],
         },
       });
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
       const loggerSpy = jest.spyOn(Logger, 'info');
@@ -137,7 +137,7 @@ describe('Object Storage Webhook Handler', () => {
           ],
         },
       });
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
       const loggerSpy = jest.spyOn(Logger, 'info');
 
@@ -170,7 +170,7 @@ describe('Object Storage Webhook Handler', () => {
           ],
         },
       });
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
       const loggerSpy = jest.spyOn(Logger, 'info');
@@ -206,7 +206,7 @@ describe('Object Storage Webhook Handler', () => {
         },
       });
 
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(new Error('Reactivation failed'));
 
       await expect(
@@ -235,7 +235,7 @@ describe('Object Storage Webhook Handler', () => {
         },
       });
 
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
 
       const axiosError = new Error('Not Found') as any;
       axiosError.response = { status: 404 };
@@ -276,7 +276,7 @@ describe('Object Storage Webhook Handler', () => {
         },
       });
 
-      jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
+      jest.spyOn(paymentAdapter, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
 
       const axiosError = new Error('Internal Server Error') as any;
       axiosError.response = { status: 500 };

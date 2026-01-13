@@ -9,16 +9,15 @@ import { PaymentService } from '../services/payment.service';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
 import { TiersService } from '../services/tiers.service';
 import handleFundsCaptured from './handleFundsCaptured';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
 import { BadRequestError } from '../errors/Errors';
 import Logger from '../Logger';
+import { InvoiceFailedHandler } from './events/invoices/InvoiceFailedHandler';
 
 export default function (
   stripe: Stripe,
@@ -53,15 +52,13 @@ export default function (
       Logger.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
-        case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(
-            event.data.object,
-            objectStorageService,
-            paymentService,
-            usersService,
-            fastify.log,
-          );
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object;
+
+          const invoiceFailedHandler = new InvoiceFailedHandler(usersService);
+          await invoiceFailedHandler.run(invoice);
           break;
+        }
 
         case 'payment_intent.amount_capturable_updated':
           await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe, fastify.log);
@@ -123,11 +120,9 @@ export default function (
           }
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
-          const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
           const handler = new InvoiceCompletedHandler({
             logger: fastify.log,
             determineLifetimeConditions,
-            objectStorageWebhookHandler,
             paymentService,
             storageService,
             tiersService,

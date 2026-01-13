@@ -1,7 +1,6 @@
-import { PaymentService } from './payment.service';
 import { sign } from 'jsonwebtoken';
-import { Axios, AxiosRequestConfig } from 'axios';
-import { type AppConfig } from '../config';
+import axios, { AxiosRequestConfig } from 'axios';
+import config from '../config';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -11,11 +10,7 @@ function signToken(duration: string, secret: string) {
 }
 
 export class ObjectStorageService {
-  constructor(
-    private readonly paymentService: PaymentService,
-    private readonly config: AppConfig,
-    private readonly axios: Axios,
-  ) {}
+  constructor() {}
 
   async initObjectStorageUser(payload: { email: string; customerId: string }) {
     const { email, customerId } = payload;
@@ -24,7 +19,7 @@ export class ObjectStorageService {
   }
 
   async reactivateAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signToken('5m', config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -32,11 +27,11 @@ export class ObjectStorageService {
       },
     };
 
-    await this.axios.put(`${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}/reactivate`, {}, params);
+    await axios.put(`${config.OBJECT_STORAGE_URL}/users/${payload.customerId}/reactivate`, {}, params);
   }
 
   async suspendAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signToken('5m', config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -44,11 +39,11 @@ export class ObjectStorageService {
       },
     };
 
-    await this.axios.put(`${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}/deactivate`, {}, params);
+    await axios.put(`${config.OBJECT_STORAGE_URL}/users/${payload.customerId}/deactivate`, {}, params);
   }
 
   async deleteAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signToken('5m', config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -56,11 +51,11 @@ export class ObjectStorageService {
       },
     };
 
-    await this.axios.delete(`${this.config.OBJECT_STORAGE_URL}/users/${payload.customerId}`, params);
+    await axios.delete(`${config.OBJECT_STORAGE_URL}/users/${payload.customerId}`, params);
   }
 
   private async createUser(email: string, customerId: string): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signToken('5m', config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -68,8 +63,8 @@ export class ObjectStorageService {
       },
     };
 
-    await this.axios.post(
-      `${this.config.OBJECT_STORAGE_URL}/users`,
+    await axios.post(
+      `${config.OBJECT_STORAGE_URL}/users`,
       {
         email,
         customerId,
@@ -78,3 +73,5 @@ export class ObjectStorageService {
     );
   }
 }
+
+export const objectStorageService = new ObjectStorageService();
