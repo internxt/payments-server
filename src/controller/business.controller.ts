@@ -5,8 +5,9 @@ import {
   InvalidSeatNumberError,
   NotFoundSubscriptionError,
   UpdateWorkspaceError,
+  UserNotFoundError,
 } from '../errors/PaymentErrors';
-import { UserNotFoundError, UsersService } from '../services/users.service';
+import { UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import Stripe from 'stripe';
 import { TiersService } from '../services/tiers.service';

@@ -6,12 +6,13 @@ import { PriceMetadata } from '../../../types/stripe';
 import { User, UserType } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
-import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
+import { CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
+import { UserNotFoundError } from '../../../errors/PaymentErrors';
 
 export interface InvoiceCompletedHandlerPayload {
   customer: Stripe.Customer;

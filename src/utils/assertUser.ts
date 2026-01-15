@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { User } from '../core/users/User';
-import { UserNotFoundError, UsersService } from '../services/users.service';
+import { UsersService } from '../services/users.service';
+import { UserNotFoundError } from '../errors/PaymentErrors';
 
 export async function assertUser(req: FastifyRequest, rep: FastifyReply, usersService: UsersService): Promise<User> {
   const { uuid } = req.user.payload;

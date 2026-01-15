@@ -10,7 +10,7 @@ import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
-import { HttpError } from '../errors/HttpError';
+import { UserNotFoundError } from '../errors/PaymentErrors';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -355,11 +355,5 @@ export class UsersService {
 
       requestConfig,
     );
-  }
-}
-
-export class UserNotFoundError extends HttpError {
-  constructor(message = 'User Not Found') {
-    super(message, 404);
   }
 }

@@ -72,3 +72,9 @@ export class UpdateWorkspaceError extends InternalServerError {
     super(message);
   }
 }
+
+export class UserNotFoundError extends NotFoundError {
+  constructor(message = 'User Not Found') {
+    super(message);
+  }
+}

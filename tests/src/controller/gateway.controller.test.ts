@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { getUser, getValidGatewayToken } from '../fixtures';
-import { UserNotFoundError, UsersService } from '../../../src/services/users.service';
+import { UsersService } from '../../../src/services/users.service';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 import CacheService from '../../../src/services/cache.service';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 
 let app: FastifyInstance;
 

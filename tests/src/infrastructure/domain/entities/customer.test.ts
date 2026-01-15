@@ -1,0 +1,48 @@
+import { getCustomer } from '../../../fixtures';
+import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
+
+describe('Customer entity', () => {
+  const mockedCustomer = getCustomer();
+  test('When converting the customer to domain, then the customer is created successfully', () => {
+    const customer = Customer.toDomain(mockedCustomer);
+
+    expect(customer).toStrictEqual({
+      id: mockedCustomer.id,
+      name: mockedCustomer.name,
+      email: mockedCustomer.email,
+      address: {
+        line1: mockedCustomer.address?.line1,
+        line2: mockedCustomer.address?.line2,
+        city: mockedCustomer.address?.city,
+        state: mockedCustomer.address?.state,
+        country: mockedCustomer.address?.country,
+        postalCode: mockedCustomer.address?.postal_code,
+      },
+    });
+  });
+
+  test('When requesting the customer id, then the customer id is returned', () => {
+    const customer = Customer.toDomain(mockedCustomer);
+
+    expect(customer.getCustomerId()).toBe(mockedCustomer.id);
+  });
+
+  test('When requesting the customer email, then the customer email is returned', () => {
+    const customer = Customer.toDomain(mockedCustomer);
+
+    expect(customer.getEmail()).toBe(mockedCustomer.email);
+  });
+
+  test('When requesting the customer address, then the customer address is returned', () => {
+    const customer = Customer.toDomain(mockedCustomer);
+
+    expect(customer.getAddress()).toStrictEqual({
+      line1: mockedCustomer.address?.line1,
+      line2: mockedCustomer.address?.line2,
+      city: mockedCustomer.address?.city,
+      state: mockedCustomer.address?.state,
+      country: mockedCustomer.address?.country,
+      postalCode: mockedCustomer.address?.postal_code,
+    });
+  });
+});
