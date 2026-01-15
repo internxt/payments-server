@@ -3,10 +3,12 @@ import { Customer } from '../../../../../src/infrastructure/domain/entities/cust
 
 describe('Customer entity', () => {
   const mockedCustomer = getCustomer();
+
   test('When converting the customer to domain, then the customer is created successfully', () => {
     const customer = Customer.toDomain(mockedCustomer);
 
-    expect(customer).toStrictEqual({
+    expect(customer).toBeInstanceOf(Customer);
+    expect(customer).toMatchObject({
       id: mockedCustomer.id,
       name: mockedCustomer.name,
       email: mockedCustomer.email,
@@ -24,13 +26,13 @@ describe('Customer entity', () => {
   test('When requesting the customer id, then the customer id is returned', () => {
     const customer = Customer.toDomain(mockedCustomer);
 
-    expect(customer.getCustomerId()).toBe(mockedCustomer.id);
+    expect(customer.getCustomerId()).toStrictEqual(mockedCustomer.id);
   });
 
   test('When requesting the customer email, then the customer email is returned', () => {
     const customer = Customer.toDomain(mockedCustomer);
 
-    expect(customer.getEmail()).toBe(mockedCustomer.email);
+    expect(customer.getEmail()).toStrictEqual(mockedCustomer.email);
   });
 
   test('When requesting the customer address, then the customer address is returned', () => {
