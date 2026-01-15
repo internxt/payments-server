@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 
 import { UserNotFoundError } from '../../errors/PaymentErrors';
 import { PaymentsAdapter } from '../domain/ports/payments.adapter';
-import { Customer } from '../domain/entities/customer';
+import { Customer, CreateCustomerParams } from '../domain/entities/customer';
 import envVariablesConfig from '../../config';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
@@ -13,19 +13,20 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   getInstance(): Stripe {
     return this.provider;
   }
-  async createCustomer(params: Stripe.CustomerCreateParams): Promise<Customer> {
-    const stripeCustomer = await this.provider.customers.create(params);
+
+  async createCustomer(params: CreateCustomerParams): Promise<Customer> {
+    const stripeCustomer = await this.provider.customers.create(this.toStripeCustomerParams(params));
 
     return Customer.toDomain(stripeCustomer);
   }
 
-  async updateCustomer(customerId: string, params: Stripe.CustomerUpdateParams): Promise<Customer> {
-    const updatedCustomer = await this.provider.customers.update(customerId, params);
+  async updateCustomer(customerId: Customer['id'], params: Partial<CreateCustomerParams>): Promise<Customer> {
+    const updatedCustomer = await this.provider.customers.update(customerId, this.toStripeCustomerParams(params));
 
     return Customer.toDomain(updatedCustomer);
   }
 
-  async getCustomer(customerId: string): Promise<Customer> {
+  async getCustomer(customerId: Customer['id']): Promise<Customer> {
     const stripeCustomer = await this.provider.customers.retrieve(customerId);
 
     if (stripeCustomer.deleted) {
@@ -35,9 +36,9 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Customer.toDomain(stripeCustomer);
   }
 
-  async searchCustomer(params: Stripe.CustomerSearchParams): Promise<Customer[]> {
+  async searchCustomer(email: Customer['email']): Promise<Customer[]> {
     const customers = await this.provider.customers.search({
-      ...params,
+      query: `email:'${email}'`,
       expand: ['total_count'],
     });
 
@@ -46,6 +47,23 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     }
 
     return customers.data.map((customer) => Customer.toDomain(customer));
+  }
+
+  private toStripeCustomerParams(params: Partial<CreateCustomerParams>): Stripe.CustomerCreateParams {
+    return {
+      ...(params.name && { name: params.name }),
+      ...(params.email && { email: params.email }),
+      ...(params.address && {
+        address: {
+          line1: params.address.line1,
+          line2: params.address.line2,
+          city: params.address.city,
+          state: params.address.state,
+          country: params.address.country,
+          postal_code: params.address.postalCode,
+        },
+      }),
+    };
   }
 }
 

@@ -1,9 +1,8 @@
-import Stripe from 'stripe';
-import { Customer } from '../entities/customer';
+import { Customer, CreateCustomerParams } from '../entities/customer';
 
 export interface PaymentsAdapter {
-  createCustomer: (params: Stripe.CustomerCreateParams) => Promise<Customer>;
-  updateCustomer: (customerId: string, params: Stripe.CustomerUpdateParams) => Promise<Customer>;
-  getCustomer: (customerId: string) => Promise<Customer>;
-  searchCustomer: (params: Stripe.CustomerSearchParams) => Promise<Customer[]>;
+  createCustomer: (params: CreateCustomerParams) => Promise<Customer>;
+  updateCustomer: (customerId: Customer['id'], params: Partial<CreateCustomerParams>) => Promise<Customer>;
+  getCustomer: (customerId: Customer['id']) => Promise<Customer>;
+  searchCustomer: (email: Customer['email']) => Promise<Customer[]>;
 }

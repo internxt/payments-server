@@ -1,13 +1,19 @@
 import Stripe from 'stripe';
 import { BadRequestError } from '../../../errors/Errors';
 
-interface CustomerAddress {
+export interface CustomerAddress {
   line1: string;
   line2: string;
   city: string;
   state: string;
   country: string;
   postalCode: string;
+}
+
+export interface CreateCustomerParams {
+  name: string;
+  email: string;
+  address: CustomerAddress;
 }
 
 export class Customer {

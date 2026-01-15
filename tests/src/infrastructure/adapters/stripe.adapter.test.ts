@@ -16,6 +16,14 @@ describe('Stripe Adapter', () => {
       const createdCustomer = await stripePaymentsAdapter.createCustomer({
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
+        address: {
+          line1: mockedCustomer.address?.line1 ?? '',
+          line2: mockedCustomer.address?.line2 ?? '',
+          city: mockedCustomer.address?.city ?? '',
+          state: mockedCustomer.address?.state ?? '',
+          country: mockedCustomer.address?.country ?? '',
+          postalCode: mockedCustomer.address?.postal_code ?? '',
+        },
       });
 
       expect(createdCustomer).toStrictEqual(Customer.toDomain(mockedCustomer));
@@ -72,9 +80,7 @@ describe('Stripe Adapter', () => {
         data: [mockedCustomer],
       } as any);
 
-      const customer = await stripePaymentsAdapter.searchCustomer({
-        query: `email:${mockedCustomer.email}`,
-      });
+      const customer = await stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string);
 
       expect(customer).toStrictEqual([Customer.toDomain(mockedCustomer)]);
     });
@@ -88,11 +94,7 @@ describe('Stripe Adapter', () => {
         total_count: 0,
       } as any);
 
-      await expect(
-        stripePaymentsAdapter.searchCustomer({
-          query: `email:${mockedCustomer.email}`,
-        }),
-      ).rejects.toThrow(mockedError);
+      await expect(stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
     });
   });
 });
