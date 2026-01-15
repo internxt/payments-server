@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { BadRequestError } from '../../../errors/Errors';
 
 interface CustomerAddress {
   line1: string;
@@ -19,15 +20,15 @@ export class Customer {
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
     if (!stripeCustomer.name) {
-      throw new Error('Customer name is required');
+      throw new BadRequestError('Customer name is required');
     }
 
     if (!stripeCustomer.email) {
-      throw new Error('Customer email is required');
+      throw new BadRequestError('Customer email is required');
     }
 
     if (!stripeCustomer.address) {
-      throw new Error('Customer address is required');
+      throw new BadRequestError('Customer address is required');
     }
 
     return new Customer(stripeCustomer.id, stripeCustomer.name, stripeCustomer.email, {

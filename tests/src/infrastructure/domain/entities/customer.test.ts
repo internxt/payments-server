@@ -1,8 +1,10 @@
 import { getCustomer } from '../../../fixtures';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
+import { BadRequestError } from '../../../../../src/errors/Errors';
 
 describe('Customer entity', () => {
   const mockedCustomer = getCustomer();
+  const badRequestNotFoundError = new BadRequestError();
 
   test('When converting the customer to domain, then the customer is created successfully', () => {
     const customer = Customer.toDomain(mockedCustomer);
@@ -46,5 +48,26 @@ describe('Customer entity', () => {
       country: mockedCustomer.address?.country,
       postalCode: mockedCustomer.address?.postal_code,
     });
+  });
+
+  test('When converting a customer without name, then an error is thrown', () => {
+    const badRequestNotFoundError = new BadRequestError('Customer name is required');
+    const customerWithoutName = { ...mockedCustomer, name: null };
+
+    expect(() => Customer.toDomain(customerWithoutName)).toThrow(badRequestNotFoundError);
+  });
+
+  test('When converting a customer without email, then an error is thrown', () => {
+    const badRequestNotFoundError = new BadRequestError('Customer email is required');
+    const customerWithoutEmail = { ...mockedCustomer, email: null };
+
+    expect(() => Customer.toDomain(customerWithoutEmail)).toThrow(badRequestNotFoundError);
+  });
+
+  test('When converting a customer without address, then an error is thrown', () => {
+    const badRequestNotFoundError = new BadRequestError('Customer address is required');
+    const customerWithoutAddress = { ...mockedCustomer, address: null };
+
+    expect(() => Customer.toDomain(customerWithoutAddress)).toThrow(badRequestNotFoundError);
   });
 });
