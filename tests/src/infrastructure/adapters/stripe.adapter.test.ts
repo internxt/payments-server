@@ -2,6 +2,7 @@ import { getCustomer } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
+import { UserNotFoundError } from '../../../../src/errors/PaymentErrors';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -50,6 +51,17 @@ describe('Stripe Adapter', () => {
 
       expect(customer).toStrictEqual(Customer.toDomain(mockedCustomer));
     });
+
+    test('When the customer does not exists, then an error indicating so is thrown', async () => {
+      const mockedCustomer = {
+        deleted: true,
+      };
+      const mockedError = new UserNotFoundError();
+
+      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
+
+      await expect(stripePaymentsAdapter.getCustomer('')).rejects.toThrow(mockedError);
+    });
   });
 
   describe('Search customer', () => {
@@ -65,6 +77,22 @@ describe('Stripe Adapter', () => {
       });
 
       expect(customer).toStrictEqual([Customer.toDomain(mockedCustomer)]);
+    });
+
+    test('When searching a customer and there is no match, then an error indicating so is thrown', async () => {
+      const mockedError = new UserNotFoundError();
+      const mockedCustomer = getCustomer();
+
+      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'search').mockResolvedValue({
+        data: [],
+        total_count: 0,
+      } as any);
+
+      await expect(
+        stripePaymentsAdapter.searchCustomer({
+          query: `email:${mockedCustomer.email}`,
+        }),
+      ).rejects.toThrow(mockedError);
     });
   });
 });
