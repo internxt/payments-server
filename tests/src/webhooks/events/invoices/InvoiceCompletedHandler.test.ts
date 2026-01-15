@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-import { CouponNotBeingTrackedError, UserNotFoundError } from '../../../../../src/services/users.service';
+import { CouponNotBeingTrackedError } from '../../../../../src/services/users.service';
 import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
@@ -8,6 +8,7 @@ import { NotFoundError } from '../../../../../src/errors/Errors';
 import Logger from '../../../../../src/Logger';
 import { Service } from '../../../../../src/core/users/Tier';
 import { createTestServices } from '../../../helpers/services-factory';
+import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 
 const {
   invoiceCompletedHandler,

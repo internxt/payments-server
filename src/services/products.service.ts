@@ -1,8 +1,9 @@
 import { Service, Tier } from '../core/users/Tier';
 import { User } from '../core/users/User';
+import { UserNotFoundError } from '../errors/PaymentErrors';
 import { TierNotFoundError, TiersService } from './tiers.service';
 import { UserFeaturesOverridesService } from './userFeaturesOverride.service';
-import { UserNotFoundError, UsersService } from './users.service';
+import { UsersService } from './users.service';
 
 export class ProductsService {
   constructor(

@@ -1,8 +1,8 @@
 import Stripe from 'stripe';
 import { InvalidLicenseCodeError, LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCodes.service';
-import { UserNotFoundError } from '../../../src/services/users.service';
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 
 describe('Tests for License Codes service', () => {
   const { licenseCodesRepository, licenseCodesService, usersService, paymentService } = createTestServices();

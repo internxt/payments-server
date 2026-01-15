@@ -1,6 +1,6 @@
 import { Service } from '../../../src/core/users/Tier';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { UserNotFoundError } from '../../../src/services/users.service';
 import { getUser, newTier } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
