@@ -103,6 +103,42 @@ export class TiersService {
     return tier;
   }
 
+  async applyTier(
+    userWithEmail: { email: string; uuid: User['uuid'] },
+    customer: Customer,
+    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
+    productId: string,
+    log: FastifyBaseLogger,
+    alreadyEnabledServices?: Service[],
+  ): Promise<void> {
+    const tier = await this.tiersRepository.findByProductId({ productId });
+
+    if (!tier) {
+      throw new TierNotFoundError(`Tier for product ${productId} not found`);
+    }
+
+    for (const service of Object.keys(tier.featuresPerService)) {
+      const s = service as Service;
+
+      if (alreadyEnabledServices?.includes(s) || !tier.featuresPerService[s].enabled) {
+        continue;
+      }
+
+      switch (s) {
+        case Service.Drive:
+          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier, log);
+          break;
+        case Service.Vpn:
+          await this.applyVpnFeatures(userWithEmail, tier);
+          break;
+
+        default:
+          // TODO;
+          break;
+      }
+    }
+  }
+
   async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
