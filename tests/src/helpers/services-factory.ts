@@ -22,7 +22,6 @@ import config from '../../../src/config';
 import { DetermineLifetimeConditions } from '../../../src/core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from '../../../src/webhooks/events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { getLogger } from '../fixtures';
 import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 
@@ -103,7 +102,6 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
-    logger: getLogger(),
     determineLifetimeConditions,
     objectStorageWebhookHandler,
     paymentService,

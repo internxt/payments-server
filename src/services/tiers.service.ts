@@ -5,9 +5,9 @@ import { StorageService } from './storage.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
-import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
 import { Customer } from '../infrastructure/domain/entities/customer';
+import Logger from '../Logger';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -99,7 +99,7 @@ export class TiersService {
     return tier;
   }
 
-  async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
+  async removeTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
 
@@ -116,7 +116,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.removeDriveFeatures(userUuid, tier, log);
+          await this.removeDriveFeatures(userUuid, tier);
           break;
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
@@ -133,7 +133,6 @@ export class TiersService {
     customer: Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
-    log: FastifyBaseLogger,
     customMaxSpaceBytes?: number,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
@@ -154,10 +153,10 @@ export class TiersService {
           seats: subscriptionSeats,
           tierId: driveTierId,
         });
-        log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
+        Logger.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
       } catch (err) {
         if (isAxiosError(err) && err.response?.status === 404) {
-          log.info(
+          Logger.info(
             `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${customer.email} does not have a workspace. Creating a new one...`,
           );
           await this.usersService.initializeWorkspace(userWithEmail.uuid, {
@@ -184,7 +183,7 @@ export class TiersService {
     );
   }
 
-  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
+  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier): Promise<void> {
     const freeTier = await this.getTierProductsByProductsId('free');
     const features = tier.featuresPerService[Service.Drive];
 
@@ -195,12 +194,12 @@ export class TiersService {
       } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
           const { status, data } = error.response;
-          log.error(
+          Logger.error(
             `Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${JSON.stringify(data)}`,
           );
           throw data;
         } else {
-          log.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
+          Logger.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
           throw error;
         }
       }

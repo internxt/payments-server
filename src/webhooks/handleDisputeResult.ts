@@ -2,10 +2,8 @@ import Stripe from 'stripe';
 import { UsersService } from '../services/users.service';
 import { StorageService } from '../services/storage.service';
 import CacheService from '../services/cache.service';
-import { AppConfig } from '../config';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
-import { FastifyBaseLogger } from 'fastify';
 import { TiersService } from '../services/tiers.service';
 
 interface HandleDisputeResultProps {
@@ -16,8 +14,6 @@ interface HandleDisputeResultProps {
   storageService: StorageService;
   cacheService: CacheService;
   tiersService: TiersService;
-  log: FastifyBaseLogger;
-  config: AppConfig;
 }
 
 export async function handleDisputeResult({
@@ -28,37 +24,22 @@ export async function handleDisputeResult({
   storageService,
   cacheService,
   tiersService,
-  log,
-  config,
 }: HandleDisputeResultProps) {
   if (dispute.status !== 'lost') {
     return;
   }
 
   const chargeId = dispute.charge as string;
-  try {
-    const charge = await stripe.charges.retrieve(chargeId);
-    const customerId = typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id as string);
-    const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : (charge.invoice?.id as string);
+  const charge = await stripe.charges.retrieve(chargeId);
+  const customerId = typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id as string);
+  const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : (charge.invoice?.id as string);
 
-    const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
-    const { lifetime } = await usersService.findUserByCustomerID(customerId);
+  const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId);
+  const { lifetime } = await usersService.findUserByCustomerID(customerId);
 
-    if (lifetime) {
-      await handleLifetimeRefunded(
-        storageService,
-        usersService,
-        charge,
-        cacheService,
-        paymentService,
-        log,
-        tiersService,
-        config,
-      );
-    } else {
-      await paymentService.cancelSubscription(subscriptionId as string);
-    }
-  } catch (error) {
-    throw error;
+  if (lifetime) {
+    await handleLifetimeRefunded(storageService, usersService, charge, cacheService, paymentService, tiersService);
+  } else {
+    await paymentService.cancelSubscription(subscriptionId as string);
   }
 }
