@@ -1,4 +1,3 @@
-import Stripe from 'stripe';
 import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
 import { AppConfig } from './config';
@@ -13,8 +12,8 @@ import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
-import webhook from './webhooks';
-import cryptoWebhook from './webhooks/providers/bit2me/index';
+import { providerWebhooksEvents } from './webhooks';
+import { cryptoProviderWebhooks } from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
@@ -34,7 +33,6 @@ interface AppDependencies {
   objectStorageService: ObjectStorageService;
   productsService: ProductsService;
   userFeaturesOverridesService: UserFeaturesOverridesService;
-  stripe: Stripe;
   config: AppConfig;
 }
 
@@ -48,7 +46,6 @@ export async function buildApp({
   objectStorageService,
   productsService,
   userFeaturesOverridesService,
-  stripe,
   config,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -81,8 +78,7 @@ export async function buildApp({
   fastify.register(controllerMigration(paymentService, usersService, config));
 
   fastify.register(
-    webhook(
-      stripe,
+    providerWebhooksEvents({
       storageService,
       usersService,
       paymentService,
@@ -90,11 +86,11 @@ export async function buildApp({
       cacheService,
       objectStorageService,
       tiersService,
-    ),
+    }),
   );
 
   fastify.register(
-    cryptoWebhook({
+    cryptoProviderWebhooks({
       storageService,
       usersService,
       paymentService,

@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
-import { FastifyBaseLogger } from 'fastify';
 import { PaymentService } from '../../../services/payment.service';
 import { PriceMetadata } from '../../../types/stripe';
 import { User, UserType } from '../../../core/users/User';
@@ -23,7 +22,6 @@ export interface InvoiceCompletedHandlerPayload {
 }
 
 export class InvoiceCompletedHandler {
-  private readonly logger: FastifyBaseLogger;
   private readonly determineLifetimeConditions: DetermineLifetimeConditions;
   private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   private readonly paymentService: PaymentService;
@@ -33,7 +31,6 @@ export class InvoiceCompletedHandler {
   private readonly cacheService: CacheService;
 
   constructor({
-    logger,
     determineLifetimeConditions,
     objectStorageWebhookHandler,
     paymentService,
@@ -42,7 +39,6 @@ export class InvoiceCompletedHandler {
     usersService,
     cacheService,
   }: {
-    logger: FastifyBaseLogger;
     determineLifetimeConditions: DetermineLifetimeConditions;
     objectStorageWebhookHandler: ObjectStorageWebhookHandler;
     paymentService: PaymentService;
@@ -51,7 +47,6 @@ export class InvoiceCompletedHandler {
     usersService: UsersService;
     cacheService: CacheService;
   }) {
-    this.logger = logger;
     this.determineLifetimeConditions = determineLifetimeConditions;
     this.objectStorageWebhookHandler = objectStorageWebhookHandler;
     this.paymentService = paymentService;
@@ -133,7 +128,7 @@ export class InvoiceCompletedHandler {
       const localUser = await this.usersService.findUserByUuid(userUuid);
 
       await this.handleNewProduct({
-        user: { ...localUser, email: email as string },
+        user: { ...localUser, email: email },
         isLifetimePlan,
         productId,
         customer,
@@ -344,7 +339,6 @@ export class InvoiceCompletedHandler {
         customer,
         totalQuantity,
         tierToApply,
-        this.logger,
         lifetimeMaxSpaceBytesToApply,
       );
       Logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);

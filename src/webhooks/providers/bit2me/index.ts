@@ -53,7 +53,7 @@ export interface Bit2MePaymentStatusCallback {
   status: 'new' | 'pending' | 'confirming' | 'paid' | 'expired' | 'paid_after_expired';
 }
 
-export default function ({
+export function cryptoProviderWebhooks({
   storageService,
   cacheService,
   config,
@@ -107,7 +107,6 @@ export default function ({
       const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
 
       const handler = new InvoiceCompletedHandler({
-        logger: fastify.log,
         determineLifetimeConditions,
         objectStorageWebhookHandler,
         paymentService,
