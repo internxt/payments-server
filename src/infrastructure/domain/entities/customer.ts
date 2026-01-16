@@ -21,8 +21,8 @@ export class Customer {
     public readonly id: string,
     public readonly name: string,
     public readonly email: string,
-    public readonly phone: string,
     public readonly address: CustomerAddress,
+    public readonly phone?: string,
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
@@ -38,14 +38,20 @@ export class Customer {
       throw new BadRequestError('Customer address is required');
     }
 
-    return new Customer(stripeCustomer.id, stripeCustomer.name, stripeCustomer.email, stripeCustomer.phone ?? '', {
-      line1: stripeCustomer.address.line1 ?? '',
-      line2: stripeCustomer.address.line2 ?? '',
-      city: stripeCustomer.address.city ?? '',
-      state: stripeCustomer.address.state ?? '',
-      country: stripeCustomer.address.country ?? '',
-      postalCode: stripeCustomer.address.postal_code ?? '',
-    });
+    return new Customer(
+      stripeCustomer.id,
+      stripeCustomer.name,
+      stripeCustomer.email,
+      {
+        line1: stripeCustomer.address.line1 ?? '',
+        line2: stripeCustomer.address.line2 ?? '',
+        city: stripeCustomer.address.city ?? '',
+        state: stripeCustomer.address.state ?? '',
+        country: stripeCustomer.address.country ?? '',
+        postalCode: stripeCustomer.address.postal_code ?? '',
+      },
+      stripeCustomer.phone ?? undefined,
+    );
   }
 
   getCustomerId(): string {

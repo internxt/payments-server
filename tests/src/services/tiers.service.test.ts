@@ -252,7 +252,13 @@ describe('TiersService tests', () => {
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
-      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier, logger);
+      expect(applyDriveFeatures).toHaveBeenCalledWith(
+        userWithEmail,
+        Customer.toDomain(mockedCustomer),
+        1,
+        tier,
+        logger,
+      );
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
   });
