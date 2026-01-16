@@ -1,19 +1,11 @@
 import Stripe from 'stripe';
 import { BadRequestError } from '../../../errors/Errors';
-
-export interface CustomerAddress {
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode: string;
-}
+import { Address } from '../types';
 
 export interface CreateCustomerParams {
   name: string;
   email: string;
-  address: Partial<CustomerAddress>;
+  address: Partial<Address>;
 }
 
 export interface UpdateCustomerParams extends Partial<CreateCustomerParams> {
@@ -29,7 +21,7 @@ export class Customer {
     public readonly id: string,
     public readonly name: string,
     public readonly email: string,
-    public readonly address: CustomerAddress,
+    public readonly address?: Address,
     public readonly phone?: string,
   ) {}
 
@@ -42,21 +34,17 @@ export class Customer {
       throw new BadRequestError('Customer email is required');
     }
 
-    if (!stripeCustomer.address) {
-      throw new BadRequestError('Customer address is required');
-    }
-
     return new Customer(
       stripeCustomer.id,
       stripeCustomer.name,
       stripeCustomer.email,
       {
-        line1: stripeCustomer.address.line1 ?? '',
-        line2: stripeCustomer.address.line2 ?? '',
-        city: stripeCustomer.address.city ?? '',
-        state: stripeCustomer.address.state ?? '',
-        country: stripeCustomer.address.country ?? '',
-        postalCode: stripeCustomer.address.postal_code ?? '',
+        line1: stripeCustomer.address?.line1,
+        line2: stripeCustomer.address?.line2,
+        city: stripeCustomer.address?.city,
+        state: stripeCustomer.address?.state,
+        country: stripeCustomer.address?.country,
+        postalCode: stripeCustomer.address?.postal_code,
       },
       stripeCustomer.phone ?? undefined,
     );
@@ -70,7 +58,7 @@ export class Customer {
     return this.email;
   }
 
-  getAddress(): CustomerAddress {
+  getAddress(): Address | undefined {
     return this.address;
   }
 }

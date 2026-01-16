@@ -1,8 +1,9 @@
-import { getCustomer } from '../../fixtures';
+import { getCustomer, getPaymentMethod } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 import { UserNotFoundError } from '../../../../src/errors/PaymentErrors';
+import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/paymentMethod';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -95,6 +96,20 @@ describe('Stripe Adapter', () => {
       } as any);
 
       await expect(stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
+    });
+  });
+
+  describe('Get Payment methods', () => {
+    test('When retrieving a payment method, then the payment method is returned', async () => {
+      const mockedPaymentMethod = getPaymentMethod();
+
+      jest
+        .spyOn(stripePaymentsAdapter.getInstance().paymentMethods, 'retrieve')
+        .mockResolvedValue(mockedPaymentMethod as Stripe.Response<Stripe.PaymentMethod>);
+
+      const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
+
+      expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
     });
   });
 });
