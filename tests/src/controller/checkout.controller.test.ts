@@ -76,7 +76,9 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const updateCustomerSpy = jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+      const updateCustomerSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
+        .mockResolvedValue({} as any);
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -93,24 +95,17 @@ describe('Checkout controller', () => {
         customerId: mockedUser.customerId,
         token: userToken,
       });
-      expect(updateCustomerSpy).toHaveBeenCalledWith(
-        mockedUser.customerId,
-        {
-          customer: {
-            name: customerData.customerName,
-          },
+      expect(updateCustomerSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        name: customerData.customerName,
+        email: userEmail,
+        address: {
+          line1: customerData.lineAddress1,
+          line2: customerData.lineAddress2,
+          city: customerData.city,
+          postalCode: customerData.postalCode,
+          country: customerData.country,
         },
-        {
-          email: userEmail,
-          address: {
-            line1: customerData.lineAddress1,
-            line2: customerData.lineAddress2,
-            city: customerData.city,
-            postal_code: customerData.postalCode,
-            country: customerData.country,
-          },
-        },
-      );
+      });
     });
 
     test('when the user does not exist, then a new customer is created and saved in the database and the customer id and its token are returned', async () => {
@@ -192,7 +187,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest
         .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
         .mockResolvedValue();
@@ -235,7 +230,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(PaymentService.prototype, 'updateCustomer').mockResolvedValue();
+      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest.spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer');
 
       const response = await app.inject({

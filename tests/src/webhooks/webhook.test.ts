@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import Stripe from 'stripe';
-import { getCustomer, getInvoice, getPaymentIntent } from '../fixtures';
+import { getCustomer, getInvoice, getPaymentIntent, getPaymentMethod } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { PaymentService } from '../../../src/services/payment.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
@@ -10,6 +10,7 @@ import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePayme
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
+import { PaymentMethod } from '../../../src/infrastructure/domain/entities/paymentMethod';
 
 let app: FastifyInstance;
 
@@ -97,6 +98,49 @@ describe('Webhook events', () => {
         expect.any(UsersService),
         app.log,
       );
+    });
+
+    test('When the event payment_intent.succeeded is triggered, then the correct function is called', async () => {
+      const mockedPaymentIntent = getPaymentIntent();
+      const mockedPaymentMethods = getPaymentMethod({
+        id: mockedPaymentIntent.payment_method as string,
+      });
+      const mockedPaymentMethodToDomain = PaymentMethod.toDomain(mockedPaymentMethods);
+
+      const event = {
+        id: 'evt_3',
+        type: 'payment_intent.succeeded',
+        data: { object: mockedPaymentIntent },
+      };
+      const payloadToString = JSON.stringify(event);
+
+      const getPaymentMethodSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'retrievePaymentMethod')
+        .mockResolvedValue(mockedPaymentMethodToDomain);
+      const updateCustomerSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
+        .mockResolvedValue({} as any);
+
+      const header = Stripe.webhooks.generateTestHeaderString({
+        payload: payloadToString,
+        secret,
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        path: 'webhook',
+        body: Buffer.from(payloadToString),
+        headers: {
+          'stripe-signature': header,
+          'content-type': 'application/json',
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(getPaymentMethodSpy).toHaveBeenCalledWith(mockedPaymentIntent.payment_method as string);
+      expect(updateCustomerSpy).toHaveBeenCalledWith(mockedPaymentIntent.customer as string, {
+        address: mockedPaymentMethodToDomain.address,
+      });
     });
 
     describe('Invoice Payment completed', () => {

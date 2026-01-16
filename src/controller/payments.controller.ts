@@ -23,6 +23,7 @@ import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 const allowedCurrency = ['eur', 'usd'];
 
@@ -334,7 +335,7 @@ export function paymentsController(
       async (req, rep) => {
         const user = await assertUser(req, rep, usersService);
         const { address, phoneNumber } = req.body;
-        await paymentService.updateCustomerBillingInfo(user.customerId, {
+        await stripePaymentsAdapter.updateCustomer(user.customerId, {
           address: {
             line1: address,
           },

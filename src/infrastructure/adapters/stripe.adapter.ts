@@ -2,8 +2,9 @@ import Stripe from 'stripe';
 
 import { UserNotFoundError } from '../../errors/PaymentErrors';
 import { PaymentsAdapter } from '../domain/ports/payments.adapter';
-import { Customer, CreateCustomerParams } from '../domain/entities/customer';
+import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
 import envVariablesConfig from '../../config';
+import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   private readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
@@ -20,7 +21,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Customer.toDomain(stripeCustomer);
   }
 
-  async updateCustomer(customerId: Customer['id'], params: Partial<CreateCustomerParams>): Promise<Customer> {
+  async updateCustomer(customerId: Customer['id'], params: Partial<UpdateCustomerParams>): Promise<Customer> {
     const updatedCustomer = await this.provider.customers.update(customerId, this.toStripeCustomerParams(params));
 
     return Customer.toDomain(updatedCustomer);
@@ -49,18 +50,24 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return customers.data.map((customer) => Customer.toDomain(customer));
   }
 
-  private toStripeCustomerParams(params: Partial<CreateCustomerParams>): Stripe.CustomerCreateParams {
+  async retrievePaymentMethod(paymentMethodId: PaymentMethod['id']): Promise<PaymentMethod> {
+    const paymentMethods = await this.provider.paymentMethods.retrieve(paymentMethodId, {});
+    return PaymentMethod.toDomain(paymentMethods);
+  }
+
+  private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {
     return {
       ...(params.name && { name: params.name }),
       ...(params.email && { email: params.email }),
+      ...(params.phone && { phone: params.phone }),
       ...(params.address && {
         address: {
-          line1: params.address.line1,
-          line2: params.address.line2,
-          city: params.address.city,
-          state: params.address.state,
-          country: params.address.country,
-          postal_code: params.address.postalCode,
+          line1: params.address.line1 ?? undefined,
+          line2: params.address.line2 ?? undefined,
+          city: params.address.city ?? undefined,
+          state: params.address.state ?? undefined,
+          country: params.address.country ?? undefined,
+          postal_code: params.address.postalCode ?? undefined,
         },
       }),
     };
