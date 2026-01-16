@@ -2,9 +2,11 @@ import Stripe from 'stripe';
 import { getPaymentIntent, getLogger, getCustomer, getCreateSubscriptionResponse } from '../fixtures';
 import { FastifyBaseLogger } from 'fastify';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
-import { BadRequestError, ConflictError, GoneError, InternalServerError } from '../../../src/errors/Errors';
+import { ConflictError, InternalServerError } from '../../../src/errors/Errors';
 import { UserSubscription, UserType } from '../../../src/core/users/User';
 import { createTestServices } from '../helpers/services-factory';
+import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
@@ -26,7 +28,7 @@ describe('Handling captured funds from a payment method', () => {
   describe('Checking the metadata', () => {
     it('When the payment intent does not contains the object-storage type in the metadata, then do nothing', async () => {
       const mockPaymentIntent = getPaymentIntent();
-      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+      const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
       await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
 
@@ -39,7 +41,7 @@ describe('Handling captured funds from a payment method', () => {
           type: 'business',
         },
       });
-      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+      const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
       await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
 
@@ -52,45 +54,11 @@ describe('Handling captured funds from a payment method', () => {
           type: 'object-storage',
         },
       });
-      const getCustomerSpy = jest.spyOn(paymentService, 'getCustomer');
+      const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
       await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
 
       expect(getCustomerSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Customer check', () => {
-    it('When the user does not exists, then an error indicating so is thrown', async () => {
-      const mockedPrice = 'price_id';
-      const mockPaymentIntent = getPaymentIntent({
-        metadata: { type: 'object-storage', priceId: mockedPrice },
-      });
-      const mockCustomer = { deleted: true } as Stripe.DeletedCustomer;
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.DeletedCustomer>);
-
-      await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
-      ).rejects.toThrow(GoneError);
-    });
-
-    it('The user exists but does not have an email, then an error indicating so is thrown', async () => {
-      const mockedPrice = 'price_id';
-      const mockPaymentIntent = getPaymentIntent({
-        metadata: { type: 'object-storage', priceId: mockedPrice },
-      });
-      const mockCustomer = getCustomer({
-        email: '',
-      });
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
-
-      await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
-      ).rejects.toThrow(BadRequestError);
     });
   });
 
@@ -104,9 +72,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       const cancelPaymentIntentSpy = jest.spyOn(stripe.paymentIntents, 'cancel');
       const getUserSubscriptionSpy = jest
         .spyOn(paymentService, 'getUserSubscription')
@@ -148,9 +114,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       jest.spyOn(stripe.paymentIntents, 'cancel').mockRejectedValue(unexpectedError);
       const getUserSubscriptionSpy = jest
         .spyOn(paymentService, 'getUserSubscription')
@@ -181,9 +145,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       const cancelPaymentIntentSpy = jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -217,9 +179,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       const cancelPaymentIntentSpy = jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -252,9 +212,7 @@ describe('Handling captured funds from a payment method', () => {
     const mockCustomer = getCustomer();
     const mockSubscription = getCreateSubscriptionResponse();
 
-    jest
-      .spyOn(paymentService, 'getCustomer')
-      .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
     const cancelPaymentIntentSpy = jest
       .spyOn(stripe.paymentIntents, 'cancel')
       .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -296,9 +254,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -321,25 +277,24 @@ describe('Handling captured funds from a payment method', () => {
 
     it('if an unexpected error occurs while initializing the object storage account, then an error indicating so is thrown', async () => {
       const mockedPrice = 'price_id';
+      const unexpectedError = new InternalServerError('Unexpected Error');
       const mockPaymentIntent = getPaymentIntent({
         metadata: { type: 'object-storage', priceId: mockedPrice },
       });
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockCustomer as unknown as Stripe.Response<Stripe.Customer>);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
       jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
       jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(mockSubscription);
-      jest.spyOn(objectStorageService, 'initObjectStorageUser').mockRejectedValue(new Error());
+      jest.spyOn(objectStorageService, 'initObjectStorageUser').mockRejectedValue(unexpectedError);
 
       await expect(
         handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
-      ).rejects.toThrow(Error);
+      ).rejects.toThrow(unexpectedError);
     });
   });
 });

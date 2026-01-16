@@ -45,6 +45,7 @@ import {
   RequestedPlan,
   HasUserAppliedCouponResponse,
 } from '../types/subscription';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
@@ -317,17 +318,13 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
-      const customer = await this.getCustomer(customerId);
-
-      if (customer.deleted) {
-        throw new BadRequestError('Customer is deleted');
-      }
+      const customer = await stripePaymentsAdapter.getCustomer(customerId);
 
       const customerName = customer.name;
       const customerAddress = customer.address?.line1;
       const customerCity = customer.address?.city;
       const customerCountry = customer.address?.country;
-      const customerPostalCode = customer.address?.postal_code;
+      const customerPostalCode = customer.address?.postalCode;
 
       if (!customerName || !customerAddress || !customerCity || !customerCountry || !customerPostalCode) {
         throw new BadRequestError('Customer address information is incomplete');
@@ -1311,10 +1308,6 @@ export class PaymentService {
     return this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
-  }
-
-  getCustomer(customerId: CustomerId) {
-    return this.provider.customers.retrieve(customerId);
   }
 
   getInvoice(invoiceId: Stripe.Invoice['id']) {

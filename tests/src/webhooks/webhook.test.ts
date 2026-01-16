@@ -8,6 +8,8 @@ import { ObjectStorageService } from '../../../src/services/objectStorage.servic
 import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
+import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 let app: FastifyInstance;
 
@@ -98,46 +100,6 @@ describe('Webhook events', () => {
     });
 
     describe('Invoice Payment completed', () => {
-      test('When the event invoice.paid is triggered but the customer is deleted, then an error indicating so is thrown', async () => {
-        const mockedInvoice = getInvoice({
-          status: 'paid',
-        });
-        const mockedCustomer = getCustomer();
-        const event = {
-          id: 'evt_2',
-          type: 'invoice.paid',
-          data: { object: mockedInvoice },
-        };
-        const payloadToString = JSON.stringify(event);
-        const header = Stripe.webhooks.generateTestHeaderString({
-          payload: payloadToString,
-          secret,
-        });
-        jest.spyOn(PaymentService.prototype, 'getCustomer').mockResolvedValueOnce({
-          deleted: true,
-          lastResponse: {
-            headers: {
-              'request-id': 'req_1',
-            },
-            requestId: '',
-            statusCode: 404,
-          },
-          ...mockedCustomer,
-        });
-
-        const response = await app.inject({
-          method: 'POST',
-          path: 'webhook',
-          body: Buffer.from(payloadToString),
-          headers: {
-            'stripe-signature': header,
-            'content-type': 'application/json',
-          },
-        });
-
-        expect(response.statusCode).toBe(400);
-      });
-
       test('When the event invoice.paid is triggered, then the correct function is called', async () => {
         const mockedInvoice = getInvoice({
           status: 'paid',
@@ -154,8 +116,8 @@ describe('Webhook events', () => {
           secret,
         });
         const getCustomerSpy = jest
-          .spyOn(PaymentService.prototype, 'getCustomer')
-          .mockResolvedValueOnce(mockedCustomer as Stripe.Response<Stripe.Customer>);
+          .spyOn(StripePaymentsAdapter.prototype, 'getCustomer')
+          .mockResolvedValueOnce(Customer.toDomain(mockedCustomer));
         const invoiceCompletedHandlerRunSpy = jest
           .spyOn(InvoiceCompletedHandler.prototype, 'run')
           .mockResolvedValueOnce();
@@ -174,7 +136,7 @@ describe('Webhook events', () => {
         expect(getCustomerSpy).toHaveBeenCalledWith(mockedInvoice.customer);
         expect(invoiceCompletedHandlerRunSpy).toHaveBeenCalledWith({
           invoice: mockedInvoice,
-          customer: mockedCustomer,
+          customer: Customer.toDomain(mockedCustomer),
           status: 'paid',
         });
       });

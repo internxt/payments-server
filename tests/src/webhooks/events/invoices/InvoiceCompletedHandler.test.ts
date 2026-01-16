@@ -9,6 +9,7 @@ import Logger from '../../../../../src/Logger';
 import { Service } from '../../../../../src/core/users/Tier';
 import { createTestServices } from '../../../helpers/services-factory';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
+import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 
 const {
   invoiceCompletedHandler,
@@ -34,7 +35,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'open' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -61,7 +62,7 @@ describe('Testing the handler when an invoice is completed', () => {
         },
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -94,7 +95,7 @@ describe('Testing the handler when an invoice is completed', () => {
         },
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -108,7 +109,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
-      expect(reactivateObjectStorageAccountSpy).toHaveBeenCalledWith(mockedCustomer, mockedInvoice);
+      expect(reactivateObjectStorageAccountSpy).toHaveBeenCalledWith(Customer.toDomain(mockedCustomer), mockedInvoice);
       expect(getTierProductsByProductIdsSpy).not.toHaveBeenCalled();
     });
 
@@ -120,7 +121,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -140,7 +141,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -181,7 +182,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -217,7 +218,7 @@ describe('Testing the handler when an invoice is completed', () => {
         user: { ...mockedUser, email: mockedCustomer.email as string },
         isLifetimePlan: false,
         productId: (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         tier: mockedTier,
         totalQuantity: 1,
       });
@@ -416,7 +417,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: mockedCustomer,
+          customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           totalQuantity,
@@ -429,7 +430,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          mockedCustomer,
+          Customer.toDomain(mockedCustomer),
           totalQuantity,
           mockedLifetimeTier,
           expect.anything(),
@@ -466,7 +467,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: mockedCustomer,
+          customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           totalQuantity,
@@ -479,7 +480,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          mockedCustomer,
+          Customer.toDomain(mockedCustomer),
           totalQuantity,
           mockedTier,
           expect.anything(),
@@ -514,7 +515,7 @@ describe('Testing the handler when an invoice is completed', () => {
           ...mockedUser,
           email: mockedCustomer.email as string,
         },
-        customer: mockedCustomer,
+        customer: Customer.toDomain(mockedCustomer),
         isLifetimePlan: mockedIsLifetimePlan,
         productId: mockedProductId,
         totalQuantity,
@@ -526,7 +527,7 @@ describe('Testing the handler when an invoice is completed', () => {
           ...mockedUser,
           email: mockedCustomer.email as string,
         },
-        mockedCustomer,
+        Customer.toDomain(mockedCustomer),
         totalQuantity,
         mockedTier,
         expect.anything(),
@@ -561,7 +562,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: mockedCustomer,
+          customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           totalQuantity,
@@ -598,7 +599,7 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: mockedCustomer,
+          customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           totalQuantity,

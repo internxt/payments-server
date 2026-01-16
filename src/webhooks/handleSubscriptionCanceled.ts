@@ -1,5 +1,5 @@
 import { UserType } from './../core/users/User';
-import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
@@ -10,17 +10,19 @@ import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { Customer } from '../infrastructure/domain/entities/customer';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
 }
 
 async function handleObjectStorageSubscriptionCancelled(
-  customer: Stripe.Customer,
+  customer: Customer,
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  logger: FastifyLoggerInstance,
+  logger: FastifyBaseLogger,
 ): Promise<void> {
   const activeSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
   const objectStorageActiveSubscriptions = activeSubscriptions.filter(
@@ -54,24 +56,13 @@ export default async function handleSubscriptionCanceled(
   log: FastifyBaseLogger,
   config: AppConfig,
 ): Promise<void> {
-  let email: string | null = '';
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
-  const customer = await paymentService.getCustomer(customerId);
-
-  if (!customer.deleted) {
-    email = customer.email;
-  }
+  const customer = await stripePaymentsAdapter.getCustomer(customerId);
 
   if (isObjectStorageProduct(productMetadata)) {
-    await handleObjectStorageSubscriptionCancelled(
-      (await paymentService.getCustomer(customerId)) as Stripe.Customer,
-      subscription,
-      objectStorageService,
-      paymentService,
-      log,
-    );
+    await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
     return;
   }
 
@@ -101,7 +92,7 @@ export default async function handleSubscriptionCanceled(
   try {
     await handleCancelPlan({
       customerId,
-      customerEmail: email ?? '',
+      customerEmail: customer.email ?? '',
       productId,
       usersService,
       tiersService,

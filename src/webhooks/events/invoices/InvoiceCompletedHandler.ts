@@ -13,9 +13,10 @@ import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
 import { UserNotFoundError } from '../../../errors/PaymentErrors';
+import { Customer } from '../../../infrastructure/domain/entities/customer';
 
 export interface InvoiceCompletedHandlerPayload {
-  customer: Stripe.Customer;
+  customer: Customer;
   invoice: Stripe.Invoice;
   status: string;
 }
@@ -308,7 +309,7 @@ export class InvoiceCompletedHandler {
     tier,
   }: {
     user: User & { email: string };
-    customer: Stripe.Customer;
+    customer: Customer;
     isLifetimePlan: boolean;
     productId: string;
     totalQuantity: number;

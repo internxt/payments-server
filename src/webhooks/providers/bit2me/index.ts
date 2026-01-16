@@ -13,6 +13,7 @@ import { InvoiceCompletedHandler } from '../../events/invoices/InvoiceCompletedH
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
 import Logger from '../../../Logger';
+import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
 
 export interface CryptoWebhookDependencies {
   storageService: StorageService;
@@ -93,10 +94,7 @@ export default function ({
         return rep.status(200).send();
       }
 
-      const customer = await paymentService.getCustomer(customerId);
-      if (customer.deleted) {
-        throw new BadRequestError(`Customer with ID ${customerId} is deleted`);
-      }
+      const customer = await stripePaymentsAdapter.getCustomer(customerId);
 
       await paymentService.markInvoiceAsPaid(stripeInvoiceId);
 
