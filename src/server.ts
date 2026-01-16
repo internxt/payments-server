@@ -64,14 +64,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     axios,
   );
   const cacheService = new CacheService(envVariablesConfig);
-  const tiersService = new TiersService(
-    usersService,
-    paymentService,
-    tiersRepository,
-    usersTiersRepository,
-    storageService,
-    envVariablesConfig,
-  );
+  const tiersService = new TiersService(usersService, tiersRepository, usersTiersRepository, storageService);
   const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,

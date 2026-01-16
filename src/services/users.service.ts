@@ -11,6 +11,7 @@ import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
+import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -18,14 +19,6 @@ function signToken(duration: string, secret: string) {
     expiresIn: duration,
     ...(!isProduction ? { allowInsecureKeySizes: true } : null),
   });
-}
-
-export class CouponNotBeingTrackedError extends Error {
-  constructor(couponName: Coupon['code']) {
-    super(`Coupon ${couponName} is not being tracked`);
-
-    Object.setPrototypeOf(this, CouponNotBeingTrackedError.prototype);
-  }
 }
 
 type OverrideServiceAvailable = Service.Cli;

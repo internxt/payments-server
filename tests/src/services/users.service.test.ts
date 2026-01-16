@@ -2,13 +2,13 @@ import axios from 'axios';
 import Stripe from 'stripe';
 
 import { ExtendedSubscription } from '../../../src/types/stripe';
-import { CouponNotBeingTrackedError } from '../../../src/services/users.service';
 import config from '../../../src/config';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { getActiveSubscriptions, getCoupon, getCustomer, getUser, newTier, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { Service } from '../../../src/core/users/Tier';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { CouponNotBeingTrackedError } from '../../../src/errors/UsersErrors';
 
 jest.mock('jsonwebtoken', () => ({
   ...jest.requireActual('jsonwebtoken'),

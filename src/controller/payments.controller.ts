@@ -15,17 +15,14 @@ import {
 } from '../errors/PaymentErrors';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
-import {
-  InvalidLicenseCodeError,
-  LicenseCodeAlreadyAppliedError,
-  LicenseCodesService,
-} from '../services/licenseCodes.service';
+import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
 import { assertUser } from '../utils/assertUser';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
+import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 
 const allowedCurrency = ['eur', 'usd'];
 

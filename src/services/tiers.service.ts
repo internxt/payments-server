@@ -2,8 +2,6 @@ import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
-import { AppConfig } from '../config';
-import { PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
@@ -38,11 +36,9 @@ export class NoSubscriptionSeatsProvidedError extends Error {
 export class TiersService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
     private readonly usersTiersRepository: UsersTiersRepository,
     private readonly storageService: StorageService,
-    private readonly config: AppConfig,
   ) {}
 
   async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
@@ -101,42 +97,6 @@ export class TiersService {
     }
 
     return tier;
-  }
-
-  async applyTier(
-    userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Customer,
-    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
-    productId: string,
-    log: FastifyBaseLogger,
-    alreadyEnabledServices?: Service[],
-  ): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId({ productId });
-
-    if (!tier) {
-      throw new TierNotFoundError(`Tier for product ${productId} not found`);
-    }
-
-    for (const service of Object.keys(tier.featuresPerService)) {
-      const s = service as Service;
-
-      if (alreadyEnabledServices?.includes(s) || !tier.featuresPerService[s].enabled) {
-        continue;
-      }
-
-      switch (s) {
-        case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier, log);
-          break;
-        case Service.Vpn:
-          await this.applyVpnFeatures(userWithEmail, tier);
-          break;
-
-        default:
-          // TODO;
-          break;
-      }
-    }
   }
 
   async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
