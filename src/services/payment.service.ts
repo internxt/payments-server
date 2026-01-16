@@ -58,12 +58,6 @@ export class PaymentService {
     private readonly bit2MeService: Bit2MeService,
   ) {}
 
-  async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
-    const customer = await this.provider.customers.create(payload);
-
-    return customer;
-  }
-
   async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
     try {
       if (country && companyVatId) {

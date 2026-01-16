@@ -6,6 +6,8 @@ import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
 import { FastifyBaseLogger } from 'fastify';
 import { Tier } from '../core/users/Tier';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { Customer } from '../infrastructure/domain/entities/customer';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
@@ -86,12 +88,12 @@ export class LicenseCodesService {
     }
 
     const maybeExistingUser = await this.usersService.findUserByUuid(user.uuid).catch(() => null);
-    let customer: Stripe.Customer;
+    let customer: Customer;
 
     if (maybeExistingUser) {
-      customer = (await this.paymentService.getCustomer(maybeExistingUser.customerId)) as Stripe.Customer;
+      customer = await stripePaymentsAdapter.getCustomer(maybeExistingUser.customerId);
     } else {
-      customer = await this.paymentService.createCustomer({
+      customer = await stripePaymentsAdapter.createCustomer({
         name: user.name || 'Internxt User',
         email: user.email,
       });

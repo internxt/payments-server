@@ -22,6 +22,8 @@ import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
+import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -135,8 +137,8 @@ describe('Checkout controller', () => {
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
       const createCustomerSpy = jest
-        .spyOn(PaymentService.prototype, 'createCustomer')
-        .mockResolvedValue(mockedCustomer);
+        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
       const response = await app.inject({
@@ -161,7 +163,7 @@ describe('Checkout controller', () => {
           line1: customerData.lineAddress1,
           line2: customerData.lineAddress2,
           city: customerData.city,
-          postal_code: customerData.postalCode,
+          postalCode: customerData.postalCode,
           country: customerData.country,
         },
       });

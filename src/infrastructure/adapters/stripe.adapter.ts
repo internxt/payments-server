@@ -14,7 +14,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return this.provider;
   }
 
-  async createCustomer(params: CreateCustomerParams): Promise<Customer> {
+  async createCustomer(params: Partial<CreateCustomerParams>): Promise<Customer> {
     const stripeCustomer = await this.provider.customers.create(this.toStripeCustomerParams(params));
 
     return Customer.toDomain(stripeCustomer);

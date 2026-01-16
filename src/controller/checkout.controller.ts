@@ -12,6 +12,7 @@ import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -89,14 +90,14 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           );
           customerId = userExists.customerId;
         } else {
-          const { id } = await paymentsService.createCustomer({
+          const { id } = await stripePaymentsAdapter.createCustomer({
             name: customerName,
             email,
             address: {
               line1: lineAddress1,
               line2: lineAddress2,
               city,
-              postal_code: postalCode,
+              postalCode,
               country,
             },
           });

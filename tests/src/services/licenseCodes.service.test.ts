@@ -1,8 +1,9 @@
-import Stripe from 'stripe';
 import { InvalidLicenseCodeError, LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCodes.service';
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 describe('Tests for License Codes service', () => {
   const { licenseCodesRepository, licenseCodesService, usersService, paymentService } = createTestServices();
@@ -52,8 +53,8 @@ describe('Tests for License Codes service', () => {
         .spyOn(licenseCodesRepository, 'findOne')
         .mockResolvedValue(mockedLicenseCode);
       const getCustomerSpy = jest
-        .spyOn(paymentService, 'getCustomer')
-        .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+        .spyOn(stripePaymentsAdapter, 'getCustomer')
+        .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,
@@ -93,8 +94,8 @@ describe('Tests for License Codes service', () => {
         .mockResolvedValue(mockedLicenseCode);
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
-        .spyOn(paymentService, 'createCustomer')
-        .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+        .spyOn(stripePaymentsAdapter, 'createCustomer')
+        .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,
         recurring: false,
