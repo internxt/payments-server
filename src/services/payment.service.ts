@@ -35,7 +35,7 @@ import {
   SetupIntent,
   PaymentMethod,
   CustomerSource,
-  Customer,
+  Customer as StripeCustomer,
 } from '../types/stripe';
 import { PaymentIntent, PromotionCode, PriceByIdResponse, Reason } from '../types/payment';
 import {
@@ -427,15 +427,6 @@ export class PaymentService {
     };
   }
 
-  async updateCustomerBillingInfo(
-    customerId: CustomerId,
-    payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
-  ): Promise<Stripe.Customer> {
-    const customer = await this.provider.customers.update(customerId, payload);
-
-    return customer;
-  }
-
   async subscribe(
     customerId: CustomerId,
     priceId: PriceId,
@@ -725,7 +716,7 @@ export class PaymentService {
     });
   }
 
-  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
+  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<StripeCustomer[]> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
     return res.data;
@@ -1551,36 +1542,6 @@ export class PaymentService {
       type,
       value,
     });
-  }
-
-  async updateCustomer(
-    customerId: Stripe.Customer['id'],
-    updatableAttributes: {
-      customer?: Partial<Pick<Stripe.CustomerUpdateParams, 'name'>>;
-      tax?: {
-        id: string;
-        type: Stripe.TaxIdCreateParams.Type;
-      };
-    },
-    additionalOptions?: Partial<Stripe.CustomerUpdateParams>,
-  ): Promise<void> {
-    if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
-      await this.provider.customers.update(customerId, {
-        name: updatableAttributes.customer.name,
-        ...additionalOptions,
-      });
-    }
-    if (updatableAttributes.tax) {
-      await this.provider.taxIds.create({
-        owner: {
-          customer: customerId,
-          type: 'customer',
-        },
-
-        type: updatableAttributes.tax.type,
-        value: updatableAttributes.tax.id,
-      });
-    }
   }
 
   async getCryptoCurrencies() {

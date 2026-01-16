@@ -100,13 +100,13 @@ export default function (
           const userAddressBillingDetails = paymentMethod.billing_details.address;
 
           if (userAddressBillingDetails) {
-            await stripe.customers.update(eventData.customer as string, {
+            await stripePaymentsAdapter.updateCustomer(eventData.customer as string, {
               address: {
                 city: userAddressBillingDetails.city as string,
                 line1: userAddressBillingDetails.line1 as string,
                 line2: userAddressBillingDetails.line2 as string,
                 country: userAddressBillingDetails.country as string,
-                postal_code: userAddressBillingDetails.postal_code as string,
+                postalCode: userAddressBillingDetails.postal_code as string,
                 state: userAddressBillingDetails.state as string,
               },
             });

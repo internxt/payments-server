@@ -70,24 +70,17 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
-          await paymentsService.updateCustomer(
-            userExists.customerId,
-            {
-              customer: {
-                name: customerName,
-              },
+          await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
+            name: customerName,
+            email,
+            address: {
+              line1: lineAddress1,
+              line2: lineAddress2,
+              city,
+              postalCode,
+              country,
             },
-            {
-              email,
-              address: {
-                line1: lineAddress1,
-                line2: lineAddress2,
-                city,
-                postal_code: postalCode,
-                country,
-              },
-            },
-          );
+          });
           customerId = userExists.customerId;
         } else {
           const { id } = await stripePaymentsAdapter.createCustomer({

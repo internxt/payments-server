@@ -16,6 +16,14 @@ export interface CreateCustomerParams {
   address: Partial<CustomerAddress>;
 }
 
+export interface UpdateCustomerParams extends Partial<CreateCustomerParams> {
+  phone?: string;
+  tax?: {
+    id: string;
+    type: Stripe.TaxIdCreateParams.Type;
+  };
+}
+
 export class Customer {
   constructor(
     public readonly id: string,
