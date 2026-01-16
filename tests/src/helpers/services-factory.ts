@@ -90,11 +90,9 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const cacheService = new CacheService(config);
   const tiersService = new TiersService(
     usersService,
-    paymentService,
     repositories.tiersRepository,
     repositories.usersTiersRepository,
     storageService,
-    config,
   );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
