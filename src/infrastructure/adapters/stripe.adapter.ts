@@ -57,17 +57,19 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
 
   private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {
     return {
-      name: params.name,
-      email: params.email,
-      phone: params.phone,
-      address: {
-        line1: params.address?.line1 ?? undefined,
-        line2: params.address?.line2 ?? undefined,
-        city: params.address?.city ?? undefined,
-        state: params.address?.state ?? undefined,
-        country: params.address?.country ?? undefined,
-        postal_code: params.address?.postalCode ?? undefined,
-      },
+      ...(params.name && { name: params.name }),
+      ...(params.email && { email: params.email }),
+      ...(params.phone && { phone: params.phone }),
+      ...(params.address && {
+        address: {
+          line1: params.address.line1 ?? undefined,
+          line2: params.address.line2 ?? undefined,
+          city: params.address.city ?? undefined,
+          state: params.address.state ?? undefined,
+          country: params.address.country ?? undefined,
+          postal_code: params.address.postalCode ?? undefined,
+        },
+      }),
     };
   }
 }
