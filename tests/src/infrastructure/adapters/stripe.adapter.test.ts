@@ -42,9 +42,67 @@ describe('Stripe Adapter', () => {
       const updatedCustomer = await stripePaymentsAdapter.updateCustomer(mockedCustomer.id, {
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
+        address: {
+          line1: mockedCustomer.address?.line1 ?? '',
+          line2: mockedCustomer.address?.line2 ?? '',
+          city: mockedCustomer.address?.city ?? '',
+          state: mockedCustomer.address?.state ?? '',
+          country: mockedCustomer.address?.country ?? '',
+          postalCode: mockedCustomer.address?.postal_code ?? '',
+        },
       });
 
       expect(updatedCustomer).toStrictEqual(Customer.toDomain(mockedCustomer));
+    });
+
+    test('When address is not provided, then the existing address should be preserved', async () => {
+      const originalAddress = {
+        postal_code: '08001',
+        country: 'ES',
+        city: 'Barcelona',
+        line1: 'Carrer Major 1',
+        line2: 'Piso 2',
+        state: 'Catalunya',
+      };
+
+      const initialCustomer = getCustomer({
+        name: 'Original Name',
+        email: 'original@internxt.com',
+        address: originalAddress,
+      });
+
+      const updatedCustomer = getCustomer({
+        id: initialCustomer.id,
+        name: 'Updated Name',
+        email: 'original@internxt.com',
+        address: originalAddress,
+      });
+
+      const updateSpy = jest
+        .spyOn(stripePaymentsAdapter.getInstance().customers, 'update')
+        .mockResolvedValue(updatedCustomer as Stripe.Response<Stripe.Customer>);
+
+      const result = await stripePaymentsAdapter.updateCustomer(initialCustomer.id, {
+        name: 'Updated Name',
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith(initialCustomer.id, {
+        name: 'Updated Name',
+      });
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.not.objectContaining({ address: expect.anything() }),
+      );
+
+      expect(result.name).toBe('Updated Name');
+      expect(result.address).toStrictEqual({
+        line1: originalAddress.line1,
+        line2: originalAddress.line2,
+        city: originalAddress.city,
+        state: originalAddress.state,
+        country: originalAddress.country,
+        postalCode: originalAddress.postal_code,
+      });
     });
   });
 
