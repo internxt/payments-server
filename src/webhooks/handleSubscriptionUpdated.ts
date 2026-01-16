@@ -1,4 +1,4 @@
-import { FastifyBaseLogger, FastifyLoggerInstance } from 'fastify';
+import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
@@ -7,16 +7,18 @@ import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { Customer } from '../infrastructure/domain/entities/customer';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
 }
 
 async function handleObjectStorageScheduledForCancelation(
-  customer: Stripe.Customer,
+  customer: Customer,
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
-  logger: FastifyLoggerInstance,
+  logger: FastifyBaseLogger,
 ): Promise<void> {
   logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
@@ -55,7 +57,7 @@ export default async function handleSubscriptionUpdated(
       log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been scheduled for cancelation`);
 
       await handleObjectStorageScheduledForCancelation(
-        (await paymentService.getCustomer(customerId)) as Stripe.Customer,
+        await stripePaymentsAdapter.getCustomer(customerId),
         subscription,
         objectStorageService,
         log,

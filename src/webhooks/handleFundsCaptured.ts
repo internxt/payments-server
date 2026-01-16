@@ -3,14 +3,11 @@ import { FastifyBaseLogger } from 'fastify';
 
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { BadRequestError, ConflictError, GoneError } from '../errors/Errors';
+import { ConflictError } from '../errors/Errors';
 import { UserType } from '../core/users/User';
 import axios from 'axios';
 import { VERIFICATION_CHARGE } from '../constants';
-
-function isCustomer(customer: Stripe.Customer | Stripe.DeletedCustomer): customer is Stripe.Customer {
-  return !customer.deleted;
-}
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export default async function handleFundsCaptured(
   paymentIntent: Stripe.PaymentIntent,
@@ -35,15 +32,7 @@ export default async function handleFundsCaptured(
     `Received successful payment intent ${paymentIntent.id} from customer ${paymentIntent.customer as string}`,
   );
 
-  const customer = await paymentsService.getCustomer(paymentIntent.customer as string);
-
-  if (!isCustomer(customer)) {
-    throw new GoneError(`Customer ${paymentIntent.customer as string} has been deleted`);
-  }
-
-  if (!customer.email) {
-    throw new BadRequestError(`Customer ${paymentIntent.customer as string} has no email`);
-  }
+  const customer = await stripePaymentsAdapter.getCustomer(paymentIntent.customer as string);
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 

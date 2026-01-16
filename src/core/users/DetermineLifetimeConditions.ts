@@ -6,6 +6,7 @@ import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
+import { stripePaymentsAdapter } from '../../infrastructure/adapters/stripe.adapter';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -72,11 +73,7 @@ export class DetermineLifetimeConditions {
     maxSpaceBytes: number;
     tier: Tier;
   }> {
-    const customer = await this.paymentsService.getCustomer(user.customerId);
-
-    if (customer.deleted) {
-      throw new Error(`Found customer ${customer.id} for user ${user.uuid} but is deleted`);
-    }
+    const customer = await stripePaymentsAdapter.getCustomer(user.customerId);
 
     const { email } = customer;
     const customersRelatedToUser = await this.paymentsService.getCustomersByEmail(email);

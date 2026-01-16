@@ -17,8 +17,8 @@ import handleFundsCaptured from './handleFundsCaptured';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
-import { BadRequestError } from '../errors/Errors';
 import Logger from '../Logger';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export default function (
   stripe: Stripe,
@@ -116,11 +116,7 @@ export default function (
 
         case 'invoice.paid': {
           const invoice = event.data.object;
-          const customer = await paymentService.getCustomer(invoice.customer as string);
-
-          if (customer.deleted) {
-            throw new BadRequestError(`The customer with ID ${invoice.customer as string} does not exist`);
-          }
+          const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
           const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);

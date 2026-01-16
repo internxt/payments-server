@@ -29,6 +29,8 @@ import { stripeNewVersion } from '../../../src/services/stripe';
 import config from '../../../src/config';
 import { generateQrCodeUrl } from '../../../src/utils/generateQrCodeUrl';
 import jwt from 'jsonwebtoken';
+import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe, bit2MeService } = createTestServices();
@@ -294,9 +296,7 @@ describe('Payments Service tests', () => {
         });
 
         jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
-        jest
-          .spyOn(paymentService, 'getCustomer')
-          .mockResolvedValueOnce(mockedCustomer as Stripe.Response<Stripe.Customer>);
+        jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockRejectedValue(new BadRequestError());
         jest
           .spyOn(stripeNewVersion.invoices, 'create')
           .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
@@ -309,7 +309,7 @@ describe('Payments Service tests', () => {
             customerId: mockedCustomerId,
             priceId: mockedPriceId,
             currency: mockCurrency,
-            userEmail: mockedCustomerEmail as string,
+            userEmail: mockedCustomerEmail,
             userAddress: '1.1.1.1',
           }),
         ).rejects.toThrow(BadRequestError);
@@ -372,9 +372,7 @@ describe('Payments Service tests', () => {
           config.JWT_SECRET,
         );
 
-        jest
-          .spyOn(paymentService, 'getCustomer')
-          .mockResolvedValueOnce(mockedCustomer as Stripe.Response<Stripe.Customer>);
+        jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValueOnce(Customer.toDomain(mockedCustomer));
         jest
           .spyOn(stripeNewVersion.invoices, 'create')
           .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);

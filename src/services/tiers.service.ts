@@ -9,6 +9,7 @@ import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository'
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
+import { Customer } from '../infrastructure/domain/entities/customer';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -104,7 +105,7 @@ export class TiersService {
 
   async applyTier(
     userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Stripe.Customer,
+    customer: Customer,
     amountOfSeats: Stripe.InvoiceLineItem['quantity'],
     productId: string,
     log: FastifyBaseLogger,
@@ -169,7 +170,7 @@ export class TiersService {
 
   async applyDriveFeatures(
     userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Stripe.Customer,
+    customer: Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
     log: FastifyBaseLogger,

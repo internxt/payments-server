@@ -3,6 +3,7 @@ import axios from 'axios';
 import { getCustomer, getInvoice, getProduct } from '../../fixtures';
 import Logger from '../../../../src/Logger';
 import { createTestServices } from '../../helpers/services-factory';
+import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 
 const { objectStorageWebhookHandler, paymentService, objectStorageService } = createTestServices();
 
@@ -73,7 +74,10 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
-      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(
+        Customer.toDomain(mockedCustomer),
+        mockedInvoice,
+      );
 
       expect(objectStorageServiceSpy).toHaveBeenCalledWith({ customerId: mockedCustomer.id });
     });
@@ -108,7 +112,10 @@ describe('Object Storage Webhook Handler', () => {
 
       const loggerSpy = jest.spyOn(Logger, 'info');
 
-      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(
+        Customer.toDomain(mockedCustomer),
+        mockedInvoice,
+      );
 
       expect(loggerSpy).toHaveBeenCalledWith(
         `Invoice ${mockedInvoice.id} not handled by object-storage handler due to lines length`,
@@ -141,7 +148,10 @@ describe('Object Storage Webhook Handler', () => {
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
       const loggerSpy = jest.spyOn(Logger, 'info');
 
-      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(
+        Customer.toDomain(mockedCustomer),
+        mockedInvoice,
+      );
 
       expect(loggerSpy).toHaveBeenCalledWith(
         `The price or the product for the invoice with ID ${mockedInvoice.id} are null.`,
@@ -175,7 +185,10 @@ describe('Object Storage Webhook Handler', () => {
 
       const loggerSpy = jest.spyOn(Logger, 'info');
 
-      await objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice);
+      await objectStorageWebhookHandler.reactivateObjectStorageAccount(
+        Customer.toDomain(mockedCustomer),
+        mockedInvoice,
+      );
 
       expect(loggerSpy).toHaveBeenCalledWith(
         `Invoice ${mockedInvoice.id} for product ${mockedInvoice.lines.data[0].price?.product} is not an object-storage product`,
@@ -210,7 +223,7 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(new Error('Reactivation failed'));
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
       ).rejects.toThrow(new Error('Reactivation failed'));
     });
 
@@ -246,7 +259,7 @@ describe('Object Storage Webhook Handler', () => {
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
       ).resolves.not.toThrow();
       expect(loggerSpy).toHaveBeenCalledWith(
         `Object storage user ${mockedCustomer.email} (customer ${mockedCustomer.id}) was not found while reactivating`,
@@ -287,8 +300,8 @@ describe('Object Storage Webhook Handler', () => {
       const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(mockedCustomer, mockedInvoice),
-      ).rejects.toThrow('Internal Server Error');
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
+      ).rejects.toThrow(axiosError);
 
       isAxiosErrorSpy.mockRestore();
     });

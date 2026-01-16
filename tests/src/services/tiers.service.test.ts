@@ -1,15 +1,14 @@
-import { AxiosError } from 'axios';
-
 import { NoSubscriptionSeatsProvidedError, TierNotFoundError } from '../../../src/services/tiers.service';
 import { getCustomer, getInvoice, getLogger, getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
+import { AxiosError } from 'axios';
 
 describe('TiersService tests', () => {
-  const { usersTiersRepository, tiersRepository, tiersService, paymentService, usersService, storageService } =
-    createTestServices();
+  const { usersTiersRepository, tiersRepository, tiersService, usersService, storageService } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -182,7 +181,7 @@ describe('TiersService tests', () => {
       await expect(
         tiersService.applyTier(
           { ...user, email: 'example@internxt.com' },
-          mockedCustomer,
+          Customer.toDomain(mockedCustomer),
           mockedInvoiceLineItem.quantity,
           productId,
           logger,
@@ -213,7 +212,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier(
         { ...user, email: 'example@internxt.com' },
-        mockedCustomer,
+        Customer.toDomain(mockedCustomer),
         mockedInvoiceLineItem.quantity,
         productId,
         logger,
@@ -246,14 +245,20 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier(
         { ...user, email: 'example@internxt.com' },
-        mockedCustomer,
+        Customer.toDomain(mockedCustomer),
         mockedInvoiceLineItem.quantity,
         productId,
         logger,
       );
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
-      expect(applyDriveFeatures).toHaveBeenCalledWith(userWithEmail, mockedCustomer, 1, tier, logger);
+      expect(applyDriveFeatures).toHaveBeenCalledWith(
+        userWithEmail,
+        Customer.toDomain(mockedCustomer),
+        1,
+        tier,
+        logger,
+      );
       expect(applyVpnFeatures).toHaveBeenCalledWith(userWithEmail, tier);
     });
   });
@@ -344,7 +349,13 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve());
 
       await expect(
-        tiersService.applyTier(userWithEmail, mockedCustomer, mockedInvoiceLineItem.quantity, tier.productId, logger),
+        tiersService.applyTier(
+          userWithEmail,
+          Customer.toDomain(mockedCustomer),
+          mockedInvoiceLineItem.quantity,
+          tier.productId,
+          logger,
+        ),
       ).rejects.toThrow(NoSubscriptionSeatsProvidedError);
       expect(updateWorkspaceStorage).not.toHaveBeenCalled();
     });
@@ -366,7 +377,7 @@ describe('TiersService tests', () => {
 
       await tiersService.applyTier(
         userWithEmail,
-        mockedCustomer,
+        Customer.toDomain(mockedCustomer),
         mockedInvoiceLineItem.quantity,
         tier.productId,
         logger,
@@ -400,7 +411,13 @@ describe('TiersService tests', () => {
 
       const initializeWorkspace = jest.spyOn(usersService, 'initializeWorkspace').mockResolvedValue();
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
+      await tiersService.applyDriveFeatures(
+        userWithEmail,
+        Customer.toDomain(mockedCustomer),
+        amountOfSeats,
+        tier,
+        logger,
+      );
 
       expect(initializeWorkspace).toHaveBeenCalledWith(userWithEmail.uuid, {
         newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
@@ -426,7 +443,7 @@ describe('TiersService tests', () => {
       jest.spyOn(usersService, 'updateWorkspace').mockRejectedValue(unexpectedError);
 
       await expect(
-        tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger),
+        tiersService.applyDriveFeatures(userWithEmail, Customer.toDomain(mockedCustomer), amountOfSeats, tier, logger),
       ).rejects.toThrow(unexpectedError);
     });
 
@@ -441,7 +458,13 @@ describe('TiersService tests', () => {
       tier.featuresPerService[Service.Drive].workspaces.enabled = false;
       const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
-      await tiersService.applyDriveFeatures(userWithEmail, mockedCustomer, amountOfSeats, tier, logger);
+      await tiersService.applyDriveFeatures(
+        userWithEmail,
+        Customer.toDomain(mockedCustomer),
+        amountOfSeats,
+        tier,
+        logger,
+      );
 
       expect(changeStorageSpy).toHaveBeenCalledWith(
         userWithEmail.uuid,
