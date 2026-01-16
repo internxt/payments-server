@@ -1,35 +1,17 @@
-import Stripe from 'stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { User } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
-import { FastifyBaseLogger } from 'fastify';
-import { Tier } from '../core/users/Tier';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
+import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 
 type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
   usersService: UsersService;
   licenseCodesRepository: LicenseCodesRepository;
 };
-
-interface ApplyProductFeaturesProps {
-  user: { uuid: string; email: string };
-  customer: Stripe.Customer;
-  logger: FastifyBaseLogger;
-  maxSpaceBytes: number;
-  tierProduct: Tier | null;
-}
-
-export class InvalidLicenseCodeError extends Error {
-  constructor() {
-    super('Invalid code provided');
-
-    Object.setPrototypeOf(this, InvalidLicenseCodeError.prototype);
-  }
-}
 
 export class LicenseCodeAlreadyAppliedError extends Error {
   constructor() {

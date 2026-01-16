@@ -12,7 +12,7 @@ export class UserFeaturesOverridesService {
   ) {}
 
   async upsertCustomUserFeatures(user: User, service: Service) {
-    const { id: userId, uuid: userUuid, customerId } = user;
+    const { id: userId, uuid: userUuid } = user;
     const overrideUserFeatures = await this.userFeatureOverridesRepository.findByUserId(userId);
 
     if (overrideUserFeatures?.featuresPerService?.[service]?.enabled) {
