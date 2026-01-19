@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { BadRequestError } from '../../../errors/Errors';
 import { Address } from '../types';
+import { DEFAULT_CUSTOMER_NAME } from '../../../constants';
 
 export interface CreateCustomerParams {
   name: string;
@@ -26,9 +27,7 @@ export class Customer {
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
-    if (!stripeCustomer.name) {
-      throw new BadRequestError('Customer name is required');
-    }
+    const customerName = stripeCustomer.name ?? DEFAULT_CUSTOMER_NAME;
 
     if (!stripeCustomer.email) {
       throw new BadRequestError('Customer email is required');
@@ -36,7 +35,7 @@ export class Customer {
 
     return new Customer(
       stripeCustomer.id,
-      stripeCustomer.name,
+      customerName,
       stripeCustomer.email,
       {
         line1: stripeCustomer.address?.line1,

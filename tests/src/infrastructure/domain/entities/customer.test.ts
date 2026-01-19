@@ -1,6 +1,7 @@
 import { getCustomer } from '../../../fixtures';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 import { BadRequestError } from '../../../../../src/errors/Errors';
+import { DEFAULT_CUSTOMER_NAME } from '../../../../../src/constants';
 
 describe('Customer entity', () => {
   const mockedCustomer = getCustomer();
@@ -49,11 +50,12 @@ describe('Customer entity', () => {
     });
   });
 
-  test('When converting a customer without name, then an error is thrown', () => {
-    const badRequestNotFoundError = new BadRequestError('Customer name is required');
+  test('When converting a customer without name, then the default name is used', () => {
     const customerWithoutName = { ...mockedCustomer, name: null };
 
-    expect(() => Customer.toDomain(customerWithoutName)).toThrow(badRequestNotFoundError);
+    const customer = Customer.toDomain(customerWithoutName);
+
+    expect(customer.name).toStrictEqual(DEFAULT_CUSTOMER_NAME);
   });
 
   test('When converting a customer without email, then an error is thrown', () => {
