@@ -1,4 +1,4 @@
-import { PlanSubscription } from '../../services/payment.service';
+import { PlanSubscription } from '../../types/subscription';
 
 export interface User {
   id: string;

@@ -1,12 +1,13 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 import envVariablesConfig from '../../../src/config';
-import { Bit2MeAPIError, Bit2MeService } from '../../../src/services/bit2me.service';
+import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { getCurrencies, getCryptoCurrency, getPayloadForCryptoInvoice, getRawCryptoInvoiceResponse } from '../fixtures';
 import { HttpError } from '../../../src/errors/HttpError';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { BadRequestError } from '../../../src/errors/Errors';
 import { randomUUID } from 'crypto';
+import { Bit2MeAPIError } from '../../../src/types/bit2me';
 
 let bit2MeService: Bit2MeService;
 
@@ -105,7 +106,7 @@ describe('Bit2Me Service tests', () => {
 
       jest.spyOn(axios, 'request').mockRejectedValue(unexpectedError);
 
-      await expect(bit2MeService.createCryptoInvoice(mockPayload)).rejects.toThrowError('Unexpected failure');
+      await expect(bit2MeService.createCryptoInvoice(mockPayload)).rejects.toThrow(unexpectedError);
     });
   });
 
@@ -124,9 +125,9 @@ describe('Bit2Me Service tests', () => {
         createdAt: new Date(rawResponse.createdAt),
         updatedAt: new Date(rawResponse.updatedAt),
         expiredAt: new Date(rawResponse.expiredAt),
-        priceAmount: parseFloat(rawResponse.priceAmount),
-        underpaidAmount: parseFloat(rawResponse.underpaidAmount),
-        overpaidAmount: parseFloat(rawResponse.overpaidAmount),
+        priceAmount: Number.parseFloat(rawResponse.priceAmount),
+        underpaidAmount: Number.parseFloat(rawResponse.underpaidAmount),
+        overpaidAmount: Number.parseFloat(rawResponse.overpaidAmount),
       };
 
       const result = await bit2MeService.checkoutInvoice(invoiceId, currencyId);

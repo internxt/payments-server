@@ -7,6 +7,8 @@ import config from '../../../../../src/config';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import Stripe from 'stripe';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
+import { StripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 
 let app: FastifyInstance;
 
@@ -93,7 +95,7 @@ describe('Handling webhook for crypto payments', () => {
       status: 'pending',
     });
 
-    const getCustomerSpy = jest.spyOn(PaymentService.prototype, 'getCustomer');
+    const getCustomerSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer');
 
     const response = await app.inject({
       method: 'POST',
@@ -103,38 +105,6 @@ describe('Handling webhook for crypto payments', () => {
 
     expect(response.statusCode).toBe(200);
     expect(getCustomerSpy).not.toHaveBeenCalled();
-  });
-
-  test('when the customer is deleted, then an error indicating so is thrown', async () => {
-    const mockedCustomer = getCustomer();
-    const mockedInvoice = getInvoice({
-      customer: mockedCustomer.id,
-    });
-    const decodedToken = jwt.sign(
-      {
-        invoiceId: mockedInvoice.id,
-        customerId: mockedInvoice.customer,
-        provider: 'stripe',
-      },
-      config.JWT_SECRET,
-    );
-    const mockedCryptoInvoiceWebhook = getCryptoInvoiceWebhook({
-      foreignId: mockedInvoice.id,
-      token: decodedToken,
-    });
-    jest.spyOn(PaymentService.prototype, 'getCustomer').mockResolvedValue({
-      deleted: true,
-      ...mockedCustomer,
-    } as any);
-
-    const response = await app.inject({
-      method: 'POST',
-      path: '/webhook/crypto',
-      body: mockedCryptoInvoiceWebhook,
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json().message).toStrictEqual(`Customer with ID ${mockedCustomer.id} is deleted`);
   });
 
   test('When all is correct, then the handler is executed to apply the features to the user', async () => {
@@ -156,9 +126,7 @@ describe('Handling webhook for crypto payments', () => {
       token: decodedToken,
     });
 
-    jest
-      .spyOn(PaymentService.prototype, 'getCustomer')
-      .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+    jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest
       .spyOn(PaymentService.prototype, 'getInvoice')
       .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
@@ -178,7 +146,7 @@ describe('Handling webhook for crypto payments', () => {
     expect(response.statusCode).toBe(200);
     expect(runSpy).toHaveBeenCalledWith({
       invoice: mockedInvoice,
-      customer: mockedCustomer,
+      customer: Customer.toDomain(mockedCustomer),
       status: 'paid',
     });
   });

@@ -1,27 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import fastifyJwt from '@fastify/jwt';
-import fastifyLimit from '@fastify/rate-limit';
 import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
+import { setupAuth } from '../plugins/auth';
 
-export default function (productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
+export function productsController(productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-    fastify.addHook('onRequest', async (request, reply) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        reply.status(401).send();
-      }
-    });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get(
       '/',

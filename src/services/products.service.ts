@@ -1,12 +1,15 @@
 import { Service, Tier } from '../core/users/Tier';
 import { User } from '../core/users/User';
+import { UserNotFoundError } from '../errors/PaymentErrors';
 import { TierNotFoundError, TiersService } from './tiers.service';
-import { UserNotFoundError, UsersService } from './users.service';
+import { UserFeaturesOverridesService } from './userFeaturesOverride.service';
+import { UsersService } from './users.service';
 
 export class ProductsService {
   constructor(
     private readonly tiersService: TiersService,
     private readonly usersService: UsersService,
+    private readonly userFeatureOverridesService: UserFeaturesOverridesService,
   ) {}
 
   private async collectAllAvailableTiers(userUuid: string, ownersId?: string[]): Promise<Tier[]> {
@@ -164,6 +167,11 @@ export class ProductsService {
           individualTier.featuresPerService[Service.darkMonitor].enabled ||
           businessTier.featuresPerService[Service.darkMonitor].enabled,
       },
+      [Service.Cli]: {
+        enabled:
+          individualTier.featuresPerService[Service.Cli].enabled ||
+          businessTier.featuresPerService[Service.Cli].enabled,
+      },
     };
 
     return {
@@ -188,10 +196,43 @@ export class ProductsService {
     return this.selectHighestTier(individualTier, businessTier);
   }
 
+  private async applyUserFeatureOverrides(tier: Tier, userId: string): Promise<Tier> {
+    const userOverrides = await this.userFeatureOverridesService.getCustomUserFeatures(userId);
+
+    if (!userOverrides?.featuresPerService) {
+      return tier;
+    }
+
+    const mergedFeatures = { ...tier.featuresPerService };
+
+    Object.entries(userOverrides.featuresPerService).forEach(([service, overrideFeature]) => {
+      const serviceKey = service as Service;
+
+      if (mergedFeatures[serviceKey] && overrideFeature) {
+        mergedFeatures[serviceKey] = {
+          ...mergedFeatures[serviceKey],
+          ...overrideFeature,
+        } as any;
+      }
+    });
+
+    return {
+      ...tier,
+      featuresPerService: mergedFeatures,
+    };
+  }
+
   async getApplicableTierForUser({ userUuid, ownersId }: { userUuid: string; ownersId?: string[] }): Promise<Tier> {
     const freeTier = await this.tiersService.getTierProductsByProductsId('free');
     const availableTier = await this.determineUserTier(userUuid, ownersId);
+    const baseTier = availableTier ?? freeTier;
 
-    return availableTier ?? freeTier;
+    try {
+      const user = await this.usersService.findUserByUuid(userUuid);
+      const mergedFeatures = await this.applyUserFeatureOverrides(baseTier, user.id);
+      return mergedFeatures;
+    } catch {
+      return baseTier;
+    }
   }
 }

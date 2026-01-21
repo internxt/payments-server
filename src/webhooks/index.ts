@@ -17,8 +17,8 @@ import handleFundsCaptured from './handleFundsCaptured';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
-import { BadRequestError } from '../errors/Errors';
 import Logger from '../Logger';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export default function (
   stripe: Stripe,
@@ -54,7 +54,13 @@ export default function (
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, fastify.log);
+          await handleInvoicePaymentFailed(
+            event.data.object,
+            objectStorageService,
+            paymentService,
+            usersService,
+            fastify.log,
+          );
           break;
 
         case 'payment_intent.amount_capturable_updated':
@@ -90,31 +96,28 @@ export default function (
 
         case 'payment_intent.succeeded': {
           const eventData = event.data.object;
-          const paymentMethod = await stripe.paymentMethods.retrieve(eventData.payment_method as string);
-          const userAddressBillingDetails = paymentMethod.billing_details.address;
+
+          const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(eventData.payment_method as string);
+          const userAddressBillingDetails = paymentMethod.getAddress();
 
           if (userAddressBillingDetails) {
-            await stripe.customers.update(eventData.customer as string, {
+            await stripePaymentsAdapter.updateCustomer(eventData.customer as string, {
               address: {
-                city: userAddressBillingDetails.city as string,
-                line1: userAddressBillingDetails.line1 as string,
-                line2: userAddressBillingDetails.line2 as string,
-                country: userAddressBillingDetails.country as string,
-                postal_code: userAddressBillingDetails.postal_code as string,
-                state: userAddressBillingDetails.state as string,
+                city: userAddressBillingDetails.city,
+                line1: userAddressBillingDetails.line1,
+                line2: userAddressBillingDetails.line2,
+                country: userAddressBillingDetails.country,
+                postalCode: userAddressBillingDetails.postalCode,
+                state: userAddressBillingDetails.state,
               },
             });
           }
           break;
         }
 
-        case 'invoice.payment_succeeded': {
+        case 'invoice.paid': {
           const invoice = event.data.object;
-          const customer = await paymentService.getCustomer(invoice.customer as string);
-
-          if (customer.deleted) {
-            throw new BadRequestError(`The customer with ID ${invoice.customer as string} does not exist`);
-          }
+          const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
           const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);

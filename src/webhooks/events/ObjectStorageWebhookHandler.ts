@@ -3,6 +3,7 @@ import { ObjectStorageService } from '../../services/objectStorage.service';
 import { PaymentService } from '../../services/payment.service';
 import { AxiosError, isAxiosError } from 'axios';
 import Logger from '../../Logger';
+import { Customer } from '../../infrastructure/domain/entities/customer';
 
 export class ObjectStorageWebhookHandler {
   constructor(
@@ -33,7 +34,7 @@ export class ObjectStorageWebhookHandler {
    * This function will handle the object storage webhook conditions.
    * If the invoice is an object storage invoice, it will reactivate the account if it was suspended
    */
-  async reactivateObjectStorageAccount(customer: Stripe.Customer, invoice: Stripe.Invoice): Promise<void> {
+  async reactivateObjectStorageAccount(customer: Customer, invoice: Stripe.Invoice): Promise<void> {
     if (invoice.lines.data.length !== 1) {
       Logger.info(`Invoice ${invoice.id} not handled by object-storage handler due to lines length`);
       return;

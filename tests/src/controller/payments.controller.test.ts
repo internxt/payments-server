@@ -4,7 +4,6 @@ import {
   getCreateSubscriptionResponse,
   getCustomer,
   getLicenseCode,
-  getLogger,
   getPaymentIntent,
   getPrices,
   getUniqueCodes,
@@ -15,13 +14,16 @@ import {
   voidPromise,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { CustomerNotFoundError, PaymentService } from '../../../src/services/payment.service';
+import { PaymentService } from '../../../src/services/payment.service';
+import { CustomerNotFoundError, NotFoundPlanByIdError } from '../../../src/errors/PaymentErrors';
 import config from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
+import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
@@ -84,6 +86,7 @@ describe('Payment controller e2e tests', () => {
             decimalAmount: expect.anything(),
           },
         };
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.subscription.exists}`,
@@ -97,6 +100,8 @@ describe('Payment controller e2e tests', () => {
 
       it('When the subscription priceId is not valid, then it returns 404 status code', async () => {
         const mockedPrice = getPrices();
+        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.subscription.doesNotExist}`,
@@ -121,6 +126,7 @@ describe('Payment controller e2e tests', () => {
             decimalAmount: expect.anything(),
           },
         };
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.lifetime.exists}`,
@@ -135,6 +141,8 @@ describe('Payment controller e2e tests', () => {
 
       it('When the lifetime priceId is not valid, then returns 404 status code', async () => {
         const mockedPrice = getPrices();
+        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
+        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
 
         const response = await app.inject({
           path: `/plan-by-id?planId=${mockedPrice.lifetime.doesNotExist}`,
@@ -271,8 +279,8 @@ describe('Payment controller e2e tests', () => {
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
         const createdCustomerSpy = jest
-          .spyOn(PaymentService.prototype, 'createCustomer')
-          .mockResolvedValue(mockedCustomer);
+          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+          .mockResolvedValue(Customer.toDomain(mockedCustomer));
 
         const response = await app.inject({
           method: 'GET',
@@ -294,7 +302,7 @@ describe('Payment controller e2e tests', () => {
           name: mockedCustomer.name,
           email: mockedCustomer.email,
           address: {
-            postal_code: mockedCustomer.address?.postal_code,
+            postalCode: mockedCustomer.address?.postal_code,
             country: mockedCustomer.address?.country,
           },
         });
@@ -328,7 +336,9 @@ describe('Payment controller e2e tests', () => {
         jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
-        jest.spyOn(PaymentService.prototype, 'createCustomer').mockResolvedValue(mockedCustomer);
+        jest
+          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+          .mockResolvedValue(Customer.toDomain(mockedCustomer));
         const attachVatIdSpy = jest
           .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
           .mockImplementation(voidPromise);
@@ -582,7 +592,6 @@ describe('Payment controller e2e tests', () => {
     test('When the code and provider are valid, then the code is redeemed', async () => {
       const mockedUser = getUser();
       const mockedLicenseCode = getLicenseCode();
-      const mockedLogger = getLogger();
       const mockedToken = getValidAuthToken(
         mockedUser.uuid,
         { owners: [] },
@@ -615,7 +624,6 @@ describe('Payment controller e2e tests', () => {
         },
         code: mockedLicenseCode.code,
         provider: mockedLicenseCode.provider,
-        logger: expect.any(Object),
       });
     });
   });

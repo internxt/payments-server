@@ -1,48 +1,29 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
-import fastifyJwt from '@fastify/jwt';
-import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { PaymentIntent, PaymentService } from '../services/payment.service';
-import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { PaymentService } from '../services/payment.service';
+import { PaymentIntent } from '../types/payment';
+import { BadRequestError, ForbiddenError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
+import { setupAuth } from '../plugins/auth';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
-export default function (usersService: UsersService, paymentsService: PaymentService) {
+export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyRateLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
-    fastify.addHook('onRequest', async (request) => {
-      const skipAuth = request.routeOptions?.config?.skipAuth;
-      const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
-
-      if (skipAuth) {
-        return;
-      }
-
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        if (allowAnonymous) {
-          return;
-        }
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        throw new UnauthorizedError();
-      }
-    });
-
-    fastify.get<{
-      Querystring: {
+    fastify.post<{
+      Body: {
         customerName: string;
+        lineAddress1: string;
+        lineAddress2: string;
+        city: string;
         country: string;
         postalCode: string;
         captchaToken: string;
@@ -52,10 +33,14 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       '/customer',
       {
         schema: {
-          querystring: {
+          body: {
             type: 'object',
+            required: ['customerName', 'lineAddress1', 'city', 'country', 'postalCode', 'captchaToken'],
             properties: {
               customerName: { type: 'string' },
+              lineAddress1: { type: 'string' },
+              lineAddress2: { type: 'string' },
+              city: { type: 'string' },
               country: { type: 'string' },
               postalCode: { type: 'string' },
               captchaToken: { type: 'string' },
@@ -72,7 +57,8 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { customerName, country, postalCode, companyVatId, captchaToken } = req.query;
+        const { customerName, lineAddress1, lineAddress2, city, country, postalCode, companyVatId, captchaToken } =
+          req.body;
         const { uuid: userUuid, email } = req.user.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -84,30 +70,31 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
-          await paymentsService.updateCustomer(
-            userExists.customerId,
-            {
-              customer: {
-                name: customerName,
-              },
-            },
-            {
-              address: {
-                postal_code: postalCode,
-                country,
-              },
-            },
-          );
-          customerId = userExists.customerId;
-        } else {
-          const { id } = await paymentsService.createCustomer({
+          await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
             name: customerName,
             email,
             address: {
+              line1: lineAddress1,
+              line2: lineAddress2,
+              city,
+              postalCode,
               country,
-              postal_code: postalCode,
             },
           });
+          customerId = userExists.customerId;
+        } else {
+          const { id } = await stripePaymentsAdapter.createCustomer({
+            name: customerName,
+            email,
+            address: {
+              line1: lineAddress1,
+              line2: lineAddress2,
+              city,
+              postalCode,
+              country,
+            },
+          });
+
           await usersService.insertUser({
             customerId: id,
             uuid: userUuid,
@@ -213,6 +200,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         token: string;
         currency: string;
         captchaToken: string;
+        userAddress: string;
         promoCodeId?: string;
       };
     }>(
@@ -236,6 +224,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
                 type: 'string',
               },
               captchaToken: { type: 'string' },
+              userAddress: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -252,7 +241,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -298,6 +287,7 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
           userEmail: email,
           currency: currency.trim(),
           promoCodeId,
+          userAddress,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: true,
@@ -361,11 +351,11 @@ export default function (usersService: UsersService, paymentsService: PaymentSer
         if (promoCodeName) {
           const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
           if (couponCode.amountOff) {
-            amount = price.amount - couponCode.amountOff;
+            amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
             const discount = Math.floor((price.amount * couponCode.percentOff) / 100);
             const discountedPrice = price.amount - discount;
-            amount = discountedPrice;
+            amount = Math.max(0, discountedPrice);
           }
         }
 

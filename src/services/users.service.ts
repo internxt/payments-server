@@ -9,8 +9,9 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
-import { VpnFeatures } from '../core/users/Tier';
-import { HttpError } from '../errors/HttpError';
+import { Service, VpnFeatures } from '../core/users/Tier';
+import { UserNotFoundError } from '../errors/PaymentErrors';
+import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -20,13 +21,7 @@ function signToken(duration: string, secret: string) {
   });
 }
 
-export class CouponNotBeingTrackedError extends Error {
-  constructor(couponName: Coupon['code']) {
-    super(`Coupon ${couponName} is not being tracked`);
-
-    Object.setPrototypeOf(this, CouponNotBeingTrackedError.prototype);
-  }
-}
+type OverrideServiceAvailable = Service.Cli;
 
 export class UsersService {
   constructor(
@@ -316,10 +311,48 @@ export class UsersService {
 
     return this.axios.delete(`${this.config.VPN_URL}/gateway/users/${userUuid}/tiers/${featureId}`, requestConfig);
   }
-}
 
-export class UserNotFoundError extends HttpError {
-  constructor(message = 'User Not Found') {
-    super(message, 404);
+  async notifyFailedPayment(userUuid: string): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/failed-payment`,
+      { userId: userUuid },
+      requestConfig,
+    );
+  }
+
+  async overrideDriveLimit({
+    userUuid,
+    feature,
+    enabled,
+  }: {
+    userUuid: User['uuid'];
+    feature: OverrideServiceAvailable;
+    enabled: boolean;
+  }): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    await this.axios.put(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
+
+      { feature, value: String(enabled) },
+
+      requestConfig,
+    );
   }
 }

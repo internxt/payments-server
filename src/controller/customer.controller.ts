@@ -1,30 +1,19 @@
 import { FastifyInstance } from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import fastifyRateLimit from '@fastify/rate-limit';
 
 import { UsersService } from '../services/users.service';
-import { UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
+import { setupAuth } from '../plugins/auth';
 
-export default function (usersService: UsersService, paymentService: PaymentService, cacheService: CacheService) {
+export function customerController(
+  usersService: UsersService,
+  paymentService: PaymentService,
+  cacheService: CacheService,
+) {
   return async function (fastify: FastifyInstance) {
-    fastify.register(fastifyJwt, { secret: config.JWT_SECRET });
-    fastify.register(fastifyRateLimit, {
-      max: 1000,
-      timeWindow: '1 minute',
-    });
-
-    fastify.addHook('onRequest', async (request) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        request.log.warn(`JWT verification failed with error: ${(err as Error).message}`);
-        throw new UnauthorizedError();
-      }
-    });
+    await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.get(
       '/redeemed-promotion-codes',

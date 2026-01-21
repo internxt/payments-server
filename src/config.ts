@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-const mandatoryVariables = [
+const BASE_REQUIRED_VARIABLES = [
   'NODE_ENV',
   'SERVER_PORT',
   'MONGO_URI',
@@ -14,6 +14,7 @@ const mandatoryVariables = [
   'DRIVE_GATEWAY_PASSWORD',
   'DRIVE_NEW_GATEWAY_URL',
   'DRIVE_NEW_GATEWAY_SECRET',
+  'PAYMENTS_GATEWAY_PUBLIC_SECRET',
   'STRIPE_OBJECT_STORAGE_PRICE_ID',
   'OBJECT_STORAGE_GATEWAY_SECRET',
   'OBJECT_STORAGE_URL',
@@ -27,33 +28,32 @@ const mandatoryVariables = [
   'RECAPTCHA_V3_ENDPOINT',
   'RECAPTCHA_V3_SCORE_THRESHOLD',
   'RECAPTCHA_V3',
-] as const;
+  'REDIS_HOST',
+  'REDIS_PASSWORD',
+];
 
-type BaseConfig = {
-  [name in (typeof mandatoryVariables)[number]]: string;
+const TEST_REQUIRED_VARIABLES = [
+  'NODE_ENV',
+  'SERVER_PORT',
+  'STRIPE_SECRET_KEY',
+  'JWT_SECRET',
+  'PAYMENTS_GATEWAY_SECRET',
+  'CHART_API_URL',
+  'DRIVE_NEW_GATEWAY_URL',
+];
+
+const allVariables = [
+  ...BASE_REQUIRED_VARIABLES,
+  ...TEST_REQUIRED_VARIABLES.filter((variable) => !BASE_REQUIRED_VARIABLES.includes(variable)),
+];
+
+type AllVariables = (typeof allVariables)[number];
+
+export type AppConfig = {
+  [K in AllVariables]: string;
 };
 
-interface DevConfig extends BaseConfig {
-  NODE_ENV: 'development';
-  REDIS_HOST?: string;
-}
-
-const mandatoryVariablesOnlyInProd = ['REDIS_HOST', 'REDIS_PASSWORD'] as const;
-
-type ProdConfig = BaseConfig & {
-  NODE_ENV: 'production';
-} & {
-  [name in (typeof mandatoryVariablesOnlyInProd)[number]]: string;
-};
-
-const mandatoryVariablesOnlyInTest = ['NODE_ENV', 'SERVER_PORT', 'STRIPE_SECRET_KEY', 'JWT_SECRET'] as const;
-
-export type AppConfig = DevConfig | ProdConfig;
-
-const variablesToCheck =
-  process.env.NODE_ENV === 'test'
-    ? mandatoryVariablesOnlyInTest
-    : [...mandatoryVariables, ...(process.env.NODE_ENV === 'production' ? mandatoryVariablesOnlyInProd : [])];
+const variablesToCheck = process.env.NODE_ENV === 'test' ? TEST_REQUIRED_VARIABLES : BASE_REQUIRED_VARIABLES;
 
 const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
 

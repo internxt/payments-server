@@ -12,7 +12,6 @@ import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
 import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
 import { LicenseCode } from '../core/users/LicenseCode';
-import { StorageService } from '../services/storage.service';
 import {
   DisplayBillingRepository,
   MongoDBDisplayBillingRepository,
@@ -24,9 +23,6 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 import { Bit2MeService } from '../services/bit2me.service';
-import { TiersService } from '../services/tiers.service';
-import { MongoDBTiersRepository, TiersRepository } from '../core/users/MongoDBTiersRepository';
-import { MongoDBUsersTiersRepository, UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -63,14 +59,12 @@ async function main() {
   try {
     const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-    const storageService = new StorageService(envVariablesConfig, axios);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
     const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
-    const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
-    const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
+
     const bit2MeService = new Bit2MeService(
       envVariablesConfig,
       axios,
@@ -88,20 +82,11 @@ async function main() {
       envVariablesConfig,
       axios,
     );
-    const tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      envVariablesConfig,
-    );
+
     const licenseCodesService = new LicenseCodesService({
       paymentService,
       usersService,
-      storageService,
       licenseCodesRepository,
-      tiersService,
     });
 
     for (const licenseCode of loadFromExcel()) {

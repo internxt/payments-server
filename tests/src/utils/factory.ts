@@ -3,6 +3,7 @@ import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRe
 import { LicenseCodesRepository } from '../../../src/core/users/LicenseCodeRepository';
 import { DisplayBillingRepository } from '../../../src/core/users/MongoDBDisplayBillingRepository';
 import { TiersRepository } from '../../../src/core/users/MongoDBTiersRepository';
+import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
 import { UsersTiersRepository } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { UsersRepository } from '../../../src/core/users/UsersRepository';
@@ -77,6 +78,13 @@ const getLicenseCodesRepositoryForTest = (): LicenseCodesRepository => {
   };
 };
 
+const getUserFeaturesOverridesRepositoryForTest = (): UserFeatureOverridesRepository => {
+  return {
+    findByUserId: jest.fn(),
+    upsert: jest.fn(),
+  };
+};
+
 const testFactory = {
   getUsersRepositoryForTest,
   getProductsRepositoryForTest,
@@ -86,6 +94,7 @@ const testFactory = {
   getTiersRepository,
   getUsersTiersRepository,
   getLicenseCodesRepositoryForTest,
+  getUserFeaturesOverridesRepositoryForTest,
 };
 
 export default testFactory;

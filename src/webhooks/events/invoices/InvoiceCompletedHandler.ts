@@ -1,19 +1,23 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
 import { FastifyBaseLogger } from 'fastify';
-import { PaymentService, PriceMetadata } from '../../../services/payment.service';
+import { PaymentService } from '../../../services/payment.service';
+import { PriceMetadata } from '../../../types/stripe';
 import { User, UserType } from '../../../core/users/User';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
-import { UserNotFoundError, CouponNotBeingTrackedError, UsersService } from '../../../services/users.service';
+import { UsersService } from '../../../services/users.service';
 import { StorageService } from '../../../services/storage.service';
 import { NotFoundError } from '../../../errors/Errors';
 import CacheService from '../../../services/cache.service';
 import { Service, Tier } from '../../../core/users/Tier';
 import Logger from '../../../Logger';
+import { UserNotFoundError } from '../../../errors/PaymentErrors';
+import { Customer } from '../../../infrastructure/domain/entities/customer';
+import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
 
 export interface InvoiceCompletedHandlerPayload {
-  customer: Stripe.Customer;
+  customer: Customer;
   invoice: Stripe.Invoice;
   status: string;
 }
@@ -306,7 +310,7 @@ export class InvoiceCompletedHandler {
     tier,
   }: {
     user: User & { email: string };
-    customer: Stripe.Customer;
+    customer: Customer;
     isLifetimePlan: boolean;
     productId: string;
     totalQuantity: number;

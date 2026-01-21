@@ -1,174 +1,56 @@
 import Stripe from 'stripe';
-import jwt from 'jsonwebtoken';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
-import { BadRequestError, NotFoundError } from '../errors/Errors';
-import config from '../config';
+import { BadRequestError, InternalServerError, NotFoundError } from '../errors/Errors';
+import {
+  NotFoundSubscriptionError,
+  CouponCodeError,
+  InvalidSeatNumberError,
+  IncompatibleSubscriptionTypesError,
+  CustomerNotFoundError,
+  MissingParametersError,
+  NotFoundPlanByIdError,
+  PromoCodeIsNotValidError,
+  ExistingSubscriptionError,
+  InvalidTaxIdError,
+} from '../errors/PaymentErrors';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
-import { getStripeNewVersion } from './stripe';
-
-type Customer = Stripe.Customer;
-export type CustomerId = Customer['id'];
-type CustomerEmail = Customer['email'];
-
-type Price = Stripe.Price;
-type Plan = Stripe.Plan;
-
-type PriceId = Price['id'];
-export type PlanId = Plan['id'];
-
-type Subscription = Stripe.Subscription;
-type SubscriptionId = Subscription['id'];
-
-type Invoice = Stripe.Invoice;
-
-type SetupIntent = Stripe.SetupIntent;
-
-type PaymentMethod = Stripe.PaymentMethod;
-
-type CustomerSource = Stripe.CustomerSource;
-
-type HasUserAppliedCouponResponse = {
-  elegible: boolean;
-  reason?: Reason;
-};
-
-export interface ExtendedSubscription extends Subscription {
-  product?: Stripe.Product;
-}
-
-type RequestedPlanData = DisplayPrice & {
-  decimalAmount: number;
-  minimumSeats?: number;
-  maximumSeats?: number;
-  type?: UserType;
-};
-
-export interface RequestedPlan {
-  selectedPlan: RequestedPlanData;
-  upsellPlan?: RequestedPlanData;
-}
-
-export interface PromotionCode {
-  codeId: Stripe.PromotionCode['id'];
-  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
-  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
-}
-
-export interface SubscriptionCreated {
-  type: 'setup' | 'payment';
-  clientSecret: string;
-  subscriptionId?: string;
-  paymentIntentId?: string;
-}
-
-export interface PaymentIntentCrypto {
-  type: 'crypto';
-  id: string;
-  token: string;
-  payload: {
-    paymentRequestUri: string;
-    payAmount: number;
-    payCurrency: string;
-    paymentAddress: string;
-    url: string;
-    qrUrl: string;
-  };
-}
-
-export interface PaymentIntentFiat {
-  type: 'fiat';
-  clientSecret: string | null;
-  id: string;
-  invoiceStatus?: string;
-}
-
-export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
-
-export interface OldPaymentIntent {
-  clientSecret: string | null;
-  id: string;
-  invoiceStatus?: string;
-}
-
-export type Reason = {
-  name: 'prevent-cancellation' | 'pc-cloud-25';
-};
-
-const commonPaymentMethodTypes: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: [],
-  eur: ['bancontact', 'ideal', 'sofort'],
-};
-
-const additionalPaymentTypesForOneTime: Record<string, Stripe.Checkout.SessionCreateParams.PaymentMethodType[]> = {
-  usd: [],
-  eur: ['alipay', 'eps', 'giropay'],
-};
+import { stripeNewVersion } from './stripe';
+import { LicenseCode } from '../core/users/LicenseCode';
+import {
+  CustomerId,
+  CustomerEmail,
+  ExtendedSubscription,
+  PriceId,
+  PlanId,
+  Subscription,
+  SubscriptionId,
+  Invoice,
+  SetupIntent,
+  PaymentMethod,
+  CustomerSource,
+  Customer as StripeCustomer,
+} from '../types/stripe';
+import { PaymentIntent, PromotionCode, PriceByIdResponse, Reason } from '../types/payment';
+import {
+  RenewalPeriod,
+  PlanSubscription,
+  SubscriptionCreated,
+  RequestedPlan,
+  HasUserAppliedCouponResponse,
+} from '../types/subscription';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 const reasonFreeMonthsMap: Record<Reason['name'], number> = {
   'prevent-cancellation': 3,
   'pc-cloud-25': 6,
 };
-
-export type PriceMetadata = {
-  maxSpaceBytes: string;
-  planType: 'subscription' | 'one_time';
-};
-
-export enum RenewalPeriod {
-  Monthly = 'monthly',
-  Semiannually = 'semiannually',
-  Annually = 'annually',
-  Lifetime = 'lifetime',
-}
-
-export interface PlanSubscription {
-  status: string;
-  planId: string;
-  productId: string;
-  name: string;
-  simpleName: string;
-  type: UserType;
-  price: number;
-  monthlyPrice: number;
-  currency: string;
-  isTeam: boolean;
-  paymentInterval: string;
-  isLifetime: boolean;
-  renewalPeriod: RenewalPeriod;
-  storageLimit: number;
-  amountOfSeats: number;
-  seats?: {
-    minimumSeats: number;
-    maximumSeats: number;
-  };
-}
-
-export interface PromotionCode {
-  promoCodeName: Stripe.PromotionCode['code'];
-  codeId: Stripe.PromotionCode['id'];
-  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
-  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
-}
-
-export interface PriceByIdResponse {
-  minimumSeats?: number;
-  maximumSeats?: number;
-  id: string;
-  currency: string;
-  amount: number;
-  bytes: number;
-  interval: string | undefined;
-  decimalAmount: number;
-  type: UserType;
-  product: string;
-}
 
 export class PaymentService {
   constructor(
@@ -176,12 +58,6 @@ export class PaymentService {
     private readonly productsRepository: ProductsRepository,
     private readonly bit2MeService: Bit2MeService,
   ) {}
-
-  async createCustomer(payload: Stripe.CustomerCreateParams): Promise<Stripe.Customer> {
-    const customer = await this.provider.customers.create(payload);
-
-    return customer;
-  }
 
   async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
     try {
@@ -200,30 +76,6 @@ export class PaymentService {
 
       throw err;
     }
-  }
-
-  // TODO: Remove this useless function
-  async createOrGetCustomer(payload: Stripe.CustomerCreateParams, country?: string, companyVatId?: string) {
-    if (!payload.email) {
-      throw new MissingParametersError(['email']);
-    }
-
-    const { data: customer } = await this.provider.customers.search({
-      query: `email:'${payload.email}'`,
-    });
-    const userExists = !!customer.length;
-
-    if (userExists) {
-      await this.getVatIdAndAttachTaxIdToCustomer(customer[0].id, country, companyVatId);
-
-      return customer[0];
-    }
-
-    const newCustomer = await this.createCustomer(payload);
-
-    await this.getVatIdAndAttachTaxIdToCustomer(newCustomer.id, country, companyVatId);
-
-    return newCustomer;
   }
 
   public async checkIfCouponIsAplicable(customerId: CustomerId, promoCodeId: Stripe.PromotionCode['id']) {
@@ -411,6 +263,7 @@ export class PaymentService {
     customerId,
     priceId,
     userEmail,
+    userAddress,
     currency,
     promoCodeId,
     additionalInvoiceOptions,
@@ -418,6 +271,7 @@ export class PaymentService {
     customerId: string;
     priceId: string;
     userEmail: string;
+    userAddress: string;
     currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
@@ -426,7 +280,6 @@ export class PaymentService {
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
     const paymentMethodTypes =
       normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
-    const stripeNewVersion = getStripeNewVersion();
 
     const invoice = await stripeNewVersion.invoices.create({
       customer: customerId,
@@ -465,32 +318,46 @@ export class PaymentService {
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
 
+      const customer = await stripePaymentsAdapter.getCustomer(customerId);
+
+      const customerName = customer.name;
+      const customerAddress = customer.address?.line1;
+      const customerCity = customer.address?.city;
+      const customerCountry = customer.address?.country;
+      const customerPostalCode = customer.address?.postalCode;
+
+      if (!customerName || !customerAddress || !customerCity || !customerCountry || !customerPostalCode) {
+        throw new BadRequestError('Customer address information is incomplete');
+      }
+
       const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
-
       Logger.info(
         `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
       );
 
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice({
-        description: `Payment for lifetime product ${priceId}`,
-        priceAmount,
-        priceCurrency: normalizedCurrencyForStripe.toUpperCase(),
-        title: `Invoice from Stripe ${invoiceId}`,
-        securityToken: jwt.sign(
-          {
-            invoiceId: invoiceId,
-            customerId: customerId,
-            provider: 'stripe',
-          },
-          config.JWT_SECRET,
-        ),
-        foreignId: invoiceId,
-        cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
-        successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
-        purchaserEmail: userEmail,
+      const cryptoInvoicePayload = this.bit2MeService.generateInvoicePayload({
+        currency: normalizedCurrencyForStripe.toUpperCase(),
+        customerId,
+        priceAmount: priceAmount,
+        priceId,
+        stripeInvoiceId: invoiceId,
+        userData: {
+          name: customerName,
+          email: userEmail,
+          userPublicAddress: userAddress,
+          address: customerAddress,
+          city: customerCity,
+          country: customerCountry,
+          postalCode: customerPostalCode,
+        },
+        userEmail,
       });
+
+      Logger.info(`Crypto invoice payload for customer ${customer.id}: ${JSON.stringify(cryptoInvoicePayload)}`);
+
+      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice(cryptoInvoicePayload);
 
       await this.updateInvoice(invoiceId, {
         metadata: {
@@ -560,16 +427,11 @@ export class PaymentService {
     };
   }
 
-  async updateCustomerBillingInfo(
+  async subscribe(
     customerId: CustomerId,
-    payload: Pick<Stripe.CustomerUpdateParams, 'address' | 'phone'>,
-  ): Promise<Stripe.Customer> {
-    const customer = await this.provider.customers.update(customerId, payload);
-
-    return customer;
-  }
-
-  async subscribe(customerId: CustomerId, priceId: PriceId): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
+    priceId: PriceId,
+    licenseCode?: Pick<LicenseCode, 'code' | 'provider'>,
+  ): Promise<{ maxSpaceBytes: number; recurring: boolean }> {
     const price = await this.provider.prices.retrieve(priceId);
     const isRecurring = price.type === 'recurring';
 
@@ -587,12 +449,17 @@ export class PaymentService {
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': licenseCode?.code ?? null,
+          'affiliate-provider': licenseCode?.provider ?? null,
+        },
       });
 
       await this.provider.invoiceItems.create({
         customer: customerId,
         price: priceId,
-        description: 'One-time charge',
+        quantity: 0,
+        description: licenseCode?.provider ? `Affiliate sale via ${licenseCode.provider}` : 'One-time charge',
         invoice: invoice.id,
       });
 
@@ -849,7 +716,7 @@ export class PaymentService {
     });
   }
 
-  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<Customer[]> {
+  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<StripeCustomer[]> {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
     return res.data;
@@ -1027,12 +894,6 @@ export class PaymentService {
     return (
       (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
     );
-  }
-
-  getPaymentMethod(paymentMethod: string | Stripe.PaymentMethod): Promise<PaymentMethod> {
-    return typeof paymentMethod === 'string'
-      ? this.provider.paymentMethods.retrieve(paymentMethod)
-      : this.provider.paymentMethods.retrieve(paymentMethod.id);
   }
 
   async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
@@ -1345,20 +1206,11 @@ export class PaymentService {
       };
     } catch (err) {
       const error = err as Error;
-      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price'))
+      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price')) {
         throw new NotFoundPlanByIdError(priceId);
-      throw new Error('Interval Server Error');
+      }
+      throw new InternalServerError();
     }
-  }
-
-  private getPaymentMethodTypes(
-    currency: string,
-    isOneTime: boolean,
-  ): Stripe.Checkout.SessionCreateParams.PaymentMethodType[] {
-    const commonPaymentTypes = commonPaymentMethodTypes[currency];
-    const additionalPaymentTypes = isOneTime ? additionalPaymentTypesForOneTime[currency] : [];
-
-    return ['card', 'paypal', ...commonPaymentTypes, ...additionalPaymentTypes];
   }
 
   /**
@@ -1443,38 +1295,10 @@ export class PaymentService {
     };
   }
 
-  async checkActiveSubscriptions(customerId: string, productType: UserType): Promise<void> {
-    let activeSubscriptions;
-    try {
-      activeSubscriptions =
-        productType === 'business'
-          ? await this.findBusinessActiveSubscription(customerId)
-          : await this.findIndividualActiveSubscription(customerId);
-    } catch (error) {
-      if (!(error instanceof NotFoundSubscriptionError)) {
-        throw error;
-      }
-    }
-
-    if (activeSubscriptions) {
-      throw new ExistingSubscriptionError('User already has an active subscription of the same type');
-    }
-  }
-
-  async getCheckoutLineItems(checkoutSessionId: string) {
-    return this.provider.checkout.sessions.listLineItems(checkoutSessionId, {
-      expand: ['data.price.product'],
-    });
-  }
-
   async getInvoiceLineItems(invoiceId: string) {
     return this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
-  }
-
-  getCustomer(customerId: CustomerId) {
-    return this.provider.customers.retrieve(customerId);
   }
 
   getInvoice(invoiceId: Stripe.Invoice['id']) {
@@ -1618,52 +1442,6 @@ export class PaymentService {
     });
   }
 
-  async billCardVerificationCharge(customerId: string, currency: string, paymentMethodId?: PaymentMethod['id']) {
-    const methods = paymentMethodId
-      ? [
-          {
-            id: paymentMethodId,
-          },
-        ]
-      : await this.getCustomerPaymentMethods(customerId);
-
-    if (methods.length === 0) {
-      throw new Error(`No payment methods found for customer ${customerId}`);
-    }
-    const [firstMethod] = methods;
-
-    console.log(`Payment method ${firstMethod.id} found for customer ${customerId}`);
-
-    const { data: charges } = await this.provider.charges.list({
-      customer: customerId,
-      limit: 100,
-    });
-    const oneTimeChargesWithThatPaymentMethod = charges.filter(
-      (c) => c.paid && c.metadata.type === 'object-storage' && c.payment_method === firstMethod.id,
-    );
-    const paymentMethodAlreadyVerified = oneTimeChargesWithThatPaymentMethod.length > 0;
-
-    if (paymentMethodAlreadyVerified) {
-      console.info(`Payment method ${firstMethod.id} has been already verified, skipping one time charge`);
-      return;
-    }
-
-    console.log(`Payment method ${firstMethod.id} is going to be charged in order to verify it`);
-
-    await this.provider.paymentIntents.create({
-      amount: 100,
-      currency,
-      metadata: {
-        type: 'object-storage',
-      },
-      customer: customerId,
-      description: 'Card verification charge',
-      payment_method: firstMethod.id,
-      off_session: true,
-      confirm: true,
-    });
-  }
-
   async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
     return this.provider.charges.retrieve(chargeId);
   }
@@ -1766,44 +1544,6 @@ export class PaymentService {
     });
   }
 
-  async updateCustomer(
-    customerId: Stripe.Customer['id'],
-    updatableAttributes: {
-      customer?: Partial<Pick<Stripe.CustomerUpdateParams, 'name'>>;
-      tax?: {
-        id: string;
-        type: Stripe.TaxIdCreateParams.Type;
-      };
-    },
-    additionalOptions?: Partial<Stripe.CustomerUpdateParams>,
-  ): Promise<void> {
-    if (updatableAttributes.customer && Object.keys(updatableAttributes.customer).length > 0) {
-      await this.provider.customers.update(customerId, {
-        name: updatableAttributes.customer.name,
-        ...additionalOptions,
-      });
-    }
-    if (updatableAttributes.tax) {
-      await this.provider.taxIds.create({
-        owner: {
-          customer: customerId,
-          type: 'customer',
-        },
-
-        type: updatableAttributes.tax.type,
-        value: updatableAttributes.tax.id,
-      });
-    }
-  }
-
-  async getCustomerPaymentMethods(customerId: Stripe.Customer['id']): Promise<Stripe.PaymentMethod[]> {
-    const res = await this.provider.paymentMethods.list({
-      customer: customerId,
-    });
-
-    return res.data;
-  }
-
   async getCryptoCurrencies() {
     const currencies = await this.bit2MeService.getCurrencies();
 
@@ -1814,107 +1554,5 @@ export class PaymentService {
     const invoice = await this.bit2MeService.getInvoice(invoiceId);
 
     return invoice.status === 'paid';
-  }
-}
-
-export class NotFoundSubscriptionError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, NotFoundSubscriptionError.prototype);
-  }
-}
-export class CouponCodeError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, CouponCodeError.prototype);
-  }
-}
-
-export class InvalidSeatNumberError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, InvalidSeatNumberError.prototype);
-  }
-}
-
-export class IncompatibleSubscriptionTypesError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, IncompatibleSubscriptionTypesError.prototype);
-  }
-}
-export class CustomerNotFoundError extends Error {
-  constructor(email: string) {
-    super(`Customer with email ${email} does not exist`);
-    Object.setPrototypeOf(this, CustomerNotFoundError.prototype);
-  }
-}
-
-export class MissingParametersError extends Error {
-  constructor(params: string[]) {
-    const missingParams = params.concat(', ');
-    super(`You must provide the following parameters: ${missingParams}`);
-
-    Object.setPrototypeOf(this, MissingParametersError.prototype);
-  }
-}
-
-export class NotFoundPlanByIdError extends Error {
-  constructor(priceId: string) {
-    super(`Plan with an id ${priceId} does not exist`);
-
-    Object.setPrototypeOf(this, NotFoundPlanByIdError.prototype);
-  }
-}
-
-export class NotFoundPromoCodeByNameError extends Error {
-  constructor(promoCodeId: string) {
-    super(`Promotion code with an id ${promoCodeId} does not exist`);
-
-    Object.setPrototypeOf(this, NotFoundPromoCodeByNameError.prototype);
-  }
-}
-
-export class PromoCodeIsNotValidError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, PromoCodeIsNotValidError.prototype);
-  }
-}
-
-export class ExistingSubscriptionError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, ExistingSubscriptionError.prototype);
-  }
-}
-
-export class UserAlreadyExistsError extends Error {
-  constructor(email: string) {
-    super(`User with email ${email} already exists.`);
-
-    Object.setPrototypeOf(this, UserAlreadyExistsError.prototype);
-  }
-}
-
-export class InvalidTaxIdError extends Error {
-  constructor() {
-    super('The provided Tax ID is invalid');
-
-    Object.setPrototypeOf(this, InvalidTaxIdError.prototype);
-  }
-}
-
-export class UpdateWorkspaceError extends Error {
-  constructor(message: string) {
-    super(message);
-
-    Object.setPrototypeOf(this, UpdateWorkspaceError.prototype);
   }
 }

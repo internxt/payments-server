@@ -1,13 +1,14 @@
 import axios from 'axios';
 import Stripe from 'stripe';
 
-import { ExtendedSubscription } from '../../../src/services/payment.service';
-import { CouponNotBeingTrackedError, UserNotFoundError } from '../../../src/services/users.service';
+import { ExtendedSubscription } from '../../../src/types/stripe';
 import config from '../../../src/config';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { getActiveSubscriptions, getCoupon, getCustomer, getUser, newTier, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { Service } from '../../../src/core/users/Tier';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { CouponNotBeingTrackedError } from '../../../src/errors/UsersErrors';
 
 jest.mock('jsonwebtoken', () => ({
   ...jest.requireActual('jsonwebtoken'),
@@ -422,6 +423,33 @@ describe('UsersService tests', () => {
           'Content-Type': 'application/json',
         },
       });
+    });
+  });
+
+  describe('Override Drive Limit', () => {
+    test('When called with a feature, then overrides the drive limit for the user', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const userUuid = mockedUser.uuid;
+      const feature = Service.Cli;
+
+      const axiosPostSpy = jest.spyOn(axios, 'put').mockResolvedValue({});
+
+      await usersService.overrideDriveLimit({ userUuid, feature, enabled: true });
+
+      expect(axiosPostSpy).toHaveBeenCalledTimes(1);
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
+        {
+          feature,
+          value: 'true',
+        },
+        {
+          headers: {
+            Authorization: 'Bearer undefined',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
     });
   });
 });

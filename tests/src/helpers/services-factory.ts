@@ -23,6 +23,8 @@ import { DetermineLifetimeConditions } from '../../../src/core/users/DetermineLi
 import { ObjectStorageWebhookHandler } from '../../../src/webhooks/events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getLogger } from '../fixtures';
+import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
+import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 
 export interface TestServices {
   stripe: Stripe;
@@ -38,6 +40,7 @@ export interface TestServices {
   determineLifetimeConditions: DetermineLifetimeConditions;
   objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;
+  userFeaturesOverridesService: UserFeaturesOverridesService;
 }
 
 export interface TestRepositories {
@@ -49,6 +52,7 @@ export interface TestRepositories {
   usersTiersRepository: UsersTiersRepository;
   productsRepository: ProductsRepository;
   licenseCodesRepository: LicenseCodesRepository;
+  userFeatureOverridesRepository: UserFeatureOverridesRepository;
 }
 
 export interface TestServiceOverrides {
@@ -64,6 +68,7 @@ const createRepositories = (): TestRepositories => ({
   usersTiersRepository: testFactory.getUsersTiersRepository(),
   productsRepository: testFactory.getProductsRepositoryForTest(),
   licenseCodesRepository: testFactory.getLicenseCodesRepositoryForTest(),
+  userFeatureOverridesRepository: testFactory.getUserFeaturesOverridesRepositoryForTest(),
 });
 
 export const createTestServices = (overrides: TestServiceOverrides = {}): TestServices & TestRepositories => {
@@ -85,21 +90,16 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const cacheService = new CacheService(config);
   const tiersService = new TiersService(
     usersService,
-    paymentService,
     repositories.tiersRepository,
     repositories.usersTiersRepository,
     storageService,
-    config,
   );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
-    storageService,
     licenseCodesRepository: repositories.licenseCodesRepository,
-    tiersService,
   });
   const objectStorageService = new ObjectStorageService(paymentService, config, axios);
-  const productsService = new ProductsService(tiersService, usersService);
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
@@ -112,6 +112,11 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     usersService,
     cacheService,
   });
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(
+    usersService,
+    repositories.userFeatureOverridesRepository,
+  );
+  const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
 
   return {
     stripe,
@@ -127,6 +132,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     determineLifetimeConditions,
     objectStorageWebhookHandler,
     invoiceCompletedHandler,
+    userFeaturesOverridesService,
     ...repositories,
   };
 };

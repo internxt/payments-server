@@ -2,13 +2,12 @@ import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
-import { AppConfig } from '../config';
-import { CustomerId, NotFoundSubscriptionError, PaymentService } from './payment.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
+import { Customer } from '../infrastructure/domain/entities/customer';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -34,22 +33,12 @@ export class NoSubscriptionSeatsProvidedError extends Error {
   }
 }
 
-export const ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS = [
-  'prod_RY24Z7Axqaz1tG',
-  'prod_RY27zjzWZWuzEO',
-  'prod_RY29StsWXwy8Wu',
-  'prod_QRYvMG6BX0TUoU',
-  'prod_QRYtuEtAKhHqIN',
-];
-
 export class TiersService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly paymentService: PaymentService,
     private readonly tiersRepository: TiersRepository,
     private readonly usersTiersRepository: UsersTiersRepository,
     private readonly storageService: StorageService,
-    private readonly config: AppConfig,
   ) {}
 
   async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
@@ -110,98 +99,6 @@ export class TiersService {
     return tier;
   }
 
-  // !TODO: Remove this function and use getTierProductsByProductsId() instead when we have the tiers collection
-  async getProductsTier(
-    customerId: CustomerId,
-    isLifetime: boolean,
-  ): Promise<{ featuresPerService: { antivirus: boolean; backups: boolean } }> {
-    let productId;
-    let isLifetimePaidOutOfBand = false;
-    const userSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
-    const activeUserSubscription = userSubscriptions.find(
-      (subscription) => subscription.status === 'active' || subscription.status === 'trialing',
-    );
-    const hasActiveSubscription = !!activeUserSubscription;
-
-    if (!hasActiveSubscription && !isLifetime) {
-      throw new NotFoundSubscriptionError('User has no active subscriptions');
-    }
-
-    if (activeUserSubscription?.product?.id) {
-      productId = activeUserSubscription?.product?.id;
-    }
-
-    if (isLifetime) {
-      const lifetimeInvoices = await this.paymentService.getInvoicesFromUser(customerId, {});
-      const paidInvoices = lifetimeInvoices.filter((invoice) => invoice.status === 'paid');
-
-      for (const invoice of paidInvoices) {
-        const lineItem = invoice.lines?.data[0];
-        const product = lineItem?.price?.product as string | undefined;
-        const invoiceMetadata = invoice.metadata;
-        const invoiceMetadataProvider = invoiceMetadata?.provider;
-        const isBit2MeProvider = invoiceMetadataProvider === 'bit2me';
-        const isExternalPayment = invoice.paid_out_of_band && !isBit2MeProvider;
-
-        if (isExternalPayment) {
-          isLifetimePaidOutOfBand = true;
-          break;
-        }
-
-        if (product && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(product)) {
-          productId = product;
-          break;
-        }
-      }
-    }
-
-    const hasToolsAccess = !!(productId && ALLOWED_PRODUCT_IDS_FOR_ANTIVIRUS.includes(productId));
-    const hasBackupsAccess = (isLifetime && !isLifetimePaidOutOfBand) || hasActiveSubscription;
-
-    return {
-      featuresPerService: {
-        antivirus: hasToolsAccess,
-        backups: hasBackupsAccess,
-      },
-    };
-  }
-
-  async applyTier(
-    userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Stripe.Customer,
-    amountOfSeats: Stripe.InvoiceLineItem['quantity'],
-    productId: string,
-    log: FastifyBaseLogger,
-    alreadyEnabledServices?: Service[],
-  ): Promise<void> {
-    const tier = await this.tiersRepository.findByProductId({ productId });
-
-    if (!tier) {
-      throw new TierNotFoundError(`Tier for product ${productId} not found`);
-    }
-
-    for (const service of Object.keys(tier.featuresPerService)) {
-      const s = service as Service;
-
-      if (alreadyEnabledServices?.includes(s) || !tier.featuresPerService[s].enabled) {
-        continue;
-      }
-
-      switch (s) {
-        case Service.Drive:
-          await this.applyDriveFeatures(userWithEmail, customer, amountOfSeats, tier, log);
-          break;
-        case Service.Vpn:
-          await this.applyVpnFeatures(userWithEmail, tier);
-          break;
-
-        default:
-          // TODO;
-          break;
-      }
-    }
-  }
-
   async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
@@ -233,7 +130,7 @@ export class TiersService {
 
   async applyDriveFeatures(
     userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Stripe.Customer,
+    customer: Customer,
     subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
     log: FastifyBaseLogger,

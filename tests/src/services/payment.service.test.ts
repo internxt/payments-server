@@ -1,4 +1,4 @@
-import { Reason } from '../../../src/services/payment.service';
+import { Reason } from '../../../src/types/payment';
 import { UserType } from '../../../src/core/users/User';
 import {
   getCharge,
@@ -9,6 +9,8 @@ import {
   getCustomer,
   getInvoice,
   getInvoices,
+  getParsedCreatedInvoiceResponse,
+  getParsedInvoiceResponse,
   getPaymentIntent,
   getPaymentIntentResponse,
   getPaymentMethod,
@@ -18,11 +20,17 @@ import {
   getPromotionCodeResponse,
   getTaxes,
   getUser,
+  getValidUserToken,
 } from '../fixtures';
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
 import { stripeNewVersion } from '../../../src/services/stripe';
+import config from '../../../src/config';
+import { generateQrCodeUrl } from '../../../src/utils/generateQrCodeUrl';
+import jwt from 'jsonwebtoken';
+import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe, bit2MeService } = createTestServices();
@@ -30,25 +38,6 @@ describe('Payments Service tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
-  });
-
-  describe('Creating a customer', () => {
-    it('When trying to create a customer with the correct params, then the customer is created successfully', async () => {
-      const mockedCustomer = getCustomer();
-
-      const createCustomerPayload = {
-        email: mockedCustomer.email as string,
-        name: mockedCustomer.name as string,
-      };
-
-      const customerCreatedSpy = jest
-        .spyOn(paymentService, 'createCustomer')
-        .mockImplementation(() => Promise.resolve(mockedCustomer));
-
-      await paymentService.createCustomer(createCustomerPayload);
-
-      expect(customerCreatedSpy).toHaveBeenCalledWith(createCustomerPayload);
-    });
   });
 
   describe('Fetching the promotion code object', () => {
@@ -130,6 +119,7 @@ describe('Payments Service tests', () => {
         currency: mockedInvoice.lines.data[0].price?.currency as string,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       };
 
       const paymentIntentSpy = jest
@@ -197,6 +187,7 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toStrictEqual({
@@ -252,129 +243,209 @@ describe('Payments Service tests', () => {
         priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
         currency: mockedInvoice.lines.data[0].currency as string,
         userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
       });
 
       expect(paymentIntent).toEqual(mockedPaymentIntent);
     });
 
-    // describe('Crypto payments', () => {
-    //   test('When trying to purchase a product using a crypto currency, then the QR code link is returned', async () => {
-    //     const mockInvoiceTotal = 1000;
-    //     const mockedPrice = getPrice({
-    //       type: 'one_time',
-    //     });
-    //     const mockedPriceId = mockedPrice.id as string;
-    //     const mockInvoiceId = 'in_test_456';
-    //     const mockCustomerId = 'cus_test_789';
-    //     const mockUserEmail = 'test@example.com';
-    //     const mockCurrency = 'BTC';
+    describe('Crypto payments', () => {
+      test('When the user address information is not complete, then an error indicating so is thrown', async () => {
+        const mockInvoiceTotal = 1000;
+        const mockedCustomer = getCustomer({
+          address: undefined,
+        });
+        const mockedCustomerEmail = mockedCustomer.email as string;
+        const mockedCustomerId = mockedCustomer.id as string;
+        const mockedPrice = getPrice({
+          type: 'one_time',
+        });
+        const mockedPriceId = mockedPrice.id as string;
+        const mockInvoiceId = 'in_test_456';
+        const mockCurrency = 'BTC';
 
-    //     const mockedInvoice = getInvoice({
-    //       id: mockInvoiceId,
-    //       customer: mockCustomerId,
-    //       customer_email: mockUserEmail,
-    //       status: 'open',
-    //       payments: {
-    //         data: [
-    //           {
-    //             payment: {
-    //               payment_intent: 'payment_intent_id',
-    //             },
-    //           },
-    //         ],
-    //       },
-    //       total: mockInvoiceTotal,
-    //       amount_remaining: mockInvoiceTotal,
-    //       lines: {
-    //         data: [
-    //           {
-    //             amount: mockInvoiceTotal,
-    //             pricing: {
-    //               price_details: {
-    //                 price: mockedPriceId,
-    //               },
-    //             },
-    //             currency: 'eth',
-    //           },
-    //         ],
-    //       },
-    //     });
+        const mockedInvoice = getInvoice({
+          id: mockInvoiceId,
+          customer: mockedCustomerId,
+          customer_email: mockedCustomerEmail,
+          status: 'open',
+          payments: {
+            data: [
+              {
+                payment: {
+                  payment_intent: 'payment_intent_id',
+                },
+              },
+            ],
+          },
+          total: mockInvoiceTotal,
+          amount_remaining: mockInvoiceTotal,
+          lines: {
+            data: [
+              {
+                amount: mockInvoiceTotal,
+                pricing: {
+                  price_details: {
+                    price: mockedPriceId,
+                  },
+                },
+                currency: 'eth',
+              },
+            ],
+          },
+        });
 
-    //     const mockedParsedInvoiceResponse = getParsedInvoiceResponse();
-    //     const mockedParsedCreatedInvoiceResponse = getParsedCreatedInvoiceResponse({
-    //       status: 'new',
-    //     });
+        jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+        jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockRejectedValue(new BadRequestError());
+        jest
+          .spyOn(stripeNewVersion.invoices, 'create')
+          .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+        jest
+          .spyOn(stripeNewVersion.invoiceItems, 'create')
+          .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
 
-    //     const expectedSecurityToken = jwt.sign(
-    //       {
-    //         invoiceId: mockInvoiceId,
-    //         customerId: mockCustomerId,
-    //         provider: 'stripe',
-    //       },
-    //       config.JWT_SECRET,
-    //     );
+        await expect(
+          paymentService.createInvoice({
+            customerId: mockedCustomerId,
+            priceId: mockedPriceId,
+            currency: mockCurrency,
+            userEmail: mockedCustomerEmail,
+            userAddress: '1.1.1.1',
+          }),
+        ).rejects.toThrow(BadRequestError);
+      });
 
-    //     jest
-    //       .spyOn(stripeNewVersion.invoices, 'create')
-    //       .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-    //     jest
-    //       .spyOn(stripeNewVersion.invoiceItems, 'create')
-    //       .mockResolvedValue(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
+      test('When trying to purchase a product using a crypto currency, then the QR code link is returned', async () => {
+        const mockInvoiceTotal = 1000;
+        const mockedCustomer = getCustomer();
+        const mockedCustomerEmail = mockedCustomer.email as string;
+        const mockedCustomerId = mockedCustomer.id as string;
+        const mockedPrice = getPrice({
+          type: 'one_time',
+        });
+        const mockedPriceId = mockedPrice.id as string;
+        const mockInvoiceId = 'in_test_456';
+        const mockCurrency = 'BTC';
 
-    //     jest.spyOn(stripeNewVersion.invoices, 'update').mockImplementation();
-    //     jest
-    //       .spyOn(stripeNewVersion.invoices, 'retrieve')
-    //       .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-    //     jest
-    //       .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
-    //       .mockResolvedValue(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-    //     jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
-    //     const createCryptoInvoiceSpy = jest
-    //       .spyOn(bit2MeService, 'createCryptoInvoice')
-    //       .mockResolvedValueOnce(mockedParsedCreatedInvoiceResponse);
-    //     const checkoutInvoiceSpy = jest
-    //       .spyOn(bit2MeService, 'checkoutInvoice')
-    //       .mockResolvedValueOnce(mockedParsedInvoiceResponse);
+        const mockedInvoice = getInvoice({
+          id: mockInvoiceId,
+          customer: mockedCustomerId,
+          customer_email: mockedCustomerEmail,
+          status: 'open',
+          payments: {
+            data: [
+              {
+                payment: {
+                  payment_intent: 'payment_intent_id',
+                },
+              },
+            ],
+          },
+          total: mockInvoiceTotal,
+          amount_remaining: mockInvoiceTotal,
+          lines: {
+            data: [
+              {
+                amount: mockInvoiceTotal,
+                pricing: {
+                  price_details: {
+                    price: mockedPriceId,
+                  },
+                },
+                currency: 'eth',
+              },
+            ],
+          },
+        });
 
-    //     const paymentIntent = await paymentService.createInvoice({
-    //       customerId: mockCustomerId,
-    //       priceId: mockedPriceId,
-    //       currency: mockCurrency,
-    //       userEmail: mockUserEmail,
-    //     });
+        const mockedParsedInvoiceResponse = getParsedInvoiceResponse();
+        const mockedParsedCreatedInvoiceResponse = getParsedCreatedInvoiceResponse({
+          status: 'new',
+        });
 
-    //     expect(paymentIntent).toStrictEqual({
-    //       id: mockedInvoice.payments?.data[0].payment.payment_intent as string,
-    //       type: 'crypto',
-    //       token: getValidUserToken({ invoiceId: mockedParsedInvoiceResponse.invoiceId }),
-    //       payload: {
-    //         paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
-    //         url: mockedParsedInvoiceResponse.url,
-    //         qrUrl: generateQrCodeUrl({ data: mockedParsedInvoiceResponse.paymentRequestUri }),
-    //         payAmount: mockedParsedInvoiceResponse.payAmount,
-    //         payCurrency: mockedParsedInvoiceResponse.payCurrency,
-    //         paymentAddress: mockedParsedInvoiceResponse.paymentAddress,
-    //       },
-    //     });
+        const expectedSecurityToken = jwt.sign(
+          {
+            invoiceId: mockInvoiceId,
+            customerId: mockedCustomerId,
+            provider: 'stripe',
+          },
+          config.JWT_SECRET,
+        );
 
-    //     expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
-    //       description: `Payment for lifetime product ${mockedPriceId}`,
-    //       priceAmount: mockInvoiceTotal / 100,
-    //       priceCurrency: 'EUR',
-    //       title: `Invoice from Stripe ${mockInvoiceId}`,
-    //       securityToken: expectedSecurityToken,
-    //       foreignId: mockInvoiceId,
-    //       cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
-    //       successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
-    //       purchaserEmail: mockUserEmail,
-    //     });
+        jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValueOnce(Customer.toDomain(mockedCustomer));
+        jest
+          .spyOn(stripeNewVersion.invoices, 'create')
+          .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+        jest
+          .spyOn(stripeNewVersion.invoiceItems, 'create')
+          .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
 
-    //     expect(checkoutInvoiceSpy).toHaveBeenCalledWith(
-    //       mockedParsedCreatedInvoiceResponse.invoiceId,
-    //       mockCurrency.toUpperCase(),
-    //     );
-    //   });
-    // });
+        jest.spyOn(stripe.invoices, 'update').mockImplementation();
+        jest
+          .spyOn(stripeNewVersion.invoices, 'retrieve')
+          .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+        jest
+          .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+          .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+        jest.spyOn(paymentService, 'getPrice').mockResolvedValue(mockedPrice);
+        const createCryptoInvoiceSpy = jest
+          .spyOn(bit2MeService, 'createCryptoInvoice')
+          .mockResolvedValueOnce(mockedParsedCreatedInvoiceResponse);
+        const checkoutInvoiceSpy = jest
+          .spyOn(bit2MeService, 'checkoutInvoice')
+          .mockResolvedValueOnce(mockedParsedInvoiceResponse);
+
+        const paymentIntent = await paymentService.createInvoice({
+          customerId: mockedCustomerId,
+          priceId: mockedPriceId,
+          currency: mockCurrency,
+          userEmail: mockedCustomerEmail as string,
+          userAddress: '1.1.1.1',
+        });
+
+        expect(paymentIntent).toStrictEqual({
+          id: mockedInvoice.payments?.data[0].payment.payment_intent as string,
+          type: 'crypto',
+          token: getValidUserToken({ invoiceId: mockedParsedInvoiceResponse.invoiceId }),
+          payload: {
+            paymentRequestUri: mockedParsedInvoiceResponse.paymentRequestUri,
+            url: mockedParsedInvoiceResponse.url,
+            qrUrl: generateQrCodeUrl({ data: mockedParsedInvoiceResponse.paymentRequestUri }),
+            payAmount: mockedParsedInvoiceResponse.payAmount,
+            payCurrency: mockedParsedInvoiceResponse.payCurrency,
+            paymentAddress: mockedParsedInvoiceResponse.paymentAddress,
+          },
+        });
+
+        expect(createCryptoInvoiceSpy).toHaveBeenCalledWith({
+          description: `Payment for lifetime product ${mockedPriceId}`,
+          priceAmount: mockInvoiceTotal / 100,
+          priceCurrency: 'EUR',
+          title: `Invoice from Stripe ${mockInvoiceId}`,
+          securityToken: expectedSecurityToken,
+          foreignId: mockInvoiceId,
+          cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
+          successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
+          purchaserEmail: mockedCustomerEmail,
+          shopper: {
+            addressLine: mockedCustomer.address?.line1,
+            city: mockedCustomer.address?.city,
+            countryOfResidence: mockedCustomer.address?.country,
+            email: mockedCustomerEmail,
+            firstName: mockedCustomer.name?.split(' ')[0],
+            ipAddress: '1.1.1.1',
+            lastName: mockedCustomer.name?.split(' ')[1],
+            postalCode: mockedCustomer.address?.postal_code,
+            type: 'personal',
+          },
+        });
+
+        expect(checkoutInvoiceSpy).toHaveBeenCalledWith(
+          mockedParsedCreatedInvoiceResponse.invoiceId,
+          mockCurrency.toUpperCase(),
+        );
+      });
+    });
   });
 
   describe('Get Crypto currencies', () => {
@@ -900,6 +971,158 @@ describe('Payments Service tests', () => {
       const invoice = await paymentService.getInvoice(mockedInvoice.id);
 
       expect(invoice).toStrictEqual(mockedInvoice);
+    });
+  });
+
+  describe('Subscribe', () => {
+    const customerId = 'cus_test_123';
+    const recurringPriceId = 'price_recurring_123';
+    const oneTimePriceId = 'price_onetime_123';
+
+    test('When subscribing with a recurring price, then it creates a subscription and returns the correct data', async () => {
+      const maxSpaceBytes = '107374182400';
+      const mockedPrice = getPrice({
+        id: recurringPriceId,
+        type: 'recurring',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedSubscription = getCreatedSubscription({
+        customer: customerId,
+        items: {
+          data: [
+            {
+              price: mockedPrice,
+            },
+          ],
+        } as any,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const subscriptionCreateSpy = jest
+        .spyOn(stripe.subscriptions, 'create')
+        .mockResolvedValue(mockedSubscription as Stripe.Response<Stripe.Subscription>);
+
+      const result = await paymentService.subscribe(customerId, recurringPriceId);
+
+      expect(stripe.prices.retrieve).toHaveBeenCalledWith(recurringPriceId);
+      expect(subscriptionCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        items: [
+          {
+            price: recurringPriceId,
+          },
+        ],
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: true,
+      });
+    });
+
+    test('When subscribing with a one-time price, then it creates an invoice, adds invoice items, pays out of band and returns the correct data', async () => {
+      const maxSpaceBytes = '107374182400';
+      const mockedPrice = getPrice({
+        id: oneTimePriceId,
+        type: 'one_time',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedInvoice = getInvoice({
+        id: 'inv_test_123',
+        customer: customerId,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const invoiceCreateSpy = jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      const invoiceItemCreateSpy = jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
+      const invoicePaySpy = jest
+        .spyOn(stripe.invoices, 'pay')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const result = await paymentService.subscribe(customerId, oneTimePriceId);
+
+      expect(stripe.prices.retrieve).toHaveBeenCalledWith(oneTimePriceId);
+      expect(invoiceCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        auto_advance: false,
+        pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': null,
+          'affiliate-provider': null,
+        },
+      });
+      expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        price: oneTimePriceId,
+        quantity: 0,
+        description: 'One-time charge',
+        invoice: mockedInvoice.id,
+      });
+      expect(invoicePaySpy).toHaveBeenCalledWith(mockedInvoice.id, {
+        paid_out_of_band: true,
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: false,
+      });
+    });
+
+    test('When subscribing with a one-time price and license code, then it includes license code information in the invoice metadata', async () => {
+      const maxSpaceBytes = '107374182400';
+      const licenseCode = {
+        code: 'AFFILIATE123',
+        provider: 'PartnerCompany',
+      };
+      const mockedPrice = getPrice({
+        id: oneTimePriceId,
+        type: 'one_time',
+        metadata: {
+          maxSpaceBytes,
+        },
+      });
+      const mockedInvoice = getInvoice({
+        id: 'inv_test_456',
+        customer: customerId,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
+      const invoiceCreateSpy = jest
+        .spyOn(stripe.invoices, 'create')
+        .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      const invoiceItemCreateSpy = jest
+        .spyOn(stripe.invoiceItems, 'create')
+        .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
+      jest.spyOn(stripe.invoices, 'pay').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+
+      const result = await paymentService.subscribe(customerId, oneTimePriceId, licenseCode);
+
+      expect(invoiceCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        auto_advance: false,
+        pending_invoice_items_behavior: 'include',
+        metadata: {
+          'affiliate-code': licenseCode.code,
+          'affiliate-provider': licenseCode.provider,
+        },
+      });
+      expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
+        customer: customerId,
+        price: oneTimePriceId,
+        quantity: 0,
+        description: expect.stringContaining(licenseCode.provider),
+        invoice: mockedInvoice.id,
+      });
+      expect(result).toEqual({
+        maxSpaceBytes: parseInt(maxSpaceBytes),
+        recurring: false,
+      });
     });
   });
 });
