@@ -124,6 +124,7 @@ describe('Products Service Tests', () => {
             [Service.darkMonitor]: { enabled: false },
             [Service.Cleaner]: { enabled: false },
             [Service.Cli]: { enabled: false },
+            [Service.rClone]: { enabled: false },
           },
         });
 
@@ -161,6 +162,7 @@ describe('Products Service Tests', () => {
             [Service.darkMonitor]: { enabled: true },
             [Service.Cleaner]: { enabled: true },
             [Service.Cli]: { enabled: true },
+            [Service.rClone]: { enabled: true },
           },
         });
 
@@ -330,6 +332,7 @@ describe('Products Service Tests', () => {
           [Service.darkMonitor]: { enabled: false },
           [Service.Cleaner]: { enabled: false },
           [Service.Cli]: { enabled: false },
+          [Service.rClone]: { enabled: false },
         },
       });
 
