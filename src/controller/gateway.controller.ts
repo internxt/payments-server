@@ -42,7 +42,7 @@ export function gatewayController({
             properties: {
               feature: {
                 type: 'string',
-                enum: [Service.Antivirus, Service.Backups, Service.Cleaner, Service.Cli],
+                enum: [Service.Antivirus, Service.Backups, Service.Cleaner, Service.Cli, Service.rClone],
               },
               userUuid: {
                 type: 'string',

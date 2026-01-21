@@ -131,6 +131,32 @@ describe('User Tier Override', () => {
       expect(upsertSpy).not.toHaveBeenCalled();
       expect(overrideDriveLimitSpy).not.toHaveBeenCalled();
     });
+
+    test('When the service is rClone, then the service should be enabled', async () => {
+      const mockedUser = getUser();
+      const rCloneService = Service.rClone;
+      const upsertPayload = {
+        userId: mockedUser.id,
+        featuresPerService: {
+          [rCloneService]: {
+            enabled: true,
+          },
+        },
+      };
+      const findByUserIdSpy = jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+      const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
+      const overrideDriveLimitSpy = jest.spyOn(usersService, 'overrideDriveLimit').mockResolvedValue();
+
+      await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, rCloneService);
+
+      expect(findByUserIdSpy).toHaveBeenCalledWith(mockedUser.id);
+      expect(upsertSpy).toHaveBeenCalledWith(upsertPayload);
+      expect(overrideDriveLimitSpy).toHaveBeenCalledWith({
+        userUuid: mockedUser.uuid,
+        feature: Service.rClone,
+        enabled: true,
+      });
+    });
   });
 
   describe('Get the custom user features', () => {

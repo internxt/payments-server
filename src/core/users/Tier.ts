@@ -51,6 +51,10 @@ interface CliFeatures {
   enabled: boolean;
 }
 
+interface RCloneFeatures {
+  enabled: boolean;
+}
+
 export enum Service {
   Drive = 'drive',
   Backups = 'backups',
@@ -61,6 +65,7 @@ export enum Service {
   Cli = 'cli',
   Cleaner = 'cleaner',
   darkMonitor = 'darkMonitor',
+  rClone = 'rclone',
 }
 
 export interface Tier {
@@ -78,5 +83,6 @@ export interface Tier {
     [Service.Cleaner]: CleanerFeatures;
     [Service.darkMonitor]: DarkMonitorFeatures;
     [Service.Cli]: CliFeatures;
+    [Service.rClone]: RCloneFeatures;
   };
 }
