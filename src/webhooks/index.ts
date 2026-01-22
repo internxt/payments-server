@@ -20,16 +20,25 @@ import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandl
 import Logger from '../Logger';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
-export default function (
-  stripe: Stripe,
-  storageService: StorageService,
-  usersService: UsersService,
-  paymentService: PaymentService,
-  config: AppConfig,
-  cacheService: CacheService,
-  objectStorageService: ObjectStorageService,
-  tiersService: TiersService,
-) {
+interface WebhooksParams {
+  storageService: StorageService;
+  usersService: UsersService;
+  paymentService: PaymentService;
+  config: AppConfig;
+  cacheService: CacheService;
+  objectStorageService: ObjectStorageService;
+  tiersService: TiersService;
+}
+
+export function providerWebhooksEvents({
+  storageService,
+  usersService,
+  paymentService,
+  config,
+  cacheService,
+  objectStorageService,
+  tiersService,
+}: WebhooksParams) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
       done(null, body);
@@ -40,7 +49,7 @@ export default function (
 
       let event: Stripe.Event;
       try {
-        event = stripe.webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_KEY);
+        event = stripePaymentsAdapter.getInstance().webhooks.constructEvent(req.body, sig, config.STRIPE_WEBHOOK_KEY);
       } catch (err) {
         if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
           Logger.info('Stripe event could not be verified');
@@ -64,7 +73,13 @@ export default function (
           break;
 
         case 'payment_intent.amount_capturable_updated':
-          await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe, fastify.log);
+          await handleFundsCaptured(
+            event.data.object,
+            paymentService,
+            objectStorageService,
+            stripePaymentsAdapter.getInstance(),
+            fastify.log,
+          );
           break;
 
         case 'customer.subscription.deleted':
@@ -76,8 +91,6 @@ export default function (
             cacheService,
             objectStorageService,
             tiersService,
-            fastify.log,
-            config,
           );
           break;
 
@@ -122,7 +135,6 @@ export default function (
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
           const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
           const handler = new InvoiceCompletedHandler({
-            logger: fastify.log,
             determineLifetimeConditions,
             objectStorageWebhookHandler,
             paymentService,
@@ -158,28 +170,25 @@ export default function (
                 event.data.object,
                 cacheService,
                 paymentService,
-                fastify.log,
                 tiersService,
-                config,
               );
             }
           }
           break;
 
-        case 'charge.dispute.closed':
+        case 'charge.dispute.closed': {
           const dispute = event.data.object;
           await handleDisputeResult({
             dispute,
-            stripe,
+            stripe: stripePaymentsAdapter.getInstance(),
             paymentService,
             usersService,
             storageService,
             cacheService,
             tiersService,
-            log: fastify.log,
-            config,
           });
           break;
+        }
 
         default:
           Logger.info(`No handler registered for event: ${event.type}, id: ${event.id}`);
