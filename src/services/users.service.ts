@@ -21,7 +21,7 @@ function signToken(duration: string, secret: string) {
   });
 }
 
-type OverrideServiceAvailable = Service.Cli;
+type OverrideServiceAvailable = Service.Cli | Service.rClone;
 
 export class UsersService {
   constructor(

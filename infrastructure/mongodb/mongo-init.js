@@ -76,6 +76,9 @@ db.tiers.insertMany([
       cli: {
         enabled: false,
       },
+      rclone: {
+        enabled: false,
+      },
       darkMonitor: {
         enabled: false,
       },
@@ -124,6 +127,9 @@ db.tiers.insertMany([
         enabled: false,
       },
       cli: {
+        enabled: false,
+      },
+      rclone: {
         enabled: false,
       },
       darkMonitor: {
@@ -177,6 +183,9 @@ db.tiers.insertMany([
       cli: {
         enabled: false,
       },
+      rclone: {
+        enabled: false,
+      },
       darkMonitor: {
         enabled: true,
       },
@@ -226,6 +235,9 @@ db.tiers.insertMany([
         enabled: true,
       },
       cli: {
+        enabled: true,
+      },
+      rclone: {
         enabled: true,
       },
       darkMonitor: {
@@ -279,6 +291,9 @@ db.tiers.insertMany([
       cli: {
         enabled: true,
       },
+      rclone: {
+        enabled: false,
+      },
       darkMonitor: {
         enabled: true,
       },
@@ -328,6 +343,9 @@ db.tiers.insertMany([
         enabled: false,
       },
       cli: {
+        enabled: false,
+      },
+      rclone: {
         enabled: false,
       },
       darkMonitor: {
@@ -381,6 +399,9 @@ db.tiers.insertMany([
       cli: {
         enabled: false,
       },
+      rclone: {
+        enabled: false,
+      },
       darkMonitor: {
         enabled: true,
       },
@@ -432,6 +453,9 @@ db.tiers.insertMany([
       cli: {
         enabled: true,
       },
+      rclone: {
+        enabled: true,
+      },
       darkMonitor: {
         enabled: true,
       },
@@ -481,6 +505,9 @@ db.tiers.insertMany([
         enabled: true,
       },
       cli: {
+        enabled: true,
+      },
+      rclone: {
         enabled: true,
       },
       darkMonitor: {

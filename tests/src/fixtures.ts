@@ -612,6 +612,7 @@ export const newTier = (params?: Partial<Tier>): Tier => {
       backups: { enabled: false },
       cleaner: { enabled: false },
       cli: { enabled: false },
+      rclone: { enabled: false },
       drive: {
         enabled: false,
         foreignTierId: randomUUID(),

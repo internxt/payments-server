@@ -34,17 +34,17 @@ export class UserFeaturesOverridesService {
         break;
 
       case Service.Cli:
-        await this.usersService.overrideDriveLimit({ userUuid, feature: Service.Cli, enabled: true });
+      case Service.rClone:
+        await this.usersService.overrideDriveLimit({ userUuid, feature: service, enabled: true });
 
         await this.userFeatureOverridesRepository.upsert({
           userId: userId,
           featuresPerService: {
-            [Service.Cli]: {
+            [service]: {
               enabled: true,
             },
           },
         });
-
         break;
 
       default:
