@@ -9,7 +9,7 @@ describe('Testing the users and tiers collection', () => {
   let client: MongoClient;
   let repository: MongoDBUsersTiersRepository;
 
-  async function createUserWithTier(userUuid: string, foreignTierId: string) {
+  async function createUserWithTier(userUuid: string, foreignTierId: string, isBusiness = false) {
     const usersCollection = client.db('payments').collection('users');
     const tiersCollection = client.db('payments').collection('tiers');
 
@@ -17,7 +17,7 @@ describe('Testing the users and tiers collection', () => {
     const insertedTier = await tiersCollection.insertOne({
       featuresPerService: {
         drive: {
-          workspaces: { enabled: false },
+          workspaces: { enabled: isBusiness },
           foreignTierId,
         },
       },
@@ -173,6 +173,24 @@ describe('Testing the users and tiers collection', () => {
       expect(userTiers[0]).toStrictEqual({
         userUuid: user1.uuid,
         foreignTierId: tier1.featuresPerService[Service.Drive].foreignTierId,
+      });
+    });
+
+    test('When getting user tier mappings for business users, then it should return only business tiers', async () => {
+      const personalUser = getUser();
+      const personalTier = newTier();
+      const businessUser = getUser();
+      const businessTier = newTier();
+
+      await createUserWithTier(personalUser.uuid, personalTier.featuresPerService[Service.Drive].foreignTierId, false);
+      await createUserWithTier(businessUser.uuid, businessTier.featuresPerService[Service.Drive].foreignTierId, true);
+
+      const userTiers = await repository.getUserTierMappings(true);
+
+      expect(userTiers).toHaveLength(1);
+      expect(userTiers[0]).toStrictEqual({
+        userUuid: businessUser.uuid,
+        foreignTierId: businessTier.featuresPerService[Service.Drive].foreignTierId,
       });
     });
   });
