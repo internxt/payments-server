@@ -36,16 +36,8 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
 
   async getUserTierMappings(
     isBusiness = false,
-    userId?: string,
+    userUuid?: string,
   ): Promise<Array<{ userUuid: string; foreignTierId: string }>> {
-    const matchStage: any = {
-      'featuresPerService.drive.workspaces.enabled': isBusiness,
-    };
-
-    if (userId) {
-      matchStage.uuid = userId;
-    }
-
     const results = await this.collection
       .aggregate([
         {
@@ -54,15 +46,6 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
             tierIdObj: { $toObjectId: '$tierId' },
           },
         },
-        ...(userId
-          ? [
-              {
-                $match: {
-                  userId: userId,
-                },
-              },
-            ]
-          : []),
         {
           $lookup: {
             from: 'users',
@@ -88,6 +71,7 @@ export class MongoDBUsersTiersRepository implements UsersTiersRepository {
         {
           $match: {
             'tier.featuresPerService.drive.workspaces.enabled': isBusiness,
+            ...(userUuid ? { 'user.uuid': userUuid } : {}),
           },
         },
         {

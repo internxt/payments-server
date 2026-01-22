@@ -2,11 +2,31 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
 import { MongoDBUsersTiersRepository } from '../../../../src/core/users/MongoDBUsersTiersRepository';
 import { getUser, newTier } from '../../fixtures';
+import { Service } from '../../../../src/core/users/Tier';
 
 describe('Testing the users and tiers collection', () => {
   let mongoServer: MongoMemoryServer;
   let client: MongoClient;
   let repository: MongoDBUsersTiersRepository;
+
+  async function createUserWithTier(userUuid: string, foreignTierId: string) {
+    const usersCollection = client.db('payments').collection('users');
+    const tiersCollection = client.db('payments').collection('tiers');
+
+    const insertedUser = await usersCollection.insertOne({ uuid: userUuid });
+    const insertedTier = await tiersCollection.insertOne({
+      featuresPerService: {
+        drive: {
+          workspaces: { enabled: false },
+          foreignTierId,
+        },
+      },
+    });
+
+    await repository.insertTierToUser(insertedUser.insertedId.toString(), insertedTier.insertedId.toString());
+
+    return insertedUser.insertedId.toString();
+  }
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
@@ -24,6 +44,10 @@ describe('Testing the users and tiers collection', () => {
   beforeEach(async () => {
     const collection = (repository as any).collection;
     await collection.deleteMany({});
+    const usersCollection = client.db('payments').collection('users');
+    await usersCollection.deleteMany({});
+    const tiersCollection = client.db('payments').collection('tiers');
+    await tiersCollection.deleteMany({});
   });
 
   it('when inserting a tier for a user, then it should be stored correctly', async () => {
@@ -109,5 +133,47 @@ describe('Testing the users and tiers collection', () => {
     await repository.deleteAllUserTiers(userId);
     userTiers = await repository.findTierIdByUserId(userId);
     expect(userTiers).toHaveLength(0);
+  });
+
+  describe('Get User Tier map', () => {
+    test('When getting user tier mappings without specific user id, then it should return all maps', async () => {
+      const user1 = getUser();
+      const tier1 = newTier();
+      const user2 = getUser();
+      const tier2 = newTier();
+
+      await createUserWithTier(user1.uuid, tier1.featuresPerService[Service.Drive].foreignTierId);
+      await createUserWithTier(user2.uuid, tier2.featuresPerService[Service.Drive].foreignTierId);
+
+      const userTiers = await repository.getUserTierMappings(false);
+
+      expect(userTiers).toHaveLength(2);
+      expect(userTiers[0]).toStrictEqual({
+        userUuid: user1.uuid,
+        foreignTierId: tier1.featuresPerService[Service.Drive].foreignTierId,
+      });
+      expect(userTiers[1]).toStrictEqual({
+        userUuid: user2.uuid,
+        foreignTierId: tier2.featuresPerService[Service.Drive].foreignTierId,
+      });
+    });
+
+    test('When getting user tier mappings with specific user id, then it should return only that user map', async () => {
+      const user1 = getUser();
+      const tier1 = newTier();
+      const user2 = getUser();
+      const tier2 = newTier();
+
+      await createUserWithTier(user1.uuid, tier1.featuresPerService[Service.Drive].foreignTierId);
+      await createUserWithTier(user2.uuid, tier2.featuresPerService[Service.Drive].foreignTierId);
+
+      const userTiers = await repository.getUserTierMappings(false, user1.uuid);
+
+      expect(userTiers).toHaveLength(1);
+      expect(userTiers[0]).toStrictEqual({
+        userUuid: user1.uuid,
+        foreignTierId: tier1.featuresPerService[Service.Drive].foreignTierId,
+      });
+    });
   });
 });
