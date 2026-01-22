@@ -217,11 +217,13 @@ export class UsersService {
     tierId,
     maxSpaceBytes,
     seats,
+    customHeaders,
   }: {
     ownerId: string;
     tierId: string;
     maxSpaceBytes?: number;
     seats?: number;
+    customHeaders?: Record<string, string>;
   }): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     let totalMaxSpaceBytes: number | undefined = undefined;
@@ -233,7 +235,7 @@ export class UsersService {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
-        'x-internxt-payments-header': process.env.X_INTERNXT_PAYMENTS_HEADER,
+        ...customHeaders,
       },
     };
 

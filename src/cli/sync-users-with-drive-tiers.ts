@@ -35,6 +35,9 @@ export async function updateBusinessUsers(usersTiersRepository: UsersTiersReposi
       await usersService.updateWorkspace({
         ownerId: userUuid,
         tierId: foreignTierId,
+        customHeaders: {
+          'x-internxt-payments-header': process.env.X_INTERNXT_PAYMENTS_HEADER as string,
+        },
       });
       console.log(`Successfully updated user: ${userUuid}`);
     } catch (error) {
@@ -64,7 +67,9 @@ export async function updateIndividualUsers(
   for (const { userUuid, foreignTierId } of userIdsAndForeignTierId) {
     try {
       console.log(`Processing user: ${userUuid} with individual foreign tier id: ${foreignTierId}`);
-      await storageService.updateUserStorageAndTier(userUuid, undefined, foreignTierId);
+      await storageService.updateUserStorageAndTier(userUuid, undefined, foreignTierId, {
+        'x-internxt-payments-header': process.env.X_INTERNXT_PAYMENTS_HEADER as string,
+      });
       console.log(`Successfully updated user: ${userUuid}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
