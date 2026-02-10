@@ -8,7 +8,13 @@ import { setupAuth } from '../plugins/auth';
 
 export function productsController(productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, {
+      secret: config.JWT_SECRET,
+      rateLimit: {
+        timeWindow: '1 minute',
+        max: 20,
+      },
+    });
 
     fastify.get(
       '/',
