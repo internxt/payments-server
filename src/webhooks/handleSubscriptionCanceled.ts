@@ -61,7 +61,7 @@ export default async function handleSubscriptionCanceled(
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const customer = await stripePaymentsAdapter.getCustomer(customerId);
-  const klaviyoService = new KlaviyoTrackingService('pk_9c5b5074b318bb02fc7f575102379c25b1');
+  const klaviyoService = new KlaviyoTrackingService(process.env.KLAVIYO_API_KEY);
   
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
