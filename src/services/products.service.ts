@@ -172,6 +172,11 @@ export class ProductsService {
           individualTier.featuresPerService[Service.Cli].enabled ||
           businessTier.featuresPerService[Service.Cli].enabled,
       },
+      [Service.rClone]: {
+        enabled:
+          individualTier.featuresPerService[Service.rClone].enabled ||
+          businessTier.featuresPerService[Service.rClone].enabled,
+      },
     };
 
     return {

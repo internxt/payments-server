@@ -204,6 +204,7 @@ describe('Products Service Tests', () => {
             cleaner: { enabled: true },
             darkMonitor: { enabled: true },
             cli: { enabled: true },
+            rclone: { enabled: true },
           },
         });
       });
