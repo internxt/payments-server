@@ -53,7 +53,7 @@ export async function buildApp({
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
-    trustProxy: 1,
+    trustProxy: true,
   });
 
   registerErrorHandler(fastify);
