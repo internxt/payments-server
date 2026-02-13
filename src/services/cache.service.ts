@@ -9,10 +9,7 @@ const FOUR_HOURS_EXPIRATION_IN_SECONDS = 4 * 60 * 60;
 export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
-    this.redis =
-      config.NODE_ENV === 'production'
-        ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD })
-        : new Redis({ host: config.REDIS_HOST });
+    this.redis = new Redis({ host: config.REDIS_HOST });
   }
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {
