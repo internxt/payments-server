@@ -49,10 +49,14 @@ export function productsController(productsService: ProductsService, cacheServic
       const ownersId = req.user.payload.workspaces?.owners ?? [];
 
       try {
-        const cachedUserTier = await cacheService.getUserTier(userUuid);
+        try {
+          const cachedUserTier = await cacheService.getUserTier(userUuid);
 
-        if (cachedUserTier) {
-          return rep.status(200).send(cachedUserTier);
+          if (cachedUserTier) {
+            return rep.status(200).send(cachedUserTier);
+          }
+        } catch (cacheError) {
+          Logger.error(`[TIER PRODUCT/CACHE_READ_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
         }
 
         const mergedFeatures = await productsService.getApplicableTierForUser({
@@ -60,7 +64,11 @@ export function productsController(productsService: ProductsService, cacheServic
           ownersId,
         });
 
-        await cacheService.setUserTier(userUuid, mergedFeatures);
+        try {
+          await cacheService.setUserTier(userUuid, mergedFeatures);
+        } catch (cacheError) {
+          Logger.error(`[TIER PRODUCT/CACHE_WRITE_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
+        }
 
         return rep.status(200).send(mergedFeatures);
       } catch (error) {
