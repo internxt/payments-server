@@ -33,11 +33,11 @@ export default async function handleSubscriptionUpdated(
   storageService: StorageService,
   usersService: UsersService,
   subscription: Stripe.Subscription,
-  cacheService: CacheService,
   paymentService: PaymentService,
   objectStorageService: ObjectStorageService,
   log: FastifyBaseLogger,
   config: AppConfig,
+  cacheService?: CacheService,
 ): Promise<void> {
   let uuid = '';
   const customerId = subscription.customer as string;
@@ -80,7 +80,7 @@ export default async function handleSubscriptionUpdated(
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
   try {
-    await cacheService.clearSubscription(customerId, productType);
+    await cacheService?.clearSubscription(customerId, productType);
   } catch (err) {
     log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }

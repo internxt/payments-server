@@ -30,7 +30,7 @@ export class InvoiceCompletedHandler {
   private readonly storageService: StorageService;
   private readonly tiersService: TiersService;
   private readonly usersService: UsersService;
-  private readonly cacheService: CacheService;
+  private readonly cacheService: CacheService | undefined;
 
   constructor({
     logger,
@@ -49,7 +49,7 @@ export class InvoiceCompletedHandler {
     storageService: StorageService;
     tiersService: TiersService;
     usersService: UsersService;
-    cacheService: CacheService;
+    cacheService?: CacheService;
   }) {
     this.logger = logger;
     this.determineLifetimeConditions = determineLifetimeConditions;
@@ -58,7 +58,7 @@ export class InvoiceCompletedHandler {
     this.storageService = storageService;
     this.tiersService = tiersService;
     this.usersService = usersService;
-    this.cacheService = cacheService;
+    this.cacheService = cacheService ?? undefined;
   }
 
   /**
@@ -488,9 +488,9 @@ export class InvoiceCompletedHandler {
    */
   private async clearUserRelatedCache(customerId: string, userUuid: string): Promise<void> {
     try {
-      await this.cacheService.clearSubscription(customerId);
-      await this.cacheService.clearUsedUserPromoCodes(customerId);
-      await this.cacheService.clearUserTier(userUuid);
+      await this.cacheService?.clearSubscription(customerId);
+      await this.cacheService?.clearUsedUserPromoCodes(customerId);
+      await this.cacheService?.clearUserTier(userUuid);
       Logger.info(`Cache for user with uuid: ${userUuid} and customer Id: ${customerId} has been cleaned`);
     } catch (err) {
       const error = err as Error;

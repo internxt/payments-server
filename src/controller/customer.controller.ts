@@ -6,11 +6,12 @@ import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
+import Logger from '../Logger';
 
 export function customerController(
   usersService: UsersService,
   paymentService: PaymentService,
-  cacheService: CacheService,
+  cacheService?: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
@@ -30,7 +31,7 @@ export function customerController(
         const user = await usersService.findUserByUuid(uuid);
 
         try {
-          const cachedCoupons = await cacheService.getUsedUserPromoCodes(user.customerId);
+          const cachedCoupons = await cacheService?.getUsedUserPromoCodes(user.customerId);
 
           if (Array.isArray(cachedCoupons) && cachedCoupons.length > 0) {
             return res.status(200).send({ usedCoupons: cachedCoupons });
@@ -67,7 +68,9 @@ export function customerController(
 
           const usedCoupons = promotionalCodes.map((promo) => promo?.code);
 
-          await cacheService.setUsedUserPromoCodes(user.customerId, usedCoupons);
+          await cacheService?.setUsedUserPromoCodes(user.customerId, usedCoupons).catch((error) => {
+            Logger.error('[CUSTOMER/COUPONS]: Failed to cache used coupons: ', error);
+          });
 
           return res.status(200).send({ usedCoupons });
         } catch (error) {

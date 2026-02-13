@@ -17,7 +17,7 @@ import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.a
 
 export interface CryptoWebhookDependencies {
   storageService: StorageService;
-  cacheService: CacheService;
+  cacheService?: CacheService;
   config: AppConfig;
   objectStorageService: ObjectStorageService;
   paymentService: PaymentService;

@@ -6,7 +6,7 @@ import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 import { setupAuth } from '../plugins/auth';
 
-export function productsController(productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
+export function productsController(productsService: ProductsService, config: AppConfig, cacheService?: CacheService) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, {
       secret: config.JWT_SECRET,
@@ -50,13 +50,15 @@ export function productsController(productsService: ProductsService, cacheServic
 
       try {
         try {
-          const cachedUserTier = await cacheService.getUserTier(userUuid);
+          const cachedUserTier = await cacheService?.getUserTier(userUuid);
 
           if (cachedUserTier) {
             return rep.status(200).send(cachedUserTier);
           }
         } catch (cacheError) {
-          Logger.error(`[TIER PRODUCT/CACHE_READ_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
+          Logger.error(
+            `[TIER PRODUCT/CACHE_READ_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`,
+          );
         }
 
         const mergedFeatures = await productsService.getApplicableTierForUser({
@@ -65,9 +67,11 @@ export function productsController(productsService: ProductsService, cacheServic
         });
 
         try {
-          await cacheService.setUserTier(userUuid, mergedFeatures);
+          await cacheService?.setUserTier(userUuid, mergedFeatures);
         } catch (cacheError) {
-          Logger.error(`[TIER PRODUCT/CACHE_WRITE_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
+          Logger.error(
+            `[TIER PRODUCT/CACHE_WRITE_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`,
+          );
         }
 
         return rep.status(200).send(mergedFeatures);

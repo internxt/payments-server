@@ -31,9 +31,9 @@ export function paymentsController(
   paymentService: PaymentService,
   usersService: UsersService,
   config: AppConfig,
-  cacheService: CacheService,
   licenseCodesService: LicenseCodesService,
   tiersService: TiersService,
+  cacheService?: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
@@ -480,7 +480,7 @@ export function paymentsController(
 
         let subscriptionInCache: UserSubscription | null | undefined;
         try {
-          subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
+          subscriptionInCache = await cacheService?.getSubscription(user.customerId, userType);
         } catch (err) {
           req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
           req.log.error(err);
@@ -508,7 +508,7 @@ export function paymentsController(
           response = await paymentService.getUserSubscription(user.customerId, userType);
         }
 
-        cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
+        cacheService?.setSubscription(user.customerId, userType, response).catch((err) => {
           req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
           req.log.error(err);
         });

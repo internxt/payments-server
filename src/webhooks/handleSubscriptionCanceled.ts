@@ -50,11 +50,11 @@ export default async function handleSubscriptionCanceled(
   usersService: UsersService,
   paymentService: PaymentService,
   subscription: Stripe.Subscription,
-  cacheService: CacheService,
   objectStorageService: ObjectStorageService,
   tiersService: TiersService,
   log: FastifyBaseLogger,
   config: AppConfig,
+  cacheService?: CacheService,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
@@ -75,9 +75,9 @@ export default async function handleSubscriptionCanceled(
   );
 
   try {
-    await cacheService.clearSubscription(customerId, productType);
-    await cacheService.clearUsedUserPromoCodes(customerId);
-    await cacheService.clearUserTier(uuid);
+    await cacheService?.clearSubscription(customerId, productType);
+    await cacheService?.clearUsedUserPromoCodes(customerId);
+    await cacheService?.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }

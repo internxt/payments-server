@@ -14,7 +14,7 @@ interface HandleDisputeResultProps {
   paymentService: PaymentService;
   usersService: UsersService;
   storageService: StorageService;
-  cacheService: CacheService;
+  cacheService?: CacheService;
   tiersService: TiersService;
   log: FastifyBaseLogger;
   config: AppConfig;
@@ -26,10 +26,10 @@ export async function handleDisputeResult({
   paymentService,
   usersService,
   storageService,
-  cacheService,
   tiersService,
   log,
   config,
+  cacheService,
 }: HandleDisputeResultProps) {
   if (dispute.status !== 'lost') {
     return;
@@ -49,11 +49,11 @@ export async function handleDisputeResult({
         storageService,
         usersService,
         charge,
-        cacheService,
         paymentService,
         log,
         tiersService,
         config,
+        cacheService,
       );
     } else {
       await paymentService.cancelSubscription(subscriptionId as string);

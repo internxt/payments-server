@@ -38,11 +38,11 @@ describe('Process when a subscription is cancelled', () => {
       usersService,
       paymentService,
       mockedSubscription,
-      cacheService,
       objectStorageService,
       tiersService,
       logger,
       config,
+      cacheService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -87,11 +87,11 @@ describe('Process when a subscription is cancelled', () => {
       usersService,
       paymentService,
       mockedSubscription,
-      cacheService,
       objectStorageService,
       tiersService,
       logger,
       config,
+      cacheService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -123,11 +123,11 @@ describe('Process when a subscription is cancelled', () => {
         usersService,
         paymentService,
         mockedSubscription,
-        cacheService,
         objectStorageService,
         tiersService,
         logger,
         config,
+        cacheService,
       ),
     ).rejects.toThrow(randomError);
   });
