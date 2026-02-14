@@ -1,8 +1,7 @@
 import axios from 'axios';
-import config from '../../../src/config';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
+import { getCharge, getDispute, getInvoice, getUser, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
@@ -23,7 +22,6 @@ const { stripe, paymentService, usersRepository, cacheService, usersService, sto
   createTestServices({
     stripe: mockStripe,
   });
-const logger = getLogger();
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
@@ -49,12 +47,10 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService: cacheService,
-        config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 
@@ -89,12 +85,10 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService,
-        config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 
@@ -107,9 +101,7 @@ describe('handleDisputeResult()', () => {
         mockedCharge,
         cacheService,
         paymentService,
-        logger,
         tiersService,
-        config,
       );
     });
   });
@@ -140,12 +132,10 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService,
-        config,
         paymentService,
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 

@@ -1,5 +1,5 @@
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { getLogger, getUser, newTier, voidPromise } from '../fixtures';
+import { getUser, newTier, voidPromise } from '../fixtures';
 import { Service } from '../../../src/core/users/Tier';
 import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -174,7 +174,7 @@ describe('TiersService tests', () => {
         .mockImplementation(() => Promise.resolve(null));
 
       await expect(
-        tiersService.removeTier({ ...mockedUser, email: 'example@internxt.com' }, productId, getLogger()),
+        tiersService.removeTier({ ...mockedUser, email: 'example@internxt.com' }, productId),
       ).rejects.toThrow(TierNotFoundError);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
@@ -182,7 +182,6 @@ describe('TiersService tests', () => {
 
     it('When removing the tier, then skips the disabled features the tier had', async () => {
       const mockedUser = getUser();
-      const log = getLogger();
       const mockedTier = newTier();
       const userWithEmail = { ...mockedUser, email: 'example@internxt.com' };
       const { productId } = mockedTier;
@@ -199,16 +198,15 @@ describe('TiersService tests', () => {
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId, log);
+      await tiersService.removeTier(userWithEmail, productId);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
-      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
       expect(removeVPNFeatures).not.toHaveBeenCalled();
     });
 
     it('When removing the tier, then removes the applied features', async () => {
       const mockedUser = getUser();
-      const log = getLogger();
       const mockedTier = newTier();
       const userWithEmail = { ...mockedUser, email: 'example@internxt.com' };
       const { productId } = mockedTier;
@@ -225,10 +223,10 @@ describe('TiersService tests', () => {
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeTier(userWithEmail, productId, log);
+      await tiersService.removeTier(userWithEmail, productId);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
-      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
+      expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
     });
   });
@@ -243,7 +241,7 @@ describe('TiersService tests', () => {
 
       const destroyWorkspace = jest.spyOn(usersService, 'destroyWorkspace').mockImplementation(() => Promise.resolve());
 
-      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+      await tiersService.removeDriveFeatures(uuid, tier);
 
       expect(destroyWorkspace).toHaveBeenCalledWith(uuid);
     });
@@ -268,7 +266,7 @@ describe('TiersService tests', () => {
       const destroyWorkspaceSpy = jest.spyOn(usersService, 'destroyWorkspace');
       const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockImplementation(voidPromise);
 
-      await tiersService.removeDriveFeatures(uuid, tier, getLogger());
+      await tiersService.removeDriveFeatures(uuid, tier);
 
       expect(destroyWorkspaceSpy).not.toHaveBeenCalled();
       expect(changeStorageSpy).toHaveBeenCalledWith(
