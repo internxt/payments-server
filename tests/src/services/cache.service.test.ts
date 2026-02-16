@@ -1,15 +1,15 @@
-import config from '../../../src/config';
 import { UserType } from '../../../src/core/users/User';
 import CacheService from '../../../src/services/cache.service';
 import { getSubscription, getUser, newTier } from '../fixtures';
 
 let cacheService: CacheService;
 
-jest.mock('ioredis', () => require('ioredis-mock'));
+const RedisMock = require('ioredis-mock');
+jest.mock('ioredis', () => jest.fn().mockImplementation(() => new RedisMock()));
 
 describe('Cache Service', () => {
   beforeEach(() => {
-    cacheService = new CacheService(config);
+    cacheService = CacheService.create() as CacheService;
   });
 
   describe('User subscription', () => {

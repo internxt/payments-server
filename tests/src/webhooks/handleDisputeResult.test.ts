@@ -105,11 +105,11 @@ describe('handleDisputeResult()', () => {
         storageService,
         usersService,
         mockedCharge,
-        cacheService,
         paymentService,
         logger,
         tiersService,
         config,
+        cacheService,
       );
     });
   });

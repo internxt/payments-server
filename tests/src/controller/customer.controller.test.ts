@@ -7,6 +7,8 @@ import CacheService from '../../../src/services/cache.service';
 
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
+    on: jest.fn(),
+    connect: jest.fn().mockResolvedValue(undefined),
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),

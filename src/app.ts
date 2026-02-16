@@ -9,7 +9,6 @@ import { productsController } from './controller/products.controller';
 import { checkoutController } from './controller/checkout.controller';
 import { customerController } from './controller/customer.controller';
 import controllerMigration from './controller-migration';
-import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
@@ -23,12 +22,12 @@ import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
 import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
 import { gatewayController } from './controller/gateway.controller';
+import CacheService from './services/cache.service';
 
 interface AppDependencies {
   paymentService: PaymentService;
   storageService: StorageService;
   usersService: UsersService;
-  cacheService: CacheService;
   tiersService: TiersService;
   licenseCodesService: LicenseCodesService;
   objectStorageService: ObjectStorageService;
@@ -36,18 +35,19 @@ interface AppDependencies {
   userFeaturesOverridesService: UserFeaturesOverridesService;
   stripe: Stripe;
   config: AppConfig;
+  cacheService?: CacheService;
 }
 
 export async function buildApp({
   paymentService,
   storageService,
   usersService,
-  cacheService,
   tiersService,
   licenseCodesService,
   objectStorageService,
   productsService,
   userFeaturesOverridesService,
+  cacheService,
   stripe,
   config,
 }: AppDependencies): Promise<FastifyInstance> {

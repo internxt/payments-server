@@ -1,18 +1,39 @@
 import { UserSubscription, UserType } from '../core/users/User';
 import Redis from 'ioredis';
-import { type AppConfig } from '../config';
+import config from '../config';
 import { Tier } from '../core/users/Tier';
+import Logger from '../Logger';
 
 const FIFTEEN_MINS_EXPIRATION_IN_SECONDS = 15 * 60;
 const FOUR_HOURS_EXPIRATION_IN_SECONDS = 4 * 60 * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
-  constructor(config: AppConfig) {
-    this.redis =
-      config.NODE_ENV === 'production'
-        ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD })
-        : new Redis({ host: config.REDIS_HOST });
+
+  private constructor(redis: Redis) {
+    this.redis = redis;
+  }
+
+  static create(): CacheService | undefined {
+    try {
+      const redis =
+        config.NODE_ENV === 'production'
+          ? new Redis({ host: config.REDIS_HOST, password: config.REDIS_PASSWORD, lazyConnect: true })
+          : new Redis({ host: config.REDIS_HOST, lazyConnect: true });
+
+      redis.on('error', (err) => {
+        Logger.error(`[CACHE_SERVICE]: Redis error: ${err.message}`);
+      });
+
+      return new CacheService(redis);
+    } catch (err) {
+      Logger.error(`[CACHE_SERVICE]: Failed to initialize Redis: ${(err as Error).message}`);
+      return;
+    }
+  }
+
+  async quit(): Promise<void> {
+    await this.redis.quit();
   }
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {

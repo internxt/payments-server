@@ -30,7 +30,7 @@ export class InvoiceCompletedHandler {
   private readonly storageService: StorageService;
   private readonly tiersService: TiersService;
   private readonly usersService: UsersService;
-  private readonly cacheService: CacheService | undefined;
+  private readonly cacheService?: CacheService;
 
   constructor({
     logger,
@@ -497,7 +497,6 @@ export class InvoiceCompletedHandler {
       Logger.error(
         `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${error.message}`,
       );
-      throw error;
     }
   }
 }

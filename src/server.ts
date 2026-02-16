@@ -9,7 +9,6 @@ import { PaymentService } from './services/payment.service';
 import envVariablesConfig from './config';
 import { UsersRepository } from './core/users/UsersRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
-import CacheService from './services/cache.service';
 import { buildApp } from './app';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { LicenseCodesRepository } from './core/users/LicenseCodeRepository';
@@ -31,6 +30,7 @@ import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTie
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
 import { ProductsService } from './services/products.service';
 import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
+import CacheService from './services/cache.service';
 import {
   MongoDBUserFeatureOverridesRepository,
   UserFeatureOverridesRepository,
@@ -63,7 +63,6 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     envVariablesConfig,
     axios,
   );
-  const cacheService = new CacheService(envVariablesConfig);
   const tiersService = new TiersService(usersService, tiersRepository, usersTiersRepository, storageService);
   const licenseCodesService = new LicenseCodesService({
     paymentService,
@@ -74,11 +73,12 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
 
+  const cacheService = CacheService.create();
+
   const fastify = await buildApp({
     paymentService,
     storageService,
     usersService,
-    cacheService,
     tiersService,
     licenseCodesService,
     objectStorageService,
@@ -86,10 +86,15 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     userFeaturesOverridesService,
     stripe,
     config: envVariablesConfig,
+    cacheService,
   });
 
   fastify.addHook('onClose', async () => {
-    await cacheService['redis'].quit();
+    try {
+      await cacheService?.quit();
+    } catch (err) {
+      fastify.log.error(`Failed to quit Redis connection: ${(err as Error).message}`);
+    }
   });
 
   try {

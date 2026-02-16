@@ -79,7 +79,9 @@ export default async function handleSubscriptionCanceled(
     await cacheService?.clearUsedUserPromoCodes(customerId);
     await cacheService?.clearUserTier(uuid);
   } catch (err) {
-    log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
+    log.error(
+      `Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription. Error: ${JSON.stringify(err)}`,
+    );
   }
 
   if (hasBoughtALifetime && productType === UserType.Individual) {

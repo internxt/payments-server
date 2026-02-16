@@ -10,7 +10,7 @@ import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.s
 import { setupAuth } from '../plugins/auth';
 
 interface GatewayControllerPayload {
-  cacheService: CacheService;
+  cacheService?: CacheService;
   usersService: UsersService;
   userFeaturesOverridesService: UserFeaturesOverridesService;
   config: AppConfig;
@@ -63,7 +63,14 @@ export function gatewayController({
         }
 
         await userFeaturesOverridesService.upsertCustomUserFeatures(user, feature);
-        await cacheService.clearUserTier(userUuid);
+
+        try {
+          await cacheService?.clearUserTier(userUuid);
+        } catch (cacheError) {
+          Logger.error(
+            `[GATEWAY/ACTIVATE]: Failed to clear cache for user ${userUuid}: ${(cacheError as Error).message}`,
+          );
+        }
 
         return response.status(204).send();
       },

@@ -36,7 +36,7 @@ export interface TestServices {
   objectStorageService: ObjectStorageService;
   productsService: ProductsService;
   licenseCodesService: LicenseCodesService;
-  cacheService: CacheService;
+  cacheService?: CacheService;
   determineLifetimeConditions: DetermineLifetimeConditions;
   objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;
@@ -87,7 +87,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     config,
     axios,
   );
-  const cacheService = new CacheService(config);
+  const cacheService = CacheService.create();
   const tiersService = new TiersService(
     usersService,
     repositories.tiersRepository,

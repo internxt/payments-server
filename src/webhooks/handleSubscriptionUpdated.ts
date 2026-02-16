@@ -73,7 +73,9 @@ export default async function handleSubscriptionUpdated(
       return;
     }
   } catch (error) {
-    log.error(`Error in handleSubscriptionUpdated trying to fetch the customer by ID ${customerId}`);
+    log.error(
+      `Error in handleSubscriptionUpdated trying to fetch the customer by ID ${customerId}. Error: ${JSON.stringify(error)}`,
+    );
     return;
   }
 
@@ -82,7 +84,9 @@ export default async function handleSubscriptionUpdated(
   try {
     await cacheService?.clearSubscription(customerId, productType);
   } catch (err) {
-    log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
+    log.error(
+      `Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription. Error: ${JSON.stringify(err)}`,
+    );
   }
 
   if (productType === UserType.Business) {

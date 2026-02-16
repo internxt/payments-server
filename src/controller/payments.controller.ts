@@ -24,6 +24,7 @@ import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import Logger from '../Logger';
 
 const allowedCurrency = ['eur', 'usd'];
 
@@ -482,8 +483,9 @@ export function paymentsController(
         try {
           subscriptionInCache = await cacheService?.getSubscription(user.customerId, userType);
         } catch (err) {
-          req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
-          req.log.error(err);
+          Logger.error(
+            `Error while trying to retrieve ${user.customerId} subscription from cache. Error: ${JSON.stringify(err)}`,
+          );
         }
 
         if (subscriptionInCache) {
