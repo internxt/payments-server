@@ -1,24 +1,28 @@
 import axios from 'axios';
+import Logger from '../Logger';
+import { BadRequestError } from '../errors/Errors';
+import config from '../config';
+
+export enum KlaviyoEvent {
+  SubscriptionCancelled = 'Subscription Cancelled',
+}
 
 interface KlaviyoEventOptions {
   email: string;
-  eventName: string;
+  eventName: KlaviyoEvent;
 }
 
 export class KlaviyoTrackingService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
 
-  constructor(
-    apiKey: string | undefined = process.env.KLAVIYO_API_KEY,
-    baseUrl: string | undefined = process.env.KLAVIYO_BASE_URL
-  ) {
-    if (!apiKey) {
-      throw new Error("Klaviyo API Key is required.");
+  constructor() {
+    if (!config.KLAVIYO_API_KEY) {
+      throw new BadRequestError("Klaviyo API Key is required.");
     }
 
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl ?? "";
+    this.apiKey = config.KLAVIYO_API_KEY;
+    this.baseUrl = config.KLAVIYO_BASE_URL ?? "";
   }
 
   private async trackEvent(options: KlaviyoEventOptions): Promise<void> {
@@ -53,18 +57,20 @@ export class KlaviyoTrackingService {
         },
       });
 
-      console.log(`[Klaviyo] ${eventName} tracked for ${email}`);
+      Logger.info(`[Klaviyo] ${eventName} tracked for ${email}`);
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`[Klaviyo] ${eventName} failed for ${email}:`, message);
-        throw error;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error(`[Klaviyo] ${eventName} failed for ${email}:`, message);
+      throw error;
     }
   }
 
   async trackSubscriptionCancelled(email: string): Promise<void> {
     await this.trackEvent({
       email,
-      eventName: 'Subscription Cancelled',
+      eventName: KlaviyoEvent.SubscriptionCancelled,
     });
   }
 }
+
+export const klaviyoService = new KlaviyoTrackingService();
