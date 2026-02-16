@@ -1,4 +1,3 @@
-import config from '../../../src/config';
 import { UserType } from '../../../src/core/users/User';
 import CacheService from '../../../src/services/cache.service';
 import { getSubscription, getUser, newTier } from '../fixtures';
@@ -8,8 +7,8 @@ let cacheService: CacheService;
 jest.mock('ioredis', () => require('ioredis-mock'));
 
 describe('Cache Service', () => {
-  beforeEach(() => {
-    cacheService = new CacheService(config);
+  beforeEach(async () => {
+    cacheService = (await CacheService.create()) as CacheService;
   });
 
   describe('User subscription', () => {

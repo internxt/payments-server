@@ -26,9 +26,9 @@ export default function (
   usersService: UsersService,
   paymentService: PaymentService,
   config: AppConfig,
-  cacheService: CacheService,
   objectStorageService: ObjectStorageService,
   tiersService: TiersService,
+  cacheService?: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -73,11 +73,11 @@ export default function (
             usersService,
             paymentService,
             event.data.object,
-            cacheService,
             objectStorageService,
             tiersService,
             fastify.log,
             config,
+            cacheService,
           );
           break;
 
@@ -86,11 +86,11 @@ export default function (
             storageService,
             usersService,
             event.data.object,
-            cacheService,
             paymentService,
             objectStorageService,
             fastify.log,
             config,
+            cacheService,
           );
           break;
 
@@ -156,11 +156,11 @@ export default function (
                 storageService,
                 usersService,
                 event.data.object,
-                cacheService,
                 paymentService,
                 fastify.log,
                 tiersService,
                 config,
+                cacheService,
               );
             }
           }

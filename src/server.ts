@@ -63,7 +63,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     envVariablesConfig,
     axios,
   );
-  const cacheService = new CacheService(envVariablesConfig);
+  const cacheService = await CacheService.create();
   const tiersService = new TiersService(usersService, tiersRepository, usersTiersRepository, storageService);
   const licenseCodesService = new LicenseCodesService({
     paymentService,
@@ -89,7 +89,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   });
 
   fastify.addHook('onClose', async () => {
-    await cacheService['redis'].quit();
+    await cacheService?.['redis'].quit();
   });
 
   try {

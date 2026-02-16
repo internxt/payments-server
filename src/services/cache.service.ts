@@ -1,15 +1,36 @@
 import { UserSubscription, UserType } from '../core/users/User';
 import Redis from 'ioredis';
-import { type AppConfig } from '../config';
 import { Tier } from '../core/users/Tier';
+import config from '../config';
+import Logger from '../Logger';
 
 const FIFTEEN_MINS_EXPIRATION_IN_SECONDS = 15 * 60;
 const FOUR_HOURS_EXPIRATION_IN_SECONDS = 4 * 60 * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
-  constructor(config: AppConfig) {
-    this.redis = new Redis(config.REDIS_HOST);
+
+  constructor(redis: Redis) {
+    this.redis = redis;
+  }
+
+  // Create a connection or return undefined if an error occurs
+  public static async create(): Promise<CacheService | undefined> {
+    let redis: Redis | undefined;
+    try {
+      redis = new Redis(config.REDIS_HOST, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 0,
+        retryStrategy: () => null,
+      });
+      await redis.ping();
+
+      return new CacheService(redis);
+    } catch (error) {
+      redis?.disconnect();
+      Logger.error(`[CACHE SERVICE] Error while connecting to Redis. Error: ${JSON.stringify(error)}`);
+      return undefined;
+    }
   }
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {

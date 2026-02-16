@@ -10,7 +10,7 @@ import { setupAuth } from '../plugins/auth';
 export function customerController(
   usersService: UsersService,
   paymentService: PaymentService,
-  cacheService: CacheService,
+  cacheService?: CacheService,
 ) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
@@ -30,7 +30,7 @@ export function customerController(
         const user = await usersService.findUserByUuid(uuid);
 
         try {
-          const cachedCoupons = await cacheService.getUsedUserPromoCodes(user.customerId);
+          const cachedCoupons = await cacheService?.getUsedUserPromoCodes(user.customerId);
 
           if (Array.isArray(cachedCoupons) && cachedCoupons.length > 0) {
             return res.status(200).send({ usedCoupons: cachedCoupons });
@@ -67,7 +67,7 @@ export function customerController(
 
           const usedCoupons = promotionalCodes.map((promo) => promo?.code);
 
-          await cacheService.setUsedUserPromoCodes(user.customerId, usedCoupons);
+          await cacheService?.setUsedUserPromoCodes(user.customerId, usedCoupons);
 
           return res.status(200).send({ usedCoupons });
         } catch (error) {

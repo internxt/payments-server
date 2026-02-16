@@ -13,11 +13,11 @@ export default async function handleLifetimeRefunded(
   storageService: StorageService,
   usersService: UsersService,
   charge: Stripe.Charge,
-  cacheService: CacheService,
   paymentsService: PaymentService,
   log: FastifyLoggerInstance,
   tiersService: TiersService,
   config: AppConfig,
+  cacheService?: CacheService,
 ): Promise<void> {
   const customerId = charge.customer as string;
   const userEmail = charge.receipt_email;
@@ -40,9 +40,9 @@ export default async function handleLifetimeRefunded(
   );
 
   try {
-    await cacheService.clearSubscription(customerId);
-    await cacheService.clearUsedUserPromoCodes(customerId);
-    await cacheService.clearUserTier(uuid);
+    await cacheService?.clearSubscription(customerId);
+    await cacheService?.clearUsedUserPromoCodes(customerId);
+    await cacheService?.clearUserTier(uuid);
   } catch (err) {
     log.error(`Error in handleLifetimeRefunded after trying to clear ${customerId} subscription`);
   }

@@ -10,7 +10,7 @@ import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.s
 import { setupAuth } from '../plugins/auth';
 
 interface GatewayControllerPayload {
-  cacheService: CacheService;
+  cacheService?: CacheService;
   usersService: UsersService;
   userFeaturesOverridesService: UserFeaturesOverridesService;
   config: AppConfig;
@@ -63,7 +63,7 @@ export function gatewayController({
         }
 
         await userFeaturesOverridesService.upsertCustomUserFeatures(user, feature);
-        await cacheService.clearUserTier(userUuid);
+        await cacheService?.clearUserTier(userUuid);
 
         return response.status(204).send();
       },

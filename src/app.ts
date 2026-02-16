@@ -28,7 +28,7 @@ interface AppDependencies {
   paymentService: PaymentService;
   storageService: StorageService;
   usersService: UsersService;
-  cacheService: CacheService;
+  cacheService?: CacheService;
   tiersService: TiersService;
   licenseCodesService: LicenseCodesService;
   objectStorageService: ObjectStorageService;
@@ -58,11 +58,11 @@ export async function buildApp({
   registerErrorHandler(fastify);
 
   fastify.register(
-    paymentsController(paymentService, usersService, config, cacheService, licenseCodesService, tiersService),
+    paymentsController(paymentService, usersService, config, licenseCodesService, tiersService, cacheService),
   );
   fastify.register(objectStorageController(paymentService), { prefix: '/object-storage' });
   fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
-  fastify.register(productsController(productsService, cacheService, config), {
+  fastify.register(productsController(productsService, config, cacheService), {
     prefix: '/products',
   });
   fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
@@ -87,9 +87,9 @@ export async function buildApp({
       usersService,
       paymentService,
       config,
-      cacheService,
       objectStorageService,
       tiersService,
+      cacheService,
     ),
   );
 
@@ -99,9 +99,9 @@ export async function buildApp({
       usersService,
       paymentService,
       config,
-      cacheService,
       objectStorageService,
       tiersService,
+      cacheService,
     }),
   );
 

@@ -35,11 +35,11 @@ describe('Process when a lifetime is refunded', () => {
       storageService,
       usersService,
       mockedCharge,
-      cacheService,
       paymentService,
       logger,
       tiersService,
       config,
+      cacheService,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -82,11 +82,11 @@ describe('Process when a lifetime is refunded', () => {
       storageService,
       usersService,
       mockedCharge,
-      cacheService,
       paymentService,
       logger,
       tiersService,
       config,
+      cacheService,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -115,11 +115,11 @@ describe('Process when a lifetime is refunded', () => {
         storageService,
         usersService,
         mockedCharge,
-        cacheService,
         paymentService,
         logger,
         tiersService,
         config,
+        cacheService,
       ),
     ).rejects.toThrow(randomError);
   });
