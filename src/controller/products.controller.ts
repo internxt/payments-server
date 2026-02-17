@@ -5,7 +5,6 @@ import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
 import CacheService from '../services/cache.service';
 import { setupAuth } from '../plugins/auth';
-import jwt from 'jsonwebtoken';
 
 export function productsController(productsService: ProductsService, config: AppConfig, cacheService?: CacheService) {
   return async function (fastify: FastifyInstance) {

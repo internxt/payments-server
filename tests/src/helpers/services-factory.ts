@@ -37,7 +37,7 @@ export interface TestServices {
   objectStorageService: ObjectStorageService;
   productsService: ProductsService;
   licenseCodesService: LicenseCodesService;
-  cacheService?: CacheService;
+  cacheService: CacheService;
   determineLifetimeConditions: DetermineLifetimeConditions;
   objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;

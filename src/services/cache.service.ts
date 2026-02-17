@@ -14,7 +14,6 @@ export default class CacheService {
     this.redis = redis;
   }
 
-  // Create a connection or return undefined if an error occurs
   public static async create(): Promise<CacheService | undefined> {
     let redis: Redis | undefined;
     try {
