@@ -5,5 +5,6 @@ jest.mock('ioredis', () => ({
     set: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
     quit: jest.fn().mockResolvedValue(undefined),
+    on: jest.fn(),
   })),
 }));

@@ -5,15 +5,6 @@ import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import CacheService from '../../../src/services/cache.service';
 
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue('OK'),
-    del: jest.fn().mockResolvedValue(1),
-    quit: jest.fn().mockResolvedValue(undefined),
-  }));
-});
-
 let app: FastifyInstance;
 
 beforeAll(async () => {
