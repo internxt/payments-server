@@ -16,7 +16,7 @@ export default class CacheService {
     });
 
     this.redis.on('error', (error) => {
-      Logger.error(`[CACHE SERVICE]: Redis connection error: ${error.message}`);
+      Logger.error(`[CACHE SERVICE]: Redis error: ${error.message}`);
     });
   }
 
