@@ -12,6 +12,7 @@ interface KlaviyoEventOptions {
   eventName: KlaviyoEvent;
 }
 
+
 export class KlaviyoTrackingService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -22,7 +23,7 @@ export class KlaviyoTrackingService {
     }
 
     this.apiKey = config.KLAVIYO_API_KEY;
-    this.baseUrl = config.KLAVIYO_BASE_URL ?? "";
+    this.baseUrl = config.KLAVIYO_BASE_URL || 'https://a.klaviyo.com/api';
   }
 
   private async trackEvent(options: KlaviyoEventOptions): Promise<void> {
@@ -60,7 +61,7 @@ export class KlaviyoTrackingService {
       Logger.info(`[Klaviyo] ${eventName} tracked for ${email}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      Logger.error(`[Klaviyo] ${eventName} failed for ${email}:`, message);
+      Logger.error(`[Klaviyo] ${eventName} failed for ${email}: ${message}`);
       throw error;
     }
   }

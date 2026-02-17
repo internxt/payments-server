@@ -125,6 +125,6 @@ export default async function handleSubscriptionCanceled(
   try {
     await klaviyoService.trackSubscriptionCancelled(customer.email);
   } catch (error) {
-    Logger.error(`[KLAVIYO] Failed to track cancellation for ${customerId}`, error);
+    Logger.error(`[KLAVIYO] Failed to track cancellation for ${customerId}: ${(error as Error).message}`);
   }
 }

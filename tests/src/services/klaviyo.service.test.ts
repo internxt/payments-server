@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { KlaviyoTrackingService, KlaviyoEvent } from '../../../src/services/klaviyo.service';
 import Logger from '../../../src/Logger';
-import config from '../../../src/config';
 import { BadRequestError } from '../../../src/errors/Errors';
+import config from '../../../src/config';
 
 jest.mock('axios');
 jest.mock('../../../src/Logger');
@@ -16,6 +16,7 @@ jest.mock('../../../src/config', () => ({
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedLogger = Logger as jest.Mocked<typeof Logger>;
+
 
 describe('KlaviyoTrackingService', () => {
   let service: KlaviyoTrackingService;
@@ -94,8 +95,7 @@ describe('KlaviyoTrackingService', () => {
       await expect(service.trackSubscriptionCancelled(email)).rejects.toThrow(errorMessage);
       
       expect(mockedLogger.error).toHaveBeenCalledWith(
-        `[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} failed for ${email}:`,
-        errorMessage
+        expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} failed for ${email}: ${errorMessage}`)
       );
     });
   });
