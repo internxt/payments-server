@@ -25,6 +25,7 @@ import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/I
 import { getLogger } from '../fixtures';
 import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
+import RedisMock from 'ioredis-mock';
 
 export interface TestServices {
   stripe: Stripe;
@@ -87,7 +88,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     config,
     axios,
   );
-  const cacheService = undefined;
+  const cacheService = new CacheService(new RedisMock());
   const tiersService = new TiersService(
     usersService,
     repositories.tiersRepository,

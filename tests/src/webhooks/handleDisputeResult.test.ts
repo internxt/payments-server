@@ -48,7 +48,7 @@ describe('handleDisputeResult()', () => {
 
       await handleDisputeResult({
         dispute: mockedDispute,
-        cacheService: cacheService,
+        cacheService,
         config,
         paymentService,
         usersService,
@@ -105,11 +105,11 @@ describe('handleDisputeResult()', () => {
         storageService,
         usersService,
         mockedCharge,
-        cacheService,
         paymentService,
         logger,
         tiersService,
         config,
+        cacheService,
       );
     });
   });

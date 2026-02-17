@@ -22,7 +22,7 @@ const {
   storageService,
 } = createTestServices();
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
 });
@@ -1053,7 +1053,7 @@ describe('Testing the handler when an invoice is completed', () => {
       );
     });
 
-    test('When cache clearing fails, then it should log an error and throw', async () => {
+    test('When cache clearing fails, then it should log an error', async () => {
       const randomError = new Error('Random error');
       const { customerId, uuid: userUuid } = getUser();
       jest.spyOn(cacheService!, 'clearSubscription').mockRejectedValue(randomError);
@@ -1061,7 +1061,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
       const clearUserRelatedCache = invoiceCompletedHandler['clearUserRelatedCache'].bind(invoiceCompletedHandler);
 
-      await expect(clearUserRelatedCache(customerId, userUuid)).rejects.not.toThrow(randomError);
+      await clearUserRelatedCache(customerId, userUuid);
       expect(loggerSpy).toHaveBeenCalledWith(
         `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${randomError.message}`,
       );

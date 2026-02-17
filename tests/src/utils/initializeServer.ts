@@ -3,10 +3,13 @@ import { MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { preloadData } from './preloadMongoDBData';
 import start from '../../../src/server';
+import CacheService from '../../../src/services/cache.service';
 
 let mongoServer: MongoMemoryServer;
 let mongoClient: MongoClient;
 let app: FastifyInstance;
+
+jest.mock('ioredis', () => require('ioredis-mock'));
 
 export const initializeServerAndDatabase = async () => {
   process.env.NODE_ENV = 'test';
@@ -17,6 +20,7 @@ export const initializeServerAndDatabase = async () => {
   mongoClient = await new MongoClient(uri).connect();
   app = await start(mongoClient);
   await preloadData(mongoClient);
+  await CacheService.create();
 
   return app;
 };

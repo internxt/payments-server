@@ -19,7 +19,6 @@ export default class CacheService {
     let redis: Redis | undefined;
     try {
       redis = new Redis(config.REDIS_HOST, {
-        lazyConnect: true,
         maxRetriesPerRequest: 0,
         retryStrategy: () => null,
       });
@@ -27,7 +26,7 @@ export default class CacheService {
 
       return new CacheService(redis);
     } catch (error) {
-      redis?.disconnect();
+      await redis?.quit();
       Logger.error(`[CACHE SERVICE] Error while connecting to Redis. Error: ${JSON.stringify(error)}`);
       return undefined;
     }

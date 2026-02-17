@@ -24,6 +24,7 @@
     "@internxt/eslint-config-internxt": "^1.0.9",
     "@internxt/prettier-config": "^1.0.2",
     "@types/chance": "^1.1.6",
+    "@types/ioredis-mock": "^8.2.6",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
