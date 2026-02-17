@@ -1,14 +1,40 @@
 import { UserType } from '../../../src/core/users/User';
 import CacheService from '../../../src/services/cache.service';
 import { getSubscription, getUser, newTier } from '../fixtures';
-
-let cacheService: CacheService;
+import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('ioredis', () => require('ioredis-mock'));
 
+const { cacheService } = createTestServices();
+
 describe('Cache Service', () => {
-  beforeEach(async () => {
-    cacheService = (await CacheService.create()) as CacheService;
+  describe('Initializing the cache service', () => {
+    test('When Redis connection is successful, then cache service instance is returned', async () => {
+      const service = await CacheService.initialize();
+
+      expect(service).toBeInstanceOf(CacheService);
+      expect(service).toBeDefined();
+    });
+
+    test('When Redis connection fails, then undefined is returned', async () => {
+      jest.resetModules();
+      jest.doMock('ioredis', () => {
+        return jest.fn().mockImplementation(() => {
+          return {
+            ping: jest.fn().mockRejectedValue(new Error('Connection refused')),
+            quit: jest.fn().mockResolvedValue(undefined),
+          };
+        });
+      });
+
+      const CacheServiceModule = require('../../../src/services/cache.service').default;
+      const service = await CacheServiceModule.initialize();
+
+      expect(service).toBeUndefined();
+
+      jest.resetModules();
+      jest.dontMock('ioredis');
+    });
   });
 
   describe('User subscription', () => {

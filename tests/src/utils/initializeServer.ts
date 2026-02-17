@@ -20,7 +20,7 @@ export const initializeServerAndDatabase = async () => {
   mongoClient = await new MongoClient(uri).connect();
   app = await start(mongoClient);
   await preloadData(mongoClient);
-  await CacheService.create();
+  await CacheService.initialize();
 
   return app;
 };

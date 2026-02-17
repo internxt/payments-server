@@ -14,7 +14,7 @@ export default class CacheService {
     this.redis = redis;
   }
 
-  public static async create(): Promise<CacheService | undefined> {
+  public static async initialize(): Promise<CacheService | undefined> {
     let redis: Redis | undefined;
     try {
       redis = new Redis(config.REDIS_HOST, {
