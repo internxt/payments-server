@@ -33,6 +33,25 @@ describe('Cache Service', () => {
     });
   });
 
+  describe('Safe await error handling', () => {
+    test('When a Redis operation fails, then the error is logged and null is returned', async () => {
+      const loggerSpy = jest.spyOn(Logger, 'error');
+      const newCacheService = new CacheService(config);
+      const redisError = new Error('Redis operation failed');
+
+      jest.spyOn((newCacheService as any).redis, 'get').mockRejectedValueOnce(redisError);
+
+      const result = await newCacheService.getSubscription('customer-123');
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[CACHE SERVICE]: There was an error while accessing the cache.'),
+      );
+      expect(result).toBeNull();
+
+      loggerSpy.mockRestore();
+    });
+  });
+
   describe('User subscription', () => {
     const mockedUserWithSubscription = getUser();
     const mockedSubscription = getSubscription({
