@@ -46,7 +46,7 @@ export class HealthService {
   private async checkMongo(): Promise<CheckResult> {
     const dbStartTime = Date.now();
     try {
-      const mongoPing = await this.mongo.db().admin().ping();
+      const mongoPing = await this.mongo.db('payments').command({ ping: 1 });
 
       if (mongoPing.ok !== 1) {
         return {

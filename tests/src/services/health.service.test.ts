@@ -13,9 +13,7 @@ describe('Health Service', () => {
 
     const mongoClient = {
       db: jest.fn().mockReturnValue({
-        admin: jest.fn().mockReturnValue({
-          ping: mockMongoPing,
-        }),
+        command: mockMongoPing,
       }),
     } as unknown as MongoClient;
 
