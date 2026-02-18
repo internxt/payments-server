@@ -1,5 +1,6 @@
 import config from '../../../src/config';
 import { UserType } from '../../../src/core/users/User';
+import Logger from '../../../src/Logger';
 import CacheService from '../../../src/services/cache.service';
 import { getSubscription, getUser, newTier } from '../fixtures';
 
@@ -10,6 +11,45 @@ jest.mock('ioredis', () => require('ioredis-mock'));
 describe('Cache Service', () => {
   beforeEach(() => {
     cacheService = new CacheService(config);
+  });
+
+  describe('Initializing Cache', () => {
+    test('When instantiating the service successfully, then the Redis connection is established', async () => {
+      const newCacheService = new CacheService(config);
+
+      await expect(newCacheService.ping()).resolves.not.toThrow();
+    });
+
+    test('When an error occurs, then it is logged', async () => {
+      const loggerSpy = jest.spyOn(Logger, 'error');
+      const newCacheService = new CacheService(config);
+
+      const error = new Error('Connection failed');
+      (newCacheService as any).redis.emit('error', error);
+
+      expect(loggerSpy).toHaveBeenCalledWith(`[CACHE SERVICE]: Redis error: ${error.message}`);
+
+      loggerSpy.mockRestore();
+    });
+  });
+
+  describe('Safe await error handling', () => {
+    test('When a Redis operation fails, then the error is logged and null is returned', async () => {
+      const loggerSpy = jest.spyOn(Logger, 'error');
+      const newCacheService = new CacheService(config);
+      const redisError = new Error('Redis operation failed');
+
+      jest.spyOn((newCacheService as any).redis, 'get').mockRejectedValueOnce(redisError);
+
+      const result = await newCacheService.getSubscription('customer-123');
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[CACHE SERVICE]: There was an error while accessing the cache.'),
+      );
+      expect(result).toBeNull();
+
+      loggerSpy.mockRestore();
+    });
   });
 
   describe('User subscription', () => {
