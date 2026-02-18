@@ -18,12 +18,18 @@ export class StorageService {
     private readonly axios: Axios,
   ) {}
 
-  async updateUserStorageAndTier(uuid: string, newStorageBytes: number, foreignTierId: string): Promise<void> {
+  async updateUserStorageAndTier(
+    uuid: string,
+    newStorageBytes?: number,
+    foreignTierId?: string,
+    customHeaders?: Record<string, string>,
+  ): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${jwt}`,
+        ...customHeaders,
       },
     };
 
