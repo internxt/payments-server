@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { MongoClient } from 'mongodb';
-import Stripe from 'stripe';
 import { FastifyInstance } from 'fastify';
 
 import { StorageService } from './services/storage.service';
@@ -35,6 +34,7 @@ import {
   MongoDBUserFeatureOverridesRepository,
   UserFeatureOverridesRepository,
 } from './core/users/MongoDBUserFeatureOverridesRepository';
+import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -50,9 +50,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     mongoClient,
   );
 
-  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
-  const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+  const paymentService = new PaymentService(stripePaymentsAdapter.getInstance(), productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(
     usersRepository,
@@ -84,7 +83,6 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     objectStorageService,
     productsService,
     userFeaturesOverridesService,
-    stripe,
     config: envVariablesConfig,
   });
 

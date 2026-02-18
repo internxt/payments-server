@@ -433,7 +433,6 @@ describe('Testing the handler when an invoice is completed', () => {
           Customer.toDomain(mockedCustomer),
           totalQuantity,
           mockedLifetimeTier,
-          expect.anything(),
           lifetimeMockedMaxSpaceBytes,
         );
         expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
@@ -483,7 +482,6 @@ describe('Testing the handler when an invoice is completed', () => {
           Customer.toDomain(mockedCustomer),
           totalQuantity,
           mockedTier,
-          expect.anything(),
           undefined,
         );
         expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
@@ -530,7 +528,6 @@ describe('Testing the handler when an invoice is completed', () => {
         Customer.toDomain(mockedCustomer),
         totalQuantity,
         mockedTier,
-        expect.anything(),
         undefined,
       );
       expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(

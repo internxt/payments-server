@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { getCharge, getInvoice, getLogger, getUser, newTier } from '../fixtures';
-import config from '../../../src/config';
+import { getCharge, getInvoice, getUser, newTier } from '../fixtures';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -9,7 +8,6 @@ import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
-const logger = getLogger();
 const { paymentService, usersService, storageService, tiersService, cacheService } = createTestServices();
 
 beforeEach(() => {
@@ -37,9 +35,7 @@ describe('Process when a lifetime is refunded', () => {
       mockedCharge,
       cacheService,
       paymentService,
-      logger,
       tiersService,
-      config,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -51,7 +47,6 @@ describe('Process when a lifetime is refunded', () => {
       isLifetime: mockedUser.lifetime,
       usersService: usersService,
       tiersService: tiersService,
-      log: logger,
     });
   });
 
@@ -84,9 +79,7 @@ describe('Process when a lifetime is refunded', () => {
       mockedCharge,
       cacheService,
       paymentService,
-      logger,
       tiersService,
-      config,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -111,16 +104,7 @@ describe('Process when a lifetime is refunded', () => {
     (handleCancelPlan as jest.Mock).mockRejectedValue(randomError);
 
     await expect(
-      handleLifetimeRefunded(
-        storageService,
-        usersService,
-        mockedCharge,
-        cacheService,
-        paymentService,
-        logger,
-        tiersService,
-        config,
-      ),
+      handleLifetimeRefunded(storageService, usersService, mockedCharge, cacheService, paymentService, tiersService),
     ).rejects.toThrow(randomError);
   });
 });

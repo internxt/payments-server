@@ -58,14 +58,7 @@ async function main() {
     const usersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
     const storageService = new StorageService(envVariablesConfig, axios);
 
-    const tiersService = new TiersService(
-      usersService,
-      paymentService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      envVariablesConfig,
-    );
+    const tiersService = new TiersService(usersService, tiersRepository, usersTiersRepository, storageService);
 
     const determineLifetimeUserCondition = new DetermineLifetimeConditions(paymentService, tiersService);
     const user = await usersService.findUserByCustomerID(customerId);
