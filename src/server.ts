@@ -35,6 +35,7 @@ import {
   MongoDBUserFeatureOverridesRepository,
   UserFeatureOverridesRepository,
 } from './core/users/MongoDBUserFeatureOverridesRepository';
+import { HealthService } from './services/health.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -73,6 +74,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
+  const healthService = new HealthService(mongoClient, cacheService);
 
   const fastify = await buildApp({
     paymentService,
@@ -86,6 +88,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     userFeaturesOverridesService,
     stripe,
     config: envVariablesConfig,
+    healthService,
   });
 
   fastify.addHook('onClose', async () => {

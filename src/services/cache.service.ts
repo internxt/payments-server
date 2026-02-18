@@ -42,8 +42,8 @@ export default class CacheService {
     }
   }
 
-  async ping(): Promise<void> {
-    await this.redis.ping();
+  async ping(): Promise<'PONG'> {
+    return this.redis.ping();
   }
 
   async getSubscription(

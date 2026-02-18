@@ -23,6 +23,8 @@ import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
 import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
 import { gatewayController } from './controller/gateway.controller';
+import { HealthService } from './services/health.service';
+import healthController from './controller/health.controller';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -36,6 +38,7 @@ interface AppDependencies {
   userFeaturesOverridesService: UserFeaturesOverridesService;
   stripe: Stripe;
   config: AppConfig;
+  healthService: HealthService;
 }
 
 export async function buildApp({
@@ -50,6 +53,7 @@ export async function buildApp({
   userFeaturesOverridesService,
   stripe,
   config,
+  healthService,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
@@ -79,6 +83,7 @@ export async function buildApp({
     },
   );
   fastify.register(controllerMigration(paymentService, usersService, config));
+  fastify.register(healthController(healthService));
 
   fastify.register(
     webhook(

@@ -35,6 +35,7 @@ import {
   PAYMENT_METHOD_BASE,
   COUPON_BASE,
 } from './fixtures/stripe-base.generated';
+import { HealthStatus } from '../../src/services/health.service';
 
 const randomDataGenerator = new Chance();
 
@@ -43,6 +44,21 @@ type DeepPartial<T> = T extends object
       [P in keyof T]?: DeepPartial<T[P]>;
     }
   : T;
+
+export const getHealthCheck = (params?: Partial<HealthStatus>): HealthStatus => {
+  return {
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    cache: {
+      status: 'ok',
+    },
+    database: {
+      status: 'ok',
+    },
+    ...params,
+  };
+};
 
 export const getUser = (params?: Partial<User>): User => ({
   id: new ObjectId().toString(),
