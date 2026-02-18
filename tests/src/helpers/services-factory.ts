@@ -25,6 +25,7 @@ import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/I
 import { getLogger } from '../fixtures';
 import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
+import { KlaviyoTrackingService } from '../../../src/services/klaviyo.service';
 
 export interface TestServices {
   stripe: Stripe;
@@ -41,6 +42,7 @@ export interface TestServices {
   objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   invoiceCompletedHandler: InvoiceCompletedHandler;
   userFeaturesOverridesService: UserFeaturesOverridesService;
+  klaviyoTrackingService: KlaviyoTrackingService;
 }
 
 export interface TestRepositories {
@@ -117,6 +119,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     repositories.userFeatureOverridesRepository,
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
+  const klaviyoTrackingService = new KlaviyoTrackingService();
 
   return {
     stripe,
@@ -133,6 +136,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     objectStorageWebhookHandler,
     invoiceCompletedHandler,
     userFeaturesOverridesService,
+    klaviyoTrackingService,
     ...repositories,
   };
 };
