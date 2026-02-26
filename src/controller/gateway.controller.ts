@@ -110,7 +110,6 @@ export function gatewayController({
             max: 5,
             timeWindow: '1 minute',
           },
-          skipAuth: true,
         },
       },
       async (req, res) => {
