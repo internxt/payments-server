@@ -73,7 +73,7 @@ export function gatewayController({
     );
 
     fastify.post<{ Body: { code: string } }>(
-      '/reactivate-license',
+      '/reactivate-license-code',
       {
         schema: {
           body: {

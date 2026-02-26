@@ -160,4 +160,26 @@ describe('Gateway endpoints', () => {
       expect(response.statusCode).toBe(404);
     });
   });
+
+  describe('Reactivating a license cod3', () => {
+    test('When the license code is reactivated, then it should be done successfully', async () => {
+      const mockedGatewayToken = getValidGatewayToken();
+      const code = 'test-code';
+
+      jest.spyOn(LicenseCodesService.prototype, 'reactivateLicenseCode').mockResolvedValue();
+
+      const response = await app.inject({
+        path: `/gateway/reactivate-license-code`,
+        method: 'POST',
+        body: {
+          code,
+        },
+        headers: {
+          Authorization: `Bearer ${mockedGatewayToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+  });
 });
