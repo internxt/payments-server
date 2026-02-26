@@ -5,6 +5,8 @@ import { UsersService } from '../../../src/services/users.service';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 import CacheService from '../../../src/services/cache.service';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../../../src/services/licenseCodes.service';
+import { InvalidLicenseCodeError } from '../../../src/errors/LicenseCodeErrors';
 
 let app: FastifyInstance;
 
@@ -70,6 +72,88 @@ describe('Gateway endpoints', () => {
         },
         headers: {
           Authorization: `Bearer ${mockedUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('Checking if a given license code has been redeemed', () => {
+    test('When the license code is redeemed, then it should indicates that it is not available', async () => {
+      const licenseCodeRedeemedError = new LicenseCodeAlreadyAppliedError();
+      const mockedGatewayToken = getValidGatewayToken();
+      const code = 'test-code';
+      const provider = 'EXAMPLE';
+
+      const userSpy = jest
+        .spyOn(LicenseCodesService.prototype, 'isLicenseCodeAvailable')
+        .mockRejectedValue(licenseCodeRedeemedError);
+
+      const response = await app.inject({
+        path: `/gateway/is-unique-code-available`,
+        method: 'GET',
+        query: {
+          code,
+          provider,
+        },
+        headers: {
+          Authorization: `Bearer ${mockedGatewayToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({ available: false });
+      expect(responseBody.available).toBeFalsy();
+      expect(userSpy).toHaveBeenCalledWith(code, provider);
+    });
+
+    test('When the license code is not redeemed, then it should indicates that it is available', async () => {
+      const mockedGatewayToken = getValidGatewayToken();
+      const code = 'test-code';
+      const provider = 'EXAMPLE';
+
+      const userSpy = jest.spyOn(LicenseCodesService.prototype, 'isLicenseCodeAvailable').mockResolvedValue(true);
+
+      const response = await app.inject({
+        path: `/gateway/is-unique-code-available`,
+        method: 'GET',
+        query: {
+          code,
+          provider,
+        },
+        headers: {
+          Authorization: `Bearer ${mockedGatewayToken}`,
+        },
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual({ available: true });
+      expect(responseBody.available).toBeTruthy();
+      expect(userSpy).toHaveBeenCalledWith(code, provider);
+    });
+
+    test('When the license code does not exist, then an error indicating so is thrown', async () => {
+      const notFoundError = new InvalidLicenseCodeError();
+      const mockedGatewayToken = getValidGatewayToken();
+      const code = 'test-code';
+      const provider = 'EXAMPLE';
+
+      jest.spyOn(LicenseCodesService.prototype, 'isLicenseCodeAvailable').mockRejectedValue(notFoundError);
+
+      const response = await app.inject({
+        path: `/gateway/is-unique-code-available`,
+        method: 'GET',
+        query: {
+          code,
+          provider,
+        },
+        headers: {
+          Authorization: `Bearer ${mockedGatewayToken}`,
         },
       });
 

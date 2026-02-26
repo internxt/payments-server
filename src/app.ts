@@ -76,6 +76,7 @@ export async function buildApp({
       usersService,
       userFeaturesOverridesService,
       cacheService,
+      licenseCodeService: licenseCodesService,
       config,
     }),
     {
