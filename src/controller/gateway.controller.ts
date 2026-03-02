@@ -8,10 +8,12 @@ import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 import { setupAuth } from '../plugins/auth';
+import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
 
 interface GatewayControllerPayload {
   cacheService: CacheService;
   usersService: UsersService;
+  licenseCodeService: LicenseCodesService;
   userFeaturesOverridesService: UserFeaturesOverridesService;
   config: AppConfig;
 }
@@ -19,6 +21,7 @@ interface GatewayControllerPayload {
 export function gatewayController({
   cacheService,
   usersService,
+  licenseCodeService,
   userFeaturesOverridesService,
   config,
 }: GatewayControllerPayload) {
@@ -66,6 +69,60 @@ export function gatewayController({
         await cacheService.clearUserTier(userUuid);
 
         return response.status(204).send();
+      },
+    );
+
+    fastify.post<{ Body: { code: string } }>(
+      '/reactivate-license-code',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['code'],
+            properties: {
+              code: {
+                type: 'string',
+              },
+            },
+          },
+        },
+      },
+      async (request, response) => {
+        const { code } = request.body;
+
+        await licenseCodeService.reactivateLicenseCode(code);
+
+        return response.status(200).send();
+      },
+    );
+
+    fastify.get<{ Querystring: { code: string; provider: string } }>(
+      '/is-unique-code-available',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: { code: { type: 'string' }, provider: { type: 'string' } },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const { code, provider } = req.query;
+
+        const available = await licenseCodeService.isLicenseCodeAvailable(code, provider).catch((error) => {
+          if (error instanceof LicenseCodeAlreadyAppliedError) {
+            return false;
+          }
+
+          throw error;
+        });
+        return res.status(200).send({ available });
       },
     );
   };

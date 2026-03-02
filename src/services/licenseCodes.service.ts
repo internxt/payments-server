@@ -100,4 +100,8 @@ export class LicenseCodesService {
   async insertLicenseCode(licenseCode: LicenseCode): Promise<void> {
     await this.licenseCodesRepository.insert(licenseCode);
   }
+
+  async reactivateLicenseCode(licenseCode: LicenseCode['code']): Promise<void> {
+    await this.licenseCodesRepository.updateByCode(licenseCode, { redeemed: false });
+  }
 }

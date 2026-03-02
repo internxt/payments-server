@@ -176,4 +176,15 @@ describe('Tests for License Codes service', () => {
       expect(findOneLicenseRepositorySpy).toHaveBeenCalledWith(mockedLicenseCode.code, mockedLicenseCode.provider);
     });
   });
+
+  describe('Reactivate license code', () => {
+    test('When a license code is marked as redeemed, then it should be marked as not redeemed correctly', async () => {
+      const mockedLicenseCode = getLicenseCode({ redeemed: true });
+      const updateByCodeSpy = jest.spyOn(licenseCodesRepository, 'updateByCode').mockResolvedValue(true);
+
+      await licenseCodesService.reactivateLicenseCode(mockedLicenseCode.code);
+
+      expect(updateByCodeSpy).toHaveBeenCalledWith(mockedLicenseCode.code, { redeemed: false });
+    });
+  });
 });
