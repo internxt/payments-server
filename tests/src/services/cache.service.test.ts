@@ -33,6 +33,48 @@ describe('Cache Service', () => {
     });
   });
 
+  describe('Retry Strategy', () => {
+    test('When reconnection attempts are less than 10, then it returns increasing delays', () => {
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      expect(retryStrategy(1)).toBe(500);
+      expect(retryStrategy(2)).toBe(1000);
+      expect(retryStrategy(5)).toBe(2500);
+      expect(retryStrategy(10)).toBe(5000);
+    });
+
+    test('When reconnection attempts reach the maximum delay, then it caps at 30 seconds', () => {
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      expect(retryStrategy(60)).toBeUndefined();
+      expect(retryStrategy(100)).toBeUndefined();
+    });
+
+    test('When reconnection attempts exceed 10, then it logs error and gives up', () => {
+      const loggerSpy = jest.spyOn(Logger, 'error');
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      const result = retryStrategy(11);
+
+      expect(loggerSpy).toHaveBeenCalledWith('[CACHE SERVICE]: Max reconnection attempts reached. Giving up.');
+      expect(result).toBeUndefined();
+
+      loggerSpy.mockRestore();
+    });
+
+    test('When reconnection attempts are exactly 10, then it still retries', () => {
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      const result = retryStrategy(10);
+
+      expect(result).toBe(5000);
+    });
+  });
+
   describe('Safe await error handling', () => {
     test('When a Redis operation fails, then the error is logged and null is returned', async () => {
       const loggerSpy = jest.spyOn(Logger, 'error');

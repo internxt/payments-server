@@ -11,7 +11,14 @@ export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
     this.redis = new Redis(config.REDIS_HOST, {
-      retryStrategy: () => undefined,
+      retryStrategy: (times) => {
+        if (times > 10) {
+          Logger.error('[CACHE SERVICE]: Max reconnection attempts reached. Giving up.');
+          return undefined;
+        }
+        return Math.min(times * 500, 30000);
+      },
+      maxRetriesPerRequest: 3,
       showFriendlyErrorStack: true,
     });
 
