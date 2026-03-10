@@ -18,13 +18,16 @@ export default class CacheService {
         }
         return Math.min(times * 500, 30000);
       },
-      maxRetriesPerRequest: 3,
+      keepAlive: 5000,
+      maxRetriesPerRequest: 5,
       showFriendlyErrorStack: true,
     });
 
     this.redis.on('error', (error) => {
       Logger.error(`[CACHE SERVICE]: Redis error: ${error.message}`);
     });
+    this.redis.on('close', () => Logger.warn('[CACHE SERVICE]: Connection closed'));
+    this.redis.on('end', () => Logger.error('[CACHE SERVICE]: Connection ended, no more retries'));
   }
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {
