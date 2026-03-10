@@ -11,13 +11,24 @@ export default class CacheService {
   private readonly redis: Redis;
   constructor(config: AppConfig) {
     this.redis = new Redis(config.REDIS_HOST, {
-      retryStrategy: () => undefined,
+      retryStrategy: (times) => {
+        if (times > 10) {
+          Logger.error('[CACHE SERVICE]: Max reconnection attempts reached. Giving up.');
+          return undefined;
+        }
+        return Math.min(times * 500, 30000);
+      },
+      enableOfflineQueue: false,
+      keepAlive: 10000,
+      maxRetriesPerRequest: 5,
       showFriendlyErrorStack: true,
     });
 
     this.redis.on('error', (error) => {
       Logger.error(`[CACHE SERVICE]: Redis error: ${error.message}`);
     });
+    this.redis.on('close', () => Logger.warn('[CACHE SERVICE]: Connection closed'));
+    this.redis.on('end', () => Logger.error('[CACHE SERVICE]: Connection ended, no more retries'));
   }
 
   private buildSubscriptionKey(customerId: string, userType: UserType = UserType.Individual): string {

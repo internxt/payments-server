@@ -33,6 +33,27 @@ describe('Cache Service', () => {
     });
   });
 
+  describe('Retry Strategy', () => {
+    test('When reconnection attempts are less than 10, then it returns increasing delays', () => {
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      expect(retryStrategy(1)).toBe(500);
+      expect(retryStrategy(2)).toBe(1000);
+      expect(retryStrategy(5)).toBe(2500);
+      expect(retryStrategy(10)).toBe(5000);
+    });
+
+    test('When reconnection attempts exceed 10, then it gives up', () => {
+      const newCacheService = new CacheService(config);
+      const retryStrategy = (newCacheService as any).redis.options.retryStrategy;
+
+      const result = retryStrategy(11);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
   describe('Safe await error handling', () => {
     test('When a Redis operation fails, then the error is logged and null is returned', async () => {
       const loggerSpy = jest.spyOn(Logger, 'error');
