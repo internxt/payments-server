@@ -19,7 +19,7 @@ export default class CacheService {
         return Math.min(times * 500, 30000);
       },
       enableOfflineQueue: false,
-      keepAlive: 5000,
+      keepAlive: 10000,
       maxRetriesPerRequest: 5,
       showFriendlyErrorStack: true,
     });
