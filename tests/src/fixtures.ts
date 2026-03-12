@@ -36,6 +36,7 @@ import {
   COUPON_BASE,
 } from './fixtures/stripe-base.generated';
 import { HealthStatus } from '../../src/services/health.service';
+import deepmerge from 'deepmerge';
 
 const randomDataGenerator = new Chance();
 
@@ -44,6 +45,12 @@ type DeepPartial<T> = T extends object
       [P in keyof T]?: DeepPartial<T[P]>;
     }
   : T;
+
+const deepMerge = <T>(target: T, source: DeepPartial<T>): T => {
+  return deepmerge(target as object, source as object, {
+    arrayMerge: (_target, source) => source,
+  }) as T;
+};
 
 export const getHealthCheck = (params?: Partial<HealthStatus>): HealthStatus => {
   return {
@@ -614,31 +621,6 @@ export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
   code: 'c0UP0n',
   ...params,
 });
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const deepMerge = <T>(target: T, source: DeepPartial<T>): T => {
-  const result = { ...target } as any;
-
-  for (const key in source) {
-    const sourceValue = source[key];
-    const targetValue = (target as any)[key];
-
-    if (
-      sourceValue !== null &&
-      typeof sourceValue === 'object' &&
-      !Array.isArray(sourceValue) &&
-      targetValue !== null &&
-      typeof targetValue === 'object' &&
-      !Array.isArray(targetValue)
-    ) {
-      result[key] = deepMerge(targetValue, sourceValue);
-    } else if (sourceValue !== undefined) {
-      result[key] = sourceValue;
-    }
-  }
-
-  return result as T;
-};
 
 export const newTier = (params?: DeepPartial<Tier>): Tier => {
   const defaultTier: Tier = {
