@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { UsersService } from '../services/users.service';
+import { OverrideDriveFeatureAvailable, UsersService } from '../services/users.service';
 import { NotFoundError } from '../errors/Errors';
 import Logger from '../Logger';
 import CacheService from '../services/cache.service';
@@ -35,7 +35,7 @@ export function gatewayController({
       },
     });
 
-    fastify.post<{ Body: { feature: Service; userUuid: string } }>(
+    fastify.post<{ Body: { feature: Service; userUuid: string; subFeature?: string } }>(
       '/activate',
       {
         schema: {
@@ -50,13 +50,17 @@ export function gatewayController({
               userUuid: {
                 type: 'string',
               },
+              subFeature: {
+                type: 'string',
+                enum: ['fileVersioning', 'passwordProtectedSharing', 'restrictedItemsSharing'],
+              },
             },
           },
         },
       },
       async (request, response) => {
         let user: User;
-        const { feature, userUuid } = request.body;
+        const { feature, userUuid, subFeature } = request.body;
 
         try {
           user = await usersService.findUserByUuid(userUuid);
@@ -65,7 +69,11 @@ export function gatewayController({
           throw new NotFoundError(`User with uuid ${userUuid} was not found`);
         }
 
-        await userFeaturesOverridesService.upsertCustomUserFeatures(user, feature);
+        await userFeaturesOverridesService.upsertCustomUserFeatures(
+          user,
+          feature,
+          subFeature as OverrideDriveFeatureAvailable,
+        );
         await cacheService.clearUserTier(userUuid);
 
         return response.status(204).send();

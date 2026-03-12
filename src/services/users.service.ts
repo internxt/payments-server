@@ -9,7 +9,7 @@ import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { Axios, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
-import { Service, VpnFeatures } from '../core/users/Tier';
+import { DriveFeatures, Service, Tier, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
 
@@ -21,7 +21,8 @@ function signToken(duration: string, secret: string) {
   });
 }
 
-type OverrideServiceAvailable = Service.Cli | Service.rClone;
+export type OverrideDriveFeatureAvailable = keyof Pick<DriveFeatures, 'fileVersioning'>;
+type OverrideServiceAvailable = Service.Cli | Service.rClone | Service.Drive | OverrideDriveFeatureAvailable;
 
 export class UsersService {
   constructor(
@@ -327,10 +328,12 @@ export class UsersService {
     userUuid,
     feature,
     enabled,
+    driveTierId,
   }: {
     userUuid: User['uuid'];
     feature: OverrideServiceAvailable;
     enabled: boolean;
+    driveTierId?: Tier['featuresPerService']['drive']['foreignTierId'];
   }): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
 
@@ -344,7 +347,7 @@ export class UsersService {
     await this.axios.put(
       `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/limits/overrides`,
 
-      { feature, value: String(enabled) },
+      { feature, value: String(enabled), tierId: driveTierId },
 
       requestConfig,
     );

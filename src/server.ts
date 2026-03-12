@@ -72,7 +72,11 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     licenseCodesRepository,
   });
   const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
-  const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
+  const userFeaturesOverridesService = new UserFeaturesOverridesService(
+    usersService,
+    userFeatureOverridesRepository,
+    tiersService,
+  );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
 

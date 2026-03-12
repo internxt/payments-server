@@ -73,6 +73,62 @@ describe('TiersService tests', () => {
     });
   });
 
+  describe('Get minimum tier with feature available', () => {
+    describe('Given feature', () => {
+      test('When there is no minimum tier, then it returns nothing', async () => {
+        const mockedTier = newTier();
+
+        jest.spyOn(tiersRepository, 'getAll').mockResolvedValue([mockedTier]);
+        const result = await tiersService.getMinimumTierWithFeatureAvailable(Service.rClone);
+
+        expect(result).toBeUndefined();
+      });
+
+      test('When there is a minimum tier, then it returns the minimum tier', async () => {
+        const mockedTier = newTier({
+          featuresPerService: {
+            rclone: {
+              enabled: true,
+            },
+          },
+        });
+
+        jest.spyOn(tiersRepository, 'getAll').mockResolvedValue([mockedTier]);
+        const result = await tiersService.getMinimumTierWithFeatureAvailable(Service.rClone);
+
+        expect(result).toStrictEqual(mockedTier);
+      });
+    });
+
+    describe('Given a feature and sub feature', () => {
+      test('When there is no minimum tier, then it returns nothing', async () => {
+        const mockedTier = newTier();
+
+        jest.spyOn(tiersRepository, 'getAll').mockResolvedValue([mockedTier]);
+        const result = await tiersService.getMinimumTierWithFeatureAvailable(Service.Drive, 'fileVersioning');
+
+        expect(result).toBeUndefined();
+      });
+
+      test('When there is a minimum tier, then it returns the minimum tier', async () => {
+        const mockedTier = newTier({
+          featuresPerService: {
+            drive: {
+              fileVersioning: {
+                enabled: true,
+              },
+            },
+          },
+        });
+
+        jest.spyOn(tiersRepository, 'getAll').mockResolvedValue([mockedTier]);
+        const result = await tiersService.getMinimumTierWithFeatureAvailable(Service.Drive, 'fileVersioning');
+
+        expect(result).toStrictEqual(mockedTier);
+      });
+    });
+  });
+
   describe('Get the tier products using the user Id', () => {
     it('When the user has no assigned tiers, then an error indicating so is thrown', async () => {
       const { id: userId } = getUser();

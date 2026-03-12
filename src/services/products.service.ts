@@ -107,76 +107,49 @@ export class ProductsService {
   private mergeTiers(individualTier: Tier, businessTier: Tier): Tier {
     const individualEnabledCount = this.countEnabledProducts(individualTier);
     const businessEnabledCount = this.countEnabledProducts(businessTier);
-
     const tierWithMostProducts = businessEnabledCount > individualEnabledCount ? businessTier : individualTier;
 
+    const individual = individualTier.featuresPerService;
+    const business = businessTier.featuresPerService;
+
+    const baseMerge = Object.values(Service).reduce(
+      (acc, service) => {
+        acc[service] = {
+          ...individual[service],
+          ...business[service],
+          enabled: individual[service].enabled || business[service].enabled,
+        };
+        return acc;
+      },
+      {} as Record<Service, any>,
+    );
+
     const mergedFeatures = {
+      ...baseMerge,
       [Service.Drive]: {
-        enabled:
-          individualTier.featuresPerService[Service.Drive].enabled ||
-          businessTier.featuresPerService[Service.Drive].enabled,
-        maxSpaceBytes: individualTier.featuresPerService[Service.Drive].maxSpaceBytes,
-        workspaces: businessTier.featuresPerService[Service.Drive].workspaces,
+        ...baseMerge[Service.Drive],
+        maxSpaceBytes: individual[Service.Drive].maxSpaceBytes,
+        workspaces: business[Service.Drive].workspaces,
         passwordProtectedSharing: {
           enabled:
-            individualTier.featuresPerService[Service.Drive].passwordProtectedSharing.enabled ||
-            businessTier.featuresPerService[Service.Drive].passwordProtectedSharing.enabled,
+            individual[Service.Drive].passwordProtectedSharing.enabled ||
+            business[Service.Drive].passwordProtectedSharing.enabled,
         },
         restrictedItemsSharing: {
           enabled:
-            individualTier.featuresPerService[Service.Drive].restrictedItemsSharing.enabled ||
-            businessTier.featuresPerService[Service.Drive].restrictedItemsSharing.enabled,
+            individual[Service.Drive].restrictedItemsSharing.enabled ||
+            business[Service.Drive].restrictedItemsSharing.enabled,
         },
       },
-      [Service.Backups]: {
-        enabled:
-          individualTier.featuresPerService[Service.Backups].enabled ||
-          businessTier.featuresPerService[Service.Backups].enabled,
-      },
-      [Service.Antivirus]: {
-        enabled:
-          individualTier.featuresPerService[Service.Antivirus].enabled ||
-          businessTier.featuresPerService[Service.Antivirus].enabled,
-      },
       [Service.Meet]: {
-        enabled:
-          individualTier.featuresPerService[Service.Meet].enabled ||
-          businessTier.featuresPerService[Service.Meet].enabled,
-        paxPerCall: Math.max(
-          individualTier.featuresPerService[Service.Meet].paxPerCall,
-          businessTier.featuresPerService[Service.Meet].paxPerCall,
-        ),
+        ...baseMerge[Service.Meet],
+        paxPerCall: Math.max(individual[Service.Meet].paxPerCall, business[Service.Meet].paxPerCall),
       },
       [Service.Mail]: {
-        enabled:
-          individualTier.featuresPerService[Service.Mail].enabled ||
-          businessTier.featuresPerService[Service.Mail].enabled,
-        addressesPerUser: Math.max(
-          individualTier.featuresPerService[Service.Mail].addressesPerUser,
-          businessTier.featuresPerService[Service.Mail].addressesPerUser,
-        ),
+        ...baseMerge[Service.Mail],
+        addressesPerUser: Math.max(individual[Service.Mail].addressesPerUser, business[Service.Mail].addressesPerUser),
       },
       [Service.Vpn]: tierWithMostProducts.featuresPerService[Service.Vpn],
-      [Service.Cleaner]: {
-        enabled:
-          individualTier.featuresPerService[Service.Cleaner].enabled ||
-          businessTier.featuresPerService[Service.Cleaner].enabled,
-      },
-      [Service.darkMonitor]: {
-        enabled:
-          individualTier.featuresPerService[Service.darkMonitor].enabled ||
-          businessTier.featuresPerService[Service.darkMonitor].enabled,
-      },
-      [Service.Cli]: {
-        enabled:
-          individualTier.featuresPerService[Service.Cli].enabled ||
-          businessTier.featuresPerService[Service.Cli].enabled,
-      },
-      [Service.rClone]: {
-        enabled:
-          individualTier.featuresPerService[Service.rClone].enabled ||
-          businessTier.featuresPerService[Service.rClone].enabled,
-      },
     };
 
     return {

@@ -50,7 +50,7 @@ describe('Gateway endpoints', () => {
 
       expect(response.statusCode).toBe(204);
       expect(userSpy).toHaveBeenCalledWith(userUuid);
-      expect(upsertCustomerUserFeatures).toHaveBeenCalledWith(mockedUser, feature);
+      expect(upsertCustomerUserFeatures).toHaveBeenCalledWith(mockedUser, feature, undefined);
       expect(clearUserTierSpy).toHaveBeenCalledWith(userUuid);
     });
 

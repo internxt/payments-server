@@ -2,8 +2,9 @@ import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
-import { Service, Tier } from '../core/users/Tier';
+import { DriveFeatures, Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+
 import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios, { isAxiosError } from 'axios';
@@ -61,6 +62,25 @@ export class TiersService {
     if (!deletedTierFromUser) {
       throw new UsersTiersError(`Error while deleting a tier ${tierId} from user Id ${userId}`);
     }
+  }
+
+  async getMinimumTierWithFeatureAvailable(
+    feature: Service,
+    driveSubFeature?: keyof Pick<
+      DriveFeatures,
+      'fileVersioning' | 'passwordProtectedSharing' | 'restrictedItemsSharing'
+    >,
+  ): Promise<Tier | undefined> {
+    const tiers = await this.tiersRepository.getAll();
+
+    const individualTiers = tiers.filter((tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled);
+    const minimumTierWithFeatureEnabled = individualTiers.find((tier) => tier.featuresPerService[feature].enabled);
+
+    if (driveSubFeature) {
+      return individualTiers.find((tier) => tier.featuresPerService[Service.Drive][driveSubFeature].enabled);
+    }
+
+    return minimumTierWithFeatureEnabled;
   }
 
   async getTiersProductsByUserId(userId: User['id']): Promise<Tier[]> {

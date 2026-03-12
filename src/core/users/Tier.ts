@@ -22,6 +22,9 @@ export interface DriveFeatures {
   restrictedItemsSharing: {
     enabled: boolean;
   };
+  fileVersioning: {
+    enabled: boolean;
+  };
 }
 
 interface MeetFeatures {
