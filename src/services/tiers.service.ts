@@ -73,7 +73,11 @@ export class TiersService {
   ): Promise<Tier | undefined> {
     const tiers = await this.tiersRepository.getAll();
 
-    const individualTiers = tiers.filter((tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled);
+    const individualTiers = tiers
+      .filter((tier) => !tier.featuresPerService[Service.Drive].workspaces.enabled)
+      .sort(
+        (a, b) => a.featuresPerService[Service.Drive].maxSpaceBytes - b.featuresPerService[Service.Drive].maxSpaceBytes,
+      );
     const minimumTierWithFeatureEnabled = individualTiers.find((tier) => tier.featuresPerService[feature].enabled);
 
     if (driveSubFeature) {
