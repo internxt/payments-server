@@ -9,6 +9,7 @@ import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 import { setupAuth } from '../plugins/auth';
 import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
+import jwt from 'jsonwebtoken';
 
 interface GatewayControllerPayload {
   cacheService: CacheService;
@@ -45,7 +46,7 @@ export function gatewayController({
             properties: {
               feature: {
                 type: 'string',
-                enum: [Service.Antivirus, Service.Backups, Service.Cleaner, Service.Cli, Service.rClone],
+                enum: [Service.Antivirus, Service.Backups, Service.Cleaner, Service.Cli, Service.rClone, Service.Drive],
               },
               userUuid: {
                 type: 'string',
