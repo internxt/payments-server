@@ -140,6 +140,9 @@ export class ProductsService {
             individual[Service.Drive].restrictedItemsSharing.enabled ||
             business[Service.Drive].restrictedItemsSharing.enabled,
         },
+        fileVersioning: {
+          enabled: individual[Service.Drive].fileVersioning.enabled || business[Service.Drive].fileVersioning.enabled,
+        },
       },
       [Service.Meet]: {
         ...baseMerge[Service.Meet],
