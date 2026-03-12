@@ -53,8 +53,8 @@ export class UserFeaturesOverridesService {
   async upsertCustomUserFeatures(user: User, service: Service, driveFeature?: keyof DriveFeatures): Promise<void> {
     const { id: userId, uuid: userUuid } = user;
     const overrideUserFeatures = await this.userFeatureOverridesRepository.findByUserId(userId);
-
-    if (overrideUserFeatures?.featuresPerService?.[service]?.enabled) {
+    const isDriveFeatureOverride = driveFeature && overrideUserFeatures?.featuresPerService?.[Service.Drive]?.enabled;
+    if (!isDriveFeatureOverride && overrideUserFeatures?.featuresPerService?.[service]?.enabled) {
       return;
     }
 

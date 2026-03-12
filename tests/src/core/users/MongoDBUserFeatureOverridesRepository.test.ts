@@ -134,4 +134,38 @@ describe('User Features OVerrides Repository', () => {
 
     expect(foundOverrides).toStrictEqual(existingPayload);
   });
+
+  it('when adding a new feature to the same service, then existing features within that service are preserved', async () => {
+    const userId = getUser().id;
+
+    await repository.upsert({
+      userId,
+      featuresPerService: {
+        drive: {
+          enabled: true,
+          passwordProtectedSharing: { enabled: true },
+        },
+      },
+    });
+
+    await repository.upsert({
+      userId,
+      featuresPerService: {
+        drive: {
+          enabled: true,
+          fileVersioning: { enabled: true },
+        },
+      },
+    });
+
+    const foundOverrides = await repository.findByUserId(userId);
+
+    expect(foundOverrides?.featuresPerService).toStrictEqual({
+      drive: {
+        enabled: true,
+        passwordProtectedSharing: { enabled: true },
+        fileVersioning: { enabled: true },
+      },
+    });
+  });
 });

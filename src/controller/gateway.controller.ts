@@ -1,15 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { AppConfig } from '../config';
-import { OverrideDriveFeatureAvailable, UsersService } from '../services/users.service';
+import { UsersService } from '../services/users.service';
 import { NotFoundError } from '../errors/Errors';
 import Logger from '../Logger';
 import CacheService from '../services/cache.service';
-import { Service } from '../core/users/Tier';
+import { DriveFeatures, Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
 import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 import { setupAuth } from '../plugins/auth';
 import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
-import jwt from 'jsonwebtoken';
 
 interface GatewayControllerPayload {
   cacheService: CacheService;
@@ -36,7 +35,7 @@ export function gatewayController({
       },
     });
 
-    fastify.post<{ Body: { feature: Service; userUuid: string; subFeature?: string } }>(
+    fastify.post<{ Body: { feature: Service; userUuid: string; driveFeature?: keyof DriveFeatures } }>(
       '/activate',
       {
         schema: {
@@ -51,7 +50,7 @@ export function gatewayController({
               userUuid: {
                 type: 'string',
               },
-              subFeature: {
+              driveFeature: {
                 type: 'string',
                 enum: ['fileVersioning', 'passwordProtectedSharing', 'restrictedItemsSharing'],
               },
@@ -61,7 +60,7 @@ export function gatewayController({
       },
       async (request, response) => {
         let user: User;
-        const { feature, userUuid, subFeature } = request.body;
+        const { feature, userUuid, driveFeature } = request.body;
 
         try {
           user = await usersService.findUserByUuid(userUuid);
@@ -70,11 +69,7 @@ export function gatewayController({
           throw new NotFoundError(`User with uuid ${userUuid} was not found`);
         }
 
-        await userFeaturesOverridesService.upsertCustomUserFeatures(
-          user,
-          feature,
-          subFeature as OverrideDriveFeatureAvailable,
-        );
+        await userFeaturesOverridesService.upsertCustomUserFeatures(user, feature, driveFeature);
         await cacheService.clearUserTier(userUuid);
 
         return response.status(204).send();
