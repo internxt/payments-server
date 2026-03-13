@@ -70,6 +70,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
           postal_code: params.address.postalCode ?? undefined,
         },
       }),
+      ...(params.metadata && { metadata: params.metadata }),
     };
   }
 }
