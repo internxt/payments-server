@@ -28,6 +28,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         postalCode: string;
         captchaToken: string;
         companyVatId?: string;
+        metadata?: Record<string, string>;
       };
     }>(
       '/customer',
@@ -45,6 +46,10 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               postalCode: { type: 'string' },
               captchaToken: { type: 'string' },
               companyVatId: { type: 'string' },
+              metadata: {
+                type: 'object',
+                additionalProperties: { type: 'string' },
+              },
             },
           },
         },
@@ -57,8 +62,17 @@ export function checkoutController(usersService: UsersService, paymentsService: 
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
-        const { customerName, lineAddress1, lineAddress2, city, country, postalCode, companyVatId, captchaToken } =
-          req.body;
+        const {
+          customerName,
+          lineAddress1,
+          lineAddress2,
+          city,
+          country,
+          postalCode,
+          companyVatId,
+          captchaToken,
+          metadata,
+        } = req.body;
         const { uuid: userUuid, email } = req.user.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -80,6 +94,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               postalCode,
               country,
             },
+            metadata,
           });
           customerId = userExists.customerId;
         } else {
@@ -93,6 +108,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               postalCode,
               country,
             },
+            metadata,
           });
 
           await usersService.insertUser({

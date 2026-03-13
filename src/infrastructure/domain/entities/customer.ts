@@ -7,6 +7,7 @@ export interface CreateCustomerParams {
   name: string;
   email: string;
   address: Partial<Address>;
+  metadata?: Record<string, string>;
 }
 
 export interface UpdateCustomerParams extends Partial<CreateCustomerParams> {

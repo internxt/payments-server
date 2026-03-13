@@ -14,6 +14,8 @@ describe('Stripe Adapter', () => {
         .spyOn(stripePaymentsAdapter.getInstance().customers, 'create')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
+      const metadata = { referralCode: 'ABC123' };
+
       const createdCustomer = await stripePaymentsAdapter.createCustomer({
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
@@ -25,6 +27,7 @@ describe('Stripe Adapter', () => {
           country: mockedCustomer.address?.country ?? '',
           postalCode: mockedCustomer.address?.postal_code ?? '',
         },
+        metadata,
       });
 
       expect(createdCustomer).toStrictEqual(Customer.toDomain(mockedCustomer));
