@@ -22,7 +22,7 @@ async function handleObjectStorageScheduledForCancelation(
 ): Promise<void> {
   logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
-  await objectStorageService.deleteAccount({
+  await objectStorageService.suspendAccount({
     customerId: customer.id,
   });
 
