@@ -23,7 +23,7 @@ export class KlaviyoTrackingService {
     }
 
     this.apiKey = config.KLAVIYO_API_KEY;
-    this.baseUrl = config.KLAVIYO_BASE_URL || 'https://a.klaviyo.com/api';
+    this.baseUrl = config.KLAVIYO_BASE_URL;
   }
 
   private async trackEvent(options: KlaviyoEventOptions): Promise<void> {

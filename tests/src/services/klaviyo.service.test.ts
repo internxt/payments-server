@@ -3,41 +3,47 @@ import { KlaviyoTrackingService, KlaviyoEvent } from '../../../src/services/klav
 import Logger from '../../../src/Logger';
 import { BadRequestError } from '../../../src/errors/Errors';
 import config from '../../../src/config';
+import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('axios');
-jest.mock('../../../src/Logger');
 jest.mock('../../../src/config', () => ({
   __esModule: true,
   default: {
     KLAVIYO_API_KEY: 'pk_test_12345',
     KLAVIYO_BASE_URL: 'https://a.klaviyo.com/api',
+    STRIPE_SECRET_KEY: 'sk_test_12345',
   },
 }));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
-const mockedLogger = Logger as jest.Mocked<typeof Logger>;
 
 
 describe('KlaviyoTrackingService', () => {
   let service: KlaviyoTrackingService;
+  let loggerInfoSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
+
   const mockApiKey = 'pk_test_12345';
   const mockBaseUrl = 'https://a.klaviyo.com/api';
 
   beforeEach(() => {
     jest.clearAllMocks();
+    loggerInfoSpy = jest.spyOn(Logger, 'info').mockImplementation();
+    loggerErrorSpy = jest.spyOn(Logger, 'error').mockImplementation();
+
     (config as any).KLAVIYO_API_KEY = mockApiKey;
     (config as any).KLAVIYO_BASE_URL = mockBaseUrl;
-    service = new KlaviyoTrackingService();
+    service = createTestServices({ stripe: {} as any }).klaviyoTrackingService;
   });
 
   describe('Initialization', () => {
     test('When instantiated without an API Key in config, then it throws an error', () => {
       (config as any).KLAVIYO_API_KEY = undefined;
-      expect(() => new KlaviyoTrackingService()).toThrow(BadRequestError);
+      expect(() => createTestServices({ stripe: {} as any }).klaviyoTrackingService).toThrow(BadRequestError);
     });
 
     test('When instantiated with valid config, then it initializes correctly', () => {
-      expect(() => new KlaviyoTrackingService()).not.toThrow();
+      expect(() => createTestServices({ stripe: {} as any }).klaviyoTrackingService).not.toThrow();
     });
   });
 
@@ -80,7 +86,7 @@ describe('KlaviyoTrackingService', () => {
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       expect(mockedAxios.post).toHaveBeenCalledWith(expectedUrl, expectedPayload, expectedHeaders);
-      expect(mockedLogger.info).toHaveBeenCalledWith(
+      expect(loggerInfoSpy).toHaveBeenCalledWith(
         expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} tracked for ${email}`)
       );
     });
@@ -94,7 +100,7 @@ describe('KlaviyoTrackingService', () => {
 
       await expect(service.trackSubscriptionCancelled(email)).rejects.toThrow(errorMessage);
       
-      expect(mockedLogger.error).toHaveBeenCalledWith(
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} failed for ${email}: ${errorMessage}`)
       );
     });
