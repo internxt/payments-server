@@ -12,6 +12,8 @@ import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
+import { klaviyoService } from '../services/klaviyo.service';
+import Logger from '../Logger';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -60,7 +62,7 @@ export default async function handleSubscriptionCanceled(
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const customer = await stripePaymentsAdapter.getCustomer(customerId);
-
+  
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
     return;
@@ -101,6 +103,7 @@ export default async function handleSubscriptionCanceled(
   } catch (error) {
     const err = error as Error;
     log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
+    
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }
@@ -117,5 +120,11 @@ export default async function handleSubscriptionCanceled(
       freeTier.featuresPerService[Service.Drive].maxSpaceBytes,
       freeTier.featuresPerService[Service.Drive].foreignTierId,
     );
+  }
+
+  try {
+    await klaviyoService.trackSubscriptionCancelled(customer.email);
+  } catch (error) {
+    Logger.error(`[KLAVIYO] Failed to track cancellation for ${customerId}: ${(error as Error).message}`);
   }
 }

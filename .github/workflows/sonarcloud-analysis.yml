@@ -35,6 +35,8 @@ jobs:
       - run: echo CHART_API_URL=api_url >> ./.env
       - run: echo PAYMENTS_GATEWAY_SECRET=${{secrets.PAYMENTS_GATEWAY_SECRET}} >> ./.env
       - run: echo PAYMENTS_GATEWAY_PUBLIC_SECRET=${{secrets.PAYMENTS_GATEWAY_PUBLIC_SECRET}} >> ./.env
+      - run: echo KLAVIYO_BASE_URL=test_klaviyo_key_123 >> ./.env
+      - run: echo KLAVIYO_API_KEY=test_klaviyo_key_123 >> ./.env
       - run: echo PC_CLOUD_TRIAL_CODE=my_code >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
