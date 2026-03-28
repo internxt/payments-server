@@ -1,9 +1,10 @@
 import { Service } from '../../../src/core/users/Tier';
 import { BadRequestError } from '../../../src/errors/Errors';
-import { getUser } from '../fixtures';
+import { getUser, newTier } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
-const { usersService, userFeaturesOverridesService, userFeatureOverridesRepository } = createTestServices();
+const { usersService, userFeaturesOverridesService, userFeatureOverridesRepository, tiersService } =
+  createTestServices();
 describe('User Tier Override', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -155,6 +156,102 @@ describe('User Tier Override', () => {
         userUuid: mockedUser.uuid,
         feature: Service.rClone,
         enabled: true,
+      });
+    });
+
+    describe('Drive Service', () => {
+      test('When overriding file versioning, then it fetches the minimum tier and overrides the drive limit', async () => {
+        const mockedUser = getUser();
+        const mockedTier = newTier({
+          featuresPerService: {
+            drive: {
+              fileVersioning: { enabled: true },
+            },
+          },
+        });
+
+        const findByUserIdSpy = jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+        const getMinimumTierSpy = jest
+          .spyOn(tiersService, 'getMinimumTierWithFeatureAvailable')
+          .mockResolvedValue(mockedTier);
+        const overrideDriveLimitSpy = jest.spyOn(usersService, 'overrideDriveLimit').mockResolvedValue();
+        const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
+
+        await userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, Service.Drive, 'fileVersioning');
+
+        expect(findByUserIdSpy).toHaveBeenCalledWith(mockedUser.id);
+        expect(getMinimumTierSpy).toHaveBeenCalledWith(Service.Drive, 'fileVersioning');
+        expect(overrideDriveLimitSpy).toHaveBeenCalledWith({
+          userUuid: mockedUser.uuid,
+          feature: 'fileVersioning',
+          enabled: true,
+          driveTierId: mockedTier.featuresPerService[Service.Drive].foreignTierId,
+        });
+        expect(upsertSpy).toHaveBeenCalledWith({
+          userId: mockedUser.id,
+          featuresPerService: {
+            [Service.Drive]: {
+              enabled: true,
+              fileVersioning: { enabled: true },
+            },
+          },
+        });
+      });
+
+      test('When overriding file versioning and no minimum tier is found, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+
+        const findByUserIdSpy = jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+        const getMinimumTierSpy = jest
+          .spyOn(tiersService, 'getMinimumTierWithFeatureAvailable')
+          .mockResolvedValue(undefined);
+
+        await expect(
+          userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, Service.Drive, 'fileVersioning'),
+        ).rejects.toThrow(BadRequestError);
+
+        expect(findByUserIdSpy).toHaveBeenCalledWith(mockedUser.id);
+        expect(getMinimumTierSpy).toHaveBeenCalledWith(Service.Drive, 'fileVersioning');
+      });
+
+      test('When overriding another feature than file versioning, then it upsert the feature directly', async () => {
+        const mockedUser = getUser();
+
+        const findByUserIdSpy = jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+        const getMinimumTierSpy = jest.spyOn(tiersService, 'getMinimumTierWithFeatureAvailable');
+        const overrideDriveLimitSpy = jest.spyOn(usersService, 'overrideDriveLimit');
+        const upsertSpy = jest.spyOn(userFeatureOverridesRepository, 'upsert').mockResolvedValue();
+
+        await userFeaturesOverridesService.upsertCustomUserFeatures(
+          mockedUser,
+          Service.Drive,
+          'passwordProtectedSharing',
+        );
+
+        expect(findByUserIdSpy).toHaveBeenCalledWith(mockedUser.id);
+        expect(getMinimumTierSpy).not.toHaveBeenCalled();
+        expect(overrideDriveLimitSpy).not.toHaveBeenCalled();
+        expect(upsertSpy).toHaveBeenCalledWith({
+          userId: mockedUser.id,
+          featuresPerService: {
+            [Service.Drive]: {
+              enabled: true,
+              passwordProtectedSharing: { enabled: true },
+            },
+          },
+        });
+      });
+
+      test('When there is no drive feature, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+
+        const findByUserIdSpy = jest.spyOn(userFeatureOverridesRepository, 'findByUserId').mockResolvedValue(null);
+
+        await expect(userFeaturesOverridesService.upsertCustomUserFeatures(mockedUser, Service.Drive)).rejects.toThrow(
+          BadRequestError,
+        );
+
+        expect(findByUserIdSpy).toHaveBeenCalledWith(mockedUser.id);
       });
     });
   });

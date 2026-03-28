@@ -4,6 +4,7 @@ import { Tier } from './Tier';
 export interface TiersRepository {
   findByProductId(where: Partial<Tier>): Promise<Tier | null>;
   findByTierId(tierId: Tier['id']): Promise<Tier | null>;
+  getAll(): Promise<Tier[]>;
 }
 
 function toDomain(tier: WithId<Omit<Tier, 'id'>>): Tier {
@@ -20,6 +21,11 @@ export class MongoDBTiersRepository implements TiersRepository {
 
   constructor(mongo: MongoClient) {
     this.collection = mongo.db('payments').collection<Tier>('tiers');
+  }
+
+  async getAll(): Promise<Tier[]> {
+    const tiers = await this.collection.find().toArray();
+    return tiers.map(toDomain);
   }
 
   async findByProductId(where: Partial<Tier>): Promise<Tier | null> {

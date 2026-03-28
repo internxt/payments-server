@@ -117,6 +117,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const userFeaturesOverridesService = new UserFeaturesOverridesService(
     usersService,
     repositories.userFeatureOverridesRepository,
+    tiersService,
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const klaviyoTrackingService = new KlaviyoTrackingService();

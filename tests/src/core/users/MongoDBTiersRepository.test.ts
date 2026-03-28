@@ -85,4 +85,17 @@ describe('Testing the tier collection', () => {
     expect(foundTier?.label).toBe(mockTier.label);
     expect(foundTier?.featuresPerService).toStrictEqual(mockTier.featuresPerService);
   });
+
+  test('When getting all tiers, then they are returned', async () => {
+    const collection = (repository as any).collection;
+    const { id: _, ...mockedTierWithoutId } = newTier();
+    const insertResult = await collection.insertOne({ ...mockedTierWithoutId });
+    const allTiers = await repository.getAll();
+
+    expect(allTiers.length).toBe(1);
+    expect(allTiers[0]).toStrictEqual({
+      id: insertResult.insertedId.toString(),
+      ...mockedTierWithoutId,
+    });
+  });
 });

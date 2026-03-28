@@ -26,6 +26,15 @@ export class MongoDBUserFeatureOverridesRepository implements UserFeatureOverrid
   }
 
   async upsert(userFeatureOverrides: Omit<UserFeatureOverrides, 'id'>): Promise<void> {
+    const newFeatures = userFeatureOverrides.featuresPerService || {};
+
+    const mergedServices: Record<string, unknown> = {};
+    for (const [serviceKey, serviceValue] of Object.entries(newFeatures)) {
+      mergedServices[serviceKey] = {
+        $mergeObjects: [{ $ifNull: [`$featuresPerService.${serviceKey}`, {}] }, serviceValue],
+      };
+    }
+
     await this.collection.updateOne(
       {
         userId: userFeatureOverrides.userId,
@@ -34,7 +43,7 @@ export class MongoDBUserFeatureOverridesRepository implements UserFeatureOverrid
         {
           $set: {
             featuresPerService: {
-              $mergeObjects: [{ $ifNull: ['$featuresPerService', {}] }, userFeatureOverrides.featuresPerService || {}],
+              $mergeObjects: [{ $ifNull: ['$featuresPerService', {}] }, mergedServices],
             },
           },
         },

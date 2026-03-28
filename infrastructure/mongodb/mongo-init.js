@@ -57,6 +57,9 @@ db.tiers.insertMany([
         restrictedItemsSharing: {
           enabled: false,
         },
+        fileVersioning: {
+          enabled: false,
+        },
       },
       meet: {
         enabled: false,
@@ -111,6 +114,9 @@ db.tiers.insertMany([
         restrictedItemsSharing: {
           enabled: false,
         },
+        fileVersioning: {
+          enabled: false,
+        },
       },
       meet: {
         enabled: false,
@@ -162,6 +168,9 @@ db.tiers.insertMany([
           enabled: true,
         },
         restrictedItemsSharing: {
+          enabled: true,
+        },
+        fileVersioning: {
           enabled: true,
         },
       },
@@ -218,6 +227,9 @@ db.tiers.insertMany([
         restrictedItemsSharing: {
           enabled: true,
         },
+        fileVersioning: {
+          enabled: true,
+        },
       },
       meet: {
         enabled: true,
@@ -270,6 +282,9 @@ db.tiers.insertMany([
           enabled: true,
         },
         restrictedItemsSharing: {
+          enabled: true,
+        },
+        fileVersioning: {
           enabled: true,
         },
       },
@@ -326,6 +341,9 @@ db.tiers.insertMany([
         restrictedItemsSharing: {
           enabled: false,
         },
+        fileVersioning: {
+          enabled: false,
+        },
       },
       meet: {
         enabled: false,
@@ -378,6 +396,9 @@ db.tiers.insertMany([
           enabled: true,
         },
         restrictedItemsSharing: {
+          enabled: true,
+        },
+        fileVersioning: {
           enabled: true,
         },
       },
@@ -434,6 +455,9 @@ db.tiers.insertMany([
         restrictedItemsSharing: {
           enabled: true,
         },
+        fileVersioning: {
+          enabled: true,
+        },
       },
       meet: {
         enabled: true,
@@ -486,6 +510,9 @@ db.tiers.insertMany([
           enabled: true,
         },
         restrictedItemsSharing: {
+          enabled: true,
+        },
+        fileVersioning: {
           enabled: true,
         },
       },

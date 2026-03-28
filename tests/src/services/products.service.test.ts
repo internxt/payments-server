@@ -183,9 +183,11 @@ describe('Products Service Tests', () => {
             drive: {
               enabled: true,
               maxSpaceBytes: 1000,
+              foreignTierId: businessTier.featuresPerService[Service.Drive].foreignTierId,
               workspaces: businessTier.featuresPerService[Service.Drive].workspaces,
               passwordProtectedSharing: { enabled: true },
               restrictedItemsSharing: { enabled: true },
+              fileVersioning: { enabled: false },
             },
             mail: {
               enabled: true,

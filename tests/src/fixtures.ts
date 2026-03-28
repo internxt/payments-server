@@ -36,6 +36,7 @@ import {
   COUPON_BASE,
 } from './fixtures/stripe-base.generated';
 import { HealthStatus } from '../../src/services/health.service';
+import deepmerge from 'deepmerge';
 
 const randomDataGenerator = new Chance();
 
@@ -44,6 +45,12 @@ type DeepPartial<T> = T extends object
       [P in keyof T]?: DeepPartial<T[P]>;
     }
   : T;
+
+const deepMerge = <T>(target: T, source: DeepPartial<T>): T => {
+  return deepmerge(target as object, source as object, {
+    arrayMerge: (_target, source) => source,
+  }) as T;
+};
 
 export const getHealthCheck = (params?: Partial<HealthStatus>): HealthStatus => {
   return {
@@ -203,7 +210,7 @@ export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.C
 };
 
 export const getPromoCode = (params?: DeepPartial<Stripe.PromotionCode>): Stripe.PromotionCode => {
-  return {
+  const defaultPromoCode: Stripe.PromotionCode = {
     ...PROMOTION_CODE_BASE,
     id: `promo_${randomDataGenerator.string({ length: 22 })}`,
     active: true,
@@ -214,8 +221,9 @@ export const getPromoCode = (params?: DeepPartial<Stripe.PromotionCode>): Stripe
       currency: null,
     },
     expires_at: null,
-    ...(params as any),
   };
+
+  return params ? deepMerge(defaultPromoCode, params) : defaultPromoCode;
 };
 
 export const priceById = ({
@@ -614,8 +622,8 @@ export const getCoupon = (params?: Partial<Coupon>): Coupon => ({
   ...params,
 });
 
-export const newTier = (params?: Partial<Tier>): Tier => {
-  return {
+export const newTier = (params?: DeepPartial<Tier>): Tier => {
+  const defaultTier: Tier = {
     id: randomDataGenerator.string({ length: 10 }),
     billingType: 'subscription',
     label: 'test-label',
@@ -641,13 +649,15 @@ export const newTier = (params?: Partial<Tier>): Tier => {
         },
         passwordProtectedSharing: { enabled: false },
         restrictedItemsSharing: { enabled: false },
+        fileVersioning: { enabled: false },
       },
       darkMonitor: {
         enabled: false,
       },
     },
-    ...params,
   };
+
+  return params ? deepMerge(defaultTier, params) : defaultTier;
 };
 
 export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
@@ -751,13 +761,13 @@ export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
 });
 
 export const getInvoice = (
-  params?: DeepPartial<Partial<Stripe.Invoice>>,
+  params?: DeepPartial<Stripe.Invoice>,
   userType = UserType.Individual,
   productId?: string,
 ): Stripe.Invoice => {
   const generatedProductId = productId ?? `prod_${randomDataGenerator.string({ length: 12 })}`;
 
-  return {
+  const defaultInvoice: Stripe.Invoice = {
     ...INVOICE_BASE,
     id: `in_${randomDataGenerator.string({ length: 14, alpha: true, numeric: true, symbols: false })}`,
     customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
@@ -789,15 +799,13 @@ export const getInvoice = (
         },
       ],
     },
-    ...(params as any),
   };
+
+  return params ? deepMerge(defaultInvoice, params) : defaultInvoice;
 };
 
 export function getInvoices(count = 2, paramsArray: DeepPartial<Stripe.Invoice>[] = []): Stripe.Invoice[] {
-  return Array.from({ length: count }, (_, index) => ({
-    ...getInvoice(),
-    ...(paramsArray[index] as any),
-  }));
+  return Array.from({ length: count }, (_, index) => getInvoice(paramsArray[index]));
 }
 
 export function getUniqueCodes() {
