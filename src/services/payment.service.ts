@@ -3,12 +3,11 @@ import dayjs from 'dayjs';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
-import { User, UserSubscription, UserType } from '../core/users/User';
+import { UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
-import { BadRequestError, InternalServerError, NotFoundError } from '../errors/Errors';
+import { BadRequestError, NotFoundError } from '../errors/Errors';
 import {
   NotFoundSubscriptionError,
-  CouponCodeError,
   InvalidSeatNumberError,
   IncompatibleSubscriptionTypesError,
   CustomerNotFoundError,
@@ -38,20 +37,9 @@ import {
   CustomerSource,
   Customer as StripeCustomer,
 } from '../types/stripe';
-import { PaymentIntent, PromotionCode, PriceByIdResponse, Reason } from '../types/payment';
-import {
-  RenewalPeriod,
-  PlanSubscription,
-  SubscriptionCreated,
-  RequestedPlan,
-  HasUserAppliedCouponResponse,
-} from '../types/subscription';
+import { PaymentIntent, PromotionCode, PriceByIdResponse } from '../types/payment';
+import { RenewalPeriod, PlanSubscription, SubscriptionCreated, RequestedPlan } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-
-const reasonFreeMonthsMap: Record<Reason['name'], number> = {
-  'prevent-cancellation': 3,
-  'pc-cloud-25': 6,
-};
 
 export class PaymentService {
   constructor(
@@ -119,30 +107,6 @@ export class PaymentService {
       minimumSeats,
       maximumSeats,
     };
-  }
-
-  async createSubscriptionWithTrial(
-    payload: {
-      customerId: string;
-      priceId: string;
-      seatsForBusinessSubscription?: number;
-      currency?: string;
-      promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
-      companyName?: string;
-      companyVatId?: string;
-    },
-    trialReason: Reason,
-  ) {
-    const now = new Date();
-    const trialEnd = Math.floor(now.setMonth(now.getMonth() + reasonFreeMonthsMap[trialReason.name]) / 1000);
-
-    const subscription = await this.createSubscription({
-      ...payload,
-      trialEnd,
-      metadata: { 'why-trial': trialReason.name },
-    });
-
-    return subscription;
   }
 
   async createSubscription({
@@ -641,37 +605,6 @@ export class PaymentService {
   }
 
   /**
-   *  Function to update the subscription with a freeTrial (prevent-cancellation flow)
-   * @param customerId - The customer id
-   * @param priceId - The price id
-   * @param reason - The reason to update the subscription
-   * @returns The updated subscription with the corresponding trial_end
-   */
-  async updateSubscriptionByReason(customerId: CustomerId, priceId: PriceId, reason: Reason) {
-    let trialEnd = 0;
-
-    const { data } = await this.provider.subscriptions.list({
-      customer: customerId,
-      status: 'active',
-    });
-    const [lastActiveSub] = data;
-
-    if (reason.name in reasonFreeMonthsMap) {
-      const date = new Date(lastActiveSub.current_period_end * 1000);
-      trialEnd = date.setMonth(date.getMonth() + reasonFreeMonthsMap[reason.name]);
-    }
-
-    return this.updateIndividualSub({
-      customerId: customerId,
-      priceId: priceId,
-      additionalOptions: {
-        trial_end: trialEnd === 0 ? undefined : Math.floor(trialEnd / 1000),
-        metadata: { reason: reason.name },
-      },
-    });
-  }
-
-  /**
    * Function to update the subscription price (change the plan)
    * @param customerId - The customer id
    * @param priceId - The price id
@@ -843,41 +776,6 @@ export class PaymentService {
       });
 
     return invoicesMapped;
-  }
-
-  async isUserElegibleForTrial(user: User, reason: Reason): Promise<HasUserAppliedCouponResponse> {
-    const { lifetime, customerId } = user;
-
-    if (lifetime) {
-      return {
-        elegible: false,
-      };
-    }
-
-    const userSubscriptions = await this.provider.subscriptions.list({
-      customer: customerId,
-      status: 'all',
-    });
-
-    const isFreeTrialAlreadyApplied = userSubscriptions.data.some(
-      (invoice) => invoice.metadata && invoice.metadata.reason === reason.name,
-    );
-
-    return isFreeTrialAlreadyApplied ? { elegible: false } : { elegible: true };
-  }
-
-  async applyFreeTrialToUser(user: User, reason: Reason) {
-    const { customerId } = user;
-    const hasCouponApplied = await this.isUserElegibleForTrial(user, reason);
-    if (hasCouponApplied.elegible) {
-      const subscription = await this.findIndividualActiveSubscription(customerId);
-
-      await this.updateSubscriptionByReason(customerId, subscription.items.data[0].plan.id, reason);
-
-      return true;
-    } else {
-      throw new CouponCodeError('User already applied coupon');
-    }
   }
 
   getSetupIntent(customerId: string, metadata: Stripe.MetadataParam): Promise<SetupIntent> {
@@ -1195,78 +1093,6 @@ export class PaymentService {
       ],
       currency,
     });
-  }
-
-  /**
-   * Deprecated - Use getPriceById instead
-   * @param priceId - Id of the price we want to fetch
-   * @param currency - Currency if needed
-   * @returns - The selected plan and their upsell if needed
-   */
-  async getPlanById(priceId: PlanId, currency?: string): Promise<RequestedPlan> {
-    let upsellPlan: RequestedPlan['upsellPlan'];
-    let businessSeats;
-    const currencyValue = currency ?? 'eur';
-
-    try {
-      const prices = await this.getPricesRaw(currencyValue);
-
-      const price = prices.find((price) => price.id === priceId);
-
-      if (!price) {
-        throw new NotFoundPlanByIdError(priceId);
-      }
-
-      const { id, currency, metadata, type, recurring, product: productId } = price;
-
-      const isBusinessPrice = !!metadata.type && metadata.type === 'business';
-
-      if (isBusinessPrice) {
-        businessSeats = {
-          minimumSeats: Number(metadata.minimumSeats),
-          maximumSeats: Number(metadata.maximumSeats),
-        };
-      }
-
-      const selectedPlan: RequestedPlan['selectedPlan'] = {
-        id: id,
-        currency: currencyValue,
-        amount: price.currency_options![currencyValue].unit_amount as number,
-        bytes: parseInt(metadata?.maxSpaceBytes),
-        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
-        decimalAmount: (price.currency_options![currencyValue].unit_amount as number) / 100,
-        type: isBusinessPrice ? UserType.Business : UserType.Individual,
-        ...businessSeats,
-      };
-
-      if (recurring?.interval === 'month') {
-        const upsell = await this.getUpsellProduct(productId as string, currency);
-
-        if (upsell?.active) {
-          upsellPlan = {
-            id: upsell.id,
-            currency: currencyValue,
-            amount: upsell.currency_options![currencyValue].unit_amount as number,
-            bytes: parseInt(upsell.metadata?.maxSpaceBytes),
-            interval: upsell.type === 'one_time' ? 'lifetime' : (upsell.recurring?.interval as 'year' | 'month'),
-            decimalAmount: (upsell.currency_options![currencyValue].unit_amount as number) / 100,
-            type: isBusinessPrice ? UserType.Business : UserType.Individual,
-            ...businessSeats,
-          };
-        }
-      }
-
-      return {
-        selectedPlan,
-        upsellPlan,
-      };
-    } catch (err) {
-      const error = err as Error;
-      if (error instanceof NotFoundPlanByIdError || error.message.includes('No such price')) {
-        throw new NotFoundPlanByIdError(priceId);
-      }
-      throw new InternalServerError();
-    }
   }
 
   /**
