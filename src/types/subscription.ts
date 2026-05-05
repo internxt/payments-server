@@ -23,6 +23,11 @@ export interface PlanSubscription {
   paymentInterval: string;
   isLifetime: boolean;
   renewalPeriod: RenewalPeriod;
+  commitment: {
+    enabled: boolean;
+    remainingMonths?: number;
+    cancellationDate?: string;
+  };
   storageLimit: number;
   amountOfSeats: number;
   seats?: {

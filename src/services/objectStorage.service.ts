@@ -1,6 +1,6 @@
 import { PaymentService } from './payment.service';
 import { sign } from 'jsonwebtoken';
-import { Axios, AxiosRequestConfig } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { type AppConfig } from '../config';
 
 function signToken(duration: string, secret: string) {
@@ -14,7 +14,7 @@ export class ObjectStorageService {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly config: AppConfig,
-    private readonly axios: Axios,
+    private readonly axios: AxiosInstance,
   ) {}
 
   async initObjectStorageUser(payload: { email: string; customerId: string }) {

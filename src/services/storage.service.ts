@@ -1,4 +1,4 @@
-import axios, { Axios, AxiosRequestConfig, isAxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, isAxiosError } from 'axios';
 import { sign } from 'jsonwebtoken';
 import { isProduction, type AppConfig } from '../config';
 import { User } from '../core/users/User';
@@ -15,7 +15,7 @@ function signToken(duration: string, secret: string) {
 export class StorageService {
   constructor(
     private readonly config: AppConfig,
-    private readonly axios: Axios,
+    private readonly axios: AxiosInstance,
   ) {}
 
   async updateUserStorageAndTier(uuid: string, newStorageBytes: number, foreignTierId: string): Promise<void> {
