@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import dayjs from 'dayjs';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -471,7 +472,47 @@ export class PaymentService {
     return { maxSpaceBytes: parseInt(price.metadata.maxSpaceBytes), recurring: isRecurring };
   }
 
+  /**
+   * Gets the annual commitment cancellation info
+   * @param subscription - The subscription we want to get info for
+   * @returns - The annual commitment cancellation info (remaining payments, amount per month, currency, cancel at)
+   */
+  getAnnualCommitmentCancellationInfo(subscription: Stripe.Subscription): {
+    remainingPayments: number;
+    cancelAt: number;
+    cancellationDate: string;
+    isFirstMonth: boolean;
+  } {
+    const createdAt = dayjs.unix(subscription.created);
+    const now = dayjs();
+
+    const monthsElapsed = now.diff(createdAt, 'month');
+    const monthsIntoPeriod = monthsElapsed % 12;
+    const periodsElapsed = Math.floor(monthsElapsed / 12);
+
+    const cancelAtDate = createdAt.add(periodsElapsed + 1, 'year');
+    const cancelAt = cancelAtDate.unix();
+
+    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
+    const remainingPayments = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
+    const cancellationDate = cancelAtDate.toISOString();
+
+    return { remainingPayments, cancelAt, cancellationDate, isFirstMonth };
+  }
+
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+    const item = subscription.items.data[0];
+    const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
+    const { isFirstMonth, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
+
+    if (hasAnnualCommitment && !isFirstMonth) {
+      await this.provider.subscriptions.update(subscriptionId, {
+        cancel_at: cancelAt,
+      });
+      return;
+    }
+
     await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
@@ -924,6 +965,8 @@ export class PaymentService {
           subscription.plan.metadata.maxSpaceBytes,
       ) || 0;
     const item = subscription.items.data[0] as Stripe.SubscriptionItem;
+    const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
+    const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscription) : null;
 
     const plan: PlanSubscription = {
       status: subscription.status,
@@ -942,7 +985,16 @@ export class PaymentService {
       isTeam: !!subscription.plan.product.metadata.is_teams,
       paymentInterval: subscription.plan.nickname,
       isLifetime: false,
-      renewalPeriod: this.getRenewalPeriod(subscription.plan.intervalCount, subscription.plan.interval),
+      renewalPeriod: this.getRenewalPeriod(
+        subscription.plan.intervalCount,
+        hasAnnualCommitment ? 'year' : subscription.plan.interval,
+      ),
+      commitment: {
+        enabled: hasAnnualCommitment,
+        remainingMonths: commitment?.remainingPayments,
+        cancellationDate: commitment?.cancellationDate,
+        isFirstMonth: commitment?.isFirstMonth,
+      },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
       seats: {
@@ -952,13 +1004,14 @@ export class PaymentService {
     };
 
     const { price } = subscription.items.data[0];
+    const itemInterval = hasAnnualCommitment ? 'year' : price.recurring?.interval;
 
     return {
       type: 'subscription',
       subscriptionId: subscription.id,
       amount: price.unit_amount!,
       currency: price.currency,
-      interval: price.recurring!.interval as 'year' | 'month',
+      interval: itemInterval,
       nextPayment: subscription.current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
@@ -988,13 +1041,16 @@ export class PaymentService {
         );
       })
       .map((price) => {
+        const hasAnnualCommitment = this.hasAnnualCommitment(price);
+        const recurringInterval = hasAnnualCommitment ? 'year' : (price.recurring?.interval as 'year' | 'month');
+
         return {
           id: price.id,
           productId: (price.product as Stripe.Product).id,
           currency: currencyValue,
           amount: price.currency_options![currencyValue].unit_amount as number,
           bytes: parseInt(price.metadata.maxSpaceBytes),
-          interval: price.type === 'one_time' ? 'lifetime' : (price.recurring!.interval as 'year' | 'month'),
+          interval: price.type === 'one_time' ? 'lifetime' : recurringInterval,
         };
       });
   }
@@ -1554,5 +1610,9 @@ export class PaymentService {
     const invoice = await this.bit2MeService.getInvoice(invoiceId);
 
     return invoice.status === 'paid';
+  }
+
+  private hasAnnualCommitment(price: Stripe.Price): boolean {
+    return price?.metadata.annualCommitment === 'true';
   }
 }

@@ -1,4 +1,4 @@
-import { Axios, AxiosError, AxiosRequestConfig } from 'axios';
+import { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import jwt from 'jsonwebtoken';
 import { AppConfig } from '../config';
 import { createHmac } from 'crypto';
@@ -20,7 +20,7 @@ import {
 export class Bit2MeService {
   constructor(
     private readonly config: AppConfig,
-    private readonly axios: Axios,
+    private readonly axios: AxiosInstance,
     private readonly secretKey = config.CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY,
     private readonly apiKey = config.CRYPTO_PAYMENTS_PROCESSOR_API_KEY,
     private readonly apiUrl = config.CRYPTO_PAYMENTS_PROCESSOR_API_URL,

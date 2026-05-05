@@ -1,6 +1,5 @@
 import axios from 'axios';
 import Logger from '../Logger';
-import { BadRequestError } from '../errors/Errors';
 import config from '../config';
 
 export enum KlaviyoEvent {
@@ -12,14 +11,14 @@ interface KlaviyoEventOptions {
   eventName: KlaviyoEvent;
 }
 
-
 export class KlaviyoTrackingService {
-  private readonly apiKey: string;
-  private readonly baseUrl: string;
+  private readonly apiKey?: string;
+  private readonly baseUrl?: string;
 
   constructor() {
     if (!config.KLAVIYO_API_KEY) {
-      throw new BadRequestError("Klaviyo API Key is required.");
+      Logger.warn('Klaviyo API key is not set');
+      return;
     }
 
     this.apiKey = config.KLAVIYO_API_KEY;

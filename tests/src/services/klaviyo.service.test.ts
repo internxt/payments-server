@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { KlaviyoTrackingService, KlaviyoEvent } from '../../../src/services/klaviyo.service';
 import Logger from '../../../src/Logger';
-import { BadRequestError } from '../../../src/errors/Errors';
 import config from '../../../src/config';
 import { createTestServices } from '../helpers/services-factory';
 
@@ -16,7 +15,6 @@ jest.mock('../../../src/config', () => ({
 }));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
-
 
 describe('KlaviyoTrackingService', () => {
   let service: KlaviyoTrackingService;
@@ -37,9 +35,11 @@ describe('KlaviyoTrackingService', () => {
   });
 
   describe('Initialization', () => {
-    test('When instantiated without an API Key in config, then it throws an error', () => {
+    test('When instantiated without an API Key in config, then it logs a warning', () => {
+      const loggerWarnSpy = jest.spyOn(Logger, 'warn').mockImplementation();
       (config as any).KLAVIYO_API_KEY = undefined;
-      expect(() => createTestServices({ stripe: {} as any }).klaviyoTrackingService).toThrow(BadRequestError);
+      createTestServices({ stripe: {} as any });
+      expect(loggerWarnSpy).toHaveBeenCalled();
     });
 
     test('When instantiated with valid config, then it initializes correctly', () => {
@@ -51,7 +51,7 @@ describe('KlaviyoTrackingService', () => {
     test('When tracking a cancellation, then it sends the correct payload to Klaviyo', async () => {
       const email = 'user@example.com';
       const expectedUrl = `${mockBaseUrl}/events/`;
-      
+
       const expectedPayload = {
         data: {
           type: 'event',
@@ -87,7 +87,7 @@ describe('KlaviyoTrackingService', () => {
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       expect(mockedAxios.post).toHaveBeenCalledWith(expectedUrl, expectedPayload, expectedHeaders);
       expect(loggerInfoSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} tracked for ${email}`)
+        expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} tracked for ${email}`),
       );
     });
 
@@ -99,9 +99,9 @@ describe('KlaviyoTrackingService', () => {
       mockedAxios.post.mockRejectedValue(error);
 
       await expect(service.trackSubscriptionCancelled(email)).rejects.toThrow(errorMessage);
-      
+
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} failed for ${email}: ${errorMessage}`)
+        expect.stringContaining(`[Klaviyo] ${KlaviyoEvent.SubscriptionCancelled} failed for ${email}: ${errorMessage}`),
       );
     });
   });

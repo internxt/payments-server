@@ -7,7 +7,7 @@ import { Coupon } from '../core/coupons/Coupon';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
-import { Axios, AxiosRequestConfig } from 'axios';
+import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
@@ -31,7 +31,7 @@ export class UsersService {
     private readonly couponsRepository: CouponsRepository,
     private readonly usersCouponsRepository: UsersCouponsRepository,
     private readonly config: AppConfig,
-    private readonly axios: Axios,
+    private readonly axios: AxiosInstance,
   ) {}
 
   async updateUser(customerId: User['customerId'], body: Partial<User>): Promise<void> {

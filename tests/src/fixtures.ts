@@ -464,6 +464,9 @@ export function getSubscription({
       type: userType,
       price: 119.88,
       monthlyPrice: 9.99,
+      commitment: {
+        enabled: false,
+      },
       currency: 'eur',
       isTeam: false,
       paymentInterval: '',
