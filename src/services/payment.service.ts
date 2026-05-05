@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import dayjs from 'dayjs';
 
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
@@ -480,31 +481,32 @@ export class PaymentService {
     remainingPayments: number;
     cancelAt: number;
     cancellationDate: string;
+    isFirstMonth: boolean;
   } {
-    const createdAt = new Date(subscription.created * 1000);
-    const now = new Date();
+    const createdAt = dayjs.unix(subscription.created);
+    const now = dayjs();
 
-    const monthsElapsed = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
+    const monthsElapsed = now.diff(createdAt, 'month');
     const monthsIntoPeriod = monthsElapsed % 12;
     const periodsElapsed = Math.floor(monthsElapsed / 12);
 
-    const cancelAtDate = new Date(createdAt);
-    cancelAtDate.setFullYear(cancelAtDate.getFullYear() + periodsElapsed + 1);
-    const cancelAt = Math.floor(cancelAtDate.getTime() / 1000);
+    const cancelAtDate = createdAt.add(periodsElapsed + 1, 'year');
+    const cancelAt = cancelAtDate.unix();
 
+    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') < 30;
     const remainingPayments = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
-    const cancellationDate = new Date(cancelAt * 1000).toISOString();
+    const cancellationDate = cancelAtDate.toISOString();
 
-    return { remainingPayments, cancelAt, cancellationDate };
+    return { remainingPayments, cancelAt, cancellationDate, isFirstMonth };
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
     const subscription = await this.getSubscriptionById(subscriptionId);
     const item = subscription.items.data[0];
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
+    const { isFirstMonth, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
 
-    if (hasAnnualCommitment) {
-      const { cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
+    if (hasAnnualCommitment && !isFirstMonth) {
       await this.provider.subscriptions.update(subscriptionId, {
         cancel_at: cancelAt,
       });
@@ -991,6 +993,7 @@ export class PaymentService {
         enabled: hasAnnualCommitment,
         remainingMonths: commitment?.remainingPayments,
         cancellationDate: commitment?.cancellationDate,
+        isFirstMonth: commitment?.isFirstMonth,
       },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,

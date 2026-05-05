@@ -35,6 +35,13 @@ describe('KlaviyoTrackingService', () => {
   });
 
   describe('Initialization', () => {
+    test('When instantiated without an API Key in config, then it logs a warning', () => {
+      const loggerWarnSpy = jest.spyOn(Logger, 'warn').mockImplementation();
+      (config as any).KLAVIYO_API_KEY = undefined;
+      createTestServices({ stripe: {} as any });
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+
     test('When instantiated with valid config, then it initializes correctly', () => {
       expect(() => createTestServices({ stripe: {} as any }).klaviyoTrackingService).not.toThrow();
     });

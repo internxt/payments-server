@@ -27,6 +27,7 @@ export interface PlanSubscription {
     enabled: boolean;
     remainingMonths?: number;
     cancellationDate?: string;
+    isFirstMonth?: boolean;
   };
   storageLimit: number;
   amountOfSeats: number;
