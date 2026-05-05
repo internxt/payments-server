@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import { ExtendedSubscription } from '../../../src/types/stripe';
 import config from '../../../src/config';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
-import { getActiveSubscriptions, getCoupon, getCustomer, getUser, newTier, voidPromise } from '../fixtures';
+import { getActiveSubscriptions, getCoupon, getUser, newTier, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { Service } from '../../../src/core/users/Tier';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
@@ -114,74 +114,6 @@ describe('UsersService tests', () => {
 
       expect(usersRepository.findUserByUuid).toHaveBeenCalledTimes(1);
       expect(usersRepository.findUserByUuid).toHaveBeenCalledWith(mockedUser.uuid);
-    });
-  });
-
-  describe('Workspaces', () => {
-    test('When initializing the workspace, then the workspace is initialized using the correct params', async () => {
-      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
-      const tier = newTier();
-      const mockedCustomer = getCustomer();
-      const amountOfSeats = 5;
-
-      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({} as any);
-
-      await usersService.initializeWorkspace(userWithEmail.uuid, {
-        newStorageBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        seats: amountOfSeats,
-        address: mockedCustomer.address?.line1 ?? undefined,
-        phoneNumber: mockedCustomer.phone ?? undefined,
-        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
-      });
-
-      expect(axiosPostSpy).toHaveBeenCalledWith(
-        `${process.env.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
-        {
-          ownerId: userWithEmail.uuid,
-          maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat * amountOfSeats,
-          numberOfSeats: amountOfSeats,
-          address: mockedCustomer.address?.line1 ?? undefined,
-          phoneNumber: mockedCustomer.phone ?? undefined,
-          tierId: tier.featuresPerService[Service.Drive].foreignTierId,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer undefined',
-          },
-        },
-      );
-    });
-
-    test('When updating the workspace, then the workspace is updated using the correct params', async () => {
-      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
-      const tier = newTier();
-      const amountOfSeats = 5;
-
-      const axiosPostSpy = jest.spyOn(axios, 'patch').mockResolvedValue({} as any);
-
-      await usersService.updateWorkspace({
-        ownerId: userWithEmail.uuid,
-        maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
-        seats: amountOfSeats,
-        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
-      });
-
-      expect(axiosPostSpy).toHaveBeenCalledWith(
-        `${process.env.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
-        {
-          ownerId: userWithEmail.uuid,
-          maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat * amountOfSeats,
-          numberOfSeats: amountOfSeats,
-          tierId: tier.featuresPerService[Service.Drive].foreignTierId,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer undefined',
-          },
-        },
-      );
     });
   });
 

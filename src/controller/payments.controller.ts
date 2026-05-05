@@ -406,13 +406,13 @@ export function paymentsController(
     }
 
     fastify.get<{
-      Querystring: { currency?: string; userType?: 'individual' | 'business' };
+      Querystring: { currency?: string; userType?: 'individual' };
       schema: {
         querystring: {
           type: 'object';
           properties: {
             currency: { type: 'string' };
-            userType: { type: 'string'; enum: ['individual', 'business'] };
+            userType: { type: 'string'; enum: ['individual'] };
           };
         };
       };
