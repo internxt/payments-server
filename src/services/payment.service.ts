@@ -493,7 +493,7 @@ export class PaymentService {
     const cancelAtDate = createdAt.add(periodsElapsed + 1, 'year');
     const cancelAt = cancelAtDate.unix();
 
-    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') < 30;
+    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
     const remainingPayments = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
     const cancellationDate = cancelAtDate.toISOString();
 
