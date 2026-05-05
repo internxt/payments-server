@@ -142,6 +142,64 @@ export class UsersService {
     return uniqueCodes;
   }
 
+  // !DEPRECATED
+  async isWorkspaceUpgradeAllowed(
+    ownerId: string,
+    workspaceId: string,
+    maxSpaceBytes: number,
+    seats: number,
+  ): Promise<boolean> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    return this.axios.post(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces/${workspaceId}/storage/upgrade-check`,
+      {
+        ownerId,
+        maxSpaceBytes: maxSpaceBytes * seats,
+        numberOfSeats: seats,
+      },
+      requestConfig,
+    );
+  }
+
+  // !DEPRECATED
+  async updateWorkspace({
+    ownerId,
+    tierId,
+    maxSpaceBytes,
+    seats,
+  }: {
+    ownerId: string;
+    tierId: string;
+    maxSpaceBytes: number;
+    seats: number;
+  }): Promise<void> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    return this.axios.patch(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
+      {
+        ownerId,
+        maxSpaceBytes: maxSpaceBytes * seats,
+        numberOfSeats: seats,
+        tierId,
+      },
+      requestConfig,
+    );
+  }
+
   async destroyWorkspace(ownerId: string): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
     const requestConfig: AxiosRequestConfig = {

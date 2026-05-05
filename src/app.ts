@@ -4,6 +4,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { AppConfig } from './config';
 import { paymentsController } from './controller/payments.controller';
 import { objectStorageController } from './controller/object-storage.controller';
+import { businessController } from './controller/business.controller';
 import { productsController } from './controller/products.controller';
 import { checkoutController } from './controller/checkout.controller';
 import { customerController } from './controller/customer.controller';
@@ -64,6 +65,7 @@ export async function buildApp({
     paymentsController(paymentService, usersService, config, cacheService, licenseCodesService, tiersService),
   );
   fastify.register(objectStorageController(paymentService), { prefix: '/object-storage' });
+  fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
