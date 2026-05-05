@@ -1,6 +1,5 @@
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { UserType } from '../core/users/User';
-import { Reason } from './payment';
 
 export enum RenewalPeriod {
   Monthly = 'monthly',
@@ -49,14 +48,4 @@ export type RequestedPlanData = DisplayPrice & {
   minimumSeats?: number;
   maximumSeats?: number;
   type?: UserType;
-};
-
-export interface RequestedPlan {
-  selectedPlan: RequestedPlanData;
-  upsellPlan?: RequestedPlanData;
-}
-
-export type HasUserAppliedCouponResponse = {
-  elegible: boolean;
-  reason?: Reason;
 };

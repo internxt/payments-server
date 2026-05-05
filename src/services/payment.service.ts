@@ -38,7 +38,7 @@ import {
   Customer as StripeCustomer,
 } from '../types/stripe';
 import { PaymentIntent, PromotionCode, PriceByIdResponse } from '../types/payment';
-import { RenewalPeriod, PlanSubscription, SubscriptionCreated, RequestedPlan } from '../types/subscription';
+import { RenewalPeriod, PlanSubscription, SubscriptionCreated, RequestedPlanData } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export class PaymentService {
@@ -995,7 +995,7 @@ export class PaymentService {
 
       const { id, metadata, type, recurring } = price;
 
-      const selectedPlan: RequestedPlan['selectedPlan'] = {
+      const selectedPlan: RequestedPlanData = {
         id: id,
         currency: currencyValue,
         amount: price.unit_amount as number,

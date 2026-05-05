@@ -6,12 +6,6 @@ export class NotFoundSubscriptionError extends NotFoundError {
   }
 }
 
-export class CouponCodeError extends BadRequestError {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
 export class InvalidSeatNumberError extends BadRequestError {
   constructor(message: string) {
     super(message);
