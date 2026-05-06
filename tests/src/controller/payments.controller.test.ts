@@ -5,7 +5,6 @@ import {
   getCustomer,
   getLicenseCode,
   getPaymentIntent,
-  getPrices,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -15,7 +14,7 @@ import {
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { PaymentService } from '../../../src/services/payment.service';
-import { CustomerNotFoundError, NotFoundPlanByIdError } from '../../../src/errors/PaymentErrors';
+import { CustomerNotFoundError } from '../../../src/errors/PaymentErrors';
 import config from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
@@ -69,88 +68,6 @@ describe('Payment controller e2e tests', () => {
       });
 
       expect(response.statusCode).toBe(404);
-    });
-  });
-
-  describe('Fetching plan object by ID and contains the basic params', () => {
-    describe('Fetch subscription plan object', () => {
-      it('When the subscription priceId is valid, then the endpoint returns the correct object', async () => {
-        const mockedPrice = getPrices();
-        const expectedKeys = {
-          selectedPlan: {
-            id: expect.anything(),
-            currency: expect.anything(),
-            amount: expect.anything(),
-            bytes: expect.anything(),
-            interval: expect.anything(),
-            decimalAmount: expect.anything(),
-          },
-        };
-        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
-
-        const response = await app.inject({
-          path: `/plan-by-id?planId=${mockedPrice.subscription.exists}`,
-          method: 'GET',
-        });
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toMatchObject(expectedKeys);
-      });
-
-      it('When the subscription priceId is not valid, then it returns 404 status code', async () => {
-        const mockedPrice = getPrices();
-        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
-        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
-
-        const response = await app.inject({
-          path: `/plan-by-id?planId=${mockedPrice.subscription.doesNotExist}`,
-          method: 'GET',
-        });
-
-        expect(response.statusCode).toBe(404);
-      });
-    });
-
-    describe('Fetch Lifetime plan object', () => {
-      it('When the lifetime priceId is valid, then it returns the lifetime price object', async () => {
-        const mockedPrice = getPrices();
-
-        const expectedKeys = {
-          selectedPlan: {
-            id: expect.anything(),
-            currency: expect.anything(),
-            amount: expect.anything(),
-            bytes: expect.anything(),
-            interval: expect.anything(),
-            decimalAmount: expect.anything(),
-          },
-        };
-        jest.spyOn(PaymentService.prototype, 'getPlanById').mockResolvedValue(expectedKeys);
-
-        const response = await app.inject({
-          path: `/plan-by-id?planId=${mockedPrice.lifetime.exists}`,
-          method: 'GET',
-        });
-
-        const responseBody = response.json();
-
-        expect(response.statusCode).toBe(200);
-        expect(responseBody).toMatchObject(expectedKeys);
-      });
-
-      it('When the lifetime priceId is not valid, then returns 404 status code', async () => {
-        const mockedPrice = getPrices();
-        const notFoundPlanByIdError = new NotFoundPlanByIdError('Plan not found');
-        jest.spyOn(PaymentService.prototype, 'getPlanById').mockRejectedValue(notFoundPlanByIdError);
-
-        const response = await app.inject({
-          path: `/plan-by-id?planId=${mockedPrice.lifetime.doesNotExist}`,
-          method: 'GET',
-        });
-
-        expect(response.statusCode).toBe(404);
-      });
     });
   });
 

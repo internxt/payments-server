@@ -4,12 +4,9 @@ import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
 import {
-  CouponCodeError,
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
-  ExistingSubscriptionError,
   MissingParametersError,
-  NotFoundPlanByIdError,
   NotFoundPromoCodeByNameError,
   PromoCodeIsNotValidError,
 } from '../errors/PaymentErrors';
@@ -132,132 +129,6 @@ export function paymentsController(
         });
       },
     );
-
-    fastify.post<{
-      Querystring: { trialToken: string };
-      Body: {
-        customerId: string;
-        priceId: string;
-        currency: string;
-        token: string;
-        trialCode: string;
-      };
-    }>(
-      '/create-subscription-with-trial',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['customerId', 'priceId'],
-            properties: {
-              customerId: {
-                type: 'string',
-              },
-              priceId: {
-                type: 'string',
-              },
-              token: {
-                type: 'string',
-              },
-              currency: {
-                type: 'string',
-              },
-              trialCode: {
-                type: 'string',
-              },
-            },
-          },
-        },
-      },
-      async (req, res) => {
-        const { customerId, priceId, currency, token } = req.body;
-
-        if (!customerId || !priceId) {
-          throw new MissingParametersError(['customerId', 'priceId']);
-        }
-
-        try {
-          const payload = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          const tokenCustomerId = payload.customerId;
-
-          if (customerId !== tokenCustomerId) {
-            return res.status(403).send();
-          }
-        } catch (error) {
-          return res.status(403).send();
-        }
-
-        const { trialToken } = req.query;
-
-        if (!trialToken) {
-          return res.status(403).send('Invalid trial token');
-        }
-
-        try {
-          const payload = jwt.verify(trialToken, config.JWT_SECRET) as { trial?: string };
-          if (!payload.trial || payload.trial !== 'pc-cloud-25') {
-            throw new Error('Invalid trial token');
-          }
-        } catch {
-          return res.status(403).send('Invalid trial token');
-        }
-
-        try {
-          const subscriptionSetup = await paymentService.createSubscriptionWithTrial(
-            {
-              customerId,
-              priceId,
-              currency,
-            },
-            {
-              name: 'pc-cloud-25',
-            },
-          );
-
-          return res.send(subscriptionSetup);
-        } catch (err) {
-          const error = err as Error;
-          req.log.error(`[ERROR CREATING SUBSCRIPTION WITH TRIAL]: ${error.stack ?? error.message}`);
-
-          if (error instanceof MissingParametersError) {
-            return res.status(400).send({
-              message: error.message,
-            });
-          } else if (error instanceof PromoCodeIsNotValidError) {
-            return res
-              .status(422)
-              .send({ message: 'The promotion code is not applicable under the current conditions' });
-          } else if (error instanceof ExistingSubscriptionError) {
-            return res.status(409).send({
-              message: error.message,
-            });
-          }
-
-          return res.status(500).send({
-            message: 'Internal Server Error',
-          });
-        }
-      },
-    );
-
-    fastify.get<{
-      Querystring: { code: string };
-    }>('/trial-for-subscription', async (req, rep) => {
-      const { code } = req.query;
-      if (!code || code !== process.env.PC_CLOUD_TRIAL_CODE) {
-        return rep.status(400).send();
-      }
-
-      return jwt.sign({ trial: 'pc-cloud-25' }, config.JWT_SECRET);
-    });
-
-    fastify.get('/users/exists', async (req, rep) => {
-      await assertUser(req, rep, usersService);
-
-      return rep.status(200).send();
-    });
 
     fastify.get<{
       Querystring: { limit: number; starting_after?: string; userType?: UserType; subscription?: string };
@@ -563,82 +434,6 @@ export function paymentsController(
         }
 
         return paymentService.getPrices(currencyValue, userType);
-      },
-    );
-
-    fastify.get('/request-prevent-cancellation', async (req) => {
-      const { uuid } = req.user.payload;
-      try {
-        const user = await usersService.findUserByUuid(uuid);
-
-        return paymentService.isUserElegibleForTrial(user, {
-          name: 'prevent-cancellation',
-        });
-      } catch (err) {
-        const error = err as Error;
-        req.log.error(
-          `[REQUEST-PREVENT-CANCELLATION/ERROR]: Error for user ${uuid} ${error.message}. ${error.stack || 'NO STACK'}`,
-        );
-        throw err;
-      }
-    });
-
-    fastify.put('/prevent-cancellation', async (req, rep) => {
-      const { uuid } = req.user.payload;
-      const user = await usersService.findUserByUuid(uuid);
-
-      try {
-        await paymentService.applyFreeTrialToUser(user, {
-          name: 'prevent-cancellation',
-        });
-        return rep.status(200).send({ message: 'Coupon applied' });
-      } catch (err) {
-        if (err instanceof CouponCodeError) {
-          return rep.status(403).send({ message: err.message });
-        } else {
-          req.log.error(err);
-          return rep.status(500).send({ message: 'Internal server error' });
-        }
-      }
-    });
-
-    fastify.get<{
-      Querystring: { planId: string; currency?: string };
-      schema: {
-        querystring: {
-          type: 'object';
-          properties: { planId: { type: 'string' }; currency: { type: 'string' } };
-        };
-      };
-      config: {
-        rateLimit: {
-          max: 5;
-          timeWindow: '1 minute';
-        };
-      };
-    }>(
-      '/plan-by-id',
-      {
-        config: {
-          skipAuth: true,
-        },
-      },
-      async (req, rep) => {
-        const { planId, currency } = req.query;
-
-        try {
-          const planObject = await paymentService.getPlanById(planId, currency);
-
-          return rep.status(200).send(planObject);
-        } catch (error) {
-          const err = error as Error;
-          if (err instanceof NotFoundPlanByIdError) {
-            return rep.status(404).send(err.message);
-          }
-
-          req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
-          return rep.status(500).send({ message: 'Internal Server Error' });
-        }
       },
     );
 

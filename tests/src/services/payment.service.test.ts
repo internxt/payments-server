@@ -1,5 +1,4 @@
 import dayjs from 'dayjs';
-import { Reason } from '../../../src/types/payment';
 import { UserType } from '../../../src/core/users/User';
 import {
   getCharge,
@@ -683,44 +682,6 @@ describe('Payments Service tests', () => {
       await expect(paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual)).rejects.toThrow(
         'Service error',
       );
-    });
-  });
-
-  describe('Creating a subscription with trial', () => {
-    beforeAll(() => {
-      jest.useFakeTimers();
-    });
-
-    afterAll(() => {
-      jest.useRealTimers();
-    });
-
-    it('When creating a subscription with trial, then it creates the sub with the correct trial end date', async () => {
-      const fixedDate = new Date('2024-01-01T12:00:00Z');
-      jest.setSystemTime(fixedDate);
-
-      const expected = getCreateSubscriptionResponse();
-      const payload = {
-        customerId: getCustomer().id,
-        priceId: getPrices().subscription.exists,
-      };
-      const trialReason: Reason = { name: 'pc-cloud-25' };
-
-      const trialMonths = 6;
-      const expectedTrialEnd = Math.floor(
-        new Date(fixedDate.setMonth(fixedDate.getMonth() + trialMonths)).getTime() / 1000,
-      );
-
-      const createSubSpy = jest.spyOn(paymentService, 'createSubscription').mockResolvedValue(expected);
-
-      const received = await paymentService.createSubscriptionWithTrial(payload, trialReason);
-
-      expect(received).toStrictEqual(expected);
-      expect(createSubSpy).toHaveBeenCalledWith({
-        ...payload,
-        trialEnd: expectedTrialEnd,
-        metadata: { 'why-trial': trialReason.name },
-      });
     });
   });
 

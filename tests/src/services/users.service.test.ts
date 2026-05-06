@@ -307,46 +307,6 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Verify if the user used a tracked coupon code', () => {
-    it('When the coupon is tracked and used by the user, then returns true', async () => {
-      const mockedUser = getUser();
-      const mockedCoupon = getCoupon();
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mockedCoupon);
-      (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue({ id: 'entry1' });
-
-      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
-
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
-      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(mockedUser.id, mockedCoupon.id);
-      expect(result).toBe(true);
-    });
-
-    it('When the coupon is tracked but not used by the user, then returns false', async () => {
-      const mockedUser = getUser();
-      const mockedCoupon = getCoupon();
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(mockedCoupon);
-      (usersCouponsRepository.findByUserAndCoupon as jest.Mock).mockResolvedValue(null);
-
-      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
-
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
-      expect(usersCouponsRepository.findByUserAndCoupon).toHaveBeenCalledWith(mockedUser.id, mockedCoupon.id);
-      expect(result).toBe(false);
-    });
-
-    it('When the coupon is not tracked, then returns false', async () => {
-      const mockedUser = getUser();
-      const mockedCoupon = getCoupon();
-      (couponsRepository.findByCode as jest.Mock).mockResolvedValue(null);
-
-      const result = await usersService.isCouponBeingUsedByUser(mockedUser, mockedCoupon.code);
-
-      expect(couponsRepository.findByCode).toHaveBeenCalledWith(mockedCoupon.code);
-      expect(usersCouponsRepository.findByUserAndCoupon).not.toHaveBeenCalled();
-      expect(result).toBe(false);
-    });
-  });
-
   describe('Fetch all coupons linked to a user', () => {
     it('When the user does not have any coupon associated, then nothing is returned', async () => {
       const mockedUser = getUser();

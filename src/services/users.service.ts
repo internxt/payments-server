@@ -122,25 +122,6 @@ export class UsersService {
   }
 
   /**
-   * Indicates if the coupon has been used or not by a given user
-   * @param user User that could have been used a coupon
-   * @param couponCode The coupon code that could have been used
-   * @returns A boolean indicating if the coupon has been used or not
-   */
-  async isCouponBeingUsedByUser(user: User, couponCode: Coupon['code']): Promise<boolean> {
-    const coupon = await this.couponsRepository.findByCode(couponCode);
-    const isTracked = !!coupon;
-
-    if (!isTracked) {
-      return false;
-    }
-
-    const userCouponEntry = await this.usersCouponsRepository.findByUserAndCoupon(user.id, coupon.id);
-
-    return !!userCouponEntry;
-  }
-
-  /**
    * @description Retrieves the unique coupon codes associated with a given user.
    *
    * @param userId - The ID of the user whose coupons are being retrieved.
