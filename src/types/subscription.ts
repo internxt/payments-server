@@ -46,8 +46,6 @@ export interface SubscriptionCreated {
 
 export type RequestedPlanData = DisplayPrice & {
   decimalAmount: number;
-  minimumSeats?: number;
-  maximumSeats?: number;
   type?: UserType;
 };
 

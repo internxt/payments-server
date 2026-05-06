@@ -162,15 +162,12 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               promoCodeId: {
                 type: 'string',
               },
-              quantity: {
-                type: 'number',
-              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, quantity, captchaToken, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
         let tokenCustomerId;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -196,7 +193,6 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           customerId,
           priceId,
           currency,
-          seatsForBusinessSubscription: quantity ?? 1,
           promoCodeId,
           additionalOptions: {
             automatic_tax: {

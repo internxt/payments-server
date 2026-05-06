@@ -112,7 +112,6 @@ export class PaymentService {
   async createSubscription({
     customerId,
     priceId,
-    seatsForBusinessSubscription = 1,
     currency,
     promoCodeId,
     companyName,
@@ -123,7 +122,6 @@ export class PaymentService {
   }: {
     customerId: string;
     priceId: string;
-    seatsForBusinessSubscription?: number;
     currency?: string;
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
     companyName?: string;
@@ -139,21 +137,6 @@ export class PaymentService {
       expand: ['product'],
     });
     const product = price.product as Stripe.Product;
-    const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
-    const isObjStorageProduct = !!product.metadata.type && product.metadata.type === UserType.ObjectStorage;
-    const seats = isObjStorageProduct ? undefined : seatsForBusinessSubscription;
-    const minimumSeats = price.metadata.minimumSeats ?? 1;
-    const maximumSeats = price.metadata.maximumSeats ?? 1;
-
-    if (isBusinessProduct && minimumSeats && maximumSeats) {
-      if (seatsForBusinessSubscription > parseInt(maximumSeats)) {
-        throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
-      }
-
-      if (seatsForBusinessSubscription < parseInt(minimumSeats)) {
-        throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
-      }
-    }
 
     await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
@@ -167,7 +150,7 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          quantity: seats,
+          quantity: 1,
         },
       ],
       discounts: [
@@ -1029,14 +1012,6 @@ export class PaymentService {
 
     let businessSeats;
     const { currency_options, recurring, metadata, type, product } = selectedPrice;
-    const isBusinessPrice = metadata?.type === 'business';
-
-    if (isBusinessPrice) {
-      businessSeats = {
-        minimumSeats: Number(metadata.minimumSeats),
-        maximumSeats: Number(metadata.maximumSeats),
-      };
-    }
 
     return {
       id: priceId,
@@ -1045,9 +1020,8 @@ export class PaymentService {
       bytes: parseInt(metadata?.maxSpaceBytes),
       interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
       decimalAmount: (currency_options![currency].unit_amount as number) / 100,
-      type: isBusinessPrice ? UserType.Business : UserType.Individual,
+      type: UserType.Individual,
       product: product as string,
-      ...businessSeats,
     };
   }
 
