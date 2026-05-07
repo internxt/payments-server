@@ -87,6 +87,29 @@ describe('Payments Service tests', () => {
       });
       expect(subscription).toEqual(mockedSubscriptionResponse);
     });
+
+    it('When trying to create a business subscription, then an error is thrown', async () => {
+      const mockedCreateSubscription = getCreatedSubscription();
+      const mockedPrice = getPrice({
+        product: {
+          metadata: {
+            type: 'business',
+          },
+        } as any,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as any);
+
+      await expect(
+        paymentService.createSubscription({
+          customerId: mockedCreateSubscription.customer as string,
+          priceId: mockedCreateSubscription.items.data[0].price.id,
+          promoCodeId: (
+            (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+          ).code,
+        }),
+      ).rejects.toThrow(BadRequestError);
+    });
   });
 
   describe('Get a price given its ID', () => {
