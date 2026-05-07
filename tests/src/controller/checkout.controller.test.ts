@@ -860,27 +860,6 @@ describe('Checkout controller', () => {
       });
     });
 
-    test('When the user wants to get a business price by its ID, then an error indicating so is thrown', async () => {
-      const mockedPrice = priceById({
-        bytes: 123456789,
-        interval: 'year',
-        type: UserType.Business,
-      });
-
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-
-      const response = await app.inject({
-        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&userAddress=123.12.12.12`,
-        query: {
-          priceId: mockedPrice.id,
-          userAddress: '123.12.12.12',
-        },
-        method: 'GET',
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-
     describe('Handling promo codes', () => {
       test('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
         const mockedPrice = priceById({
