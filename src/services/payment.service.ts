@@ -1013,8 +1013,16 @@ export class PaymentService {
       throw new NotFoundError('The requested price does not exist');
     }
 
+    let businessSeats;
     const { currency_options, recurring, metadata, type, product } = selectedPrice;
-    const isBusiness = metadata.type === UserType.Business;
+    const isBusinessPrice = metadata?.type === 'business';
+
+    if (isBusinessPrice) {
+      businessSeats = {
+        minimumSeats: Number(metadata.minimumSeats),
+        maximumSeats: Number(metadata.maximumSeats),
+      };
+    }
 
     return {
       id: priceId,
@@ -1023,8 +1031,9 @@ export class PaymentService {
       bytes: Number.parseInt(metadata?.maxSpaceBytes),
       interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
       decimalAmount: (currency_options![currency].unit_amount as number) / 100,
-      type: isBusiness ? UserType.Business : UserType.Individual,
+      type: isBusinessPrice ? UserType.Business : UserType.Individual,
       product: product as string,
+      ...businessSeats,
     };
   }
 

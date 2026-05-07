@@ -718,6 +718,38 @@ describe('Payments Service tests', () => {
       await expect(paymentService.getPriceById(invalidPriceId)).rejects.toThrow(NotFoundError);
     });
 
+    it('When the price exists and belongs to a business product, then the price is returned with minimum and maximum seats', async () => {
+      const businessSeats = {
+        minimumSeats: 1,
+        maximumSeats: 3,
+      };
+      const mockedPrice = getPrice({
+        metadata: {
+          type: 'business',
+          maxSpaceBytes: '123456789',
+          minimumSeats: businessSeats.minimumSeats.toString(),
+          maximumSeats: businessSeats.maximumSeats.toString(),
+        },
+      });
+      const validPriceId = mockedPrice.id;
+      const priceResponse = {
+        id: validPriceId,
+        currency: mockedPrice.currency,
+        amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
+        bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
+        interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
+        decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        product: mockedPrice.product as string,
+        type: UserType.Business,
+        ...businessSeats,
+      };
+      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
+
+      const price = await paymentService.getPriceById(validPriceId);
+
+      expect(price).toStrictEqual(priceResponse);
+    });
+
     it('When the price exists, then the correct price object is returned', async () => {
       const mockedPrice = getPrice({
         metadata: {
