@@ -13,6 +13,7 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { UserType } from '../core/users/User';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -188,6 +189,10 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         if (customerId !== tokenCustomerId) {
           throw new ForbiddenError();
         }
+
+        const price = await paymentsService.getPriceById(priceId);
+
+        if (price.type === UserType.Business) throw new BadRequestError('Business plan is not available');
 
         const subscriptionAttempt = await paymentsService.createSubscription({
           customerId,

@@ -4,10 +4,8 @@ import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
 import axios from 'axios';
-import { Customer } from '../infrastructure/domain/entities/customer';
 import { BadRequestError } from '../errors/Errors';
 
 export class TierNotFoundError extends Error {
@@ -131,10 +129,7 @@ export class TiersService {
 
   async applyDriveFeatures(
     userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Customer,
-    subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
-    log: FastifyBaseLogger,
     customMaxSpaceBytes?: number,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
