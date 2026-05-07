@@ -287,9 +287,6 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         }
 
         const price = await paymentsService.getPriceById(priceId);
-        const isBusiness = price.type === UserType.Business;
-
-        if (isBusiness) throw new BadRequestError('Business plans are not available');
 
         if (price.interval !== 'lifetime') {
           throw new BadRequestError('Only lifetime plans are supported');
