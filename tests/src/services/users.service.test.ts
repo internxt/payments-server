@@ -117,6 +117,39 @@ describe('UsersService tests', () => {
     });
   });
 
+  describe('Workspaces', () => {
+    test('When updating the workspace, then the workspace is updated using the correct params', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+      const amountOfSeats = 5;
+
+      const axiosPostSpy = jest.spyOn(axios, 'patch').mockResolvedValue({} as any);
+
+      await usersService.updateWorkspace({
+        ownerId: userWithEmail.uuid,
+        maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat,
+        seats: amountOfSeats,
+        tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+      });
+
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${process.env.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
+        {
+          ownerId: userWithEmail.uuid,
+          maxSpaceBytes: tier.featuresPerService[Service.Drive].workspaces.maxSpaceBytesPerSeat * amountOfSeats,
+          numberOfSeats: amountOfSeats,
+          tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer undefined',
+          },
+        },
+      );
+    });
+  });
+
   describe('Cancel user subscription', () => {
     describe('Cancel the user Individual subscription', () => {
       it('When the customer wants to cancel the individual subscription, then the Stripe plan is cancelled and the storage is restored', async () => {

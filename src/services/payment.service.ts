@@ -1011,16 +1011,15 @@ export class PaymentService {
     }
 
     const { currency_options, recurring, metadata, type, product } = selectedPrice;
-    const isBusiness = metadata.type === 'business';
 
     return {
       id: priceId,
       currency,
       amount: currency_options![currency].unit_amount as number,
-      bytes: parseInt(metadata?.maxSpaceBytes),
+      bytes: Number.parseInt(metadata?.maxSpaceBytes),
       interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
       decimalAmount: (currency_options![currency].unit_amount as number) / 100,
-      type: isBusiness ? UserType.Business : UserType.Individual,
+      type: UserType.Individual,
       product: product as string,
     };
   }
