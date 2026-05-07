@@ -192,7 +192,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
 
         const price = await paymentsService.getPriceById(priceId);
 
-        if (price.type === UserType.Business) throw new BadRequestError('Business plan is not available');
+        if (price.type === UserType.Business) throw new BadRequestError('Business plan is no longer available');
 
         const subscriptionAttempt = await paymentsService.createSubscription({
           customerId,

@@ -139,7 +139,7 @@ export class PaymentService {
     const product = price.product as Stripe.Product;
     const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
 
-    if (isBusinessProduct) throw new BadRequestError('Business plan is not available');
+    if (isBusinessProduct) throw new BadRequestError('Business plan is no longer available');
 
     await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
