@@ -142,32 +142,7 @@ export class UsersService {
     return uniqueCodes;
   }
 
-  async initializeWorkspace(
-    ownerId: string,
-    payload: { newStorageBytes: number; seats: number; tierId: string; address?: string; phoneNumber?: string },
-  ): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
-    const params: AxiosRequestConfig = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${jwt}`,
-      },
-    };
-
-    await this.axios.post(
-      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/workspaces`,
-      {
-        ownerId,
-        tierId: payload.tierId,
-        maxSpaceBytes: payload.newStorageBytes * payload.seats,
-        address: payload.address,
-        numberOfSeats: payload.seats,
-        phoneNumber: payload.phoneNumber,
-      },
-      params,
-    );
-  }
-
+  // !DEPRECATED
   async isWorkspaceUpgradeAllowed(
     ownerId: string,
     workspaceId: string,
@@ -193,6 +168,7 @@ export class UsersService {
     );
   }
 
+  // !DEPRECATED
   async updateWorkspace({
     ownerId,
     tierId,

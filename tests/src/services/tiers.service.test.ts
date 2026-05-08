@@ -4,6 +4,7 @@ import { Service } from '../../../src/core/users/Tier';
 import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
+import { BadRequestError } from '../../../src/errors/Errors';
 
 describe('TiersService tests', () => {
   const { usersTiersRepository, tiersRepository, tiersService, usersService, storageService } = createTestServices();
@@ -161,6 +162,55 @@ describe('TiersService tests', () => {
         productId: tier.productId,
         billingType: tierBillingType,
       });
+    });
+  });
+
+  describe('Apply the Drive features', () => {
+    test('When the user wants to apply an individual plan, then the Drive features are applied', async () => {
+      const mockedUser = getUser();
+      const mockedTier = newTier();
+
+      const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
+
+      await tiersService.applyDriveFeatures(
+        {
+          email: 'example@internxt.com',
+          uuid: mockedUser.uuid,
+        },
+        mockedTier,
+        mockedTier.featuresPerService.drive.maxSpaceBytes,
+      );
+
+      expect(changeStorageSpy).toHaveBeenCalledWith(
+        mockedUser.uuid,
+        mockedTier.featuresPerService.drive.maxSpaceBytes,
+        mockedTier.featuresPerService.drive.foreignTierId,
+      );
+    });
+
+    test('When the user wants to apply a business plan, then an error indicating that it is not possible is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedTier = newTier({
+        featuresPerService: {
+          drive: {
+            workspaces: {
+              enabled: true,
+            },
+            maxSpaceBytes: 100,
+          },
+        } as any,
+      });
+
+      await expect(
+        tiersService.applyDriveFeatures(
+          {
+            email: 'example@internxt.com',
+            uuid: mockedUser.uuid,
+          },
+          mockedTier,
+          mockedTier.featuresPerService.drive.maxSpaceBytes,
+        ),
+      ).rejects.toThrow(BadRequestError);
     });
   });
 

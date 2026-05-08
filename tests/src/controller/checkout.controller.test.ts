@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import {
-  getCreatedSubscription,
   getCreateSubscriptionResponse,
   getCryptoCurrency,
   getCustomer,
   getInvoice,
+  getPrice,
   getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
@@ -24,6 +24,7 @@ import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
+import { UserType } from '../../../src/core/users/User';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 
@@ -280,13 +281,16 @@ describe('Checkout controller', () => {
   describe('Creating a subscription', () => {
     test('When the user wants to create a subscription, test is created successfully', async () => {
       const mockedUser = getUser();
-      const mockedSubscription = getCreatedSubscription();
+      const mockedPrice = getPrice();
       const mockedSubscriptionResponse = getCreateSubscriptionResponse();
       const mockedCaptchaToken = 'captcha_token';
 
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
+      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue({
+        type: UserType.Individual,
+      } as any);
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
@@ -295,8 +299,8 @@ describe('Checkout controller', () => {
         method: 'POST',
         body: {
           customerId: mockedUser.customerId,
-          priceId: mockedSubscription.items.data[0].price.id,
-          currency: mockedSubscription.items.data[0].price.currency,
+          priceId: mockedPrice.id,
+          currency: mockedPrice.currency,
           quantity: 1,
           token: userToken,
           captchaToken: mockedCaptchaToken,
@@ -313,6 +317,38 @@ describe('Checkout controller', () => {
     });
 
     describe('Handling errors', () => {
+      test('When the subscription is a business plan, then an error indicating so is thrown', async () => {
+        const mockedUser = getUser();
+        const mockedPrice = getPrice();
+        const mockedCaptchaToken = 'captcha_token';
+
+        const authToken = getValidAuthToken(mockedUser.uuid);
+        const userToken = getValidUserToken({ customerId: mockedUser.customerId });
+
+        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue({
+          type: UserType.Business,
+        } as any);
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        const response = await app.inject({
+          path: '/checkout/subscription',
+          method: 'POST',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: mockedPrice.id,
+            currency: mockedPrice.currency,
+            quantity: 1,
+            token: userToken,
+            captchaToken: mockedCaptchaToken,
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      });
+
       test('When the id of the price is not present in the body, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);

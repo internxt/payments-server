@@ -4,10 +4,9 @@ import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import Stripe from 'stripe';
 import { FastifyBaseLogger } from 'fastify';
-import axios, { isAxiosError } from 'axios';
-import { Customer } from '../infrastructure/domain/entities/customer';
+import axios from 'axios';
+import { BadRequestError } from '../errors/Errors';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -130,49 +129,13 @@ export class TiersService {
 
   async applyDriveFeatures(
     userWithEmail: { email: string; uuid: User['uuid'] },
-    customer: Customer,
-    subscriptionSeats: Stripe.InvoiceLineItem['quantity'],
     tier: Tier,
-    log: FastifyBaseLogger,
     customMaxSpaceBytes?: number,
   ): Promise<void> {
     const features = tier.featuresPerService[Service.Drive];
 
     if (features.workspaces.enabled) {
-      if (!subscriptionSeats || subscriptionSeats < features.workspaces.minimumSeats)
-        throw new NoSubscriptionSeatsProvidedError('The amount of seats is not allowed for this type of subscription');
-
-      const maxSpaceBytes = features.workspaces.maxSpaceBytesPerSeat;
-      const address = customer.address?.line1 ?? undefined;
-      const phoneNumber = customer.phone ?? undefined;
-      const driveTierId = tier.featuresPerService[Service.Drive].foreignTierId;
-
-      try {
-        await this.usersService.updateWorkspace({
-          ownerId: userWithEmail.uuid,
-          maxSpaceBytes: Number(maxSpaceBytes),
-          seats: subscriptionSeats,
-          tierId: driveTierId,
-        });
-        log.info(`[DRIVE/WORKSPACES]: The workspace for user ${userWithEmail.uuid} has been updated`);
-      } catch (err) {
-        if (isAxiosError(err) && err.response?.status === 404) {
-          log.info(
-            `[DRIVE/WORKSPACES]: User with customer Id: ${customer.id} - uuid: ${userWithEmail.uuid} - email: ${customer.email} does not have a workspace. Creating a new one...`,
-          );
-          await this.usersService.initializeWorkspace(userWithEmail.uuid, {
-            newStorageBytes: Number(maxSpaceBytes),
-            seats: subscriptionSeats,
-            tierId: driveTierId,
-            address,
-            phoneNumber,
-          });
-        } else {
-          throw err;
-        }
-      }
-
-      return;
+      throw new BadRequestError('Workspaces feature is not available anymore');
     }
 
     const maxSpaceBytes = customMaxSpaceBytes ?? features.maxSpaceBytes;
