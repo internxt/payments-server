@@ -5,4 +5,7 @@ export interface DisplayPrice {
   interval: 'year' | 'month' | 'lifetime';
   amount: number;
   currency: string;
+  commitmentPlan?: boolean;
+  minimumSeats?: number;
+  maximumSeats?: number;
 }

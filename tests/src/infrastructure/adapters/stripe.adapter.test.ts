@@ -1,5 +1,5 @@
 import { getCustomer, getPaymentMethod } from '../../fixtures';
-import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 import { UserNotFoundError } from '../../../../src/errors/PaymentErrors';
@@ -11,12 +11,12 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'create')
+        .spyOn(stripeAdapter.provider.customers, 'create')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
       const metadata = { referralCode: 'ABC123' };
 
-      const createdCustomer = await stripePaymentsAdapter.createCustomer({
+      const createdCustomer = await stripeAdapter.createCustomer({
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
         address: {
@@ -39,10 +39,10 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'update')
+        .spyOn(stripeAdapter.provider.customers, 'update')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const updatedCustomer = await stripePaymentsAdapter.updateCustomer(mockedCustomer.id, {
+      const updatedCustomer = await stripeAdapter.updateCustomer(mockedCustomer.id, {
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
         address: {
@@ -82,10 +82,10 @@ describe('Stripe Adapter', () => {
       });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'update')
+        .spyOn(stripeAdapter.provider.customers, 'update')
         .mockResolvedValue(updatedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const result = await stripePaymentsAdapter.updateCustomer(initialCustomer.id, {
+      const result = await stripeAdapter.updateCustomer(initialCustomer.id, {
         name: 'Updated Name',
       });
 
@@ -114,10 +114,10 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'retrieve')
+        .spyOn(stripeAdapter.provider.customers, 'retrieve')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const customer = await stripePaymentsAdapter.getCustomer(mockedCustomer.id);
+      const customer = await stripeAdapter.getCustomer(mockedCustomer.id);
 
       expect(customer).toStrictEqual(Customer.toDomain(mockedCustomer));
     });
@@ -128,9 +128,9 @@ describe('Stripe Adapter', () => {
       };
       const mockedError = new UserNotFoundError();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(stripeAdapter.provider.customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
 
-      await expect(stripePaymentsAdapter.getCustomer('')).rejects.toThrow(mockedError);
+      await expect(stripeAdapter.getCustomer('')).rejects.toThrow(mockedError);
     });
   });
 
@@ -138,11 +138,11 @@ describe('Stripe Adapter', () => {
     test('When searching a customer, then the customer is returned', async () => {
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.customers, 'search').mockResolvedValue({
         data: [mockedCustomer],
       } as any);
 
-      const customer = await stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string);
+      const customer = await stripeAdapter.searchCustomer(mockedCustomer.email as string);
 
       expect(customer).toStrictEqual([Customer.toDomain(mockedCustomer)]);
     });
@@ -151,12 +151,12 @@ describe('Stripe Adapter', () => {
       const mockedError = new UserNotFoundError();
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.customers, 'search').mockResolvedValue({
         data: [],
         total_count: 0,
       } as any);
 
-      await expect(stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
+      await expect(stripeAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
     });
   });
 
@@ -165,10 +165,10 @@ describe('Stripe Adapter', () => {
       const mockedPaymentMethod = getPaymentMethod();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().paymentMethods, 'retrieve')
+        .spyOn(stripeAdapter.provider.paymentMethods, 'retrieve')
         .mockResolvedValue(mockedPaymentMethod as Stripe.Response<Stripe.PaymentMethod>);
 
-      const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
+      const paymentMethod = await stripeAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
 
       expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
     });

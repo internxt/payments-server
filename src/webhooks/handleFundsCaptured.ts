@@ -7,7 +7,7 @@ import { ConflictError } from '../errors/Errors';
 import { UserType } from '../core/users/User';
 import axios from 'axios';
 import { VERIFICATION_CHARGE } from '../constants';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export default async function handleFundsCaptured(
   paymentIntent: Stripe.PaymentIntent,
@@ -32,7 +32,7 @@ export default async function handleFundsCaptured(
     `Received successful payment intent ${paymentIntent.id} from customer ${paymentIntent.customer as string}`,
   );
 
-  const customer = await stripePaymentsAdapter.getCustomer(paymentIntent.customer as string);
+  const customer = await stripeAdapter.getCustomer(paymentIntent.customer as string);
 
   logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 

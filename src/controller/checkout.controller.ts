@@ -12,7 +12,7 @@ import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { UserType } from '../core/users/User';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
@@ -85,7 +85,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         if (userExists) {
-          await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
+          await stripeAdapter.updateCustomer(userExists.customerId, {
             name: customerName,
             email,
             address: {
@@ -99,7 +99,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           });
           customerId = userExists.customerId;
         } else {
-          const { id } = await stripePaymentsAdapter.createCustomer({
+          const { id } = await stripeAdapter.createCustomer({
             name: customerName,
             email,
             address: {
@@ -190,7 +190,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError();
         }
 
-        const price = await paymentsService.getPriceById(priceId);
+        const price = await stripeAdapter.getPriceById(priceId);
 
         if (price.type === UserType.Business) throw new BadRequestError('Business plan is no longer available');
 
@@ -286,7 +286,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError();
         }
 
-        const price = await paymentsService.getPriceById(priceId);
+        const price = await stripeAdapter.getPriceById(priceId);
 
         if (price.interval !== 'lifetime') {
           throw new BadRequestError('Only lifetime plans are supported');
@@ -362,12 +362,11 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const userUuid = req.user?.payload?.uuid;
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
 
-        const price = await paymentsService.getPriceById(priceId, currency);
-
+        const price = await stripeAdapter.getPriceById(priceId, currency);
         let amount = price.amount;
 
-        if (promoCodeName) {
-          const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
+        if (promoCodeName && price.productId) {
+          const couponCode = await paymentsService.getPromoCodeByName(price.productId, promoCodeName);
           if (couponCode.amountOff) {
             amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {

@@ -2,7 +2,7 @@ import { FastifyBaseLogger } from 'fastify';
 import { getCustomer, getInvoice, getLogger, getProduct } from '../fixtures';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { createTestServices } from '../helpers/services-factory';
-import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
@@ -23,7 +23,7 @@ describe('Handle Invoice Payment Failed', () => {
       const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
 
       const getCustomerSpy = jest
-        .spyOn(stripePaymentsAdapter, 'getCustomer')
+        .spyOn(stripeAdapter, 'getCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
       jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
       const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
@@ -52,7 +52,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedProduct = getProduct({ params: { metadata: { type: 'non-object-storage' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error('Gateway error'));
@@ -70,7 +70,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedProduct = getProduct({ params: { metadata: { type: 'non-object-storage' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error(errorMessage));
@@ -91,7 +91,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedProduct = getProduct({ params: { metadata: { type: 'non-object-storage' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(nonErrorObject);
@@ -111,7 +111,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedInvoice = getInvoice({ customer: customerId });
     const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(new Error(errorMessage));
     const loggerErrorSpy = jest.spyOn(logger, 'error');
@@ -137,7 +137,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedInvoice = getInvoice({ customer: customerId });
     const mockedProduct = getProduct({ params: { metadata: { type: 'object-storage' } } });
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     const findUserByCustomerIDSpy = jest.spyOn(usersService, 'findUserByCustomerID');
     const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
@@ -157,7 +157,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockResolvedValue();
@@ -176,7 +176,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedInvoice = getInvoice({ customer: customerId });
     const mockedProduct = getProduct({ params: { metadata: { type: 'drive-product' } } });
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(null as any);
     const loggerWarnSpy = jest.spyOn(logger, 'warn');
@@ -195,7 +195,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedProduct = getProduct({ params: { metadata: { type: 'regular-product' } } });
     const mockedUser = { uuid: 'test-uuid-123', email: 'test@internxt.com' };
 
-    jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');

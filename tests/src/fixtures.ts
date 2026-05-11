@@ -36,6 +36,24 @@ import {
   COUPON_BASE,
 } from './fixtures/stripe-base.generated';
 import { HealthStatus } from '../../src/services/health.service';
+import { Price } from '../../src/infrastructure/domain/entities/price';
+import { RequestedPlanData } from '../../src/types/subscription';
+
+export const getPriceEntity = (params?: Partial<RequestedPlanData>): Price => {
+  const mockedPrice = getPrice();
+  const data: RequestedPlanData = {
+    id: mockedPrice.id,
+    productId: mockedPrice.product as string,
+    bytes: 1099511627776,
+    interval: 'year',
+    amount: mockedPrice.unit_amount as number,
+    currency: mockedPrice.currency,
+    decimalAmount: (mockedPrice.unit_amount as number) / 100,
+    type: UserType.Individual,
+    ...params,
+  };
+  return Price.toDomain(data);
+};
 
 const randomDataGenerator = new Chance();
 

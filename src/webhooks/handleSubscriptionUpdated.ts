@@ -7,7 +7,7 @@ import { UsersService } from '../services/users.service';
 import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
@@ -57,7 +57,7 @@ export default async function handleSubscriptionUpdated(
       log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been scheduled for cancelation`);
 
       await handleObjectStorageScheduledForCancelation(
-        await stripePaymentsAdapter.getCustomer(customerId),
+        await stripeAdapter.getCustomer(customerId),
         subscription,
         objectStorageService,
         log,

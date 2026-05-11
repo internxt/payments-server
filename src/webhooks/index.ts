@@ -18,7 +18,7 @@ import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeCond
 import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
 import Logger from '../Logger';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export default function (
   stripe: Stripe,
@@ -97,11 +97,11 @@ export default function (
         case 'payment_intent.succeeded': {
           const eventData = event.data.object;
 
-          const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(eventData.payment_method as string);
+          const paymentMethod = await stripeAdapter.retrievePaymentMethod(eventData.payment_method as string);
           const userAddressBillingDetails = paymentMethod.getAddress();
 
           if (userAddressBillingDetails) {
-            await stripePaymentsAdapter.updateCustomer(eventData.customer as string, {
+            await stripeAdapter.updateCustomer(eventData.customer as string, {
               address: {
                 city: userAddressBillingDetails.city,
                 line1: userAddressBillingDetails.line1,
@@ -117,7 +117,7 @@ export default function (
 
         case 'invoice.paid': {
           const invoice = event.data.object;
-          const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
+          const customer = await stripeAdapter.getCustomer(invoice.customer as string);
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
           const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);

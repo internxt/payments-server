@@ -10,7 +10,7 @@ import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import { klaviyoService } from '../services/klaviyo.service';
 import Logger from '../Logger';
@@ -61,8 +61,8 @@ export default async function handleSubscriptionCanceled(
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
-  const customer = await stripePaymentsAdapter.getCustomer(customerId);
-  
+  const customer = await stripeAdapter.getCustomer(customerId);
+
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
     return;
@@ -103,7 +103,7 @@ export default async function handleSubscriptionCanceled(
   } catch (error) {
     const err = error as Error;
     log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
-    
+
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }

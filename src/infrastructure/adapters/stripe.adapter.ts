@@ -5,15 +5,13 @@ import { PaymentsAdapter } from '../domain/ports/payments.adapter';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
 import envVariablesConfig from '../../config';
 import { PaymentMethod } from '../domain/entities/paymentMethod';
+import { Price } from '../domain/entities/price';
+import { UserType } from '../../core/users/User';
 
-export class StripePaymentsAdapter implements PaymentsAdapter {
-  private readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
+export class StripeAdapter implements PaymentsAdapter {
+  readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
     apiVersion: '2025-02-24.acacia',
   });
-
-  getInstance(): Stripe {
-    return this.provider;
-  }
 
   async createCustomer(params: Partial<CreateCustomerParams>): Promise<Customer> {
     const stripeCustomer = await this.provider.customers.create(this.toStripeCustomerParams(params));
@@ -55,6 +53,50 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return PaymentMethod.toDomain(paymentMethods);
   }
 
+  async getPrices(currency: string = 'eur'): Promise<Price[]> {
+    const prices = await this.provider.prices.search({
+      query: `metadata["show"]:"1" active:"true" currency:"${currency}"`,
+      expand: ['data.currency_options', 'data.product'],
+      limit: 100,
+    });
+
+    return prices.data.map((price) =>
+      Price.toDomain({
+        id: price.id,
+        productId: (price.product as Stripe.Product).id,
+        bytes: Number.parseInt(price.metadata.bytes),
+        interval: this.getInterval(price.recurring!.interval),
+        commitmentPlan: this.hasAnnualCommitment(price),
+        amount: price.currency_options![currency].unit_amount as number,
+        currency: price.currency,
+        decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
+        type: price.metadata.type === 'business' ? UserType.Business : UserType.Individual,
+      }),
+    );
+  }
+
+  async getPriceById(priceId: Price['id'], currency: string = 'eur'): Promise<Price> {
+    const price = await this.provider.prices.retrieve(priceId, {
+      expand: ['currency_options', 'product'],
+    });
+
+    const isBusinessPlan = price.metadata?.type === 'business';
+
+    const businessSeats = isBusinessPlan ? this.getBusinessSeats(price) : undefined;
+
+    return Price.toDomain({
+      id: price.id,
+      productId: (price.product as Stripe.Product).id,
+      bytes: Number.parseInt(price.metadata.bytes),
+      interval: this.getInterval(price.recurring!.interval),
+      commitmentPlan: this.hasAnnualCommitment(price),
+      amount: price.currency_options![currency].unit_amount as number,
+      currency: price.currency,
+      decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
+      ...businessSeats,
+    });
+  }
+
   private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {
     return {
       ...(params.name && { name: params.name }),
@@ -73,6 +115,30 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       ...(params.metadata && { metadata: params.metadata }),
     };
   }
+
+  private hasAnnualCommitment(price: Stripe.Price): boolean {
+    return price?.metadata.annualCommitment === 'true';
+  }
+
+  private getInterval(interval: Stripe.Price.Recurring.Interval): 'year' | 'month' | 'lifetime' {
+    switch (interval) {
+      case 'year':
+        return 'year';
+      case 'month':
+        return 'month';
+      default:
+        return 'lifetime';
+    }
+  }
+
+  private getBusinessSeats(price: Stripe.Price): {
+    minimumSeats: number;
+    maximumSeats: number;
+  } {
+    const minimumSeats = Number.parseInt(price.metadata.minimumSeats);
+    const maximumSeats = Number.parseInt(price.metadata.maximumSeats);
+    return { minimumSeats, maximumSeats };
+  }
 }
 
-export const stripePaymentsAdapter = new StripePaymentsAdapter();
+export const stripeAdapter = new StripeAdapter();

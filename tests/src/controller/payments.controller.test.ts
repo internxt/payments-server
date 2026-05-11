@@ -21,7 +21,7 @@ import { TierNotFoundError, TiersService } from '../../../src/services/tiers.ser
 import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 jest.mock('../../../src/utils/assertUser');
@@ -196,7 +196,7 @@ describe('Payment controller e2e tests', () => {
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
         const createdCustomerSpy = jest
-          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+          .spyOn(StripeAdapter.prototype, 'createCustomer')
           .mockResolvedValue(Customer.toDomain(mockedCustomer));
 
         const response = await app.inject({
@@ -253,9 +253,7 @@ describe('Payment controller e2e tests', () => {
         jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
-        jest
-          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
-          .mockResolvedValue(Customer.toDomain(mockedCustomer));
+        jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
         const attachVatIdSpy = jest
           .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
           .mockImplementation(voidPromise);

@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { UserType } from '../../../src/core/users/User';
 import { getPrices, getUniqueCodes } from '../fixtures';
 

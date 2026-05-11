@@ -5,6 +5,7 @@ import {
   getCustomer,
   getInvoice,
   getPrice,
+  getPriceEntity,
   getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
@@ -22,7 +23,7 @@ import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 
@@ -77,9 +78,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const updateCustomerSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
-        .mockResolvedValue({} as any);
+      const updateCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -133,7 +132,7 @@ describe('Checkout controller', () => {
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
       const createCustomerSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .spyOn(StripeAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
@@ -188,7 +187,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
+      jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest
         .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
         .mockResolvedValue();
@@ -231,7 +230,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
+      jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest.spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer');
 
       const response = await app.inject({
@@ -288,7 +287,7 @@ describe('Checkout controller', () => {
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue({
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue({
         type: UserType.Individual,
       } as any);
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
@@ -325,7 +324,7 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue({
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue({
           type: UserType.Business,
         } as any);
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
@@ -492,7 +491,7 @@ describe('Checkout controller', () => {
     test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
-      const mockedPrice = priceById({
+      const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'lifetime',
       });
@@ -505,7 +504,7 @@ describe('Checkout controller', () => {
       } as const;
       const mockedCaptchaToken = 'captcha_token';
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
       });
@@ -536,7 +535,7 @@ describe('Checkout controller', () => {
     test('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
-      const mockedPrice = priceById({
+      const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'lifetime',
       });
@@ -557,7 +556,7 @@ describe('Checkout controller', () => {
         token: getValidUserToken({ invoiceId: 'invoice_id' }),
       } as const;
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
       });
@@ -588,13 +587,13 @@ describe('Checkout controller', () => {
 
     test('When the user wants to pay a subscription plan creating an invoice, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
-      const mockedPrice = priceById({
+      const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'year',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -616,14 +615,14 @@ describe('Checkout controller', () => {
     test('When the user already has the max storage allowed, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedInvoice = getInvoice();
-      const mockedPrice = priceById({
+      const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'lifetime',
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: false,
       });
@@ -826,13 +825,13 @@ describe('Checkout controller', () => {
 
   describe('Get Price by its ID', () => {
     test('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
-      const mockedPrice = priceById({
+      const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'year',
       });
       const taxes = mockCalculateTaxFor(mockedPrice.amount);
 
-      jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       jest
         .spyOn(PaymentService.prototype, 'calculateTax')
         .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
@@ -850,7 +849,7 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({
-        price: mockedPrice,
+        price: JSON.parse(JSON.stringify(mockedPrice)),
         taxes: {
           tax: taxes.tax_amount_exclusive,
           decimalTax: taxes.tax_amount_exclusive / 100,
@@ -862,7 +861,7 @@ describe('Checkout controller', () => {
 
     describe('Handling promo codes', () => {
       test('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
-        const mockedPrice = priceById({
+        const mockedPrice = getPriceEntity({
           bytes: 123456789,
           interval: 'year',
         });
@@ -875,7 +874,7 @@ describe('Checkout controller', () => {
         const discountedAmount = mockedPrice.amount - promoCode.amountOff;
         const taxes = mockCalculateTaxFor(discountedAmount);
 
-        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
@@ -895,7 +894,7 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          price: mockedPrice,
+          price: JSON.parse(JSON.stringify(mockedPrice)),
           taxes: {
             tax: taxes.tax_amount_exclusive,
             decimalTax: taxes.tax_amount_exclusive / 100,
@@ -906,7 +905,7 @@ describe('Checkout controller', () => {
       });
 
       test('When the user provides a promo code with percent off, then the price is returned with the discount applied', async () => {
-        const mockedPrice = priceById({
+        const mockedPrice = getPriceEntity({
           bytes: 123456789,
           interval: 'year',
         });
@@ -920,7 +919,7 @@ describe('Checkout controller', () => {
         const discountedAmount = mockedPrice.amount - discount;
         const taxes = mockCalculateTaxFor(discountedAmount);
 
-        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
@@ -940,7 +939,7 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          price: mockedPrice,
+          price: JSON.parse(JSON.stringify(mockedPrice)),
           taxes: {
             tax: taxes.tax_amount_exclusive,
             decimalTax: taxes.tax_amount_exclusive / 100,
@@ -951,14 +950,14 @@ describe('Checkout controller', () => {
       });
 
       test('When the user provides a promo code with a discount that is more than the product price, then the price should be 0 instead of a negative price', async () => {
-        const mockedPrice = {
+        const mockedPrice = getPriceEntity({
           ...priceById({
             bytes: 123456789,
             interval: 'year',
           }),
           amount: 14000,
           decimalAmount: 140,
-        };
+        });
         const promoCode = {
           promoCodeName: 'promo_code_name',
           amountOff: 15000,
@@ -969,7 +968,7 @@ describe('Checkout controller', () => {
         const discountedAmount = 0;
         const taxes = mockCalculateTaxFor(discountedAmount);
 
-        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
@@ -989,7 +988,7 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          price: mockedPrice,
+          price: JSON.parse(JSON.stringify(mockedPrice)),
           taxes: {
             tax: taxes.tax_amount_exclusive,
             decimalTax: taxes.tax_amount_exclusive / 100,
@@ -1013,13 +1012,13 @@ describe('Checkout controller', () => {
 
     describe('User address, country and postal code are not provided', () => {
       test('When any of user location params are provided, then the price is returned with taxes to 0', async () => {
-        const mockedPrice = priceById({
+        const mockedPrice = getPriceEntity({
           bytes: 123456789,
           interval: 'year',
         });
         const mockedTaxes = getTaxes();
 
-        jest.spyOn(PaymentService.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
@@ -1034,7 +1033,7 @@ describe('Checkout controller', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          price: mockedPrice,
+          price: JSON.parse(JSON.stringify(mockedPrice)),
           taxes: {
             tax: 0,
             decimalTax: 0,

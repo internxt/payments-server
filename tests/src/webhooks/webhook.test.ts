@@ -8,7 +8,7 @@ import { ObjectStorageService } from '../../../src/services/objectStorage.servic
 import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { PaymentMethod } from '../../../src/infrastructure/domain/entities/paymentMethod';
 
@@ -115,11 +115,9 @@ describe('Webhook events', () => {
       const payloadToString = JSON.stringify(event);
 
       const getPaymentMethodSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'retrievePaymentMethod')
+        .spyOn(StripeAdapter.prototype, 'retrievePaymentMethod')
         .mockResolvedValue(mockedPaymentMethodToDomain);
-      const updateCustomerSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
-        .mockResolvedValue({} as any);
+      const updateCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
 
       const header = Stripe.webhooks.generateTestHeaderString({
         payload: payloadToString,
@@ -160,7 +158,7 @@ describe('Webhook events', () => {
           secret,
         });
         const getCustomerSpy = jest
-          .spyOn(StripePaymentsAdapter.prototype, 'getCustomer')
+          .spyOn(StripeAdapter.prototype, 'getCustomer')
           .mockResolvedValueOnce(Customer.toDomain(mockedCustomer));
         const invoiceCompletedHandlerRunSpy = jest
           .spyOn(InvoiceCompletedHandler.prototype, 'run')

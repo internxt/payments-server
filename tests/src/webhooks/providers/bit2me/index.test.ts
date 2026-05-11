@@ -7,7 +7,7 @@ import config from '../../../../../src/config';
 import { PaymentService } from '../../../../../src/services/payment.service';
 import Stripe from 'stripe';
 import { InvoiceCompletedHandler } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { StripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 
 let app: FastifyInstance;
@@ -95,7 +95,7 @@ describe('Handling webhook for crypto payments', () => {
       status: 'pending',
     });
 
-    const getCustomerSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer');
+    const getCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'getCustomer');
 
     const response = await app.inject({
       method: 'POST',
@@ -126,7 +126,7 @@ describe('Handling webhook for crypto payments', () => {
       token: decodedToken,
     });
 
-    jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(StripeAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest
       .spyOn(PaymentService.prototype, 'getInvoice')
       .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);

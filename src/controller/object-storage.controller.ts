@@ -7,7 +7,7 @@ import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 function signUserToken(customerId: string) {
   return jwt.sign({ customerId }, config.JWT_SECRET);
@@ -58,7 +58,7 @@ export function objectStorageController(paymentService: PaymentService) {
         if (userExists) {
           customerId = userExists.id;
         } else {
-          const { id } = await stripePaymentsAdapter.createCustomer({
+          const { id } = await stripeAdapter.createCustomer({
             name: customerName,
             email,
             address: {
@@ -186,7 +186,7 @@ export function objectStorageController(paymentService: PaymentService) {
         const { planId, currency } = req.query;
 
         try {
-          const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
+          const planObject = await stripeAdapter.getPriceById(planId, currency);
 
           return rep.status(200).send(planObject);
         } catch (error) {
