@@ -8,5 +8,6 @@ export interface PaymentsAdapter {
   getCustomer: (customerId: Customer['id']) => Promise<Customer>;
   searchCustomer: (email: Customer['email']) => Promise<Customer[]>;
   retrievePaymentMethod: (paymentMethodId: PaymentMethod['id']) => Promise<PaymentMethod>;
+  getPriceById: (priceId: Price['id'], currency: string) => Promise<Price>;
   getPrices: (currency: string) => Promise<Price[]>;
 }
