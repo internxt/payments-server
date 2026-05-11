@@ -51,18 +51,18 @@ export function businessController(
             throw new NotFoundSubscriptionError('Subscription not found');
           }
           const productItem = activeSubscription.items.data[0];
-          const maxSpaceBytes = productItem?.price.metadata.maxSpaceBytes as string;
+          const maxSpaceBytes = productItem?.price.metadata.maxSpaceBytes;
 
           const { minimumSeats, maximumSeats } = await paymentService.getBusinessSubscriptionSeats(
-            productItem?.price.id as string,
+            productItem?.price.id,
           );
 
           if (minimumSeats && maximumSeats) {
-            if (workspaceUpdatedSeats > parseInt(maximumSeats)) {
+            if (workspaceUpdatedSeats > Number.parseInt(maximumSeats)) {
               throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
             }
 
-            if (workspaceUpdatedSeats < parseInt(minimumSeats)) {
+            if (workspaceUpdatedSeats < Number.parseInt(minimumSeats)) {
               throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
             }
 
@@ -80,7 +80,7 @@ export function businessController(
 
           const updatedSub = await paymentService.updateBusinessSub({
             customerId: user.customerId,
-            priceId: productItem?.price.id as string,
+            priceId: productItem?.price.id,
             seats: workspaceUpdatedSeats,
             additionalOptions: {
               proration_behavior: 'create_prorations',

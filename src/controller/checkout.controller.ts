@@ -13,6 +13,7 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { UserType } from '../core/users/User';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -162,15 +163,12 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               promoCodeId: {
                 type: 'string',
               },
-              quantity: {
-                type: 'number',
-              },
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, quantity, captchaToken, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
         let tokenCustomerId;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -192,11 +190,14 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError();
         }
 
+        const price = await paymentsService.getPriceById(priceId);
+
+        if (price.type === UserType.Business) throw new BadRequestError('Business plan is no longer available');
+
         const subscriptionAttempt = await paymentsService.createSubscription({
           customerId,
           priceId,
           currency,
-          seatsForBusinessSubscription: quantity ?? 1,
           promoCodeId,
           additionalOptions: {
             automatic_tax: {
@@ -362,6 +363,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
 
         const price = await paymentsService.getPriceById(priceId, currency);
+
         let amount = price.amount;
 
         if (promoCodeName) {

@@ -87,6 +87,29 @@ describe('Payments Service tests', () => {
       });
       expect(subscription).toEqual(mockedSubscriptionResponse);
     });
+
+    it('When trying to create a business subscription, then an error is thrown', async () => {
+      const mockedCreateSubscription = getCreatedSubscription();
+      const mockedPrice = getPrice({
+        product: {
+          metadata: {
+            type: 'business',
+          },
+        } as any,
+      });
+
+      jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as any);
+
+      await expect(
+        paymentService.createSubscription({
+          customerId: mockedCreateSubscription.customer as string,
+          priceId: mockedCreateSubscription.items.data[0].price.id,
+          promoCodeId: (
+            (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
+          ).code,
+        }),
+      ).rejects.toThrow(BadRequestError);
+    });
   });
 
   describe('Get a price given its ID', () => {
@@ -695,30 +718,6 @@ describe('Payments Service tests', () => {
       await expect(paymentService.getPriceById(invalidPriceId)).rejects.toThrow(NotFoundError);
     });
 
-    it('When the price exists, then the correct price object is returned', async () => {
-      const mockedPrice = getPrice({
-        metadata: {
-          maxSpaceBytes: '123456789',
-        },
-      });
-      const validPriceId = mockedPrice.id;
-      const priceResponse = {
-        id: validPriceId,
-        currency: mockedPrice.currency,
-        amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
-        bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
-        interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
-        decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
-        product: mockedPrice.product as string,
-        type: UserType.Individual,
-      };
-      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
-
-      const price = await paymentService.getPriceById(validPriceId);
-
-      expect(price).toStrictEqual(priceResponse);
-    });
-
     it('When the price exists and belongs to a business product, then the price is returned with minimum and maximum seats', async () => {
       const businessSeats = {
         minimumSeats: 1,
@@ -743,6 +742,30 @@ describe('Payments Service tests', () => {
         product: mockedPrice.product as string,
         type: UserType.Business,
         ...businessSeats,
+      };
+      jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
+
+      const price = await paymentService.getPriceById(validPriceId);
+
+      expect(price).toStrictEqual(priceResponse);
+    });
+
+    it('When the price exists, then the correct price object is returned', async () => {
+      const mockedPrice = getPrice({
+        metadata: {
+          maxSpaceBytes: '123456789',
+        },
+      });
+      const validPriceId = mockedPrice.id;
+      const priceResponse = {
+        id: validPriceId,
+        currency: mockedPrice.currency,
+        amount: mockedPrice.currency_options![mockedPrice.currency].unit_amount as number,
+        bytes: parseInt(mockedPrice.metadata?.maxSpaceBytes),
+        interval: mockedPrice.type === 'one_time' ? 'lifetime' : mockedPrice.recurring?.interval,
+        decimalAmount: (mockedPrice.currency_options![mockedPrice.currency].unit_amount as number) / 100,
+        product: mockedPrice.product as string,
+        type: UserType.Individual,
       };
       jest.spyOn(paymentService, 'getPricesRaw').mockResolvedValue([mockedPrice]);
 

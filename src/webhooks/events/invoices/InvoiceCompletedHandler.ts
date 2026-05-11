@@ -339,14 +339,7 @@ export class InvoiceCompletedHandler {
 
     // Apply Drive features
     try {
-      await this.tiersService.applyDriveFeatures(
-        user,
-        customer,
-        totalQuantity,
-        tierToApply,
-        this.logger,
-        lifetimeMaxSpaceBytesToApply,
-      );
+      await this.tiersService.applyDriveFeatures(user, tierToApply, lifetimeMaxSpaceBytesToApply);
       Logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
       Logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
