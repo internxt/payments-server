@@ -288,9 +288,9 @@ describe('Checkout controller', () => {
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue({
-        type: UserType.Individual,
-      } as any);
+      jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+        .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
@@ -325,9 +325,9 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue({
-          type: UserType.Business,
-        } as any);
+        jest
+          .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+          .mockResolvedValue(getPriceEntity({ type: UserType.Business }));
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
         const response = await app.inject({
