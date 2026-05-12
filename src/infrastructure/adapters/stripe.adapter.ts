@@ -56,13 +56,14 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
 
   async getPrices(currency: string = 'eur'): Promise<Price[]> {
     const prices = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currency}"`,
+      query: `metadata["show"]:"1" active:"true" currency:"eur"`,
       expand: ['data.currency_options', 'data.product'],
       limit: 100,
     });
 
     return prices.data.map((price) => {
       const businessSeats = this.getBusinessSeats(price);
+      const currencyOptions = price.currency_options![currency] ?? price.currency_options!['eur'];
 
       return Price.toDomain({
         id: price.id,
@@ -71,9 +72,9 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
         interval: this.getInterval(price.recurring?.interval),
         commitmentPlan: this.hasAnnualCommitment(price),
         recurring: price.type === 'recurring',
-        amount: price.currency_options![currency].unit_amount as number,
-        currency: price.currency,
-        decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
+        amount: currencyOptions.unit_amount as number,
+        currency,
+        decimalAmount: (currencyOptions.unit_amount as number) / 100,
         type: price.metadata.type === 'business' ? UserType.Business : UserType.Individual,
         ...businessSeats,
       });

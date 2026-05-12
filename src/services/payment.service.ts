@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import dayjs from 'dayjs';
 
-import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
@@ -190,10 +189,6 @@ export class PaymentService {
     }
   }
 
-  async getPrice(priceId: string): Promise<Stripe.Price> {
-    return this.provider.prices.retrieve(priceId);
-  }
-
   /**
    * Creates an invoice to purchase a one time plan.
    *
@@ -261,8 +256,8 @@ export class PaymentService {
       throw new BadRequestError('Invoice item does not have a price.');
     }
 
-    const price = await this.getPrice(invoiceItem.pricing?.price_details?.price);
-    const isLifetime = price.type === 'one_time';
+    const price = await stripePaymentsAdapter.getPriceById(invoiceItem.pricing?.price_details?.price);
+    const isLifetime = price.interval === 'lifetime';
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
@@ -901,40 +896,6 @@ export class PaymentService {
       userType,
       plan,
     };
-  }
-
-  async getPrices(currency?: string, userType: UserType = UserType.Individual): Promise<DisplayPrice[]> {
-    const currencyValue = currency ?? 'eur';
-
-    const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
-      expand: ['data.currency_options', 'data.product'],
-      limit: 100,
-    });
-
-    return res.data
-      .filter((price) => {
-        const priceProductType = ((price.product as Stripe.Product).metadata.type as UserType) || UserType.Individual;
-        return (
-          price.metadata.maxSpaceBytes &&
-          price.currency_options &&
-          price.currency_options[currencyValue].unit_amount &&
-          priceProductType === userType
-        );
-      })
-      .map((price) => {
-        const hasAnnualCommitment = this.hasAnnualCommitment(price);
-        const recurringInterval = hasAnnualCommitment ? 'year' : (price.recurring?.interval as 'year' | 'month');
-
-        return {
-          id: price.id,
-          productId: (price.product as Stripe.Product).id,
-          currency: currencyValue,
-          amount: price.currency_options![currencyValue].unit_amount as number,
-          bytes: parseInt(price.metadata.maxSpaceBytes),
-          interval: price.type === 'one_time' ? 'lifetime' : recurringInterval,
-        };
-      });
   }
 
   /**
