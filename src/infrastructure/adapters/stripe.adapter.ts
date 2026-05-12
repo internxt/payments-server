@@ -93,7 +93,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       id: price.id,
       productId: (price.product as Stripe.Product).id,
       bytes: Number.parseInt(price.metadata.bytes),
-      interval: this.getInterval(price.recurring!.interval),
+      interval: this.getInterval(price.recurring?.interval),
       commitmentPlan: this.hasAnnualCommitment(price),
       recurring: price.type === 'recurring',
       amount: price.currency_options![currency].unit_amount as number,
@@ -127,7 +127,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return price?.metadata.annualCommitment === 'true';
   }
 
-  private getInterval(interval: Stripe.Price.Recurring.Interval): PriceInterval {
+  private getInterval(interval?: Stripe.Price.Recurring.Interval): PriceInterval {
     switch (interval) {
       case 'year':
         return 'year';

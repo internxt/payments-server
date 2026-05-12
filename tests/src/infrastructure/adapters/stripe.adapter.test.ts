@@ -347,5 +347,47 @@ describe('Stripe Adapter', () => {
 
       expect(price.isCommitmentPlan).toBeTruthy();
     });
+
+    test('When the price is a business plan, then the price is returned indicating that', async () => {
+      const stripePrice = getPrice({
+        metadata: { bytes: '107374182400', type: 'business' },
+        recurring: {
+          interval: 'year',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+
+      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+
+      expect(price.isBusinessPlan).toBeTruthy();
+    });
+
+    test('When the price is a one-time payment, then the interval is lifetime', async () => {
+      const stripePrice = getPrice({
+        metadata: { bytes: '107374182400', type: 'individual' },
+        recurring: null,
+        type: 'one_time',
+        product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+
+      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+
+      expect(price.interval).toBe('lifetime');
+    });
   });
 });
