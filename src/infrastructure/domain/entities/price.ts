@@ -42,8 +42,7 @@ export class Price implements PriceAttributes {
     this.decimalAmount = attributes.decimalAmount;
     this.recurring = attributes.recurring;
     this.type = attributes.type;
-    this.minimumSeats = attributes.minimumSeats;
-    this.maximumSeats = attributes.maximumSeats;
+    this.buildBusinessSeats(attributes.minimumSeats, attributes.maximumSeats);
   }
 
   static toDomain(attributes: PriceAttributes): Price {
@@ -60,5 +59,27 @@ export class Price implements PriceAttributes {
 
   public isRecurring(): boolean {
     return this.recurring;
+  }
+
+  public toJSON(): PriceAttributes {
+    return {
+      id: this.id,
+      productId: this.productId,
+      bytes: this.bytes,
+      interval: this.interval,
+      commitmentPlan: this.commitmentPlan,
+      recurring: this.recurring,
+      amount: this.amount,
+      currency: this.currency,
+      decimalAmount: this.decimalAmount,
+      type: this.type,
+      ...(this.minimumSeats !== undefined && { minimumSeats: this.minimumSeats }),
+      ...(this.maximumSeats !== undefined && { maximumSeats: this.maximumSeats }),
+    };
+  }
+
+  private buildBusinessSeats(minimumSeats?: number, maximumSeats?: number) {
+    if (minimumSeats !== undefined) this.minimumSeats = minimumSeats;
+    if (maximumSeats !== undefined) this.maximumSeats = maximumSeats;
   }
 }

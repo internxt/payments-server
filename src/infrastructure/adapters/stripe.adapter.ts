@@ -67,8 +67,8 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       return Price.toDomain({
         id: price.id,
         productId: (price.product as Stripe.Product).id,
-        bytes: Number.parseInt(price.metadata.bytes),
-        interval: this.getInterval(price.recurring!.interval),
+        bytes: Number.parseInt(price.metadata.maxSpaceBytes),
+        interval: this.getInterval(price.recurring?.interval),
         commitmentPlan: this.hasAnnualCommitment(price),
         recurring: price.type === 'recurring',
         amount: price.currency_options![currency].unit_amount as number,
@@ -92,7 +92,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Price.toDomain({
       id: price.id,
       productId: (price.product as Stripe.Product).id,
-      bytes: Number.parseInt(price.metadata.bytes),
+      bytes: Number.parseInt(price.metadata.maxSpaceBytes),
       interval: this.getInterval(price.recurring?.interval),
       commitmentPlan: this.hasAnnualCommitment(price),
       recurring: price.type === 'recurring',

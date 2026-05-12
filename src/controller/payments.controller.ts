@@ -425,7 +425,6 @@ export function paymentsController(
       },
       async (req, rep) => {
         const { currency } = req.query;
-        const userType = (req.query.userType as UserType) || UserType.Individual;
 
         const { currencyValue, isError, errorMessage } = checkCurrency(currency);
 
@@ -433,7 +432,18 @@ export function paymentsController(
           return rep.status(400).send({ message: errorMessage });
         }
 
-        return paymentService.getPrices(currencyValue, userType);
+        const prices = await stripePaymentsAdapter.getPrices(currencyValue);
+
+        const mappedPrices = prices.map((price) => ({
+          id: price.id,
+          productId: price.productId,
+          currency: price.currency,
+          amount: price.amount,
+          bytes: price.bytes,
+          interval: price?.interval,
+        }));
+
+        return mappedPrices;
       },
     );
 

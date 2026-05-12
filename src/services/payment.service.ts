@@ -35,7 +35,7 @@ import {
   CustomerSource,
   Customer as StripeCustomer,
 } from '../types/stripe';
-import { PaymentIntent, PromotionCode, PriceByIdResponse } from '../types/payment';
+import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
@@ -935,67 +935,6 @@ export class PaymentService {
           interval: price.type === 'one_time' ? 'lifetime' : recurringInterval,
         };
       });
-  }
-
-  async getPricesRaw(currency?: string, expandProduct = false): Promise<Stripe.Price[]> {
-    const currencyValue = currency ?? 'eur';
-
-    const expandOptions = ['data.currency_options'];
-
-    if (expandProduct) {
-      expandOptions.push('data.product');
-    }
-
-    //!TODO: add metadata["show"]:"1" in query param
-    const res = await this.provider.prices.search({
-      query: `active:"true" currency:"${currencyValue}"`,
-      expand: expandOptions,
-      limit: 100,
-    });
-
-    return res.data.filter(
-      (price) =>
-        price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
-    );
-  }
-
-  /**
-   * Returns the requested price if exists
-   * @param priceId - The id of the requested price
-   * @param currency - The currency of the requested price
-   * @returns - The selected price if it exists and it is active
-   */
-  async getPriceById(priceId: string, currency = 'eur'): Promise<PriceByIdResponse> {
-    const availablePrices = await this.getPricesRaw(currency);
-
-    const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
-
-    if (!selectedPrice) {
-      throw new NotFoundError('The requested price does not exist');
-    }
-
-    let businessSeats;
-    const { currency_options, recurring, metadata, type, product } = selectedPrice;
-    const isBusinessPrice = metadata?.type === 'business';
-
-    if (isBusinessPrice) {
-      businessSeats = {
-        minimumSeats: Number(metadata.minimumSeats),
-        maximumSeats: Number(metadata.maximumSeats),
-      };
-    }
-
-    return {
-      id: priceId,
-      currency,
-      amount: currency_options![currency].unit_amount as number,
-      bytes: Number.parseInt(metadata?.maxSpaceBytes),
-      interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
-      decimalAmount: (currency_options![currency].unit_amount as number) / 100,
-      type: isBusinessPrice ? UserType.Business : UserType.Individual,
-      product: product as string,
-      ...businessSeats,
-    };
   }
 
   /**
