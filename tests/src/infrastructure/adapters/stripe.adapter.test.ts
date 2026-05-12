@@ -1,9 +1,12 @@
-import { getCustomer, getPaymentMethod } from '../../fixtures';
+import { getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 import { UserNotFoundError } from '../../../../src/errors/PaymentErrors';
 import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/paymentMethod';
+import { Price } from '../../../../src/infrastructure/domain/entities/price';
+import { UserType } from '../../../../src/core/users/User';
+import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -11,7 +14,7 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'create')
+        .spyOn(stripePaymentsAdapter.provider.customers, 'create')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
       const metadata = { referralCode: 'ABC123' };
@@ -39,7 +42,7 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'update')
+        .spyOn(stripePaymentsAdapter.provider.customers, 'update')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
       const updatedCustomer = await stripePaymentsAdapter.updateCustomer(mockedCustomer.id, {
@@ -82,7 +85,7 @@ describe('Stripe Adapter', () => {
       });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'update')
+        .spyOn(stripePaymentsAdapter.provider.customers, 'update')
         .mockResolvedValue(updatedCustomer as Stripe.Response<Stripe.Customer>);
 
       const result = await stripePaymentsAdapter.updateCustomer(initialCustomer.id, {
@@ -114,7 +117,7 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().customers, 'retrieve')
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
       const customer = await stripePaymentsAdapter.getCustomer(mockedCustomer.id);
@@ -128,7 +131,7 @@ describe('Stripe Adapter', () => {
       };
       const mockedError = new UserNotFoundError();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(stripePaymentsAdapter.provider.customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
 
       await expect(stripePaymentsAdapter.getCustomer('')).rejects.toThrow(mockedError);
     });
@@ -138,7 +141,7 @@ describe('Stripe Adapter', () => {
     test('When searching a customer, then the customer is returned', async () => {
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'search').mockResolvedValue({
+      jest.spyOn(stripePaymentsAdapter.provider.customers, 'search').mockResolvedValue({
         data: [mockedCustomer],
       } as any);
 
@@ -151,7 +154,7 @@ describe('Stripe Adapter', () => {
       const mockedError = new UserNotFoundError();
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.getInstance().customers, 'search').mockResolvedValue({
+      jest.spyOn(stripePaymentsAdapter.provider.customers, 'search').mockResolvedValue({
         data: [],
         total_count: 0,
       } as any);
@@ -165,12 +168,184 @@ describe('Stripe Adapter', () => {
       const mockedPaymentMethod = getPaymentMethod();
 
       jest
-        .spyOn(stripePaymentsAdapter.getInstance().paymentMethods, 'retrieve')
+        .spyOn(stripePaymentsAdapter.provider.paymentMethods, 'retrieve')
         .mockResolvedValue(mockedPaymentMethod as Stripe.Response<Stripe.PaymentMethod>);
 
       const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
 
       expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
+    });
+  });
+
+  describe('Get prices', () => {
+    test('When getting all available prices, then all prices are returned with the correct data', async () => {
+      const stripePrice = getPrice({
+        metadata: { show: '1', bytes: '107374182400', type: 'individual', annualCommitment: 'false' },
+        recurring: {
+          interval: 'year',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'search').mockResolvedValue({
+        data: [stripePrice],
+      } as any);
+
+      const prices = await stripePaymentsAdapter.getPrices('eur');
+
+      expect(prices).toHaveLength(1);
+      expect(prices[0]).toStrictEqual(
+        Price.toDomain({
+          id: stripePrice.id,
+          productId: 'prod_test',
+          bytes: 107374182400,
+          interval: 'year',
+          commitmentPlan: false,
+          recurring: true,
+          amount: 999,
+          currency: stripePrice.currency,
+          decimalAmount: 9.99,
+          type: UserType.Individual,
+        }),
+      );
+    });
+
+    test('When getting all available prices for a business plan, then the seat limits are included', async () => {
+      const stripePrice = getPrice({
+        metadata: {
+          show: '1',
+          bytes: '107374182400',
+          type: 'business',
+          annualCommitment: 'false',
+          minimumSeats: '1',
+          maximumSeats: '10',
+        },
+        recurring: {
+          interval: 'month',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_business' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 2000, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '2000' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'search').mockResolvedValue({
+        data: [stripePrice],
+      } as any);
+
+      const prices = await stripePaymentsAdapter.getPrices('eur');
+
+      expect(prices[0].type).toBe(UserType.Business);
+      expect(prices[0].minimumSeats).toBe(1);
+      expect(prices[0].maximumSeats).toBe(10);
+    });
+  });
+
+  describe('Get price by ID', () => {
+    test('When getting a price by its ID, then the price is returned with the correct data', async () => {
+      const stripePrice = getPrice({
+        metadata: { bytes: '107374182400', type: 'individual', annualCommitment: 'false' },
+        recurring: {
+          interval: 'year',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+
+      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+
+      expect(price).toStrictEqual(
+        Price.toDomain({
+          id: stripePrice.id,
+          productId: 'prod_test',
+          bytes: 107374182400,
+          interval: 'year',
+          commitmentPlan: false,
+          recurring: true,
+          amount: 999,
+          currency: stripePrice.currency,
+          decimalAmount: 9.99,
+          type: UserType.Individual,
+        }),
+      );
+    });
+
+    test('When getting a business price by its ID, then the seat limits are included', async () => {
+      const stripePrice = getPrice({
+        metadata: {
+          bytes: '107374182400',
+          type: 'business',
+          annualCommitment: 'false',
+          minimumSeats: '1',
+          maximumSeats: '10',
+        },
+        recurring: {
+          interval: 'year',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_business' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 5000, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '5000' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+
+      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+
+      expect(price.type).toBe(UserType.Business);
+      expect(price.minimumSeats).toBe(1);
+      expect(price.maximumSeats).toBe(10);
+    });
+
+    test('When the price has an annual commitment, then the price is returned indicating that', async () => {
+      const stripePrice = getPrice({
+        metadata: { bytes: '107374182400', type: 'individual', annualCommitment: 'true' },
+        recurring: {
+          interval: 'year',
+          interval_count: 1,
+          aggregate_usage: null,
+          meter: null,
+          usage_type: 'licensed',
+          trial_period_days: null,
+        },
+        product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
+        currency_options: {
+          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+        },
+      });
+
+      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+
+      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+
+      expect(price.commitmentPlan).toBe(true);
     });
   });
 });
