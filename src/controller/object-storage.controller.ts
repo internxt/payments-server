@@ -186,9 +186,16 @@ export function objectStorageController(paymentService: PaymentService) {
         const { planId, currency } = req.query;
 
         try {
-          const planObject = await paymentService.getObjectStoragePlanById(planId, currency);
+          const price = await stripePaymentsAdapter.getPriceById(planId, currency);
 
-          return rep.status(200).send(planObject);
+          return rep.status(200).send({
+            id: price.id,
+            currency: price.currency,
+            amount: price.amount,
+            bytes: price.bytes,
+            interval: price.interval,
+            decimalAmount: price.decimalAmount,
+          });
         } catch (error) {
           const err = error as Error;
           if (err instanceof NotFoundPlanByIdError) {

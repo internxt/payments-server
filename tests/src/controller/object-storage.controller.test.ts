@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getInvoices, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
+import { getInvoices, getPriceEntity, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
 import { PaymentService } from '../../../src/services/payment.service';
 import Stripe from 'stripe';
+import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 
 let app: FastifyInstance;
 
@@ -20,6 +21,31 @@ beforeEach(() => {
 });
 
 describe('Object Storage controller', () => {
+  describe('Get the object storage price', () => {
+    test('When the price is requested, then it is returned', async () => {
+      const mockedPriceEntity = getPriceEntity();
+      const returnedObject = {
+        id: mockedPriceEntity.id,
+        currency: mockedPriceEntity.currency,
+        amount: mockedPriceEntity.amount,
+        bytes: mockedPriceEntity.bytes,
+        interval: mockedPriceEntity.interval,
+        decimalAmount: mockedPriceEntity.decimalAmount,
+      };
+
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPriceEntity);
+      const response = await app.inject({
+        method: 'GET',
+        path: '/object-storage/price',
+      });
+
+      const priceResponse = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(priceResponse).toStrictEqual(returnedObject);
+    });
+  });
+
   describe('Get invoices', () => {
     describe('Handling errors', () => {
       it('When there is no customer Id, then an error indicating so is thrown', async () => {

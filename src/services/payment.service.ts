@@ -12,7 +12,6 @@ import {
   IncompatibleSubscriptionTypesError,
   CustomerNotFoundError,
   MissingParametersError,
-  NotFoundPlanByIdError,
   PromoCodeIsNotValidError,
   ExistingSubscriptionError,
   InvalidTaxIdError,
@@ -28,7 +27,6 @@ import {
   CustomerEmail,
   ExtendedSubscription,
   PriceId,
-  PlanId,
   Subscription,
   SubscriptionId,
   Invoice,
@@ -38,7 +36,7 @@ import {
   Customer as StripeCustomer,
 } from '../types/stripe';
 import { PaymentIntent, PromotionCode, PriceByIdResponse } from '../types/payment';
-import { RenewalPeriod, PlanSubscription, SubscriptionCreated, RequestedPlanData } from '../types/subscription';
+import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
 export class PaymentService {
@@ -959,43 +957,6 @@ export class PaymentService {
       (price) =>
         price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
     );
-  }
-
-  async getUpsellProduct(productId: Stripe.Product['id'], currency: string): Promise<Stripe.Price | undefined> {
-    const productData = await this.provider.prices.list({
-      active: true,
-      product: productId,
-      currency: currency,
-      expand: ['data.currency_options'],
-    });
-
-    const upsellProduct = productData.data.find((productItem) => productItem.recurring?.interval === 'year');
-
-    return upsellProduct;
-  }
-
-  async getObjectStoragePlanById(priceId: PlanId, currency?: string) {
-    const currencyValue = currency ?? 'eur';
-    try {
-      const price = await this.provider.prices.retrieve(priceId, {});
-
-      const { id, metadata, type, recurring } = price;
-
-      const selectedPlan: RequestedPlanData = {
-        id: id,
-        currency: currencyValue,
-        amount: price.unit_amount as number,
-        bytes: parseInt(metadata?.maxSpaceBytes),
-        interval: type === 'one_time' ? 'lifetime' : (recurring?.interval as 'year' | 'month'),
-        decimalAmount: (price.unit_amount as number) / 100,
-      };
-
-      return selectedPlan;
-    } catch (err) {
-      const error = err as Error;
-      if (error.message.includes('No such price')) throw new NotFoundPlanByIdError(priceId);
-      throw new Error(error.message);
-    }
   }
 
   /**
