@@ -5,6 +5,7 @@ import {
   getCustomer,
   getLicenseCode,
   getPaymentIntent,
+  getPriceEntity,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -542,6 +543,32 @@ describe('Payment controller e2e tests', () => {
         code: mockedLicenseCode.code,
         provider: mockedLicenseCode.provider,
       });
+    });
+  });
+
+  describe('Get prices', () => {
+    test('When fetching the available prices, then they are returned with the necessary data', async () => {
+      const mockedPriceEntity = getPriceEntity();
+      const expectedResponse = {
+        id: mockedPriceEntity.id,
+        currency: mockedPriceEntity.currency,
+        amount: mockedPriceEntity.amount,
+        bytes: mockedPriceEntity.bytes,
+        interval: mockedPriceEntity.interval,
+        productId: mockedPriceEntity.productId,
+      };
+
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+
+      const response = await app.inject({
+        method: 'GET',
+        path: '/prices',
+      });
+
+      const responseBody = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(responseBody).toStrictEqual([expectedResponse]);
     });
   });
 });
