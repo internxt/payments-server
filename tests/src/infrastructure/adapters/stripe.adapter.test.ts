@@ -345,7 +345,7 @@ describe('Stripe Adapter', () => {
 
       const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
 
-      expect(price.commitmentPlan).toBe(true);
+      expect(price.isCommitmentPlan).toBeTruthy();
     });
   });
 });
