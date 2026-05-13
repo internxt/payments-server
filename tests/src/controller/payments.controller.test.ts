@@ -24,6 +24,7 @@ import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
+import { UserType } from '../../../src/core/users/User';
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
@@ -547,28 +548,76 @@ describe('Payment controller e2e tests', () => {
   });
 
   describe('Get prices', () => {
-    test('When fetching the available prices, then they are returned with the necessary data', async () => {
-      const mockedPriceEntity = getPriceEntity();
+    test('When no currency is provided, then EUR is used and prices are returned', async () => {
+      const mockedPriceEntity = getPriceEntity({ currency: 'eur' });
       const expectedResponse = {
         id: mockedPriceEntity.id,
+        productId: mockedPriceEntity.productId,
         currency: mockedPriceEntity.currency,
         amount: mockedPriceEntity.amount,
         bytes: mockedPriceEntity.bytes,
         interval: mockedPriceEntity.interval,
-        productId: mockedPriceEntity.productId,
       };
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
 
-      const response = await app.inject({
-        method: 'GET',
-        path: '/prices',
-      });
+      const response = await app.inject({ method: 'GET', path: '/prices' });
 
+      expect(response.statusCode).toBe(200);
+      expect(getPricesSpy).toHaveBeenCalledWith('eur');
+      expect(response.json()).toStrictEqual([expectedResponse]);
+    });
+
+    test('When a valid currency is provided, then prices are returned in that currency', async () => {
+      const mockedPriceEntity = getPriceEntity({ currency: 'usd' });
+      const expectedResponse = {
+        id: mockedPriceEntity.id,
+        productId: mockedPriceEntity.productId,
+        currency: mockedPriceEntity.currency,
+        amount: mockedPriceEntity.amount,
+        bytes: mockedPriceEntity.bytes,
+        interval: mockedPriceEntity.interval,
+      };
+
+      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+
+      const response = await app.inject({ method: 'GET', path: '/prices?currency=usd' });
+
+      expect(response.statusCode).toBe(200);
+      expect(getPricesSpy).toHaveBeenCalledWith('usd');
+      expect(response.json()).toStrictEqual([expectedResponse]);
+    });
+
+    test('When an unsupported currency is provided, then a bad request error is returned', async () => {
+      const response = await app.inject({ method: 'GET', path: '/prices?currency=xyz' });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toStrictEqual({ message: 'Bad request' });
+    });
+
+    test('When there are business prices, then only individual prices are returned', async () => {
+      const individualPrice = getPriceEntity({ type: UserType.Individual });
+      const businessPrice = getPriceEntity({ type: UserType.Business });
+
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([individualPrice, businessPrice]);
+
+      const response = await app.inject({ method: 'GET', path: '/prices' });
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual([expectedResponse]);
+      expect(responseBody).toHaveLength(1);
+      expect(responseBody[0].id).toBe(individualPrice.id);
+    });
+
+    test('When a price has an annual commitment, then the interval is returned as year', async () => {
+      const mockedPriceEntity = getPriceEntity({ commitmentPlan: true, interval: 'month' });
+
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+
+      const response = await app.inject({ method: 'GET', path: '/prices' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()[0].interval).toBe('year');
     });
   });
 });
