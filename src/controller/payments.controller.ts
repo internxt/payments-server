@@ -434,14 +434,16 @@ export function paymentsController(
 
         const prices = await stripePaymentsAdapter.getPrices(currencyValue);
 
-        const mappedPrices = prices.map((price) => ({
-          id: price.id,
-          productId: price.productId,
-          currency: price.currency,
-          amount: price.amount,
-          bytes: price.bytes,
-          interval: price?.interval,
-        }));
+        const mappedPrices = prices
+          .filter((price) => price.type === UserType.Individual)
+          .map((price) => ({
+            id: price.id,
+            productId: price.productId,
+            currency: price.currency,
+            amount: price.amount,
+            bytes: price.bytes,
+            interval: price.commitmentPlan ? 'year' : price?.interval,
+          }));
 
         return mappedPrices;
       },
