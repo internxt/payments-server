@@ -13,7 +13,6 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { UserType } from '../core/users/User';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -190,9 +189,9 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError();
         }
 
-        const price = await paymentsService.getPriceById(priceId);
+        const price = await stripePaymentsAdapter.getPriceById(priceId);
 
-        if (price.type === UserType.Business) throw new BadRequestError('Business plan is no longer available');
+        if (price.isBusinessPlan()) throw new BadRequestError('Business plan is no longer available');
 
         const subscriptionAttempt = await paymentsService.createSubscription({
           customerId,
@@ -286,7 +285,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError();
         }
 
-        const price = await paymentsService.getPriceById(priceId);
+        const price = await stripePaymentsAdapter.getPriceById(priceId);
 
         if (price.interval !== 'lifetime') {
           throw new BadRequestError('Only lifetime plans are supported');
@@ -362,12 +361,12 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const userUuid = req.user?.payload?.uuid;
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
 
-        const price = await paymentsService.getPriceById(priceId, currency);
+        const price = await stripePaymentsAdapter.getPriceById(priceId, currency);
 
         let amount = price.amount;
 
         if (promoCodeName) {
-          const couponCode = await paymentsService.getPromoCodeByName(price.product, promoCodeName);
+          const couponCode = await paymentsService.getPromoCodeByName(price.productId, promoCodeName);
           if (couponCode.amountOff) {
             amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
@@ -393,7 +392,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         const amountTotal = taxForPrice?.amount_total ?? price.amount;
 
         return res.status(200).send({
-          price,
+          price: price.toJSON(),
           taxes: {
             tax: taxAmount,
             decimalTax: taxAmount / 100,

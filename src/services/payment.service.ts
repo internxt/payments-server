@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import dayjs from 'dayjs';
 
-import { DisplayPrice } from '../core/users/DisplayPrice';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { UserSubscription, UserType } from '../core/users/User';
 import { Bit2MeService } from './bit2me.service';
@@ -35,7 +34,7 @@ import {
   CustomerSource,
   Customer as StripeCustomer,
 } from '../types/stripe';
-import { PaymentIntent, PromotionCode, PriceByIdResponse } from '../types/payment';
+import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
@@ -190,10 +189,6 @@ export class PaymentService {
     }
   }
 
-  async getPrice(priceId: string): Promise<Stripe.Price> {
-    return this.provider.prices.retrieve(priceId);
-  }
-
   /**
    * Creates an invoice to purchase a one time plan.
    *
@@ -261,8 +256,8 @@ export class PaymentService {
       throw new BadRequestError('Invoice item does not have a price.');
     }
 
-    const price = await this.getPrice(invoiceItem.pricing?.price_details?.price);
-    const isLifetime = price.type === 'one_time';
+    const price = await stripePaymentsAdapter.getPriceById(invoiceItem.pricing?.price_details?.price);
+    const isLifetime = price.interval === 'lifetime';
 
     if (isLifetime && isCryptoCurrency(currency)) {
       const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
@@ -900,101 +895,6 @@ export class PaymentService {
       productId: price?.product as string,
       userType,
       plan,
-    };
-  }
-
-  async getPrices(currency?: string, userType: UserType = UserType.Individual): Promise<DisplayPrice[]> {
-    const currencyValue = currency ?? 'eur';
-
-    const res = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"${currencyValue}"`,
-      expand: ['data.currency_options', 'data.product'],
-      limit: 100,
-    });
-
-    return res.data
-      .filter((price) => {
-        const priceProductType = ((price.product as Stripe.Product).metadata.type as UserType) || UserType.Individual;
-        return (
-          price.metadata.maxSpaceBytes &&
-          price.currency_options &&
-          price.currency_options[currencyValue].unit_amount &&
-          priceProductType === userType
-        );
-      })
-      .map((price) => {
-        const hasAnnualCommitment = this.hasAnnualCommitment(price);
-        const recurringInterval = hasAnnualCommitment ? 'year' : (price.recurring?.interval as 'year' | 'month');
-
-        return {
-          id: price.id,
-          productId: (price.product as Stripe.Product).id,
-          currency: currencyValue,
-          amount: price.currency_options![currencyValue].unit_amount as number,
-          bytes: parseInt(price.metadata.maxSpaceBytes),
-          interval: price.type === 'one_time' ? 'lifetime' : recurringInterval,
-        };
-      });
-  }
-
-  async getPricesRaw(currency?: string, expandProduct = false): Promise<Stripe.Price[]> {
-    const currencyValue = currency ?? 'eur';
-
-    const expandOptions = ['data.currency_options'];
-
-    if (expandProduct) {
-      expandOptions.push('data.product');
-    }
-
-    //!TODO: add metadata["show"]:"1" in query param
-    const res = await this.provider.prices.search({
-      query: `active:"true" currency:"${currencyValue}"`,
-      expand: expandOptions,
-      limit: 100,
-    });
-
-    return res.data.filter(
-      (price) =>
-        price.metadata.maxSpaceBytes && price.currency_options && price.currency_options[currencyValue].unit_amount,
-    );
-  }
-
-  /**
-   * Returns the requested price if exists
-   * @param priceId - The id of the requested price
-   * @param currency - The currency of the requested price
-   * @returns - The selected price if it exists and it is active
-   */
-  async getPriceById(priceId: string, currency = 'eur'): Promise<PriceByIdResponse> {
-    const availablePrices = await this.getPricesRaw(currency);
-
-    const selectedPrice = availablePrices.find((price) => price.id === priceId && price.active);
-
-    if (!selectedPrice) {
-      throw new NotFoundError('The requested price does not exist');
-    }
-
-    let businessSeats;
-    const { currency_options, recurring, metadata, type, product } = selectedPrice;
-    const isBusinessPrice = metadata?.type === 'business';
-
-    if (isBusinessPrice) {
-      businessSeats = {
-        minimumSeats: Number(metadata.minimumSeats),
-        maximumSeats: Number(metadata.maximumSeats),
-      };
-    }
-
-    return {
-      id: priceId,
-      currency,
-      amount: currency_options![currency].unit_amount as number,
-      bytes: Number.parseInt(metadata?.maxSpaceBytes),
-      interval: type === 'one_time' ? 'lifetime' : recurring?.interval,
-      decimalAmount: (currency_options![currency].unit_amount as number) / 100,
-      type: isBusinessPrice ? UserType.Business : UserType.Individual,
-      product: product as string,
-      ...businessSeats,
     };
   }
 

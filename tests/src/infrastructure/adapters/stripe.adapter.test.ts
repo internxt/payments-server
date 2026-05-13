@@ -180,7 +180,7 @@ describe('Stripe Adapter', () => {
   describe('Get prices', () => {
     test('When getting all available prices, then all prices are returned with the correct data', async () => {
       const stripePrice = getPrice({
-        metadata: { show: '1', bytes: '107374182400', type: 'individual', annualCommitment: 'false' },
+        metadata: { show: '1', maxSpaceBytes: '107374182400', type: 'individual', annualCommitment: 'false' },
         recurring: {
           interval: 'year',
           interval_count: 1,
@@ -206,7 +206,7 @@ describe('Stripe Adapter', () => {
         Price.toDomain({
           id: stripePrice.id,
           productId: 'prod_test',
-          bytes: 107374182400,
+          bytes: Number(stripePrice.metadata.maxSpaceBytes),
           interval: 'year',
           commitmentPlan: false,
           recurring: true,
@@ -222,7 +222,7 @@ describe('Stripe Adapter', () => {
       const stripePrice = getPrice({
         metadata: {
           show: '1',
-          bytes: '107374182400',
+          maxSpaceBytes: '107374182400',
           type: 'business',
           annualCommitment: 'false',
           minimumSeats: '1',
@@ -257,7 +257,7 @@ describe('Stripe Adapter', () => {
   describe('Get price by ID', () => {
     test('When getting a price by its ID, then the price is returned with the correct data', async () => {
       const stripePrice = getPrice({
-        metadata: { bytes: '107374182400', type: 'individual', annualCommitment: 'false' },
+        metadata: { maxSpaceBytes: '107374182400', type: 'individual', annualCommitment: 'false' },
         recurring: {
           interval: 'year',
           interval_count: 1,
@@ -280,7 +280,7 @@ describe('Stripe Adapter', () => {
         Price.toDomain({
           id: stripePrice.id,
           productId: 'prod_test',
-          bytes: 107374182400,
+          bytes: Number(stripePrice.metadata.maxSpaceBytes),
           interval: 'year',
           commitmentPlan: false,
           recurring: true,
