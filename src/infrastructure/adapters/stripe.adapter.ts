@@ -61,24 +61,26 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       limit: 100,
     });
 
-    return prices.data.map((price) => {
-      const businessSeats = this.getBusinessSeats(price);
-      const currencyOptions = price.currency_options![currency] ?? price.currency_options!['eur'];
+    return prices.data
+      .filter((price) => price.metadata.maxSpaceBytes && price.currency_options)
+      .map((price) => {
+        const businessSeats = this.getBusinessSeats(price);
+        const currencyOptions = price.currency_options![currency] ?? price.currency_options!['eur'];
 
-      return Price.toDomain({
-        id: price.id,
-        productId: (price.product as Stripe.Product).id,
-        bytes: Number.parseInt(price.metadata.maxSpaceBytes),
-        interval: this.getInterval(price.recurring?.interval),
-        commitmentPlan: this.hasAnnualCommitment(price),
-        recurring: price.type === 'recurring',
-        amount: currencyOptions.unit_amount as number,
-        currency,
-        decimalAmount: (currencyOptions.unit_amount as number) / 100,
-        type: price.metadata.type === 'business' ? UserType.Business : UserType.Individual,
-        ...businessSeats,
+        return Price.toDomain({
+          id: price.id,
+          productId: (price.product as Stripe.Product).id,
+          bytes: Number.parseInt(price.metadata.maxSpaceBytes),
+          interval: this.getInterval(price.recurring?.interval),
+          commitmentPlan: this.hasAnnualCommitment(price),
+          recurring: price.type === 'recurring',
+          amount: currencyOptions.unit_amount as number,
+          currency,
+          decimalAmount: (currencyOptions.unit_amount as number) / 100,
+          type: price.metadata.type === 'business' ? UserType.Business : UserType.Individual,
+          ...businessSeats,
+        });
       });
-    });
   }
 
   async getPriceById(priceId: Price['id'], currency: string = 'eur'): Promise<Price> {
@@ -98,7 +100,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       commitmentPlan: this.hasAnnualCommitment(price),
       recurring: price.type === 'recurring',
       amount: price.currency_options![currency].unit_amount as number,
-      currency: price.currency,
+      currency,
       decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
       type: isBusinessPlan ? UserType.Business : UserType.Individual,
       ...businessSeats,

@@ -222,7 +222,7 @@ describe('Stripe Adapter', () => {
       const stripePrice = getPrice({
         metadata: {
           show: '1',
-          bytes: '107374182400',
+          maxSpaceBytes: '107374182400',
           type: 'business',
           annualCommitment: 'false',
           minimumSeats: '1',
