@@ -1,4 +1,4 @@
-import { getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
+import { getCustomer, getPaymentIntent, getPaymentMethod, getPrice } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
@@ -7,6 +7,7 @@ import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/pa
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
+import { PaymentIntent } from '../../../../src/infrastructure/domain/entities/paymentIntent';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -388,6 +389,88 @@ describe('Stripe Adapter', () => {
       const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.interval).toBe('lifetime');
+    });
+  });
+
+  describe('Get payment intent', () => {
+    test('When retrieving a payment intent, then the mapped domain entity is returned', async () => {
+      const stripePaymentIntent = getPaymentIntent({
+        customer: 'cus_test123',
+        payment_method: 'pm_test123',
+        metadata: { type: 'object-storage', priceId: 'price_abc' },
+        status: 'succeeded',
+        amount_received: 100,
+      });
+
+      jest
+        .spyOn(stripePaymentsAdapter.provider.paymentIntents, 'retrieve')
+        .mockResolvedValue(stripePaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
+
+      const result = await stripePaymentsAdapter.getPaymentIntent(stripePaymentIntent.id);
+
+      expect(result).toStrictEqual(
+        PaymentIntent.toDomain({
+          id: stripePaymentIntent.id,
+          customer: stripePaymentIntent.customer as string,
+          payment_method: stripePaymentIntent.payment_method as string,
+          metadata: stripePaymentIntent.metadata,
+          status: stripePaymentIntent.status,
+          amount_received: stripePaymentIntent.amount_received,
+        }),
+      );
+    });
+
+    test('When retrieving a payment intent, then the Stripe API is called with the correct ID', async () => {
+      const stripePaymentIntent = getPaymentIntent();
+
+      const retrieveSpy = jest
+        .spyOn(stripePaymentsAdapter.provider.paymentIntents, 'retrieve')
+        .mockResolvedValue(stripePaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
+
+      await stripePaymentsAdapter.getPaymentIntent(stripePaymentIntent.id);
+
+      expect(retrieveSpy).toHaveBeenCalledWith(stripePaymentIntent.id);
+    });
+  });
+
+  describe('Cancel payment intent', () => {
+    test('When cancelling a payment intent, then the cancelled domain entity is returned', async () => {
+      const stripePaymentIntent = getPaymentIntent({
+        customer: 'cus_test123',
+        payment_method: 'pm_test123',
+        metadata: { type: 'object-storage', priceId: 'price_abc' },
+        status: 'canceled',
+        amount_received: 0,
+      });
+
+      jest
+        .spyOn(stripePaymentsAdapter.provider.paymentIntents, 'cancel')
+        .mockResolvedValue(stripePaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
+
+      const result = await stripePaymentsAdapter.cancelPaymentIntent(stripePaymentIntent.id);
+
+      expect(result).toStrictEqual(
+        PaymentIntent.toDomain({
+          id: stripePaymentIntent.id,
+          customer: stripePaymentIntent.customer as string,
+          payment_method: stripePaymentIntent.payment_method as string,
+          metadata: stripePaymentIntent.metadata,
+          status: stripePaymentIntent.status,
+          amount_received: stripePaymentIntent.amount_received,
+        }),
+      );
+    });
+
+    test('When cancelling a payment intent, then the Stripe API is called with the correct ID', async () => {
+      const stripePaymentIntent = getPaymentIntent();
+
+      const cancelSpy = jest
+        .spyOn(stripePaymentsAdapter.provider.paymentIntents, 'cancel')
+        .mockResolvedValue(stripePaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
+
+      await stripePaymentsAdapter.cancelPaymentIntent(stripePaymentIntent.id);
+
+      expect(cancelSpy).toHaveBeenCalledWith(stripePaymentIntent.id);
     });
   });
 });

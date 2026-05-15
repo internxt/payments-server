@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import Stripe from 'stripe';
-import { getCustomer, getInvoice, getPaymentIntent, getPaymentMethod } from '../fixtures';
+import { getCustomer, getInvoice, getPaymentIntent, getPaymentIntentEntity, getPaymentMethod } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { PaymentService } from '../../../src/services/payment.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
@@ -32,12 +32,17 @@ describe('Webhook events', () => {
   describe('The webhooks are called correctly', () => {
     test('When the event payment_intent.amount_capturable_updated is triggered, then the correct function is called', async () => {
       const mockedPaymentIntent = getPaymentIntent();
+      const mockedPaymentIntentEntity = getPaymentIntentEntity({ id: mockedPaymentIntent.id });
       const event = {
         id: 'evt_1',
         type: 'payment_intent.amount_capturable_updated',
         data: { object: mockedPaymentIntent },
       };
       const payloadToString = JSON.stringify(event);
+
+      jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPaymentIntent')
+        .mockResolvedValue(mockedPaymentIntentEntity);
 
       const header = Stripe.webhooks.generateTestHeaderString({
         payload: payloadToString,
@@ -55,13 +60,10 @@ describe('Webhook events', () => {
       });
 
       expect(response.statusCode).toBe(204);
-      expect(handleFundsCaptured).toHaveBeenCalled();
       expect(handleFundsCaptured).toHaveBeenCalledWith(
-        event.data.object,
+        mockedPaymentIntentEntity,
         expect.any(PaymentService),
         expect.any(ObjectStorageService),
-        expect.any(Stripe),
-        app.log,
       );
     });
 

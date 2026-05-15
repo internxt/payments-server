@@ -63,9 +63,12 @@ export default function (
           );
           break;
 
-        case 'payment_intent.amount_capturable_updated':
-          await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe, fastify.log);
+        case 'payment_intent.amount_capturable_updated': {
+          const paymentIntentId = event.data.object.id;
+          const paymentIntentData = await stripePaymentsAdapter.getPaymentIntent(paymentIntentId);
+          await handleFundsCaptured(paymentIntentData, paymentService, objectStorageService);
           break;
+        }
 
         case 'customer.subscription.deleted':
           await handleSubscriptionCanceled(
