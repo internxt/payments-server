@@ -150,7 +150,6 @@ export class PaymentService {
       items: [
         {
           price: priceId,
-          quantity: 1,
         },
       ],
       discounts: [
