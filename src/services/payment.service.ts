@@ -704,12 +704,14 @@ export class PaymentService {
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
     subscriptionId?: SubscriptionId,
+    status?: Stripe.Invoice['status'],
   ): Promise<Invoice[]> {
     const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
+      ...(status && { status }),
     });
 
     return res.data;
@@ -729,7 +731,7 @@ export class PaymentService {
   ) {
     const { limit, startingAfter } = pagination;
 
-    const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId);
+    const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId, 'paid');
 
     const invoicesMapped = invoices
       .filter((invoice) =>
