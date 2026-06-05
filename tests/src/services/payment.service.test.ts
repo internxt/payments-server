@@ -620,7 +620,7 @@ describe('Payments Service tests', () => {
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined);
+      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
       expect(result).toEqual([
         {
           id: mockedInvoices.id,
@@ -640,7 +640,7 @@ describe('Payments Service tests', () => {
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Business);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined);
+      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
       expect(result).toEqual([
         {
           id: mockedInvoices.id,
@@ -665,7 +665,12 @@ describe('Payments Service tests', () => {
         subscriptionId,
       );
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, subscriptionId);
+      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(
+        customerId,
+        mockPagination,
+        subscriptionId,
+        'paid',
+      );
       expect(result).toEqual(
         mockedInvoices.map((invoice) => ({
           id: invoice.id,
@@ -684,7 +689,7 @@ describe('Payments Service tests', () => {
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined);
+      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
       expect(result).toEqual([]);
     });
 
