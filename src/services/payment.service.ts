@@ -748,10 +748,10 @@ export class PaymentService {
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0].price!.metadata.maxSpaceBytes,
+          bytesInPlan: invoice.lines.data[0]?.price?.metadata?.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
-          product: invoice.lines.data[0].price?.product,
+          product: invoice.lines.data[0]?.price?.product,
         };
       });
 
