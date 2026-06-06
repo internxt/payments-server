@@ -6,6 +6,7 @@ import { Chance } from 'chance';
 import config from '../../src/config';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import { PaymentIntent, PaymentIntentCrypto, PaymentIntentFiat, PromotionCode } from '../../src/types/payment';
+import { PaymentIntent as PaymentIntentEntity } from '../../src/infrastructure/domain/entities/paymentIntent';
 import { RenewalPeriod, SubscriptionCreated } from '../../src/types/subscription';
 import { Coupon } from '../../src/core/coupons/Coupon';
 import {
@@ -626,6 +627,18 @@ export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe
     payment_method_types: ['card', 'link'],
     ...params,
   };
+};
+
+export const getPaymentIntentEntity = (params?: Partial<Stripe.PaymentIntent>): PaymentIntentEntity => {
+  const paymentIntent = getPaymentIntent(params);
+  return PaymentIntentEntity.toDomain({
+    id: paymentIntent.id,
+    customer: paymentIntent.customer as string,
+    payment_method: paymentIntent.payment_method as string,
+    metadata: paymentIntent.metadata,
+    status: paymentIntent.status,
+    amount_received: paymentIntent.amount_received,
+  });
 };
 
 export const getCoupon = (params?: Partial<Coupon>): Coupon => ({

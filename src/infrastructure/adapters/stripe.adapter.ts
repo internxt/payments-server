@@ -8,6 +8,7 @@ import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
+import { PaymentIntent } from '../domain/entities/paymentIntent';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
@@ -104,6 +105,32 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
       type: isBusinessPlan ? UserType.Business : UserType.Individual,
       ...businessSeats,
+    });
+  }
+
+  async getPaymentIntent(paymentIntentId: string): Promise<PaymentIntent> {
+    const paymentIntent = await this.provider.paymentIntents.retrieve(paymentIntentId);
+
+    return PaymentIntent.toDomain({
+      id: paymentIntent.id,
+      customer: paymentIntent.customer as string,
+      payment_method: paymentIntent.payment_method as string,
+      metadata: paymentIntent.metadata,
+      status: paymentIntent.status,
+      amount_received: paymentIntent.amount_received,
+    });
+  }
+
+  async cancelPaymentIntent(paymentIntentId: string): Promise<PaymentIntent> {
+    const canceledPaymentIntent = await this.provider.paymentIntents.cancel(paymentIntentId);
+
+    return PaymentIntent.toDomain({
+      id: canceledPaymentIntent.id,
+      customer: canceledPaymentIntent.customer as string,
+      payment_method: canceledPaymentIntent.payment_method as string,
+      metadata: canceledPaymentIntent.metadata,
+      status: canceledPaymentIntent.status,
+      amount_received: canceledPaymentIntent.amount_received,
     });
   }
 
