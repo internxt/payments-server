@@ -502,6 +502,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
       const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       const applyVpnFeaturesSpy = jest.spyOn(tiersService, 'applyVpnFeatures').mockResolvedValue();
+      const applyMailFeaturesSpy = jest.spyOn(tiersService, 'applyMailFeatures').mockResolvedValue();
 
       const handleNewProduct = invoiceCompletedHandler['handleNewProduct'].bind(invoiceCompletedHandler);
       await handleNewProduct({
@@ -525,6 +526,13 @@ describe('Testing the handler when an invoice is completed', () => {
         undefined,
       );
       expect(applyVpnFeaturesSpy).toHaveBeenCalledWith(
+        {
+          ...mockedUser,
+          email: mockedCustomer.email as string,
+        },
+        mockedTier,
+      );
+      expect(applyMailFeaturesSpy).toHaveBeenCalledWith(
         {
           ...mockedUser,
           email: mockedCustomer.email as string,

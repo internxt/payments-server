@@ -7,7 +7,8 @@ import { createTestServices } from '../helpers/services-factory';
 import { BadRequestError } from '../../../src/errors/Errors';
 
 describe('TiersService tests', () => {
-  const { usersTiersRepository, tiersRepository, tiersService, usersService, storageService } = createTestServices();
+  const { usersTiersRepository, tiersRepository, tiersService, usersService, storageService, mailService } =
+    createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -264,6 +265,7 @@ describe('TiersService tests', () => {
       const { productId } = mockedTier;
       mockedTier.featuresPerService[Service.Drive].enabled = true;
       mockedTier.featuresPerService[Service.Vpn].enabled = true;
+      mockedTier.featuresPerService[Service.Mail].enabled = true;
 
       const findTierByProductId = jest
         .spyOn(tiersRepository, 'findByProductId')
@@ -274,12 +276,16 @@ describe('TiersService tests', () => {
       const removeVPNFeatures = jest
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
+      const removeMailFeatures = jest
+        .spyOn(tiersService, 'removeMailFeatures')
+        .mockImplementation(() => Promise.resolve());
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
+      expect(removeMailFeatures).toHaveBeenCalledWith(userWithEmail.uuid);
     });
   });
 
@@ -367,6 +373,48 @@ describe('TiersService tests', () => {
       await tiersService.removeVPNFeatures(uuid, tier.featuresPerService['vpn']);
 
       expect(removeVPNTierSpy).toHaveBeenCalledWith(uuid, tier.featuresPerService[Service.Vpn].featureId);
+    });
+  });
+
+  describe('Enable Mail access based on user tier', () => {
+    it('When Mail is enabled, then a request to reactivate the mail account is sent', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Mail].enabled = true;
+
+      const reactivateAccountSpy = jest
+        .spyOn(mailService, 'reactivateAccount')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyMailFeatures(userWithEmail, tier);
+
+      expect(reactivateAccountSpy).toHaveBeenCalledWith(userWithEmail.uuid);
+    });
+
+    it('When Mail is disabled, then it does not send a request to reactivate the mail account', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      const reactivateAccountSpy = jest
+        .spyOn(mailService, 'reactivateAccount')
+        .mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyMailFeatures(userWithEmail, tier);
+
+      expect(reactivateAccountSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Remove Mail access based on user tier', () => {
+    it('When the tier is cancelled, then the request to suspend the mail account is sent', async () => {
+      const { uuid } = getUser();
+
+      const suspendAccountSpy = jest.spyOn(mailService, 'suspendAccount').mockImplementation(() => Promise.resolve());
+
+      await tiersService.removeMailFeatures(uuid);
+
+      expect(suspendAccountSpy).toHaveBeenCalledWith(uuid);
     });
   });
 });
