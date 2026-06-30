@@ -32,7 +32,7 @@ describe('MailService', () => {
   };
 
   describe('suspendAccount', () => {
-    it('When called, then it POSTs to the suspend gateway endpoint with the signed token', async () => {
+    test('When called, then it POSTs to the suspend gateway endpoint with the signed token', async () => {
       const { mailService, post } = buildService();
       const uuid = 'user-uuid';
 
@@ -47,7 +47,7 @@ describe('MailService', () => {
   });
 
   describe('reactivateAccount', () => {
-    it('When called, then it POSTs to the reactivate gateway endpoint with the signed token', async () => {
+    test('When called, then it POSTs to the reactivate gateway endpoint with the signed token', async () => {
       const { mailService, post } = buildService();
       const uuid = 'user-uuid';
 

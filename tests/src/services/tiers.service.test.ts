@@ -377,7 +377,7 @@ describe('TiersService tests', () => {
   });
 
   describe('Enable Mail access based on user tier', () => {
-    it('When Mail is enabled, then a request to reactivate the mail account is sent', async () => {
+    test('When Mail is enabled, then a request to reactivate the mail account is sent', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
@@ -392,7 +392,7 @@ describe('TiersService tests', () => {
       expect(reactivateAccountSpy).toHaveBeenCalledWith(userWithEmail.uuid);
     });
 
-    it('When Mail is disabled, then it does not send a request to reactivate the mail account', async () => {
+    test('When Mail is disabled, then it does not send a request to reactivate the mail account', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
@@ -407,7 +407,7 @@ describe('TiersService tests', () => {
   });
 
   describe('Remove Mail access based on user tier', () => {
-    it('When the tier is cancelled, then the request to suspend the mail account is sent', async () => {
+    test('When the tier is cancelled, then the request to suspend the mail account is sent', async () => {
       const { uuid } = getUser();
 
       const suspendAccountSpy = jest.spyOn(mailService, 'suspendAccount').mockImplementation(() => Promise.resolve());
