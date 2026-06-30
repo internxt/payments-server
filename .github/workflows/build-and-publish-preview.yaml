@@ -1,13 +1,13 @@
 name: Build & Publish Stable Preview
 on:
   push:
-    branches: ['master']
+    branches: ["master"]
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22.12.0]
+        node-version: [24.14.0]
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          registry-url: 'https://npm.pkg.github.com'
+          registry-url: "https://npm.pkg.github.com"
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
       - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
       # You cannot read packages from other private repos with GITHUB_TOKEN
