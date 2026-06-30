@@ -12,7 +12,7 @@ jobs:
     environment: test
     strategy:
       matrix:
-        node-version: [22.12.0]
+        node-version: [24.14.0]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -35,7 +35,7 @@ jobs:
       - run: echo CHART_API_URL=api_url >> ./.env
       - run: echo PAYMENTS_GATEWAY_SECRET=${{secrets.PAYMENTS_GATEWAY_SECRET}} >> ./.env
       - run: echo PAYMENTS_GATEWAY_PUBLIC_SECRET=${{secrets.PAYMENTS_GATEWAY_PUBLIC_SECRET}} >> ./.env
-      - run: echo KLAVIYO_BASE_URL=test_klaviyo_url >> ./.env    
+      - run: echo KLAVIYO_BASE_URL=test_klaviyo_url >> ./.env
       - run: echo KLAVIYO_API_KEY=test_klaviyo_key_123 >> ./.env
 
       - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc

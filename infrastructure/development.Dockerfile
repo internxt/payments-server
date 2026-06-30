@@ -1,11 +1,9 @@
-FROM node:22-alpine
+FROM node:24-alpine
 LABEL author="internxt"
 
 WORKDIR /usr/app
 
 COPY package*.json ./
-
-COPY .npmrc ./
 
 RUN yarn
 

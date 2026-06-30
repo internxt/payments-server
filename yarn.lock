@@ -617,10 +617,10 @@
     "@typescript-eslint/parser" "^5.4.0"
     eslint-config-prettier "^8.3.0"
 
-"@internxt/prettier-config@^1.0.2":
-  version "1.0.2"
-  resolved "https://npm.pkg.github.com/download/@internxt/prettier-config/1.0.2/5bd220b8de76734448db5475b3e0c01f9d22c19b#5bd220b8de76734448db5475b3e0c01f9d22c19b"
-  integrity sha512-t4HiqvCbC7XgQepwWlIaFJe3iwW7HCf6xOSU9nKTV0tiGqOPz7xMtIgLEloQrDA34Cx4PkOYBXrvFPV6RxSFAA==
+"@internxt/prettier-config@2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@internxt/prettier-config/-/prettier-config-2.0.0.tgz#a71e175c891c205a061bff702d1a9720fa19efb1"
+  integrity sha512-4M+W8ALWjKFK7L4i6lGo7UhHf4a7QD8YGjI99nAvD5HpKsVNb/Kzq53w7boKCtn8/iqvucOsJixp53bRdibICw==
 
 "@ioredis/as-callback@^3.0.0":
   version "3.0.0"
