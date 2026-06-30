@@ -1,9 +1,9 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { HttpError } from '../errors/HttpError';
 import { isAxiosError } from 'axios';
 
 export function registerErrorHandler(app: FastifyInstance) {
-  app.setErrorHandler((error, request: FastifyRequest, reply: FastifyReply) => {
+  app.setErrorHandler((error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof HttpError) {
       return reply.status(error.statusCode).send({
         message: error.message,
