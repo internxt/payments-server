@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-import { UserNotFoundError } from '../../errors/PaymentErrors';
+import { MissingParametersError, UserNotFoundError } from '../../errors/PaymentErrors';
 import { PaymentsAdapter } from '../domain/ports/payments.adapter';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
 import envVariablesConfig from '../../config';
@@ -8,6 +8,8 @@ import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
+import { PaymentIntent } from '../domain/entities/paymentIntent';
+import { Invoice } from '../domain/entities/invoice';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
@@ -105,6 +107,55 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       type: isBusinessPlan ? UserType.Business : UserType.Individual,
       ...businessSeats,
     });
+  }
+
+  async createPaymentIntent(params: Partial<Stripe.PaymentIntentCreateParams>): Promise<PaymentIntent> {
+    const { customer, currency, amount } = params;
+
+    if (!customer || !currency || !amount) {
+      throw new MissingParametersError(['customer', 'currency', 'amount']);
+    }
+
+    const paymentIntent = await this.provider.paymentIntents.create({
+      customer,
+      currency,
+      amount,
+      ...params,
+    });
+
+    return PaymentIntent.toDomain({
+      id: paymentIntent.id,
+      customer,
+      status: paymentIntent.status,
+      clientSecret: paymentIntent.client_secret,
+    });
+  }
+
+  async getUserInvoices(
+    customerId: string,
+    params?: Partial<Omit<Stripe.InvoiceListParams, 'customer'>>,
+  ): Promise<Invoice[]> {
+    const res = await this.provider.invoices.list({
+      customer: customerId,
+      ...params,
+    });
+
+    return res.data.map((invoice) =>
+      Invoice.toDomain({
+        id: invoice.id,
+        lines: invoice.lines.data,
+        created: invoice.created,
+        total: invoice.total,
+        charge: invoice.charge,
+        metadata: invoice.metadata,
+        paidOutOfBand: invoice.paid_out_of_band,
+        pdf: invoice.invoice_pdf ?? undefined,
+        paid: invoice.paid,
+        subscription: invoice.subscription,
+        status: invoice.status,
+        currency: invoice.currency,
+      }),
+    );
   }
 
   private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {

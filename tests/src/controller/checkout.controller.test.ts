@@ -875,7 +875,7 @@ describe('Checkout controller', () => {
         const taxes = mockCalculateTaxFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest.spyOn(PaymentService.prototype, 'getPromotionalCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
           .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
@@ -920,7 +920,7 @@ describe('Checkout controller', () => {
         const taxes = mockCalculateTaxFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest.spyOn(PaymentService.prototype, 'getPromotionalCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
           .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
@@ -967,7 +967,7 @@ describe('Checkout controller', () => {
         const taxes = mockCalculateTaxFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-        jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
+        jest.spyOn(PaymentService.prototype, 'getPromotionalCodeByName').mockResolvedValue(promoCode);
         jest
           .spyOn(PaymentService.prototype, 'calculateTax')
           .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);

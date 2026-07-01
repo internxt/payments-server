@@ -6,6 +6,7 @@ import { PaymentService } from './services/payment.service';
 import fastifyJwt from '@fastify/jwt';
 import { User } from './core/users/User';
 import { assertUser } from './utils/assertUser';
+import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
 
 export default function (paymentService: PaymentService, usersService: UsersService, config: AppConfig) {
   return async function (fastify: FastifyInstance) {
@@ -29,14 +30,12 @@ export default function (paymentService: PaymentService, usersService: UsersServ
       const user: User = await assertUser(req, rep, usersService);
 
       if (user.lifetime) {
-        const invoices = await paymentService.getInvoicesFromUser(user.customerId, { limit: 100 });
+        const invoices = await stripePaymentsAdapter.getUserInvoices(user.customerId, { limit: 100 });
 
         if (invoices.length > 0) {
           const oneTimePurchases = invoices
-            .filter(
-              (invoice) => invoice.paid && !invoice.subscription && invoice?.lines?.data[0]?.price?.type === 'one_time',
-            )
-            .map((invoice) => ({ price: invoice.lines.data[0].price, planId: invoice.lines.data[0].price?.product }));
+            .filter((invoice) => invoice.paid && !invoice.subscription && invoice?.lines[0]?.price?.type === 'one_time')
+            .map((invoice) => ({ price: invoice.lines[0].price, planId: invoice.lines[0].price?.product }));
           response = {
             planId: oneTimePurchases[0].planId as string,
             type: 'lifetime',

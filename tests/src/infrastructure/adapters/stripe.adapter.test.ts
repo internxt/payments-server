@@ -1,4 +1,4 @@
-import { getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
+import { getCustomer, getInvoices, getPaymentIntent, getPaymentMethod, getPrice } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
@@ -7,6 +7,8 @@ import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/pa
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
+import { PaymentIntent } from '../../../../src/infrastructure/domain/entities/paymentIntent';
+import { Invoice } from '../../../../src/infrastructure/domain/entities/invoice';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -388,6 +390,60 @@ describe('Stripe Adapter', () => {
       const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.interval).toBe('lifetime');
+    });
+  });
+
+  describe('Create Payment Intent', () => {
+    test('when creating a payment intent, then the payment intent is created and the correct fields returned', async () => {
+      const mockedPaymentIntent = getPaymentIntent();
+      const mockedCustomer = getCustomer();
+      jest.spyOn(stripePaymentsAdapter.provider.paymentIntents, 'create').mockResolvedValue(mockedPaymentIntent as any);
+
+      const paymentIntent = await stripePaymentsAdapter.createPaymentIntent({
+        customer: mockedCustomer.id,
+        amount: 1000,
+        currency: 'EUR',
+      });
+
+      expect(paymentIntent).toStrictEqual(
+        PaymentIntent.toDomain({
+          id: mockedPaymentIntent.id,
+          customer: mockedCustomer.id,
+          status: mockedPaymentIntent.status,
+          clientSecret: mockedPaymentIntent.client_secret,
+        }),
+      );
+    });
+  });
+
+  describe('Get user invoices', () => {
+    test('When getting the user invoices, then the invoices are returned with the correct fields', async () => {
+      const mockedCustomer = 'cus_123';
+      const mockedInvoices = getInvoices();
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'list').mockResolvedValue({
+        data: mockedInvoices,
+      } as any);
+
+      const invoices = await stripePaymentsAdapter.getUserInvoices(mockedCustomer, {});
+
+      const expectedResult = mockedInvoices.map((invoice) =>
+        Invoice.toDomain({
+          id: invoice.id,
+          lines: invoice.lines.data,
+          created: invoice.created,
+          total: invoice.total,
+          charge: invoice.charge,
+          metadata: invoice.metadata,
+          paidOutOfBand: invoice.paid_out_of_band,
+          pdf: invoice.invoice_pdf ?? undefined,
+          paid: invoice.paid,
+          subscription: invoice.subscription,
+          status: invoice.status,
+          currency: invoice.currency,
+        }),
+      );
+
+      expect(invoices).toStrictEqual(expectedResult);
     });
   });
 });

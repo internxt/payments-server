@@ -16,11 +16,11 @@ import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services
 import { assertUser } from '../utils/assertUser';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { ForbiddenError } from '../errors/Errors';
-import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { VERIFICATION_CHARGE } from '../constants';
 
 const allowedCurrency = ['eur', 'usd'];
 
@@ -98,35 +98,35 @@ export function paymentsController(
 
         res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
 
-        const paymentIntentVerification = await paymentService.paymentIntent(
-          customerId,
+        const paymentIntentVerification = await stripePaymentsAdapter.createPaymentIntent({
+          customer: customerId,
           currency,
-          VERIFICATION_CHARGE,
-          {
-            metadata: {
-              type: 'object-storage',
-              priceId,
-            },
-            description: 'Card verification charge',
-            capture_method: 'manual',
-            setup_future_usage: 'off_session',
-            payment_method_types: ['card', 'paypal'],
-            payment_method: paymentMethod,
+          amount: VERIFICATION_CHARGE,
+          metadata: {
+            type: 'object-storage',
+            priceId,
           },
-        );
+          description: 'Card verification charge',
+          capture_method: 'manual',
+          setup_future_usage: 'off_session',
+          payment_method_types: ['card', 'paypal'],
+          payment_method: paymentMethod,
+        });
 
-        if (paymentIntentVerification.status === 'requires_capture') {
-          return res.status(200).send({
-            intentId: paymentIntentVerification.id,
-            verified: true,
-          });
-        }
-
-        return res.status(200).send({
+        let response: { intentId: string; verified: boolean; clientSecret?: string | null } = {
           intentId: paymentIntentVerification.id,
           verified: false,
-          clientSecret: paymentIntentVerification.client_secret,
-        });
+          clientSecret: paymentIntentVerification.clientSecret,
+        };
+
+        if (paymentIntentVerification.isCaptureRequired()) {
+          response = {
+            intentId: paymentIntentVerification.id,
+            verified: true,
+          };
+        }
+
+        return res.status(200).send(response);
       },
     );
 
@@ -474,9 +474,11 @@ export function paymentsController(
         const { priceId, promotionCode } = req.query;
 
         try {
-          const promoCodeObject = await paymentService.getPromotionCodeByName(priceId, promotionCode);
+          const price = await stripePaymentsAdapter.getPriceById(priceId);
 
-          return rep.status(200).send(promoCodeObject);
+          const couponCode = await paymentService.getPromotionalCodeByName(price.productId, promotionCode);
+
+          return rep.status(200).send(couponCode);
         } catch (error) {
           const err = error as Error;
           if (err instanceof NotFoundPromoCodeByNameError) {

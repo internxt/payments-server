@@ -4,7 +4,6 @@ import {
   getCreateSubscriptionResponse,
   getCustomer,
   getLicenseCode,
-  getPaymentIntent,
   getPriceEntity,
   getUniqueCodes,
   getUser,
@@ -20,11 +19,11 @@ import config from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
-import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
+import { getPaymentIntentEntity } from '../entities.fixtures';
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
@@ -390,7 +389,7 @@ describe('Payment controller e2e tests', () => {
         const paymentMethod = 'pm_123';
         const priceId = 'price_id';
         const mockedUser = getUser();
-        const mockedPaymentIntent = getPaymentIntent({
+        const mockedPaymentIntentEntity = getPaymentIntentEntity({
           status: 'requires_capture',
         });
         const token = jwt.sign(
@@ -400,8 +399,8 @@ describe('Payment controller e2e tests', () => {
           config.JWT_SECRET,
         );
         const paymentIntentSpy = jest
-          .spyOn(PaymentService.prototype, 'paymentIntent')
-          .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+          .spyOn(StripePaymentsAdapter.prototype, 'createPaymentIntent')
+          .mockResolvedValue(mockedPaymentIntentEntity);
 
         const response = await app.inject({
           method: 'POST',
@@ -418,10 +417,13 @@ describe('Payment controller e2e tests', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          intentId: mockedPaymentIntent.id,
+          intentId: mockedPaymentIntentEntity.id,
           verified: true,
         });
-        expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
+        expect(paymentIntentSpy).toHaveBeenCalledWith({
+          customer: mockedUser.customerId,
+          currency: 'eur',
+          amount: 100,
           metadata: {
             type: 'object-storage',
             priceId,
@@ -434,11 +436,11 @@ describe('Payment controller e2e tests', () => {
         });
       });
 
-      it('When the payment intent needs an additional step (such as 3D secure), then the client secret is returned to allow the user finish the process', async () => {
+      test('When the payment intent needs an additional step (such as 3D secure), then the client secret is returned to allow the user finish the process', async () => {
         const paymentMethod = 'pm_123';
         const priceId = 'price_id';
         const mockedUser = getUser();
-        const mockedPaymentIntent = getPaymentIntent();
+        const mockedPaymentIntentEntity = getPaymentIntentEntity();
         const token = jwt.sign(
           {
             customerId: mockedUser.customerId,
@@ -446,8 +448,8 @@ describe('Payment controller e2e tests', () => {
           config.JWT_SECRET,
         );
         const paymentIntentSpy = jest
-          .spyOn(PaymentService.prototype, 'paymentIntent')
-          .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
+          .spyOn(StripePaymentsAdapter.prototype, 'createPaymentIntent')
+          .mockResolvedValue(mockedPaymentIntentEntity);
 
         const response = await app.inject({
           method: 'POST',
@@ -464,11 +466,14 @@ describe('Payment controller e2e tests', () => {
 
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
-          intentId: mockedPaymentIntent.id,
+          intentId: mockedPaymentIntentEntity.id,
           verified: false,
-          clientSecret: mockedPaymentIntent.client_secret,
+          clientSecret: mockedPaymentIntentEntity.clientSecret,
         });
-        expect(paymentIntentSpy).toHaveBeenCalledWith(mockedUser.customerId, 'eur', 100, {
+        expect(paymentIntentSpy).toHaveBeenCalledWith({
+          customer: mockedUser.customerId,
+          currency: 'eur',
+          amount: 100,
           metadata: {
             type: 'object-storage',
             priceId,
@@ -559,7 +564,9 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
@@ -579,7 +586,9 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices?currency=usd' });
 
