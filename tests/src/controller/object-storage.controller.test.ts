@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getInvoices, getPriceEntity, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
+import { getPriceEntity, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
 import { PaymentService } from '../../../src/services/payment.service';
 import Stripe from 'stripe';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { getInvoiceEntity } from '../entities.fixtures';
 
 let app: FastifyInstance;
 
@@ -66,7 +67,7 @@ describe('Object Storage controller', () => {
         const unexpectedError = new Error('Unexpected error');
         const mockedUser = getUser();
         const token = getValidUserToken({ customerId: mockedUser.customerId });
-        jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockRejectedValue(unexpectedError);
+        jest.spyOn(StripePaymentsAdapter.prototype, 'getUserInvoices').mockRejectedValue(unexpectedError);
 
         const response = await app.inject({
           method: 'GET',
@@ -83,7 +84,7 @@ describe('Object Storage controller', () => {
     it('When the user has no invoices, then an empty array is returned', async () => {
       const mockedUser = getUser();
       const token = getValidUserToken({ customerId: mockedUser.customerId });
-      jest.spyOn(PaymentService.prototype, 'getInvoicesFromUser').mockResolvedValue([]);
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getUserInvoices').mockResolvedValue([]);
 
       const response = await app.inject({
         method: 'GET',
@@ -109,42 +110,20 @@ describe('Object Storage controller', () => {
           },
         },
       });
-      const mockedInvoices = getInvoices(4, [
-        {
-          customer: mockedUser.customerId,
-          lines: {
-            data: [
-              {
-                price: {
-                  product: mockedProduct.id,
-                },
-              },
-            ],
+      const mockedInvoices = getInvoiceEntity({
+        customer: mockedUser.customerId,
+        lines: [
+          {
+            price: {
+              product: mockedProduct.id,
+            },
           },
-        },
-        {
-          customer: mockedUser.customerId,
-          lines: {
-            data: [
-              {
-                price: {
-                  product: mockedProduct.id,
-                },
-              },
-            ],
-          },
-        },
-        {
-          customer: mockedUser.customerId,
-        },
-        {
-          customer: mockedUser.customerId,
-        },
-      ]);
+        ],
+      } as any);
 
       const getInvoicesSpy = jest
-        .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
-        .mockResolvedValue(mockedInvoices);
+        .spyOn(StripePaymentsAdapter.prototype, 'getUserInvoices')
+        .mockResolvedValue([mockedInvoices]);
       jest
         .spyOn(PaymentService.prototype, 'getProduct')
         .mockResolvedValue(mockedProduct as Stripe.Response<Stripe.Product>);
@@ -161,7 +140,7 @@ describe('Object Storage controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(getInvoicesSpy).toHaveBeenCalledWith(mockedUser.customerId, {});
-      expect(responseBody).toHaveLength(2);
+      expect(responseBody).toHaveLength(1);
       expect(responseBody[0].product).toBe(mockedProduct.id);
     });
 
@@ -169,20 +148,10 @@ describe('Object Storage controller', () => {
       const mockedUser = getUser();
       const token = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedProduct = getProduct({});
-      const mockedInvoices = getInvoices(3, [
-        {
-          customer: mockedUser.customerId,
-        },
-        {
-          customer: mockedUser.customerId,
-        },
-        {
-          customer: mockedUser.customerId,
-        },
-      ]);
+      const mockedInvoices = [getInvoiceEntity()];
 
       const getInvoicesSpy = jest
-        .spyOn(PaymentService.prototype, 'getInvoicesFromUser')
+        .spyOn(StripePaymentsAdapter.prototype, 'getUserInvoices')
         .mockResolvedValue(mockedInvoices);
       jest
         .spyOn(PaymentService.prototype, 'getProduct')

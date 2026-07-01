@@ -1,10 +1,12 @@
 import { TierNotFoundError } from '../../../../src/services/tiers.service';
-import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice, getInvoices } from '../../fixtures';
+import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice } from '../../fixtures';
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
 import { createTestServices } from '../../helpers/services-factory';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
+import { getInvoiceEntity } from '../../entities.fixtures';
+import Stripe from 'stripe';
 
 describe('Determining Lifetime conditions', () => {
   const { paymentService, tiersService, determineLifetimeConditions } = createTestServices();
@@ -106,13 +108,23 @@ describe('Determining Lifetime conditions', () => {
         },
       };
 
-      const mockedInvoices = getInvoices(3, [{ ...baseLineItem }, { ...baseLineItem }, { ...baseLineItem }]);
+      const mockedInvoices = [
+        getInvoiceEntity({
+          lines: baseLineItem.lines.data as unknown as Stripe.InvoiceLineItem[],
+        }),
+        getInvoiceEntity({
+          lines: baseLineItem.lines.data as unknown as Stripe.InvoiceLineItem[],
+        }),
+        getInvoiceEntity({
+          lines: baseLineItem.lines.data as unknown as Stripe.InvoiceLineItem[],
+        }),
+      ];
       const mockedCustomer = getCustomer();
 
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
+      jest.spyOn(stripePaymentsAdapter, 'getUserInvoices').mockResolvedValue(mockedInvoices);
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
       jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([getCustomer({ id: mockedUser.customerId })]);
       //@ts-ignore
@@ -135,7 +147,7 @@ describe('Determining Lifetime conditions', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customer));
       jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([customer]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([]);
+      jest.spyOn(stripePaymentsAdapter, 'getUserInvoices').mockResolvedValue([]);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
       //@ts-ignore
       jest.spyOn(determineLifetimeConditions, 'getHigherTier').mockResolvedValue(null);
@@ -147,12 +159,12 @@ describe('Determining Lifetime conditions', () => {
     it('When we want to fetch the higher tier and the max space bytes, then the correct tier and bytes are returned', async () => {
       const user = getUser({ lifetime: true });
       const customer = getCustomer({ id: user.customerId });
-      const invoice = getInvoice();
+      const invoice = getInvoiceEntity();
       const mockedTier = newTier({ billingType: 'lifetime' });
 
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customer));
       jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([customer]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([invoice]);
+      jest.spyOn(stripePaymentsAdapter, 'getUserInvoices').mockResolvedValue([invoice]);
       //@ts-ignore
       jest.spyOn(determineLifetimeConditions, 'getPaidInvoices').mockResolvedValue([invoice]);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
@@ -163,7 +175,7 @@ describe('Determining Lifetime conditions', () => {
       const result = await determineLifetimeConditions.handleStackingLifetime(user);
 
       expect(result.tier).toEqual(mockedTier);
-      expect(result.maxSpaceBytes).toBe(Number.parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'));
+      expect(result.maxSpaceBytes).toBe(Number.parseInt(invoice.lines[0].price?.metadata?.maxSpaceBytes ?? '0'));
     });
   });
 
@@ -181,11 +193,18 @@ describe('Determining Lifetime conditions', () => {
 
     it('When the invoice is paid out of band, then the invoice is returned directly', async () => {
       const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.paid = true;
-      invoice.paid_out_of_band = true;
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.metadata = {};
+      const invoice = getInvoiceEntity({
+        paidOutOfBand: true,
+        lines: [
+          {
+            price: {
+              metadata: {
+                planType: 'one_time',
+              },
+            },
+          },
+        ] as any,
+      });
 
       //@ts-ignore
       const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
@@ -195,10 +214,9 @@ describe('Determining Lifetime conditions', () => {
 
     it('When the invoice is paid and it has not been refunded nor disputed, then the invoice is returned', async () => {
       const customer = getCustomer();
-      const invoice = getInvoice();
+      const invoice = getInvoiceEntity();
       invoice.metadata = { chargeId: 'ch_123' };
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.paid = true;
+      invoice.lines[0].price!.metadata!.planType = 'one_time';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')

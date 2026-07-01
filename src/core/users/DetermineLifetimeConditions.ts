@@ -7,6 +7,7 @@ import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
 import { stripePaymentsAdapter } from '../../infrastructure/adapters/stripe.adapter';
+import { Invoice } from '../../infrastructure/domain/entities/invoice';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -82,7 +83,7 @@ export class DetermineLifetimeConditions {
 
     // Get total Max Space Bytes
     for (const customer of customersRelatedToUser) {
-      const invoices = await this.paymentsService.getInvoicesFromUser(customer.id, {
+      const invoices = await stripePaymentsAdapter.getUserInvoices(customer.id, {
         limit: 100,
       });
 
@@ -91,13 +92,13 @@ export class DetermineLifetimeConditions {
       Logger.info(`Found ${filteredPaidInvoices.length} paid invoices for customer ${customer.id}`);
 
       filteredPaidInvoices.forEach((invoice) => {
-        const price = invoice.lines.data[0].price;
+        const price = invoice.lines[0].price;
         const productId = typeof price?.product === 'string' ? price.product : price?.product.id;
         productIds.push(productId ?? '');
       });
 
       totalMaxSpaceBytes += filteredPaidInvoices.reduce(
-        (accum, invoice) => Number.parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
+        (accum, invoice) => Number.parseInt(invoice.lines[0].price?.metadata?.maxSpaceBytes ?? '0') + accum,
         0,
       );
     }
@@ -122,12 +123,12 @@ export class DetermineLifetimeConditions {
     };
   }
 
-  private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
+  private async getPaidInvoices(customer: Stripe.Customer, invoices: Invoice[]): Promise<Invoice[]> {
     const paidInvoices = await Promise.all(
       invoices
         .filter((invoice) => invoice.paid)
         .map(async (invoice) => {
-          const line = invoice.lines.data[0];
+          const line = invoice.lines[0];
 
           if (!line?.price?.metadata) {
             Logger.warn(`Invoice ${invoice.id} for customer ${customer.id} has no price metadata`);
@@ -136,7 +137,7 @@ export class DetermineLifetimeConditions {
 
           const isLifetime = line.price?.metadata?.planType.trim() === 'one_time';
           const invoiceMetadata = invoice.metadata;
-          const isOutOfBand = invoice.paid_out_of_band;
+          const isOutOfBand = invoice.paidOutOfBand;
 
           const chargeIdFromInvoice = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge?.id;
           const chargeId = invoiceMetadata?.chargeId ?? chargeIdFromInvoice;
@@ -164,7 +165,7 @@ export class DetermineLifetimeConditions {
         }),
     );
 
-    return paidInvoices.filter((invoice): invoice is Stripe.Invoice => invoice !== null);
+    return paidInvoices.filter((invoice): invoice is Invoice => invoice !== null);
   }
 
   private async getHigherTier(productIds: string[], userTier: Tier[] | null) {

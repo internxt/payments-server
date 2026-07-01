@@ -215,14 +215,14 @@ export function objectStorageController(paymentService: PaymentService) {
         throw new UnauthorizedError('Customer ID is required');
       }
 
-      const userInvoices = await paymentService.getInvoicesFromUser(customerId, {});
+      const userInvoices = await stripePaymentsAdapter.getUserInvoices(customerId, {});
 
       if (userInvoices.length === 0) {
         return res.status(200).send([]);
       }
 
       const productPromises = userInvoices
-        .map((invoice) => invoice.lines.data[0]?.price?.product)
+        .map((invoice) => invoice.product)
         .filter(Boolean)
         .map((productId) => paymentService.getProduct(productId as string));
 
@@ -231,13 +231,13 @@ export function objectStorageController(paymentService: PaymentService) {
       const objectStorageProduct = productDetails.find((product) => product.metadata?.type === 'object-storage');
 
       const objectStorageInvoices = userInvoices
-        .filter((invoice) => invoice.lines.data[0].price?.product === objectStorageProduct?.id)
+        .filter((invoice) => invoice.product === objectStorageProduct?.id)
         .map((invoice) => ({
           id: invoice.id,
           created: invoice.created,
-          pdf: invoice.invoice_pdf,
+          pdf: invoice.pdf,
           total: invoice.total,
-          product: invoice.lines.data[0].price?.product,
+          product: invoice.product,
         }));
 
       return res.status(200).send(objectStorageInvoices);

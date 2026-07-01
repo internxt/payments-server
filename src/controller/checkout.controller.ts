@@ -366,7 +366,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         let amount = price.amount;
 
         if (promoCodeName) {
-          const couponCode = await paymentsService.getPromoCodeByName(price.productId, promoCodeName);
+          const couponCode = await paymentsService.getPromotionalCodeByName(price.productId, promoCodeName);
           if (couponCode.amountOff) {
             amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
