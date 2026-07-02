@@ -6,6 +6,9 @@ import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
+import { UserNotFoundError } from '../errors/PaymentErrors';
+import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
 
 export function customerController(
   usersService: UsersService,
@@ -75,6 +78,51 @@ export function customerController(
 
           throw error;
         }
+      },
+    );
+
+    fastify.post<{
+      Body: {
+        subscriptionId: string;
+      };
+    }>(
+      '/cancellation-trial',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['subscriptionId'],
+            properties: {
+              subscriptionId: {
+                type: 'string',
+                description: 'The ID of the subscription to apply the cancellation trial',
+              },
+            },
+          },
+        },
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: '1 minute',
+          },
+        },
+      },
+      async (req, res) => {
+        const { uuid } = req.user.payload;
+        const { subscriptionId } = req.body;
+        const user = await usersService.findUserByUuid(uuid);
+
+        if (!user) throw new UserNotFoundError('User does not exists while applying the cancellation trial');
+
+        const customer = await stripePaymentsAdapter.getCustomer(user.customerId);
+
+        if (customer.cancellationTrialRedeemed) {
+          throw new CancellationTrialAlreadyRedeemedError();
+        }
+
+        await paymentService.applyOneMonthTrial(user.customerId, subscriptionId);
+
+        return res.status(204).send();
       },
     );
   };

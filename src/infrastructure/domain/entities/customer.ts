@@ -7,7 +7,7 @@ export interface CreateCustomerParams {
   name: string;
   email: string;
   address: Partial<Address>;
-  metadata?: Record<string, string>;
+  metadata: Record<string, string>;
 }
 
 export interface UpdateCustomerParams extends Partial<CreateCustomerParams> {
@@ -18,6 +18,7 @@ export interface UpdateCustomerParams extends Partial<CreateCustomerParams> {
   };
 }
 
+// !TODO: Refactor the entity to be more generic
 export class Customer {
   constructor(
     public readonly id: string,
@@ -25,6 +26,7 @@ export class Customer {
     public readonly email: string,
     public readonly address?: Address,
     public readonly phone?: string,
+    public readonly metadata?: Record<string, string>,
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
@@ -47,6 +49,7 @@ export class Customer {
         postalCode: stripeCustomer.address?.postal_code,
       },
       stripeCustomer.phone ?? undefined,
+      stripeCustomer.metadata,
     );
   }
 
@@ -60,5 +63,9 @@ export class Customer {
 
   getAddress(): Address | undefined {
     return this.address;
+  }
+
+  get cancellationTrialRedeemed(): boolean {
+    return this.metadata?.cancellation_trial_redeemed === 'true';
   }
 }

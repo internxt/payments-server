@@ -13,6 +13,7 @@ export interface PriceAttributes {
   currency: string;
   decimalAmount: number;
   type: UserType;
+  intervalCount?: number;
   minimumSeats?: number;
   maximumSeats?: number;
 }
@@ -28,6 +29,7 @@ export class Price implements PriceAttributes {
   currency: string;
   decimalAmount: number;
   type: UserType;
+  intervalCount?: number;
   minimumSeats?: number;
   maximumSeats?: number;
 
@@ -35,11 +37,12 @@ export class Price implements PriceAttributes {
     this.id = attributes.id;
     this.productId = attributes.productId;
     this.bytes = attributes.bytes;
-    this.interval = attributes.interval;
     this.commitmentPlan = attributes.commitmentPlan;
     this.amount = attributes.amount;
     this.currency = attributes.currency;
     this.decimalAmount = attributes.decimalAmount;
+    this.interval = attributes.interval;
+    this.intervalCount = attributes.intervalCount;
     this.recurring = attributes.recurring;
     this.type = attributes.type;
     this.buildBusinessSeats(attributes.minimumSeats, attributes.maximumSeats);

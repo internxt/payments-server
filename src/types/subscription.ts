@@ -10,23 +10,18 @@ export enum RenewalPeriod {
 
 export interface PlanSubscription {
   status: string;
-  planId: string;
-  productId: string;
   name: string;
-  simpleName: string;
   type: UserType;
   price: number;
   monthlyPrice: number;
   currency: string;
-  isTeam: boolean;
-  paymentInterval: string;
-  isLifetime: boolean;
   renewalPeriod: RenewalPeriod;
   commitment: {
     enabled: boolean;
+    isCancellationTrialRedeemed?: boolean;
     remainingMonths?: number;
     cancellationDate?: string;
-    isFirstMonth?: boolean;
+    isCancellable?: boolean;
   };
   storageLimit: number;
   amountOfSeats: number;
