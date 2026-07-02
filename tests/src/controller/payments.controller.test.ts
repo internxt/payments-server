@@ -5,7 +5,6 @@ import {
   getCustomer,
   getLicenseCode,
   getPaymentIntent,
-  getPriceEntity,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -13,6 +12,7 @@ import {
   newTier,
   voidPromise,
 } from '../fixtures';
+import { getPriceEntity } from '../entity.fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { PaymentService } from '../../../src/services/payment.service';
 import { CustomerNotFoundError } from '../../../src/errors/PaymentErrors';
@@ -559,7 +559,9 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
@@ -579,7 +581,9 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices?currency=usd' });
 

@@ -5,7 +5,6 @@ import {
   getCustomer,
   getInvoice,
   getPrice,
-  getPriceEntity,
   getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
@@ -13,6 +12,7 @@ import {
   getValidUserToken,
   mockCalculateTaxFor,
 } from '../fixtures';
+import { getPriceEntity } from '../entity.fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';

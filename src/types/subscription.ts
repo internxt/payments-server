@@ -1,5 +1,6 @@
 import { DisplayPrice } from '../core/users/DisplayPrice';
 import { UserType } from '../core/users/User';
+import { CommitmentCancellationInfo } from '../infrastructure/domain/entities/subscription';
 
 export enum RenewalPeriod {
   Monthly = 'monthly',
@@ -16,12 +17,9 @@ export interface PlanSubscription {
   monthlyPrice: number;
   currency: string;
   renewalPeriod: RenewalPeriod;
-  commitment: {
+  commitment: CommitmentCancellationInfo & {
     enabled: boolean;
-    isCancellationTrialRedeemed?: boolean;
-    remainingMonths?: number;
-    cancellationDate?: string;
-    isCancellable?: boolean;
+    isCancellationTrialRedeemed: boolean;
   };
   storageLimit: number;
   amountOfSeats: number;

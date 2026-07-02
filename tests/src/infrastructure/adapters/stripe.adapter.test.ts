@@ -1,4 +1,4 @@
-import { getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
+import { getCreatedSubscription, getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
@@ -7,6 +7,7 @@ import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/pa
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
+import { Subscription } from '../../../../src/infrastructure/domain/entities/subscription';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -208,6 +209,7 @@ describe('Stripe Adapter', () => {
           productId: 'prod_test',
           bytes: Number(stripePrice.metadata.maxSpaceBytes),
           interval: 'year',
+          intervalCount: 1,
           commitmentPlan: false,
           recurring: true,
           amount: 999,
@@ -388,6 +390,86 @@ describe('Stripe Adapter', () => {
       const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.interval).toBe('lifetime');
+    });
+  });
+
+  describe('Updating a subscription', () => {
+    test('When updating a subscription, then the subscription is updated and mapped to a subscription entity', async () => {
+      const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
+
+      const updateSpy = jest
+        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'update')
+        .mockResolvedValue(stripeSubscription as any);
+
+      const params = { cancel_at: 1800000000 };
+      const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, params);
+
+      expect(updateSpy).toHaveBeenCalledWith(stripeSubscription.id, params);
+      expect(subscription).toStrictEqual(
+        Subscription.toDomain({
+          id: stripeSubscription.id,
+          customer: stripeSubscription.customer as string,
+          active: true,
+          priceId: stripeSubscription.items.data[0].price.id,
+          trialing: false,
+          currentPeriodEnd: stripeSubscription.current_period_end,
+          metadata: stripeSubscription.metadata,
+          created: stripeSubscription.created,
+        }),
+      );
+    });
+
+    test('When updating a trialing subscription, then the entity reflects the trial state', async () => {
+      const trialEnd = 1800000000;
+      const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
+
+      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'update').mockResolvedValue(stripeSubscription as any);
+
+      const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, {});
+
+      expect(subscription.active).toBe(false);
+      expect(subscription.trialing).toBe(true);
+      expect(subscription.trialEnd).toBe(trialEnd);
+    });
+  });
+
+  describe('Getting a subscription', () => {
+    test('When getting a subscription, then it is retrieved and mapped to a subscription entity', async () => {
+      const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
+
+      const retrieveSpy = jest
+        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve')
+        .mockResolvedValue(stripeSubscription as any);
+
+      const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
+
+      expect(retrieveSpy).toHaveBeenCalledWith(stripeSubscription.id, { expand: ['plan.product'] });
+      expect(subscription).toStrictEqual(
+        Subscription.toDomain({
+          id: stripeSubscription.id,
+          customer: stripeSubscription.customer as string,
+          active: true,
+          trialing: false,
+          currentPeriodEnd: stripeSubscription.current_period_end,
+          priceId: stripeSubscription.items.data[0].price.id,
+          created: stripeSubscription.created,
+          metadata: stripeSubscription.metadata,
+          trialEnd: undefined,
+        }),
+      );
+    });
+
+    test('When getting a trialing subscription, then the entity reflects the trial state', async () => {
+      const trialEnd = 1800000000;
+      const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
+
+      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve').mockResolvedValue(stripeSubscription as any);
+
+      const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
+
+      expect(subscription.active).toBe(false);
+      expect(subscription.trialing).toBe(true);
+      expect(subscription.trialEnd).toBe(trialEnd);
     });
   });
 });

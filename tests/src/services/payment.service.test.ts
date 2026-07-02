@@ -15,7 +15,6 @@ import {
   getPaymentIntentResponse,
   getPaymentMethod,
   getPrice,
-  getPriceEntity,
   getPrices,
   getProduct,
   getPromoCode,
@@ -24,6 +23,7 @@ import {
   getUser,
   getValidUserToken,
 } from '../fixtures';
+import { getCustomerEntity, getPriceEntity, getSubscriptionEntity } from '../entity.fixtures';
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
@@ -1039,137 +1039,22 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Annual commitment cancellation info', () => {
-    beforeAll(() => {
-      jest.useFakeTimers();
-    });
-
-    afterAll(() => {
-      jest.useRealTimers();
-    });
-
-    const makeSubscriptionWithCommitment = (createdAt: dayjs.Dayjs, annualCommitment = true): Stripe.Subscription => {
-      const price = getPrice({
-        metadata: { annualCommitment: annualCommitment ? 'true' : 'false' },
-      });
-      return getCreatedSubscription({
-        created: createdAt.unix(),
-        items: {
-          object: 'list',
-          has_more: false,
-          url: '',
-          data: [
-            {
-              ...getCreatedSubscription().items.data[0],
-              price,
-            },
-          ],
-        },
-      });
-    };
-
-    test('when the user just subscribed this month, then they have 12 remaining payments and cancel date is one year from now', () => {
-      jest.setSystemTime(dayjs('2026-05-05T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2026-05-01T00:00:00Z'));
-      const { remainingPayments, cancelAt } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(remainingPayments).toBe(12);
-      expect(dayjs.unix(cancelAt).year()).toBe(2027);
-      expect(dayjs.unix(cancelAt).month()).toBe(4);
-    });
-
-    test('when the user has been subscribed for 7 months, then they have 5 remaining payments', () => {
-      jest.setSystemTime(dayjs('2026-05-05T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2025-10-01T00:00:00Z'));
-      const { remainingPayments } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(remainingPayments).toBe(5);
-    });
-
-    test('when the user completes exactly 12 months and starts a new period, then they have 12 remaining payments again', () => {
-      jest.setSystemTime(dayjs('2026-10-01T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2025-10-01T00:00:00Z'));
-      const { remainingPayments, cancelAt } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(remainingPayments).toBe(12);
-      expect(dayjs.unix(cancelAt).year()).toBe(2027);
-    });
-
-    test('when the user has been subscribed for 14 months, then they have 10 remaining payments and cancel date is in the second year', () => {
-      jest.setSystemTime(dayjs('2026-12-01T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2025-10-01T00:00:00Z'));
-      const { remainingPayments, cancelAt } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(remainingPayments).toBe(10);
-      expect(dayjs.unix(cancelAt).year()).toBe(2027);
-    });
-
-    test('when the user has 1 month left in the period, then they have 1 remaining payment', () => {
-      jest.setSystemTime(dayjs('2026-09-01T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2025-10-01T00:00:00Z'));
-      const { remainingPayments } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(remainingPayments).toBe(1);
-    });
-
-    test('when the user subscribed less than 30 days ago, then they are still in their first month', () => {
-      jest.setSystemTime(dayjs('2026-05-05T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2026-04-28T10:00:00Z'));
-      const { isFirstMonth } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(isFirstMonth).toBe(true);
-    });
-
-    test('when the user subscribed more than 30 days ago, then they are no longer in their first month', () => {
-      jest.setSystemTime(dayjs('2026-05-05T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2026-03-01T10:00:00Z'));
-      const { isFirstMonth } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(isFirstMonth).toBe(false);
-    });
-
-    test('when the user has completed a full year and starts a new cycle, then they are not considered in their first month', () => {
-      jest.setSystemTime(dayjs('2026-10-01T10:00:00Z').toDate());
-
-      const subscription = makeSubscriptionWithCommitment(dayjs('2025-10-01T00:00:00Z'));
-      const { isFirstMonth } = paymentService.getAnnualCommitmentCancellationInfo(subscription);
-
-      expect(isFirstMonth).toBe(false);
-    });
-  });
-
   describe('Cancelling a subscription', () => {
     test('when the subscription has an annual commitment, then it schedules the cancellation at the end of the commitment period instead of cancelling immediately', async () => {
-      const subscription = getCreatedSubscription({
-        created: dayjs('2025-10-01T00:00:00Z').unix(),
-        items: {
-          object: 'list',
-          has_more: false,
-          url: '',
-          data: [
-            {
-              ...getCreatedSubscription().items.data[0],
-              price: getPrice({ metadata: { annualCommitment: 'true' } }),
-            },
-          ],
-        },
+      const mockedSubscription = getSubscriptionEntity();
+      const mockedPrice = getPriceEntity({
+        commitmentPlan: true,
       });
 
-      jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(subscription as any);
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as unknown as any);
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(mockedSubscription);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(mockedPrice);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(undefined as any);
       const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(undefined as any);
 
-      await paymentService.cancelSubscription(subscription.id);
+      await paymentService.cancelSubscription(mockedSubscription.id);
 
-      const expectedCancelAt = dayjs.unix(subscription.created).add(1, 'year').unix();
-      expect(updateSpy).toHaveBeenCalledWith(subscription.id, { cancel_at: expectedCancelAt });
+      const expectedCancelAt = mockedSubscription.commitmentCancellationInfo.cancelAt;
+      expect(updateSpy).toHaveBeenCalledWith(mockedSubscription.id, { cancel_at: expectedCancelAt });
       expect(cancelSpy).not.toHaveBeenCalled();
     });
 
@@ -1177,56 +1062,77 @@ describe('Payments Service tests', () => {
       jest.useFakeTimers();
       jest.setSystemTime(dayjs('2026-05-05T10:00:00Z').toDate());
 
-      const subscription = getCreatedSubscription({
+      const mockedSubscription = getSubscriptionEntity({
         created: dayjs('2026-04-28T00:00:00Z').unix(),
-        items: {
-          object: 'list',
-          has_more: false,
-          url: '',
-          data: [
-            {
-              ...getCreatedSubscription().items.data[0],
-              price: getPrice({ metadata: { annualCommitment: 'true' } }),
-            },
-          ],
-        },
+      });
+      const mockedPrice = getPriceEntity({
+        commitmentPlan: true,
       });
 
-      jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(subscription as any);
-      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(subscription as unknown as any);
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(mockedSubscription);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(mockedPrice);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(undefined as any);
+      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(undefined as any);
 
-      await paymentService.cancelSubscription(subscription.id);
+      await paymentService.cancelSubscription(mockedSubscription.id);
 
-      expect(cancelSpy).toHaveBeenCalledWith(subscription.id, {});
+      expect(cancelSpy).toHaveBeenCalledWith(mockedSubscription.id, {});
       expect(updateSpy).not.toHaveBeenCalled();
 
       jest.useRealTimers();
     });
 
     test('when the subscription has no annual commitment, then it cancels immediately', async () => {
-      const subscription = getCreatedSubscription({
-        items: {
-          object: 'list',
-          has_more: false,
-          url: '',
-          data: [
-            {
-              ...getCreatedSubscription().items.data[0],
-              price: getPrice({ metadata: { annualCommitment: 'false' } }),
-            },
-          ],
-        },
+      const mockedSubscription = getSubscriptionEntity();
+      const mockedPrice = getPriceEntity({
+        commitmentPlan: false,
       });
 
-      jest.spyOn(paymentService, 'getSubscriptionById').mockResolvedValue(subscription as any);
-      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(subscription as unknown as any);
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(mockedSubscription);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(mockedPrice);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(undefined as any);
+      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(undefined as any);
 
-      await paymentService.cancelSubscription(subscription.id);
+      await paymentService.cancelSubscription(mockedSubscription.id);
 
-      expect(cancelSpy).toHaveBeenCalledWith(subscription.id, {});
+      expect(cancelSpy).toHaveBeenCalledWith(mockedSubscription.id, {});
       expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Applying Cancellation Trial', () => {
+    test('When the user is not elegible for cancellation, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedSubscription = getSubscriptionEntity({
+        customer: mockedUser.id,
+      });
+      mockedSubscription.commitmentCancellationInfo.isElegibleForCancellation = false;
+
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(mockedSubscription);
+
+      await expect(paymentService.applyCancellationTrial(mockedUser.customerId, mockedSubscription.id)).rejects.toThrow(
+        BadRequestError,
+      );
+    });
+
+    test('When the user is elegible for cancellation, then the next month is trialed', async () => {
+      const mockedUser = getUser();
+      const mockedSubscription = getSubscriptionEntity({
+        customer: mockedUser.id,
+      });
+      mockedSubscription.commitmentCancellationInfo.isElegibleForCancellation = true;
+
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(mockedSubscription);
+      jest.spyOn(stripePaymentsAdapter, 'updateCustomer').mockResolvedValue(undefined as any);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(undefined as any);
+
+      await paymentService.applyCancellationTrial(mockedUser.customerId, mockedSubscription.id);
+
+      const expectedTrialEnd = dayjs.unix(mockedSubscription.currentPeriodEnd).add(1, 'month').unix();
+      expect(updateSpy).toHaveBeenCalledWith(mockedSubscription.id, {
+        trial_end: expectedTrialEnd,
+        proration_behavior: 'none',
+      });
     });
   });
 
@@ -1257,6 +1163,15 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripe.invoices, 'retrieveUpcoming').mockResolvedValue({ total: 999 } as any);
     };
 
+    const mockCommitmentInfo = ({ commitmentPlan, created }: { commitmentPlan: boolean; created?: number }) => {
+      const subscriptionEntity = getSubscriptionEntity(created ? { created } : {});
+      const priceEntity = getPriceEntity({ commitmentPlan, interval: commitmentPlan ? 'year' : 'month' });
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscriptionEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(getCustomerEntity());
+      return subscriptionEntity;
+    };
+
     test('when the user has no active subscription, then it returns a free plan', async () => {
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([]);
 
@@ -1269,6 +1184,7 @@ describe('Payments Service tests', () => {
       const subscription = makeActiveSubscription();
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
       mockUpcomingInvoice();
+      mockCommitmentInfo({ commitmentPlan: false });
 
       const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
 
@@ -1289,6 +1205,7 @@ describe('Payments Service tests', () => {
       );
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
       mockUpcomingInvoice();
+      mockCommitmentInfo({ commitmentPlan: true, created: dayjs('2025-10-01T00:00:00Z').unix() });
 
       const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
 
@@ -1307,6 +1224,7 @@ describe('Payments Service tests', () => {
       const subscription = makeActiveSubscription({}, { product: { metadata: { type: 'business' } } });
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
       mockUpcomingInvoice();
+      mockCommitmentInfo({ commitmentPlan: false });
 
       jest
         .spyOn(paymentService['productsRepository'], 'findByType')

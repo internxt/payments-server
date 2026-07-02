@@ -6,7 +6,6 @@ import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
-import { UserNotFoundError } from '../errors/PaymentErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
 
@@ -112,15 +111,13 @@ export function customerController(
         const { subscriptionId } = req.body;
         const user = await usersService.findUserByUuid(uuid);
 
-        if (!user) throw new UserNotFoundError('User does not exists while applying the cancellation trial');
-
         const customer = await stripePaymentsAdapter.getCustomer(user.customerId);
 
         if (customer.cancellationTrialRedeemed) {
           throw new CancellationTrialAlreadyRedeemedError();
         }
 
-        await paymentService.applyOneMonthTrial(user.customerId, subscriptionId);
+        await paymentService.applyCancellationTrial(user.customerId, subscriptionId);
 
         return res.status(204).send();
       },

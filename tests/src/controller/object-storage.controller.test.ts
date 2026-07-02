@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
-import { getInvoices, getPriceEntity, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
+import { getInvoices, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
+import { getPriceEntity } from '../entity.fixtures';
 import { PaymentService } from '../../../src/services/payment.service';
 import Stripe from 'stripe';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';

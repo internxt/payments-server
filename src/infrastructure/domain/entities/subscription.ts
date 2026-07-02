@@ -13,10 +13,10 @@ export interface SubscriptionAttributes {
 }
 
 export interface CommitmentCancellationInfo {
-  remainingPayments: number;
-  cancelAt: number;
-  cancellationDate: string;
-  isFirstMonth: boolean;
+  remainingMonths?: number;
+  cancelAt?: number;
+  cancellationDate?: string;
+  isElegibleForCancellation?: boolean;
 }
 
 export class Subscription implements SubscriptionAttributes {
@@ -71,12 +71,7 @@ export class Subscription implements SubscriptionAttributes {
    * @param subscription - The subscription we want to get info for
    * @returns - The annual commitment cancellation info (remaining payments, amount per month, currency, cancel at)
    */
-  private getAnnualCommitmentCancellationInfo(subscription: Subscription): {
-    remainingPayments: number;
-    cancelAt: number;
-    cancellationDate: string;
-    isFirstMonth: boolean;
-  } {
+  private getAnnualCommitmentCancellationInfo(subscription: Subscription): CommitmentCancellationInfo {
     const createdAt = dayjs.unix(subscription.created);
     const now = dayjs();
 
@@ -87,10 +82,11 @@ export class Subscription implements SubscriptionAttributes {
     const cancelAtDate = createdAt.add(periodsElapsed + 1, 'year');
     const cancelAt = cancelAtDate.unix();
 
-    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
-    const remainingPayments = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
+    const isInFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
+    const isElegibleForCancellation = isInFirstMonth || (monthsElapsed === 1 && !!this.isTrialing);
+    const remainingMonths = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
     const cancellationDate = cancelAtDate.toISOString();
 
-    return { remainingPayments, cancelAt, cancellationDate, isFirstMonth };
+    return { remainingMonths, cancelAt, cancellationDate, isElegibleForCancellation };
   }
 }

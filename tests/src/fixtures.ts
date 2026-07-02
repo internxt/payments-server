@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import { Price, PriceAttributes } from '../../src/infrastructure/domain/entities/price';
 import { randomUUID } from 'node:crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
@@ -217,23 +216,6 @@ export const getPromoCode = (params?: DeepPartial<Stripe.PromotionCode>): Stripe
     expires_at: null,
     ...(params as any),
   };
-};
-
-export const getPriceEntity = (params?: Partial<PriceAttributes>): Price => {
-  const mockedStripePrice = getPrice();
-  return Price.toDomain({
-    id: mockedStripePrice.id,
-    productId: mockedStripePrice.product as string,
-    bytes: 1099511627776,
-    interval: 'year',
-    commitmentPlan: false,
-    recurring: true,
-    amount: mockedStripePrice.unit_amount as number,
-    currency: mockedStripePrice.currency,
-    decimalAmount: (mockedStripePrice.unit_amount as number) / 100,
-    type: UserType.Individual,
-    ...params,
-  });
 };
 
 export const priceById = ({
@@ -474,21 +456,16 @@ export function getSubscription({
     productId: `prod_${randomDataGenerator.string({ length: 8 })}`,
     userType,
     plan: {
-      simpleName: 'Essential',
       status: 'active',
-      planId: `price_${randomDataGenerator.string({ length: 12 })}`,
-      productId: `prod_${randomDataGenerator.string({ length: 10 })}`,
       name: 'Essential',
       type: userType,
       price: 119.88,
       monthlyPrice: 9.99,
       commitment: {
         enabled: false,
+        isCancellationTrialRedeemed: false,
       },
       currency: 'eur',
-      isTeam: false,
-      paymentInterval: '',
-      isLifetime: false,
       renewalPeriod: RenewalPeriod.Annually,
       storageLimit: 1099511627776,
       amountOfSeats: 1,

@@ -418,10 +418,10 @@ export class PaymentService {
     const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
     const price = await stripePaymentsAdapter.getPriceById(subscription.priceId);
     const hasAnnualCommitment = price.commitmentPlan;
-    const { isFirstMonth, cancelAt } = subscription.commitmentCancellationInfo;
+    const { isElegibleForCancellation, cancelAt } = subscription.commitmentCancellationInfo;
 
-    if (hasAnnualCommitment && !isFirstMonth) {
-      await this.provider.subscriptions.update(subscriptionId, {
+    if (hasAnnualCommitment && !isElegibleForCancellation) {
+      await stripePaymentsAdapter.updateSubscription(subscriptionId, {
         cancel_at: cancelAt,
       });
       return;
@@ -430,8 +430,11 @@ export class PaymentService {
     await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
-  async applyOneMonthTrial(customerId: string, subscriptionId: SubscriptionId): Promise<void> {
+  async applyCancellationTrial(customerId: string, subscriptionId: SubscriptionId): Promise<void> {
     const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+    if (!subscription.commitmentCancellationInfo.isElegibleForCancellation)
+      throw new BadRequestError('The trial cannot be applied.');
+
     const trialEnd = dayjs.unix(subscription.currentPeriodEnd).add(1, 'month').unix();
     await stripePaymentsAdapter.updateSubscription(subscriptionId, {
       trial_end: trialEnd,
@@ -842,9 +845,9 @@ export class PaymentService {
       commitment: {
         enabled: hasAnnualCommitment,
         isCancellationTrialRedeemed: customer.cancellationTrialRedeemed,
-        remainingMonths: commitment?.remainingPayments,
+        remainingMonths: commitment?.remainingMonths,
         cancellationDate: commitment?.cancellationDate,
-        isCancellable: commitment?.isFirstMonth,
+        isElegibleForCancellation: commitment?.isElegibleForCancellation,
       },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
