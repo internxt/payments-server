@@ -38,7 +38,14 @@ export const getCustomerEntity = (params?: Partial<CustomerEntityParams>): Custo
     ...params,
   };
 
-  return new Customer(attributes.id, attributes.name, attributes.email, attributes.address, attributes.phone);
+  return new Customer(
+    attributes.id,
+    attributes.name,
+    attributes.email,
+    attributes.address,
+    attributes.phone,
+    attributes.metadata,
+  );
 };
 
 export const getPriceEntity = (params?: Partial<PriceAttributes>): Price => {
