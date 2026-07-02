@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { BadRequestError } from '../../../errors/Errors';
 import { Address } from '../types';
-import { DEFAULT_CUSTOMER_NAME } from '../../../constants';
+import { CANCELLATION_TRIAL_REDEEMED_KEY, DEFAULT_CUSTOMER_NAME } from '../../../constants';
 
 export interface CreateCustomerParams {
   name: string;
@@ -25,6 +25,7 @@ export class Customer {
     public readonly email: string,
     public readonly address?: Address,
     public readonly phone?: string,
+    public readonly metadata?: Record<string, string>,
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
@@ -47,6 +48,7 @@ export class Customer {
         postalCode: stripeCustomer.address?.postal_code,
       },
       stripeCustomer.phone ?? undefined,
+      stripeCustomer.metadata,
     );
   }
 
@@ -60,5 +62,9 @@ export class Customer {
 
   getAddress(): Address | undefined {
     return this.address;
+  }
+
+  get cancellationTrialRedeemed(): boolean {
+    return this.metadata?.[CANCELLATION_TRIAL_REDEEMED_KEY] === 'true';
   }
 }

@@ -37,6 +37,9 @@ import {
 import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { CommitmentCancellationInfo } from '../infrastructure/domain/entities/subscription';
+import { Subscription as SubscriptionEntity } from '../infrastructure/domain/entities/subscription';
+import { CANCELLATION_TRIAL_REDEEMED_KEY } from '../constants';
 
 export class PaymentService {
   constructor(
@@ -414,17 +417,13 @@ export class PaymentService {
     return { maxSpaceBytes: parseInt(price.metadata.maxSpaceBytes), recurring: isRecurring };
   }
 
+  // !TODO: Move this into subscription entity and return a commitment object directly
   /**
    * Gets the annual commitment cancellation info
    * @param subscription - The subscription we want to get info for
    * @returns - The annual commitment cancellation info (remaining payments, amount per month, currency, cancel at)
    */
-  getAnnualCommitmentCancellationInfo(subscription: Stripe.Subscription): {
-    remainingPayments: number;
-    cancelAt: number;
-    cancellationDate: string;
-    isFirstMonth: boolean;
-  } {
+  getAnnualCommitmentCancellationInfo(subscription: SubscriptionEntity): CommitmentCancellationInfo {
     const createdAt = dayjs.unix(subscription.created);
     const now = dayjs();
 
@@ -435,20 +434,22 @@ export class PaymentService {
     const cancelAtDate = createdAt.add(periodsElapsed + 1, 'year');
     const cancelAt = cancelAtDate.unix();
 
-    const isFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
-    const remainingPayments = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
+    const isInFirstMonth = monthsElapsed === 0 && now.diff(createdAt, 'day') <= 30;
+
+    const isElegibleForCancellation = isInFirstMonth || (monthsElapsed === 1 && !!subscription.isTrialing);
+    const remainingMonths = monthsIntoPeriod === 0 ? 12 : 12 - monthsIntoPeriod;
     const cancellationDate = cancelAtDate.toISOString();
 
-    return { remainingPayments, cancelAt, cancellationDate, isFirstMonth };
+    return { remainingMonths, cancelAt, cancellationDate, isElegibleForCancellation };
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
-    const subscription = await this.getSubscriptionById(subscriptionId);
-    const item = subscription.items.data[0];
-    const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
-    const { isFirstMonth, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
+    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+    const price = await stripePaymentsAdapter.getPriceById(subscription.priceId);
+    const hasAnnualCommitment = price.isCommitmentPlan();
+    const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
 
-    if (hasAnnualCommitment && !isFirstMonth) {
+    if (hasAnnualCommitment && !isElegibleForCancellation) {
       await this.provider.subscriptions.update(subscriptionId, {
         cancel_at: cancelAt,
       });
@@ -456,6 +457,24 @@ export class PaymentService {
     }
 
     await this.provider.subscriptions.cancel(subscriptionId, {});
+  }
+
+  async applyCancellationTrial(customerId: string, subscriptionId: SubscriptionId): Promise<void> {
+    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+    const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
+    if (!isElegibleForCancellation) throw new BadRequestError('The trial cannot be applied.');
+
+    const trialEnd = dayjs.unix(subscription.currentPeriodEnd).add(1, 'month').unix();
+    await stripePaymentsAdapter.updateSubscription(subscriptionId, {
+      trial_end: trialEnd,
+      proration_behavior: 'none',
+    });
+
+    await stripePaymentsAdapter.updateCustomer(customerId, {
+      metadata: {
+        [CANCELLATION_TRIAL_REDEEMED_KEY]: 'true',
+      },
+    });
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
@@ -844,7 +863,18 @@ export class PaymentService {
       ) || 0;
     const item = subscription.items.data[0] as Stripe.SubscriptionItem;
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
-    const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscription) : null;
+    const subscriptionEntity = SubscriptionEntity.toDomain({
+      active: subscription.active,
+      currentPeriodEnd: subscription.current_period_end,
+      customer: subscription.customer as string,
+      id: subscription.id,
+      metadata: subscription.metadata,
+      priceId: subscription.items.data[0].price.id,
+      created: subscription.created,
+      trialEnd: subscription.trial_end ?? undefined,
+      trialing: subscription.status === 'trialing',
+    });
+    const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
 
     const plan: PlanSubscription = {
       status: subscription.status,
@@ -869,9 +899,9 @@ export class PaymentService {
       ),
       commitment: {
         enabled: hasAnnualCommitment,
-        remainingMonths: commitment?.remainingPayments,
+        remainingMonths: commitment?.remainingMonths,
         cancellationDate: commitment?.cancellationDate,
-        isFirstMonth: commitment?.isFirstMonth,
+        isElegibleForCancellation: commitment?.isElegibleForCancellation,
       },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
