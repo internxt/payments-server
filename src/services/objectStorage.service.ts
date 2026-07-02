@@ -1,14 +1,7 @@
 import { PaymentService } from './payment.service';
-import { sign } from 'jsonwebtoken';
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { type AppConfig } from '../config';
-
-function signToken(duration: string, secret: string) {
-  return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
-    algorithm: 'RS256',
-    expiresIn: duration,
-  });
-}
+import { signGatewayToken } from '../utils/signGatewayToken';
 
 export class ObjectStorageService {
   constructor(
@@ -24,7 +17,7 @@ export class ObjectStorageService {
   }
 
   async reactivateAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +29,7 @@ export class ObjectStorageService {
   }
 
   async suspendAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -48,7 +41,7 @@ export class ObjectStorageService {
   }
 
   private async createUser(email: string, customerId: string): Promise<void> {
-    const jwt = signToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',

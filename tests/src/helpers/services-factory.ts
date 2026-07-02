@@ -6,6 +6,7 @@ import { UsersService } from '../../../src/services/users.service';
 import { StorageService } from '../../../src/services/storage.service';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
+import { MailService } from '../../../src/services/mail.service';
 import { ProductsService } from '../../../src/services/products.service';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 import CacheService from '../../../src/services/cache.service';
@@ -35,6 +36,7 @@ export interface TestServices {
   storageService: StorageService;
   bit2MeService: Bit2MeService;
   objectStorageService: ObjectStorageService;
+  mailService: MailService;
   productsService: ProductsService;
   licenseCodesService: LicenseCodesService;
   cacheService: CacheService;
@@ -90,11 +92,13 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     axios,
   );
   const cacheService = new CacheService(config);
+  const mailService = new MailService(config, axios);
   const tiersService = new TiersService(
     usersService,
     repositories.tiersRepository,
     repositories.usersTiersRepository,
     storageService,
+    mailService,
   );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
@@ -129,6 +133,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     storageService,
     bit2MeService,
     objectStorageService,
+    mailService,
     productsService,
     licenseCodesService,
     cacheService,

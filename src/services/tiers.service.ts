@@ -2,6 +2,7 @@ import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { User } from '../core/users/User';
 import { UsersService } from './users.service';
 import { StorageService } from './storage.service';
+import { MailService } from './mail.service';
 import { Service, Tier } from '../core/users/Tier';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { FastifyBaseLogger } from 'fastify';
@@ -38,6 +39,7 @@ export class TiersService {
     private readonly tiersRepository: TiersRepository,
     private readonly usersTiersRepository: UsersTiersRepository,
     private readonly storageService: StorageService,
+    private readonly mailService: MailService,
   ) {}
 
   async insertTierToUser(userId: User['id'], newTierId: Tier['id']): Promise<void> {
@@ -120,6 +122,9 @@ export class TiersService {
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
           break;
+        case Service.Mail:
+          await this.removeMailFeatures(userUuid);
+          break;
         default:
           // TODO;
           break;
@@ -189,5 +194,17 @@ export class TiersService {
     const { featureId } = vpnFeature;
 
     await this.usersService.disableVPNTier(userUuid, featureId);
+  }
+
+  async applyMailFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {
+    const { enabled } = tier.featuresPerService[Service.Mail];
+
+    if (enabled) {
+      await this.mailService.reactivateAccount(userWithEmail.uuid);
+    }
+  }
+
+  async removeMailFeatures(userUuid: User['uuid']): Promise<void> {
+    await this.mailService.suspendAccount(userUuid);
   }
 }
