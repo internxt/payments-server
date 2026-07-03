@@ -12,7 +12,7 @@ import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
-import { BadRequestError } from '../errors/Errors';
+import dayjs from 'dayjs';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -62,15 +62,24 @@ export class UsersService {
   }
 
   async redeemCancellationTrial(customerId: User['customerId']): Promise<void> {
-    const redeemedCancellationTrial = await this.usersRepository.redeemCancellationTrial(customerId);
+    const updated = await this.usersRepository.updateUser(customerId, {
+      details: {
+        cancellationTrial: {
+          redeemed: true,
+          redeemedAt: dayjs().toDate(),
+        },
+      },
+    });
 
-    if (!redeemedCancellationTrial) {
-      throw new BadRequestError(`Cancellation trial for customer id ${customerId} has not been applied`);
+    if (!updated) {
+      throw new UserNotFoundError();
     }
   }
 
   async hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean> {
-    return this.usersRepository.hasRedeemedCancellationTrial(customerId);
+    const user = await this.findUserByCustomerID(customerId);
+
+    return user.details?.cancellationTrial?.redeemed ?? false;
   }
 
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {

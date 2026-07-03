@@ -1,8 +1,7 @@
 import { Collection, MongoClient, ObjectId } from 'mongodb';
-import { User, UserDetails } from './User';
+import { User } from './User';
 
 import { UsersRepository } from './UsersRepository';
-import dayjs from 'dayjs';
 
 interface MongoUser extends Omit<User, 'customerId' | 'id'> {
   _id: ObjectId;
@@ -16,8 +15,17 @@ export class MongoDBUsersRepository implements UsersRepository {
     this.collection = mongo.db('payments').collection<MongoUser>('users');
   }
 
-  async updateUser(customerId: string, body: Pick<User, 'lifetime'>): Promise<boolean> {
-    const result = await this.collection.updateOne({ customer_id: customerId }, { $set: body });
+  async updateUser(customerId: string, body: Partial<Pick<User, 'lifetime' | 'details'>>): Promise<boolean> {
+    const { details, ...rest } = body;
+
+    const set: Record<string, unknown> = { ...rest };
+    if (details) {
+      for (const [key, value] of Object.entries(details)) {
+        set[`details.${key}`] = value;
+      }
+    }
+
+    const result = await this.collection.updateOne({ customer_id: customerId }, { $set: set });
     return result.matchedCount === 1;
   }
 
@@ -43,39 +51,6 @@ export class MongoDBUsersRepository implements UsersRepository {
 
   async insertUser(user: Omit<User, 'id'>): Promise<void> {
     await this.collection.insertOne(this.userToMongoUser(user) as MongoUser);
-  }
-
-  async redeemCancellationTrial(customerId: User['customerId']): Promise<boolean> {
-    const cancellationTrialKey: keyof UserDetails = 'cancellationTrial';
-    const cancellationTrial: UserDetails['cancellationTrial'] = {
-      redeemed: true,
-      redeemedAt: dayjs().toDate(),
-    };
-
-    return this.updateUserDetails(customerId, cancellationTrialKey, cancellationTrial);
-  }
-
-  async hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean> {
-    const user = await this.getUserDetails(customerId);
-    return user?.cancellationTrial?.redeemed ?? false;
-  }
-
-  private async updateUserDetails(
-    customerId: User['customerId'],
-    detailsKey: keyof UserDetails,
-    details: UserDetails[keyof UserDetails],
-  ): Promise<boolean> {
-    const result = await this.collection.updateOne(
-      { customer_id: customerId },
-      { $set: { [`details.${detailsKey}`]: details } },
-    );
-
-    return result.matchedCount === 1;
-  }
-
-  private async getUserDetails(customerId: User['customerId']): Promise<UserDetails> {
-    const user = await this.collection.findOne({ customer_id: customerId });
-    return user?.details ?? {};
   }
 
   private mongoUserToUser(mongoUser: MongoUser): User {

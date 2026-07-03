@@ -26,38 +26,38 @@ describe('User Repository', () => {
     await collection.deleteMany({});
   });
 
-  describe('Redeem cancellation trial', () => {
-    test('When the user redeems the cancellation trial, the correct values are inserted in the user document', async () => {
+  describe('Update user', () => {
+    test('When a top-level field is updated, then it is persisted', async () => {
+      const mockedUser = getUser({ lifetime: false });
+      await repository.insertUser(mockedUser);
+
+      const updated = await repository.updateUser(mockedUser.customerId, { lifetime: true });
+
+      const user = await repository.findUserByCustomerId(mockedUser.customerId);
+      expect(updated).toBeTruthy();
+      expect(user?.lifetime).toBeTruthy();
+    });
+
+    test('When a details field is updated, then it is persisted', async () => {
       const mockedUser = getUser();
       await repository.insertUser(mockedUser);
-      await repository.redeemCancellationTrial(mockedUser.customerId);
+      const redeemedAt = new Date();
+
+      const updated = await repository.updateUser(mockedUser.customerId, {
+        details: { cancellationTrial: { redeemed: true, redeemedAt } },
+      });
 
       const user = await repository.findUserByCustomerId(mockedUser.customerId);
       const cancellationTrial = user?.details?.cancellationTrial;
-
+      expect(updated).toBeTruthy();
       expect(cancellationTrial?.redeemed).toBeTruthy();
       expect(cancellationTrial?.redeemedAt).toBeInstanceOf(Date);
     });
-  });
 
-  describe('User has redeemed cancellation trial', () => {
-    test('When the user has redeemed the cancellation trial, then it is indicated', async () => {
-      const mockedUser = getUser();
-      await repository.insertUser(mockedUser);
-      await repository.redeemCancellationTrial(mockedUser.customerId);
+    test('When no user matches the customer id, then it returns false', async () => {
+      const updated = await repository.updateUser('cus_nonexistent', { lifetime: true });
 
-      const hasRedeemedCancellationTrial = await repository.hasRedeemedCancellationTrial(mockedUser.customerId);
-
-      expect(hasRedeemedCancellationTrial).toBeTruthy();
-    });
-
-    test('When the user has not redeemed the cancellation trial, then it is indicated', async () => {
-      const mockedUser = getUser();
-      await repository.insertUser(mockedUser);
-
-      const hasRedeemedCancellationTrial = await repository.hasRedeemedCancellationTrial(mockedUser.customerId);
-
-      expect(hasRedeemedCancellationTrial).toBeFalsy();
+      expect(updated).toBeFalsy();
     });
   });
 });

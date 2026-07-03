@@ -9,7 +9,6 @@ import { createTestServices } from '../helpers/services-factory';
 import { Service } from '../../../src/core/users/Tier';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../src/errors/UsersErrors';
-import { BadRequestError } from '../../../src/errors/Errors';
 
 jest.mock('jsonwebtoken', () => ({
   ...jest.requireActual('jsonwebtoken'),
@@ -382,26 +381,39 @@ describe('UsersService tests', () => {
   describe('Redeem cancellation flow', () => {
     test('When the user redeems the cancellation flow, then the cancellation object is added to the user document', async () => {
       const mockedUser = getUser();
-      jest.spyOn(usersRepository, 'redeemCancellationTrial').mockResolvedValue(true);
+      const updateUserSpy = jest.spyOn(usersRepository, 'updateUser').mockResolvedValue(true);
 
       await usersService.redeemCancellationTrial(mockedUser.customerId);
 
-      expect(usersRepository.redeemCancellationTrial).toHaveBeenCalledTimes(1);
-      expect(usersRepository.redeemCancellationTrial).toHaveBeenCalledWith(mockedUser.customerId);
+      expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        details: {
+          cancellationTrial: {
+            redeemed: true,
+            redeemedAt: expect.any(Date),
+          },
+        },
+      });
     });
 
     test('When there is a problem while redeeming the cancellation flow, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
-      jest.spyOn(usersRepository, 'redeemCancellationTrial').mockResolvedValue(false);
+      jest.spyOn(usersRepository, 'updateUser').mockResolvedValue(false);
 
-      await expect(usersService.redeemCancellationTrial(mockedUser.customerId)).rejects.toThrow(BadRequestError);
+      await expect(usersService.redeemCancellationTrial(mockedUser.customerId)).rejects.toThrow(UserNotFoundError);
     });
   });
 
   describe('Has Redeemed Cancellation Trial', () => {
     test('When the user has redeemed the cancellation flow, then it is indicated', async () => {
-      const mockedUser = getUser();
-      jest.spyOn(usersRepository, 'hasRedeemedCancellationTrial').mockResolvedValue(true);
+      const mockedUser = getUser({
+        details: {
+          cancellationTrial: {
+            redeemed: true,
+            redeemedAt: new Date(),
+          },
+        },
+      });
+      jest.spyOn(usersRepository, 'findUserByCustomerId').mockResolvedValue(mockedUser);
 
       const result = await usersService.hasRedeemedCancellationTrial(mockedUser.customerId);
 
@@ -409,8 +421,15 @@ describe('UsersService tests', () => {
     });
 
     test('When the user has not redeemed the cancellation flow, then it is indicated', async () => {
-      const mockedUser = getUser();
-      jest.spyOn(usersRepository, 'hasRedeemedCancellationTrial').mockResolvedValue(false);
+      const mockedUser = getUser({
+        details: {
+          cancellationTrial: {
+            redeemed: false,
+            redeemedAt: new Date(),
+          },
+        },
+      });
+      jest.spyOn(usersRepository, 'findUserByCustomerId').mockResolvedValue(mockedUser);
 
       const result = await usersService.hasRedeemedCancellationTrial(mockedUser.customerId);
 

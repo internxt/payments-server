@@ -14,8 +14,6 @@ const getUsersRepositoryForTest = (): UsersRepository => {
     findUserByUuid: jest.fn(),
     insertUser: jest.fn(),
     updateUser: jest.fn().mockResolvedValue(true),
-    hasRedeemedCancellationTrial: jest.fn(),
-    redeemCancellationTrial: jest.fn(),
   };
 
   return usersRepositoryMock;
