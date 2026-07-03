@@ -12,6 +12,7 @@ import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
+import { BadRequestError } from '../errors/Errors';
 
 function signToken(duration: string, secret: string) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
@@ -61,7 +62,11 @@ export class UsersService {
   }
 
   async redeemCancellationTrial(customerId: User['customerId']): Promise<void> {
-    await this.usersRepository.redeemCancellationTrial(customerId);
+    const redeemedCancellationTrial = await this.usersRepository.redeemCancellationTrial(customerId);
+
+    if (!redeemedCancellationTrial) {
+      throw new BadRequestError(`Cancellation trial for customer id ${customerId} has not been applied`);
+    }
   }
 
   async hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean> {

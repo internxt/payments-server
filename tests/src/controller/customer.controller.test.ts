@@ -172,6 +172,7 @@ describe('Customer controller', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(false);
       jest.spyOn(PaymentService.prototype, 'applyCancellationTrial').mockResolvedValue();
+      const redeemSpy = jest.spyOn(UsersService.prototype, 'redeemCancellationTrial').mockResolvedValue();
 
       const response = await app.inject({
         path: `/customer/cancellation-trial`,
@@ -185,6 +186,7 @@ describe('Customer controller', () => {
       });
 
       expect(response.statusCode).toBe(204);
+      expect(redeemSpy).toHaveBeenCalledWith(mockedUser.customerId);
     });
   });
 });

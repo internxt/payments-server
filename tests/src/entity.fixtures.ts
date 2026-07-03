@@ -34,7 +34,7 @@ export const getCustomerEntity = (params?: Partial<CustomerEntityParams>): Custo
     email: randomGenerator.email(),
     address: getAddress(),
     phone: randomGenerator.phone(),
-    metadata: { cancellation_trial_redeemed: randomGenerator.bool().toString() },
+    metadata: {},
     ...params,
   };
 

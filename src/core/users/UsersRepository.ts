@@ -5,6 +5,6 @@ export interface UsersRepository {
   findUserByUuid(uuid: User['uuid']): Promise<User | null>;
   insertUser(user: Omit<User, 'id'>): Promise<void>;
   updateUser(customerId: User['customerId'], body: Pick<User, 'lifetime'>): Promise<boolean>;
-  redeemCancellationTrial(customerId: User['customerId']): Promise<void>;
+  redeemCancellationTrial(customerId: User['customerId']): Promise<boolean>;
   hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean>;
 }

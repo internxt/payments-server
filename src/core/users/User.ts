@@ -1,10 +1,18 @@
 import { PlanSubscription } from '../../types/subscription';
 
+export interface UserDetails {
+  cancellationTrial?: {
+    redeemed: boolean;
+    redeemedAt: Date;
+  };
+}
+
 export interface User {
   id: string;
   customerId: string;
   uuid: string;
   lifetime?: boolean;
+  details?: UserDetails;
 }
 
 export enum UserType {

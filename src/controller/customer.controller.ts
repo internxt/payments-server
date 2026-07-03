@@ -116,7 +116,7 @@ export function customerController(
           throw new CancellationTrialAlreadyRedeemedError();
         }
 
-        await paymentService.applyCancellationTrial(user.customerId, subscriptionId);
+        await paymentService.applyCancellationTrial(subscriptionId);
 
         await usersService.redeemCancellationTrial(user.customerId);
 

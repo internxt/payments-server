@@ -460,7 +460,7 @@ export class PaymentService {
     await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
-  async applyCancellationTrial(customerId: string, subscriptionId: SubscriptionId): Promise<void> {
+  async applyCancellationTrial(subscriptionId: SubscriptionId): Promise<void> {
     const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
     const { isElegibleForCancellation } = this.getAnnualCommitmentCancellationInfo(subscription);
     if (!isElegibleForCancellation) throw new BadRequestError('The trial cannot be applied.');
