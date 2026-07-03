@@ -37,8 +37,10 @@ import {
 import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { CommitmentCancellationInfo } from '../infrastructure/domain/entities/subscription';
-import { Subscription as SubscriptionEntity } from '../infrastructure/domain/entities/subscription';
+import {
+  CommitmentCancellationInfo,
+  Subscription as SubscriptionEntity,
+} from '../infrastructure/domain/entities/subscription';
 import { CANCELLATION_TRIAL_REDEEMED_KEY } from '../constants';
 
 export class PaymentService {
@@ -461,7 +463,7 @@ export class PaymentService {
 
   async applyCancellationTrial(customerId: string, subscriptionId: SubscriptionId): Promise<void> {
     const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
-    const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
+    const { isElegibleForCancellation } = this.getAnnualCommitmentCancellationInfo(subscription);
     if (!isElegibleForCancellation) throw new BadRequestError('The trial cannot be applied.');
 
     const trialEnd = dayjs.unix(subscription.currentPeriodEnd).add(1, 'month').unix();
