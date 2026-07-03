@@ -70,12 +70,11 @@ export const getSubscriptionEntity = (params?: Partial<SubscriptionAttributes>):
   return Subscription.toDomain({
     id: `sub_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     customer: `cus_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
-    active: randomGenerator.bool(),
     metadata: {},
     created: randomGenerator.integer({ min: 1600000000, max: 1700000000 }),
     priceId: `price_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     currentPeriodEnd: randomGenerator.integer({ min: 1700000000, max: 1800000000 }),
-    trialing: randomGenerator.bool(),
+    status: randomGenerator.pickone(['active', 'trialing', 'past_due', 'canceled']),
     trialEnd: randomGenerator.integer({ min: 1700000000, max: 1800000000 }),
     ...params,
   });

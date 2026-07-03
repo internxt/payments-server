@@ -408,9 +408,8 @@ describe('Stripe Adapter', () => {
         Subscription.toDomain({
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
-          active: true,
+          status: stripeSubscription.status,
           priceId: stripeSubscription.items.data[0].price.id,
-          trialing: false,
           currentPeriodEnd: stripeSubscription.current_period_end,
           metadata: stripeSubscription.metadata,
           created: stripeSubscription.created,
@@ -426,8 +425,7 @@ describe('Stripe Adapter', () => {
 
       const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, {});
 
-      expect(subscription.active).toBe(false);
-      expect(subscription.trialing).toBe(true);
+      expect(subscription.isTrialing).toBeTruthy();
       expect(subscription.trialEnd).toBe(trialEnd);
     });
   });
@@ -447,8 +445,7 @@ describe('Stripe Adapter', () => {
         Subscription.toDomain({
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
-          active: true,
-          trialing: false,
+          status: stripeSubscription.status,
           currentPeriodEnd: stripeSubscription.current_period_end,
           priceId: stripeSubscription.items.data[0].price.id,
           created: stripeSubscription.created,
@@ -466,8 +463,7 @@ describe('Stripe Adapter', () => {
 
       const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
 
-      expect(subscription.active).toBe(false);
-      expect(subscription.trialing).toBe(true);
+      expect(subscription.isTrialing).toBeTruthy();
       expect(subscription.trialEnd).toBe(trialEnd);
     });
   });

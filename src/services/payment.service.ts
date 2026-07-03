@@ -864,15 +864,14 @@ export class PaymentService {
     const item = subscription.items.data[0] as Stripe.SubscriptionItem;
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
     const subscriptionEntity = SubscriptionEntity.toDomain({
-      active: subscription.active,
       currentPeriodEnd: subscription.current_period_end,
       customer: subscription.customer as string,
       id: subscription.id,
+      status: subscription.status,
       metadata: subscription.metadata,
       priceId: subscription.items.data[0].price.id,
       created: subscription.created,
       trialEnd: subscription.trial_end ?? undefined,
-      trialing: subscription.status === 'trialing',
     });
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
 

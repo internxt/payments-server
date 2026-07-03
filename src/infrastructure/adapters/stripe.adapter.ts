@@ -117,9 +117,8 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
-      active: subscription.status === 'active',
+      status: subscription.status,
       priceId: subscription.items.data[0].price.id,
-      trialing: subscription.status === 'trialing',
       currentPeriodEnd: subscription.current_period_end,
       metadata: subscription.metadata,
       created: subscription.created,
@@ -135,8 +134,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
-      active: subscription.status === 'active',
-      trialing: subscription.status === 'trialing',
+      status: subscription.status,
       currentPeriodEnd: subscription.current_period_end,
       priceId: subscription.items.data[0].price.id,
       created: subscription.created,

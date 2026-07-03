@@ -1,12 +1,14 @@
+export type SubscriptionStatus =
+  'incomplete' | 'incomplete_expired' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'paused';
+
 export interface SubscriptionAttributes {
   id: string;
   customer: string;
-  active: boolean;
+  status: SubscriptionStatus;
   metadata: Record<string, unknown>;
   created: number;
   priceId: string;
   currentPeriodEnd: number;
-  trialing?: boolean;
   trialEnd?: number;
 }
 
@@ -20,33 +22,30 @@ export interface CommitmentCancellationInfo {
 export class Subscription implements SubscriptionAttributes {
   id: string;
   customer: string;
-  active: boolean;
+  status: SubscriptionStatus;
   metadata: Record<string, unknown>;
   created: number;
   priceId: string;
   currentPeriodEnd: number;
-  trialing?: boolean;
   trialEnd?: number;
 
   constructor({
     id,
     customer,
-    active,
     metadata,
+    status,
     created,
     priceId,
     currentPeriodEnd,
-    trialing,
     trialEnd,
   }: SubscriptionAttributes) {
     this.id = id;
     this.customer = customer;
-    this.active = active;
+    this.status = status;
     this.metadata = metadata;
     this.created = created;
     this.priceId = priceId;
     this.currentPeriodEnd = currentPeriodEnd;
-    this.trialing = trialing;
     this.trialEnd = trialEnd;
   }
 
@@ -55,10 +54,10 @@ export class Subscription implements SubscriptionAttributes {
   }
 
   get isActive(): boolean {
-    return this.active;
+    return this.status === 'active';
   }
 
   get isTrialing(): boolean {
-    return this.trialing ?? false;
+    return this.status === 'trialing';
   }
 }
