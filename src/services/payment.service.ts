@@ -829,7 +829,11 @@ export class PaymentService {
     );
   }
 
-  async getUserSubscription(customerId: CustomerId, userType?: UserType): Promise<UserSubscription> {
+  async getUserSubscription(
+    customerId: CustomerId,
+    userType?: UserType,
+    hasRedeemedCancellationTrial?: boolean,
+  ): Promise<UserSubscription> {
     let subscription: any;
     try {
       if (userType === UserType.ObjectStorage) {
@@ -896,6 +900,9 @@ export class PaymentService {
         remainingMonths: commitment?.remainingMonths,
         cancellationDate: commitment?.cancellationDate,
         isElegibleForCancellation: commitment?.isElegibleForCancellation,
+      },
+      cancellationTrial: {
+        redeemed: hasRedeemedCancellationTrial ?? false,
       },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,

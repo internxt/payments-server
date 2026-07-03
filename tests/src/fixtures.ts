@@ -485,6 +485,9 @@ export function getSubscription({
       commitment: {
         enabled: false,
       },
+      cancellationTrial: {
+        redeemed: false,
+      },
       currency: 'eur',
       isTeam: false,
       paymentInterval: '',

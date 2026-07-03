@@ -30,6 +30,9 @@ export interface PlanSubscription {
   };
   storageLimit: number;
   amountOfSeats: number;
+  cancellationTrial: {
+    redeemed: boolean;
+  };
   seats?: {
     minimumSeats: number;
     maximumSeats: number;
