@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { BadRequestError } from '../../../errors/Errors';
 import { Address } from '../types';
-import { CANCELLATION_TRIAL_REDEEMED_KEY, DEFAULT_CUSTOMER_NAME } from '../../../constants';
+import { DEFAULT_CUSTOMER_NAME } from '../../../constants';
 
 export interface CreateCustomerParams {
   name: string;
@@ -62,9 +62,5 @@ export class Customer {
 
   getAddress(): Address | undefined {
     return this.address;
-  }
-
-  get cancellationTrialRedeemed(): boolean {
-    return this.metadata?.[CANCELLATION_TRIAL_REDEEMED_KEY] === 'true';
   }
 }

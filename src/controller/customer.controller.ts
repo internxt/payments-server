@@ -6,7 +6,6 @@ import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
 
 export function customerController(
@@ -111,13 +110,15 @@ export function customerController(
         const { subscriptionId } = req.body;
         const user = await usersService.findUserByUuid(uuid);
 
-        const customer = await stripePaymentsAdapter.getCustomer(user.customerId);
+        const hasRedeemedCancellationTrial = await usersService.hasRedeemedCancellationTrial(user.customerId);
 
-        if (customer.cancellationTrialRedeemed) {
+        if (hasRedeemedCancellationTrial) {
           throw new CancellationTrialAlreadyRedeemedError();
         }
 
         await paymentService.applyCancellationTrial(user.customerId, subscriptionId);
+
+        await usersService.redeemCancellationTrial(user.customerId);
 
         return res.status(204).send();
       },

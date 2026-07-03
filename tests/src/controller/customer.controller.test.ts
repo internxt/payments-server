@@ -4,8 +4,6 @@ import { getCoupon, getPromoCode, getUser, getValidAuthToken } from '../fixtures
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import CacheService from '../../../src/services/cache.service';
-import { getCustomerEntity } from '../entity.fixtures';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 
 let app: FastifyInstance;
@@ -151,9 +149,8 @@ describe('Customer controller', () => {
     test('When the customer already redeemed the cancellation trial, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedToken = getValidAuthToken(mockedUser.uuid);
-      const mockedCustomerEntity = getCustomerEntity({ metadata: { cancellation_trial_redeemed: 'true' } });
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(mockedCustomerEntity);
+      jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(true);
 
       const response = await app.inject({
         path: `/customer/cancellation-trial`,
@@ -172,9 +169,8 @@ describe('Customer controller', () => {
     test('When the customer is elegible, then the cancellation trial is applied', async () => {
       const mockedUser = getUser();
       const mockedToken = getValidAuthToken(mockedUser.uuid);
-      const mockedCustomerEntity = getCustomerEntity({ metadata: { cancellation_trial_redeemed: 'false' } });
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(mockedCustomerEntity);
+      jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(false);
       jest.spyOn(PaymentService.prototype, 'applyCancellationTrial').mockResolvedValue();
 
       const response = await app.inject({

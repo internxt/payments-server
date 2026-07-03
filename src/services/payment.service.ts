@@ -41,7 +41,6 @@ import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
 } from '../infrastructure/domain/entities/subscription';
-import { CANCELLATION_TRIAL_REDEEMED_KEY } from '../constants';
 
 export class PaymentService {
   constructor(
@@ -470,12 +469,6 @@ export class PaymentService {
     await stripePaymentsAdapter.updateSubscription(subscriptionId, {
       trial_end: trialEnd,
       proration_behavior: 'none',
-    });
-
-    await stripePaymentsAdapter.updateCustomer(customerId, {
-      metadata: {
-        [CANCELLATION_TRIAL_REDEEMED_KEY]: 'true',
-      },
     });
   }
 

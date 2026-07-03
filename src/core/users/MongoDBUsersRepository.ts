@@ -2,10 +2,15 @@ import { Collection, MongoClient, ObjectId } from 'mongodb';
 import { User } from './User';
 
 import { UsersRepository } from './UsersRepository';
+import dayjs from 'dayjs';
 
 interface MongoUser extends Omit<User, 'customerId' | 'id'> {
   _id: ObjectId;
   customer_id: string;
+  cancellation_trial?: {
+    redeemed: boolean;
+    redeemed_at: Date;
+  };
 }
 
 export class MongoDBUsersRepository implements UsersRepository {
@@ -42,6 +47,28 @@ export class MongoDBUsersRepository implements UsersRepository {
 
   async insertUser(user: Omit<User, 'id'>): Promise<void> {
     await this.collection.insertOne(this.userToMongoUser(user) as MongoUser);
+  }
+
+  async redeemCancellationTrial(customerId: User['customerId']): Promise<void> {
+    const cancellationTrialObject = {
+      cancellation_trial: {
+        redeemed: true,
+        redeemed_at: dayjs().toDate(),
+      },
+    };
+    await this.collection.updateOne(
+      { customer_id: customerId },
+      {
+        $set: {
+          ...cancellationTrialObject,
+        },
+      },
+    );
+  }
+
+  async hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean> {
+    const user = await this.collection.findOne({ customer_id: customerId });
+    return user?.cancellation_trial?.redeemed ?? false;
   }
 
   private mongoUserToUser(mongoUser: MongoUser): User {

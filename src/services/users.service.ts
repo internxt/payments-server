@@ -60,6 +60,14 @@ export class UsersService {
     return userFound;
   }
 
+  async redeemCancellationTrial(customerId: User['customerId']): Promise<void> {
+    await this.usersRepository.redeemCancellationTrial(customerId);
+  }
+
+  async hasRedeemedCancellationTrial(customerId: User['customerId']): Promise<boolean> {
+    return this.usersRepository.hasRedeemedCancellationTrial(customerId);
+  }
+
   async cancelUserIndividualSubscriptions(customerId: User['customerId']): Promise<void> {
     const activeSubscriptions = await this.paymentService.getActiveSubscriptions(customerId);
 
