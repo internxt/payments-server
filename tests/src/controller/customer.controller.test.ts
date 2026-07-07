@@ -4,6 +4,7 @@ import { getCoupon, getPromoCode, getUser, getValidAuthToken } from '../fixtures
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import CacheService from '../../../src/services/cache.service';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 
 let app: FastifyInstance;
 
@@ -121,6 +122,71 @@ describe('Customer controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual({ usedCoupons: [] });
+    });
+  });
+
+  describe('Applying Cancellation Trial', () => {
+    test('When the user does not exists, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
+      const userNotFoundError = new UserNotFoundError();
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
+
+      const response = await app.inject({
+        path: `/customer/cancellation-trial`,
+        method: 'POST',
+        body: {
+          subscriptionId: 'subscription-id',
+        },
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    test('When the customer already redeemed the cancellation trial, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(true);
+
+      const response = await app.inject({
+        path: `/customer/cancellation-trial`,
+        method: 'POST',
+        body: {
+          subscriptionId: 'subscription-id',
+        },
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    test('When the customer is elegible, then the cancellation trial is applied', async () => {
+      const mockedUser = getUser();
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(false);
+      jest.spyOn(PaymentService.prototype, 'applyCancellationTrial').mockResolvedValue();
+      const redeemSpy = jest.spyOn(UsersService.prototype, 'redeemCancellationTrial').mockResolvedValue();
+
+      const response = await app.inject({
+        path: `/customer/cancellation-trial`,
+        method: 'POST',
+        body: {
+          subscriptionId: 'subscription-id',
+        },
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(redeemSpy).toHaveBeenCalledWith(mockedUser.customerId);
     });
   });
 });

@@ -377,4 +377,63 @@ describe('UsersService tests', () => {
       );
     });
   });
+
+  describe('Redeem cancellation flow', () => {
+    test('When the user redeems the cancellation flow, then the cancellation object is added to the user document', async () => {
+      const mockedUser = getUser();
+      const updateUserSpy = jest.spyOn(usersRepository, 'updateUser').mockResolvedValue(true);
+
+      await usersService.redeemCancellationTrial(mockedUser.customerId);
+
+      expect(updateUserSpy).toHaveBeenCalledWith(mockedUser.customerId, {
+        details: {
+          cancellationTrial: {
+            redeemed: true,
+            redeemedAt: expect.any(Date),
+          },
+        },
+      });
+    });
+
+    test('When there is a problem while redeeming the cancellation flow, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      jest.spyOn(usersRepository, 'updateUser').mockResolvedValue(false);
+
+      await expect(usersService.redeemCancellationTrial(mockedUser.customerId)).rejects.toThrow(UserNotFoundError);
+    });
+  });
+
+  describe('Has Redeemed Cancellation Trial', () => {
+    test('When the user has redeemed the cancellation flow, then it is indicated', async () => {
+      const mockedUser = getUser({
+        details: {
+          cancellationTrial: {
+            redeemed: true,
+            redeemedAt: new Date(),
+          },
+        },
+      });
+      jest.spyOn(usersRepository, 'findUserByCustomerId').mockResolvedValue(mockedUser);
+
+      const result = await usersService.hasRedeemedCancellationTrial(mockedUser.customerId);
+
+      expect(result).toBeTruthy();
+    });
+
+    test('When the user has not redeemed the cancellation flow, then it is indicated', async () => {
+      const mockedUser = getUser({
+        details: {
+          cancellationTrial: {
+            redeemed: false,
+            redeemedAt: new Date(),
+          },
+        },
+      });
+      jest.spyOn(usersRepository, 'findUserByCustomerId').mockResolvedValue(mockedUser);
+
+      const result = await usersService.hasRedeemedCancellationTrial(mockedUser.customerId);
+
+      expect(result).toBeFalsy();
+    });
+  });
 });

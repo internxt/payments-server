@@ -25,6 +25,7 @@ export class Customer {
     public readonly email: string,
     public readonly address?: Address,
     public readonly phone?: string,
+    public readonly metadata?: Record<string, string>,
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
@@ -47,6 +48,7 @@ export class Customer {
         postalCode: stripeCustomer.address?.postal_code,
       },
       stripeCustomer.phone ?? undefined,
+      stripeCustomer.metadata,
     );
   }
 

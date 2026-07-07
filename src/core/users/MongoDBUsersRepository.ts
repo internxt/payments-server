@@ -15,8 +15,17 @@ export class MongoDBUsersRepository implements UsersRepository {
     this.collection = mongo.db('payments').collection<MongoUser>('users');
   }
 
-  async updateUser(customerId: string, body: Pick<User, 'lifetime'>): Promise<boolean> {
-    const result = await this.collection.updateOne({ customer_id: customerId }, { $set: body });
+  async updateUser(customerId: string, body: Partial<Pick<User, 'lifetime' | 'details'>>): Promise<boolean> {
+    const { details, ...rest } = body;
+
+    const set: Record<string, unknown> = { ...rest };
+    if (details) {
+      for (const [key, value] of Object.entries(details)) {
+        set[`details.${key}`] = value;
+      }
+    }
+
+    const result = await this.collection.updateOne({ customer_id: customerId }, { $set: set });
     return result.matchedCount === 1;
   }
 
@@ -45,9 +54,9 @@ export class MongoDBUsersRepository implements UsersRepository {
   }
 
   private mongoUserToUser(mongoUser: MongoUser): User {
-    const { customer_id: customerId, uuid, lifetime } = mongoUser;
+    const { customer_id: customerId, uuid, lifetime, details } = mongoUser;
 
-    return { customerId, uuid, lifetime, id: mongoUser._id.toString() };
+    return { customerId, uuid, lifetime, id: mongoUser._id.toString(), details };
   }
 
   private userToMongoUser(user: Omit<User, 'id'>): Omit<MongoUser, '_id'> {

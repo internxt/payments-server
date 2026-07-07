@@ -35,6 +35,19 @@ export function paymentsController(
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
+    const getUserSubscription = async (customerId: string, userType: UserType) => {
+      /**
+       * Needs to pass the redeemed cancellation trial flag because we cannot pass usersService to
+       * paymentsService directly as we would create a circular dependency...
+       *
+       * We need either to refactor this part to make them independent of each other or make paymentService
+       * dependent on usersService no the other way around
+       */
+
+      const hasRedeemedCancellationTrial = await usersService.hasRedeemedCancellationTrial(customerId);
+      return paymentService.getUserSubscription(customerId, userType, hasRedeemedCancellationTrial);
+    };
+
     fastify.post<{
       Body: {
         customerId: string;
@@ -247,7 +260,7 @@ export function paymentsController(
             userType,
           );
 
-          const updatedSubscription = await paymentService.getUserSubscription(user.customerId, userType);
+          const updatedSubscription = await getUserSubscription(user.customerId, userType);
           return rep.send({
             userSubscription: updatedSubscription,
             request3DSecure: userUpdated.is3DSecureRequired,
@@ -376,7 +389,7 @@ export function paymentsController(
             response = { type: 'lifetime' };
           }
         } else {
-          response = await paymentService.getUserSubscription(user.customerId, userType);
+          response = await getUserSubscription(user.customerId, userType);
         }
 
         cacheService.setSubscription(user.customerId, userType, response).catch((err) => {

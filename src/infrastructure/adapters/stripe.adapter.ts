@@ -8,6 +8,7 @@ import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
+import { Subscription } from '../domain/entities/subscription';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
@@ -104,6 +105,41 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       decimalAmount: (price.currency_options![currency].unit_amount as number) / 100,
       type: isBusinessPlan ? UserType.Business : UserType.Individual,
       ...businessSeats,
+    });
+  }
+
+  async updateSubscription(
+    subscriptionId: string,
+    params: Partial<Stripe.SubscriptionUpdateParams>,
+  ): Promise<Subscription> {
+    const subscription = await this.provider.subscriptions.update(subscriptionId, params);
+
+    return Subscription.toDomain({
+      id: subscription.id,
+      customer: subscription.customer as string,
+      status: subscription.status,
+      priceId: subscription.items.data[0].price.id,
+      currentPeriodEnd: subscription.current_period_end,
+      metadata: subscription.metadata,
+      created: subscription.created,
+      trialEnd: subscription.trial_end ?? undefined,
+    });
+  }
+
+  async getSubscription(subscriptionId: string): Promise<Subscription> {
+    const subscription = await this.provider.subscriptions.retrieve(subscriptionId, {
+      expand: ['plan.product'],
+    });
+
+    return Subscription.toDomain({
+      id: subscription.id,
+      customer: subscription.customer as string,
+      status: subscription.status,
+      currentPeriodEnd: subscription.current_period_end,
+      priceId: subscription.items.data[0].price.id,
+      created: subscription.created,
+      metadata: subscription.metadata,
+      trialEnd: subscription.trial_end ?? undefined,
     });
   }
 
