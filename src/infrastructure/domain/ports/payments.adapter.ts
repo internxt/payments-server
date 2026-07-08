@@ -25,4 +25,5 @@ export interface PaymentsAdapter {
     customerId: string,
     params: Partial<Stripe.InvoiceItemCreateParams>,
   ) => Promise<InvoiceItems>;
+  finalizeInvoice: (invoiceId: Invoice['id']) => Promise<Invoice>;
 }

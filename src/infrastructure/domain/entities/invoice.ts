@@ -16,7 +16,7 @@ export class Invoice implements InvoiceAttributes {
     this.status = status;
   }
 
-  static toDomain({ id, clientSecretId }: InvoiceAttributes): Invoice {
-    return new Invoice({ id, clientSecretId });
+  static toDomain({ id, clientSecretId, status }: InvoiceAttributes): Invoice {
+    return new Invoice({ id, clientSecretId, status });
   }
 }

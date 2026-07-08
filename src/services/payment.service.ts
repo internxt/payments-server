@@ -738,12 +738,6 @@ export class PaymentService {
       customer: customerId,
     });
 
-    await this.provider.customers.update(customerId, {
-      invoice_settings: {
-        default_payment_method: id,
-      },
-    });
-
     if (!id || !customer) throw new Error('Payment method not attached');
 
     return this.provider.subscriptions.update(subscriptionId, {
