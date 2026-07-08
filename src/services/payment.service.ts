@@ -14,6 +14,9 @@ import {
   PromoCodeIsNotValidError,
   ExistingSubscriptionError,
   InvalidTaxIdError,
+  PaymentMethodNotFoundError,
+  ClientSecretNotFoundError,
+  SubscriptionNotEligibleForEarlyChargeError,
 } from '../errors/PaymentErrors';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
@@ -477,14 +480,15 @@ export class PaymentService {
     const price = await stripePaymentsAdapter.getPriceById(subscriptionEntity.priceId);
 
     const { remainingMonths } = this.getAnnualCommitmentCancellationInfo(subscriptionEntity);
-    if (remainingMonths === 1) throw new BadRequestError('The subscription will end this month');
+    if (remainingMonths === 1)
+      throw new SubscriptionNotEligibleForEarlyChargeError('The subscription will end this month');
 
     const amountToCharge = this.calculateRemainingSubscriptionAmount(price, remainingMonths);
 
     const defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.getDefaultPaymentMethod();
 
     if (!defaultPaymentMethod) {
-      throw new BadRequestError('The customer has no payment method to charge the remaining amount');
+      throw new PaymentMethodNotFoundError('The customer has no payment method to charge the remaining amount');
     }
 
     const invoice = await stripePaymentsAdapter.createInvoice({
@@ -511,7 +515,7 @@ export class PaymentService {
     const clientSecretId = finalizedInvoice.clientSecretId;
 
     if (!clientSecretId) {
-      throw new BadRequestError('The remaining subscription amount cannot be charged');
+      throw new ClientSecretNotFoundError('The remaining subscription amount cannot be charged');
     }
 
     return {

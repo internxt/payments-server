@@ -39,6 +39,11 @@ import {
   getPriceEntity,
   getSubscriptionEntity,
 } from '../entity.fixtures';
+import {
+  ClientSecretNotFoundError,
+  PaymentMethodNotFoundError,
+  SubscriptionNotEligibleForEarlyChargeError,
+} from '../../../src/errors/PaymentErrors';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe, bit2MeService } = createTestServices();
@@ -1289,7 +1294,9 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
-      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(BadRequestError);
+      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+        SubscriptionNotEligibleForEarlyChargeError,
+      );
     });
 
     test('When the user does not have a default payment method, then an error indicating so is thrown', async () => {
@@ -1297,7 +1304,25 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
-      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(BadRequestError);
+      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+        PaymentMethodNotFoundError,
+      );
+    });
+
+    test('When there is no client secret id when finalizing the invoice, then an error indicating so is thrown', async () => {
+      const subscription = getSubscriptionEntity({ paymentMethod: 'pm_test_default' });
+      const invoiceEntity = getInvoiceEntity({
+        clientSecretId: undefined,
+      });
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'addInvoiceItems').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
+
+      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+        ClientSecretNotFoundError,
+      );
     });
 
     test('When the user has a subscription, then the remaining subscription amount is charged', async () => {
