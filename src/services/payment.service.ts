@@ -523,13 +523,12 @@ export class PaymentService {
     };
   }
 
-  async applyCancellationTrial(subscriptionId: SubscriptionId): Promise<void> {
-    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+  async applyCancellationTrial(subscription: SubscriptionEntity): Promise<void> {
     const { isElegibleForCancellation } = this.getAnnualCommitmentCancellationInfo(subscription);
     if (!isElegibleForCancellation) throw new BadRequestError('The trial cannot be applied.');
 
     const trialEnd = dayjs.unix(subscription.currentPeriodEnd).add(1, 'month').unix();
-    await stripePaymentsAdapter.updateSubscription(subscriptionId, {
+    await stripePaymentsAdapter.updateSubscription(subscription.id, {
       trial_end: trialEnd,
       proration_behavior: 'none',
     });
