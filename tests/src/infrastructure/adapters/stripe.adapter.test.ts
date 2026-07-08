@@ -1,4 +1,11 @@
-import { getCreatedSubscription, getCustomer, getPaymentMethod, getPrice } from '../../fixtures';
+import {
+  getCreatedSubscription,
+  getCustomer,
+  getInvoice,
+  getInvoiceItems,
+  getPaymentMethod,
+  getPrice,
+} from '../../fixtures';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
@@ -8,6 +15,8 @@ import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
 import { Subscription } from '../../../../src/infrastructure/domain/entities/subscription';
+import { Invoice, InvoiceStatus } from '../../../../src/infrastructure/domain/entities/invoice';
+import { InvoiceItems } from '../../../../src/infrastructure/domain/entities/invoiceItems';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -451,6 +460,7 @@ describe('Stripe Adapter', () => {
           created: stripeSubscription.created,
           metadata: stripeSubscription.metadata,
           trialEnd: undefined,
+          paymentMethod: (stripeSubscription.default_payment_method as Stripe.PaymentMethod).id as string,
         }),
       );
     });
@@ -465,6 +475,67 @@ describe('Stripe Adapter', () => {
 
       expect(subscription.isTrialing).toBeTruthy();
       expect(subscription.trialEnd).toBe(trialEnd);
+    });
+  });
+
+  describe('Creating an invoice', () => {
+    test('When creating an invoice, then the invoice is created and the entity is mapped and returned', async () => {
+      const mockedInvoice = getInvoice();
+
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
+
+      const invoice = await stripePaymentsAdapter.createInvoice({
+        customer: mockedInvoice.customer as string,
+      });
+
+      expect(invoice).toStrictEqual(
+        Invoice.toDomain({
+          id: mockedInvoice.id,
+          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          status: mockedInvoice.status as InvoiceStatus,
+        }),
+      );
+    });
+  });
+
+  describe('Finalizing an invoice', () => {
+    test('When finalizing an invoice, then the invoice is finalized and the entity is mapped and returned', async () => {
+      const mockedInvoice = getInvoice();
+
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
+
+      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id);
+
+      expect(invoice).toStrictEqual(
+        Invoice.toDomain({
+          id: mockedInvoice.id,
+          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          status: mockedInvoice.status as InvoiceStatus,
+        }),
+      );
+    });
+  });
+
+  describe('Adding invoice items', () => {
+    test('When adding invoice items, then the invoice items are added and the entity is mapped and returned', async () => {
+      const mockedInvoiceItems = getInvoiceItems();
+
+      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({
+        ...mockedInvoiceItems,
+        lastResponse: {} as any,
+      });
+
+      const invoice = await stripePaymentsAdapter.addInvoiceItems(
+        mockedInvoiceItems.id,
+        mockedInvoiceItems.customer as string,
+        {},
+      );
+
+      expect(invoice).toStrictEqual(
+        InvoiceItems.toDomain({
+          id: mockedInvoiceItems.id,
+        }),
+      );
     });
   });
 });

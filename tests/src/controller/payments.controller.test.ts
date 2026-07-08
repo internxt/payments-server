@@ -5,7 +5,6 @@ import {
   getCustomer,
   getLicenseCode,
   getPaymentIntent,
-  getPriceEntity,
   getUniqueCodes,
   getUser,
   getValidAuthToken,
@@ -25,6 +24,7 @@ import { LicenseCodesService } from '../../../src/services/licenseCodes.service'
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
+import { getPriceEntity } from '../entity.fixtures';
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
@@ -549,7 +549,7 @@ describe('Payment controller e2e tests', () => {
 
   describe('Get prices', () => {
     test('When no currency is provided, then EUR is used and prices are returned', async () => {
-      const mockedPriceEntity = getPriceEntity({ currency: 'eur' });
+      const mockedPriceEntity = getPriceEntity({ currency: 'eur', type: UserType.Individual, interval: 'year' });
       const expectedResponse = {
         id: mockedPriceEntity.id,
         productId: mockedPriceEntity.productId,
@@ -559,7 +559,9 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
@@ -569,7 +571,7 @@ describe('Payment controller e2e tests', () => {
     });
 
     test('When a valid currency is provided, then prices are returned in that currency', async () => {
-      const mockedPriceEntity = getPriceEntity({ currency: 'usd' });
+      const mockedPriceEntity = getPriceEntity({ currency: 'usd', type: UserType.Individual });
       const expectedResponse = {
         id: mockedPriceEntity.id,
         productId: mockedPriceEntity.productId,
@@ -579,13 +581,17 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
+        .mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices?currency=usd' });
 
+      const body = response.json();
+
       expect(response.statusCode).toBe(200);
       expect(getPricesSpy).toHaveBeenCalledWith('usd');
-      expect(response.json()).toStrictEqual([expectedResponse]);
+      expect(body).toStrictEqual([expectedResponse]);
     });
 
     test('When an unsupported currency is provided, then a bad request error is returned', async () => {
@@ -616,8 +622,10 @@ describe('Payment controller e2e tests', () => {
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
+      const body = response.json();
+
       expect(response.statusCode).toBe(200);
-      expect(response.json()[0].interval).toBe('year');
+      expect(body[0].interval).toBe('year');
     });
   });
 });

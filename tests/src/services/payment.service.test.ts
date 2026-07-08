@@ -15,7 +15,6 @@ import {
   getPaymentIntentResponse,
   getPaymentMethod,
   getPrice,
-  getPriceEntity,
   getPrices,
   getProduct,
   getPromoCode,
@@ -33,7 +32,13 @@ import { generateQrCodeUrl } from '../../../src/utils/generateQrCodeUrl';
 import jwt from 'jsonwebtoken';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
-import { getSubscriptionEntity } from '../entity.fixtures';
+import {
+  getCustomerEntity,
+  getInvoiceEntity,
+  getInvoiceItemsEntity,
+  getPriceEntity,
+  getSubscriptionEntity,
+} from '../entity.fixtures';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe, bit2MeService } = createTestServices();
@@ -1273,6 +1278,55 @@ describe('Payments Service tests', () => {
       const result = await paymentService.getUserSubscription('cus_test', UserType.Business);
 
       expect(result.type).toBe('subscription');
+    });
+  });
+
+  describe('Charge remaining subscription amount', () => {
+    const customerEntity = getCustomerEntity();
+    const priceEntity = getPriceEntity();
+    test('When the user subscription ends this month(last month of commitment), then an error indicating so is thrown', async () => {
+      const subscription = getSubscriptionEntity({ created: dayjs().subtract(11, 'month').unix() });
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+
+      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(BadRequestError);
+    });
+
+    test('When the user does not have a default payment method, then an error indicating so is thrown', async () => {
+      const subscription = getSubscriptionEntity({ paymentMethod: undefined });
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+
+      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(BadRequestError);
+    });
+
+    test('When the user has a subscription, then the remaining subscription amount is charged', async () => {
+      const subscription = getSubscriptionEntity({ paymentMethod: 'pm_test_default' });
+      const invoiceEntity = getInvoiceEntity({
+        clientSecretId: 'pi_test_secret',
+      });
+      const invoiceItemsEntity = getInvoiceItemsEntity();
+      const expectedClientSecret = 'pi_test_secret';
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
+      const addInvoiceItemsSpy = jest
+        .spyOn(stripePaymentsAdapter, 'addInvoiceItems')
+        .mockResolvedValue(invoiceItemsEntity);
+      jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
+
+      const result = await paymentService.chargeRemainingSubscriptionAmount(subscription);
+
+      expect(result).toStrictEqual({ clientSecret: expectedClientSecret });
+      expect(addInvoiceItemsSpy).toHaveBeenCalledWith(
+        invoiceEntity.id,
+        subscription.customer,
+        expect.objectContaining({
+          description: expect.any(String),
+          amount: expect.any(Number),
+          metadata: { price_id: subscription.priceId },
+        }),
+      );
     });
   });
 });

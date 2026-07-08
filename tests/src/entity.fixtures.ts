@@ -1,10 +1,14 @@
 import { Chance } from 'chance';
 import { Customer } from '../../src/infrastructure/domain/entities/customer';
-import { Price, PriceAttributes, PriceInterval } from '../../src/infrastructure/domain/entities/price';
+import { Price, PriceAttributes } from '../../src/infrastructure/domain/entities/price';
 import { Subscription, SubscriptionAttributes } from '../../src/infrastructure/domain/entities/subscription';
 import { PaymentMethod } from '../../src/infrastructure/domain/entities/paymentMethod';
 import { Address } from '../../src/infrastructure/domain/types';
 import { UserType } from '../../src/core/users/User';
+import dayjs from 'dayjs';
+import { Invoice, InvoiceStatus } from '../../src/infrastructure/domain/entities/invoice';
+import { getInvoice, getInvoiceItems } from './fixtures';
+import { InvoiceItems } from '../../src/infrastructure/domain/entities/invoiceItems';
 
 const randomGenerator = new Chance();
 
@@ -55,13 +59,13 @@ export const getPriceEntity = (params?: Partial<PriceAttributes>): Price => {
     id: `price_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     productId: `prod_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     bytes: randomGenerator.integer({ min: 1, max: 10 }) * 1099511627776,
-    interval: randomGenerator.pickone<PriceInterval>(['year', 'month', 'lifetime']),
-    commitmentPlan: randomGenerator.bool(),
-    recurring: randomGenerator.bool(),
+    interval: 'year',
+    commitmentPlan: false,
+    recurring: true,
     amount,
     currency: randomGenerator.pickone(['eur', 'usd']),
     decimalAmount: amount / 100,
-    type: randomGenerator.pickone(Object.values(UserType)),
+    type: UserType.Individual,
     ...params,
   });
 };
@@ -73,7 +77,7 @@ export const getSubscriptionEntity = (params?: Partial<SubscriptionAttributes>):
     metadata: {},
     created: randomGenerator.integer({ min: 1600000000, max: 1700000000 }),
     priceId: `price_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
-    currentPeriodEnd: randomGenerator.integer({ min: 1700000000, max: 1800000000 }),
+    currentPeriodEnd: dayjs().unix(),
     status: randomGenerator.pickone(['active', 'trialing', 'past_due', 'canceled']),
     trialEnd: randomGenerator.integer({ min: 1700000000, max: 1800000000 }),
     ...params,
@@ -85,4 +89,22 @@ export const getPaymentMethodEntity = (params?: Partial<{ id: string; address: A
     params?.id ?? `pm_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     getAddress(params?.address),
   );
+};
+
+export const getInvoiceEntity = (params?: Partial<Invoice>): Invoice => {
+  const mockedInvoice = getInvoice();
+  return Invoice.toDomain({
+    id: mockedInvoice.id,
+    clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+    status: mockedInvoice.status as InvoiceStatus,
+    ...params,
+  });
+};
+
+export const getInvoiceItemsEntity = (params?: Partial<InvoiceItems>): Invoice => {
+  const mockedInvoiceItem = getInvoiceItems();
+  return InvoiceItems.toDomain({
+    id: mockedInvoiceItem.id,
+    ...params,
+  });
 };

@@ -41,6 +41,8 @@ import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
 } from '../infrastructure/domain/entities/subscription';
+import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../constants';
+import { Price } from '../infrastructure/domain/entities/price';
 
 export class PaymentService {
   constructor(
@@ -460,6 +462,63 @@ export class PaymentService {
     await this.provider.subscriptions.cancel(subscriptionId, {});
   }
 
+  private calculateRemainingSubscriptionAmount(price: Price, remainingMonths: number): number {
+    const subscriptionAmount = price.amount;
+    const remainingAmount = subscriptionAmount * remainingMonths;
+    // Get the 50% of the remaining amount to charge
+    const amountToCharge = remainingAmount / 2;
+    return amountToCharge;
+  }
+
+  async chargeRemainingSubscriptionAmount(subscriptionEntity: SubscriptionEntity): Promise<{
+    clientSecret?: string;
+  }> {
+    const customer = await stripePaymentsAdapter.getCustomer(subscriptionEntity.customer);
+    const price = await stripePaymentsAdapter.getPriceById(subscriptionEntity.priceId);
+
+    const { remainingMonths } = this.getAnnualCommitmentCancellationInfo(subscriptionEntity);
+    if (remainingMonths === 1) throw new BadRequestError('The subscription will end this month');
+
+    const amountToCharge = this.calculateRemainingSubscriptionAmount(price, remainingMonths);
+
+    const defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.getDefaultPaymentMethod();
+
+    if (!defaultPaymentMethod) {
+      throw new BadRequestError('The customer has no payment method to charge the remaining amount');
+    }
+
+    const invoice = await stripePaymentsAdapter.createInvoice({
+      customer: subscriptionEntity.customer,
+      auto_advance: false,
+      metadata: {
+        subscriptionId: subscriptionEntity.id,
+        type: SUBSCRIPTION_EARLY_CANCELLATION_KEY,
+      },
+      default_payment_method: defaultPaymentMethod,
+      pending_invoice_items_behavior: 'include',
+    });
+
+    await stripePaymentsAdapter.addInvoiceItems(invoice.id, subscriptionEntity.customer, {
+      description: 'Remaining subscription amount',
+      amount: Math.round(amountToCharge),
+      metadata: {
+        price_id: subscriptionEntity.priceId,
+      },
+    });
+
+    const finalizedInvoice = await stripePaymentsAdapter.finalizeInvoice(invoice.id);
+
+    const clientSecretId = finalizedInvoice.clientSecretId;
+
+    if (!clientSecretId) {
+      throw new BadRequestError('The remaining subscription amount cannot be charged');
+    }
+
+    return {
+      clientSecret: clientSecretId,
+    };
+  }
+
   async applyCancellationTrial(subscriptionId: SubscriptionId): Promise<void> {
     const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
     const { isElegibleForCancellation } = this.getAnnualCommitmentCancellationInfo(subscription);
@@ -675,6 +734,12 @@ export class PaymentService {
       customer: customerId,
     });
 
+    await this.provider.customers.update(customerId, {
+      invoice_settings: {
+        default_payment_method: id,
+      },
+    });
+
     if (!id || !customer) throw new Error('Payment method not attached');
 
     return this.provider.subscriptions.update(subscriptionId, {
@@ -862,16 +927,7 @@ export class PaymentService {
       ) || 0;
     const item = subscription.items.data[0] as Stripe.SubscriptionItem;
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
-    const subscriptionEntity = SubscriptionEntity.toDomain({
-      currentPeriodEnd: subscription.current_period_end,
-      customer: subscription.customer as string,
-      id: subscription.id,
-      status: subscription.status,
-      metadata: subscription.metadata,
-      priceId: subscription.items.data[0].price.id,
-      created: subscription.created,
-      trialEnd: subscription.trial_end ?? undefined,
-    });
+    const subscriptionEntity = this.mapToSubscriptionEntity(subscription);
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
 
     const plan: PlanSubscription = {
@@ -1106,6 +1162,45 @@ export class PaymentService {
 
   async updateInvoice(invoiceId: Invoice['id'], data: Stripe.InvoiceUpdateParams) {
     return this.provider.invoices.update(invoiceId, data);
+  }
+
+  /**
+   * Temporal, we need to extract this to the adapter and start using the Subscription entity everywhere.
+   * But we added this map so we can start using the Entity in existing code for now to avoid breaking changes or
+   * big-bang Refactors
+   *
+   */
+  private mapToSubscriptionEntity(subscription: ExtendedSubscription): SubscriptionEntity {
+    return SubscriptionEntity.toDomain({
+      id: subscription.id,
+      customer: subscription.customer as string,
+      status: subscription.status,
+      metadata: subscription.metadata,
+      created: subscription.created,
+      priceId: subscription.items.data[0].price.id,
+      currentPeriodEnd: subscription.current_period_end,
+      paymentMethod:
+        typeof subscription.default_payment_method === 'string'
+          ? subscription.default_payment_method
+          : subscription.default_payment_method?.id,
+      trialEnd: subscription.trial_end ?? undefined,
+    });
+  }
+
+  async getActiveSubscriptionEntity(
+    customerId: CustomerId,
+    userType: UserType = UserType.Individual,
+  ): Promise<SubscriptionEntity> {
+    let subscription: ExtendedSubscription;
+    if (userType === UserType.ObjectStorage) {
+      subscription = await this.findObjectStorageActiveSubscription(customerId);
+    } else if (userType === UserType.Business) {
+      subscription = await this.findBusinessActiveSubscription(customerId);
+    } else {
+      subscription = await this.findIndividualActiveSubscription(customerId);
+    }
+
+    return this.mapToSubscriptionEntity(subscription);
   }
 
   private async findIndividualActiveSubscription(customerId: CustomerId): Promise<Subscription> {

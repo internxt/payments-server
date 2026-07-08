@@ -9,6 +9,8 @@ import { PaymentMethod } from '../domain/entities/paymentMethod';
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription } from '../domain/entities/subscription';
+import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
+import { InvoiceItems } from '../domain/entities/invoiceItems';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
@@ -131,6 +133,11 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       expand: ['plan.product'],
     });
 
+    const paymentMethod =
+      typeof subscription.default_payment_method === 'string'
+        ? subscription.default_payment_method
+        : subscription.default_payment_method?.id;
+
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
@@ -140,6 +147,55 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       created: subscription.created,
       metadata: subscription.metadata,
       trialEnd: subscription.trial_end ?? undefined,
+      paymentMethod,
+    });
+  }
+
+  async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>, idempotencyKey?: string): Promise<Invoice> {
+    const invoice = await this.provider.invoices.create(params, {
+      idempotencyKey,
+    });
+
+    return Invoice.toDomain({
+      id: invoice.id,
+      clientSecretId: invoice.confirmation_secret?.client_secret,
+      status: invoice.status as InvoiceStatus,
+    });
+  }
+
+  async addInvoiceItems(
+    invoiceId: InvoiceItems['id'],
+    customerId: string,
+    params: Partial<Stripe.InvoiceItemCreateParams>,
+    idempotencyKey?: string,
+  ): Promise<InvoiceItems> {
+    const invoice = await this.provider.invoiceItems.create(
+      { invoice: invoiceId, customer: customerId, ...params },
+      {
+        idempotencyKey,
+      },
+    );
+
+    return InvoiceItems.toDomain({
+      id: invoice.id,
+    });
+  }
+
+  async finalizeInvoice(invoiceId: Invoice['id'], idempotencyKey?: string): Promise<Invoice> {
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(
+      invoiceId,
+      {
+        expand: ['payments', 'confirmation_secret'],
+      },
+      {
+        idempotencyKey,
+      },
+    );
+
+    return Invoice.toDomain({
+      id: finalizedInvoice.id,
+      clientSecretId: finalizedInvoice.confirmation_secret?.client_secret,
+      status: finalizedInvoice.status as InvoiceStatus,
     });
   }
 
