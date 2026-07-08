@@ -151,10 +151,8 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     });
   }
 
-  async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>, idempotencyKey?: string): Promise<Invoice> {
-    const invoice = await this.provider.invoices.create(params, {
-      idempotencyKey,
-    });
+  async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>): Promise<Invoice> {
+    const invoice = await this.provider.invoices.create(params);
 
     return Invoice.toDomain({
       id: invoice.id,
@@ -167,30 +165,18 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     invoiceId: InvoiceItems['id'],
     customerId: string,
     params: Partial<Stripe.InvoiceItemCreateParams>,
-    idempotencyKey?: string,
   ): Promise<InvoiceItems> {
-    const invoice = await this.provider.invoiceItems.create(
-      { invoice: invoiceId, customer: customerId, ...params },
-      {
-        idempotencyKey,
-      },
-    );
+    const invoice = await this.provider.invoiceItems.create({ invoice: invoiceId, customer: customerId, ...params });
 
     return InvoiceItems.toDomain({
       id: invoice.id,
     });
   }
 
-  async finalizeInvoice(invoiceId: Invoice['id'], idempotencyKey?: string): Promise<Invoice> {
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(
-      invoiceId,
-      {
-        expand: ['payments', 'confirmation_secret'],
-      },
-      {
-        idempotencyKey,
-      },
-    );
+  async finalizeInvoice(invoiceId: Invoice['id']): Promise<Invoice> {
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
+      expand: ['payments', 'confirmation_secret'],
+    });
 
     return Invoice.toDomain({
       id: finalizedInvoice.id,
