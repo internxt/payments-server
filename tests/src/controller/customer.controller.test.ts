@@ -5,6 +5,7 @@ import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import CacheService from '../../../src/services/cache.service';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { getSubscriptionEntity } from '../entity.fixtures';
 
 let app: FastifyInstance;
 
@@ -135,9 +136,6 @@ describe('Customer controller', () => {
       const response = await app.inject({
         path: `/customer/cancellation-trial`,
         method: 'POST',
-        body: {
-          subscriptionId: 'subscription-id',
-        },
         headers: {
           authorization: `Bearer ${mockedToken}`,
         },
@@ -155,9 +153,6 @@ describe('Customer controller', () => {
       const response = await app.inject({
         path: `/customer/cancellation-trial`,
         method: 'POST',
-        body: {
-          subscriptionId: 'subscription-id',
-        },
         headers: {
           authorization: `Bearer ${mockedToken}`,
         },
@@ -168,18 +163,17 @@ describe('Customer controller', () => {
 
     test('When the customer is elegible, then the cancellation trial is applied', async () => {
       const mockedUser = getUser();
+      const mockedSubscriptionEntity = getSubscriptionEntity();
       const mockedToken = getValidAuthToken(mockedUser.uuid);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(false);
+      jest.spyOn(PaymentService.prototype, 'getActiveSubscriptionEntity').mockResolvedValue(mockedSubscriptionEntity);
       jest.spyOn(PaymentService.prototype, 'applyCancellationTrial').mockResolvedValue();
       const redeemSpy = jest.spyOn(UsersService.prototype, 'redeemCancellationTrial').mockResolvedValue();
 
       const response = await app.inject({
         path: `/customer/cancellation-trial`,
         method: 'POST',
-        body: {
-          subscriptionId: 'subscription-id',
-        },
         headers: {
           authorization: `Bearer ${mockedToken}`,
         },

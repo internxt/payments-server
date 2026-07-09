@@ -79,25 +79,9 @@ export function customerController(
       },
     );
 
-    fastify.post<{
-      Body: {
-        subscriptionId: string;
-      };
-    }>(
+    fastify.post(
       '/cancellation-trial',
       {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['subscriptionId'],
-            properties: {
-              subscriptionId: {
-                type: 'string',
-                description: 'The ID of the subscription to apply the cancellation trial',
-              },
-            },
-          },
-        },
         config: {
           rateLimit: {
             max: 5,
@@ -107,7 +91,6 @@ export function customerController(
       },
       async (req, res) => {
         const { uuid } = req.user.payload;
-        const { subscriptionId } = req.body;
         const user = await usersService.findUserByUuid(uuid);
 
         const hasRedeemedCancellationTrial = await usersService.hasRedeemedCancellationTrial(user.customerId);
@@ -116,7 +99,9 @@ export function customerController(
           throw new CancellationTrialAlreadyRedeemedError();
         }
 
-        await paymentService.applyCancellationTrial(subscriptionId);
+        const subscription = await paymentService.getActiveSubscriptionEntity(user.customerId);
+
+        await paymentService.applyCancellationTrial(subscription);
 
         await usersService.redeemCancellationTrial(user.customerId);
 
