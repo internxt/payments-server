@@ -462,7 +462,7 @@ export class PaymentService {
       return;
     }
 
-    await this.provider.subscriptions.cancel(subscriptionId, {});
+    await stripePaymentsAdapter.deleteSubscription(subscriptionId);
   }
 
   private calculateRemainingSubscriptionAmount(price: Price, remainingMonths: number): number {
@@ -473,7 +473,7 @@ export class PaymentService {
     return amountToCharge;
   }
 
-  async chargeRemainingSubscriptionAmount(subscriptionEntity: SubscriptionEntity): Promise<{
+  async createEarlyCancellationCharge(subscriptionEntity: SubscriptionEntity): Promise<{
     clientSecret?: string;
   }> {
     const customer = await stripePaymentsAdapter.getCustomer(subscriptionEntity.customer);

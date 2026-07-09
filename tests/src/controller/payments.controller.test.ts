@@ -24,7 +24,7 @@ import { LicenseCodesService } from '../../../src/services/licenseCodes.service'
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPriceEntity } from '../entity.fixtures';
+import { getPriceEntity, getSubscriptionEntity } from '../entity.fixtures';
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
@@ -147,7 +147,7 @@ describe('Payment controller e2e tests', () => {
     });
   });
 
-  describe('Object storage tests', () => {
+  describe('Object storage', () => {
     describe('Create customer', () => {
       it('When the user exists, then its ID is returned with the user token', async () => {
         const mockCustomer = getCustomer();
@@ -626,6 +626,33 @@ describe('Payment controller e2e tests', () => {
 
       expect(response.statusCode).toBe(200);
       expect(body[0].interval).toBe('year');
+    });
+  });
+
+  describe('Cancel early charge', () => {
+    test('When the user wants to cancel the usb early, then we charge the 50% of the remaining amount', async () => {
+      const mockedClientSecret = 'client_secret_123';
+      const mockedUser = getUser();
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
+      const mockedSubscriptionEntity = getSubscriptionEntity();
+
+      jest.spyOn(PaymentService.prototype, 'getActiveSubscriptionEntity').mockResolvedValue(mockedSubscriptionEntity);
+      jest.spyOn(PaymentService.prototype, 'createEarlyCancellationCharge').mockResolvedValue({
+        clientSecret: mockedClientSecret,
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/subscriptions/cancel-early-charge',
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+      });
+
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body).toStrictEqual({ clientSecret: mockedClientSecret });
     });
   });
 });

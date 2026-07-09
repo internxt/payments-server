@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
@@ -274,6 +274,15 @@ export function paymentsController(
         }
       },
     );
+
+    fastify.post('/subscriptions/cancel-early-charge', async (req: FastifyRequest, rep: FastifyReply) => {
+      const user = await assertUser(req, rep, usersService);
+
+      const subscription = await paymentService.getActiveSubscriptionEntity(user.customerId, UserType.Individual);
+
+      const { clientSecret } = await paymentService.createEarlyCancellationCharge(subscription);
+      return rep.send({ clientSecret });
+    });
 
     fastify.post<{
       Body: { customerId: string };

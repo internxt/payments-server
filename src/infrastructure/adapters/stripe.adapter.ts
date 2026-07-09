@@ -151,6 +151,10 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     });
   }
 
+  async deleteSubscription(subscriptionId: string): Promise<void> {
+    await this.provider.subscriptions.cancel(subscriptionId);
+  }
+
   async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>): Promise<Invoice> {
     const invoice = await this.provider.invoices.create(params);
 
