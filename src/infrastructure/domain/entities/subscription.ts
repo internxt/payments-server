@@ -9,6 +9,7 @@ export interface SubscriptionAttributes {
   created: number;
   priceId: string;
   currentPeriodEnd: number;
+  paymentMethod?: string;
   trialEnd?: number;
 }
 
@@ -27,6 +28,7 @@ export class Subscription implements SubscriptionAttributes {
   created: number;
   priceId: string;
   currentPeriodEnd: number;
+  paymentMethod?: string;
   trialEnd?: number;
 
   constructor({
@@ -37,6 +39,7 @@ export class Subscription implements SubscriptionAttributes {
     created,
     priceId,
     currentPeriodEnd,
+    paymentMethod,
     trialEnd,
   }: SubscriptionAttributes) {
     this.id = id;
@@ -47,6 +50,7 @@ export class Subscription implements SubscriptionAttributes {
     this.priceId = priceId;
     this.currentPeriodEnd = currentPeriodEnd;
     this.trialEnd = trialEnd;
+    this.paymentMethod = paymentMethod;
   }
 
   static toDomain(attributes: SubscriptionAttributes): Subscription {

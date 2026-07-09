@@ -5,7 +5,6 @@ import {
   getCustomer,
   getInvoice,
   getPrice,
-  getPriceEntity,
   getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
@@ -25,6 +24,7 @@ import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
+import { getPriceEntity } from '../entity.fixtures';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 

@@ -26,6 +26,7 @@ export class Customer {
     public readonly address?: Address,
     public readonly phone?: string,
     public readonly metadata?: Record<string, string>,
+    public readonly defaultPaymentMethod?: string,
   ) {}
 
   static toDomain(stripeCustomer: Stripe.Customer): Customer {
@@ -49,7 +50,22 @@ export class Customer {
       },
       stripeCustomer.phone ?? undefined,
       stripeCustomer.metadata,
+      Customer.extractDefaultPaymentMethod(stripeCustomer),
     );
+  }
+
+  private static extractDefaultPaymentMethod(stripeCustomer: Stripe.Customer): string | undefined {
+    const defaultPaymentMethod = stripeCustomer.invoice_settings?.default_payment_method;
+    if (defaultPaymentMethod) {
+      return typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod.id;
+    }
+
+    const defaultSource = stripeCustomer.default_source;
+    if (defaultSource) {
+      return typeof defaultSource === 'string' ? defaultSource : defaultSource.id;
+    }
+
+    return undefined;
   }
 
   getCustomerId(): string {
@@ -62,5 +78,9 @@ export class Customer {
 
   getAddress(): Address | undefined {
     return this.address;
+  }
+
+  getDefaultPaymentMethod(): string | undefined {
+    return this.defaultPaymentMethod;
   }
 }

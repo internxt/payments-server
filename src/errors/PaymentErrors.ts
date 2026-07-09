@@ -72,3 +72,21 @@ export class UserNotFoundError extends NotFoundError {
     super(message);
   }
 }
+
+export class PaymentMethodNotFoundError extends NotFoundError {
+  constructor(message = 'Payment Method Not Found') {
+    super(message);
+  }
+}
+
+export class ClientSecretNotFoundError extends NotFoundError {
+  constructor(message = 'Client Secret Not Found') {
+    super(message);
+  }
+}
+
+export class SubscriptionNotEligibleForEarlyChargeError extends BadRequestError {
+  constructor(message = 'The subscription is not eligible for an early charge as it will end this month') {
+    super(message);
+  }
+}
