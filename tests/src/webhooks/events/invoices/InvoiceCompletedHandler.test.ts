@@ -248,7 +248,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: mockedInvoice.status as string,
       };
 
-      const cancelSubscriptionSpy = jest.spyOn(stripePaymentsAdapter, 'deleteSubscription').mockResolvedValue();
+      const cancelSubscriptionSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 

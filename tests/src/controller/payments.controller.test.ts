@@ -630,7 +630,7 @@ describe('Payment controller e2e tests', () => {
   });
 
   describe('Cancel early charge', () => {
-    test('When the user wants to cancel the usb early, then we charge the 50% of the remaining amount', async () => {
+    test('When the user wants to cancel the sub early, then we charge the 50% of the remaining amount', async () => {
       const mockedClientSecret = 'client_secret_123';
       const mockedUser = getUser();
       const mockedToken = getValidAuthToken(mockedUser.uuid);

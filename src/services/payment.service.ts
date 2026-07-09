@@ -462,7 +462,7 @@ export class PaymentService {
       return;
     }
 
-    await stripePaymentsAdapter.deleteSubscription(subscriptionId);
+    await stripePaymentsAdapter.cancelSubscription(subscriptionId);
   }
 
   private calculateRemainingSubscriptionAmount(price: Price, remainingMonths: number): number {

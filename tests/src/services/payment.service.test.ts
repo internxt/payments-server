@@ -1171,7 +1171,7 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'deleteSubscription').mockResolvedValue();
+      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
@@ -1188,7 +1188,7 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'deleteSubscription').mockResolvedValue();
+      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);

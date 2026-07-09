@@ -151,7 +151,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     });
   }
 
-  async deleteSubscription(subscriptionId: string): Promise<void> {
+  async cancelSubscription(subscriptionId: string): Promise<void> {
     await this.provider.subscriptions.cancel(subscriptionId);
   }
 
