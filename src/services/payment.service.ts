@@ -928,6 +928,13 @@ export class PaymentService {
     const subscriptionEntity = this.mapToSubscriptionEntity(subscription);
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
 
+    let earlyCancellationFee: number | undefined;
+    if (hasAnnualCommitment) {
+      const priceEntity = await stripePaymentsAdapter.getPriceById(subscriptionEntity.priceId);
+      earlyCancellationFee =
+        this.calculateRemainingSubscriptionAmount(priceEntity, commitment?.remainingMonths || 0) * 0.01;
+    }
+
     const plan: PlanSubscription = {
       status: subscription.status,
       planId: subscription.plan.id,
@@ -954,9 +961,14 @@ export class PaymentService {
         remainingMonths: commitment?.remainingMonths,
         cancellationDate: commitment?.cancellationDate,
         isElegibleForCancellation: commitment?.isElegibleForCancellation,
+        earlyCancellationFee,
       },
       cancellationTrial: {
         redeemed: hasRedeemedCancellationTrial ?? false,
+      },
+      cancellation: {
+        scheduled: !!subscription.cancel_at,
+        cancelAt: subscription.cancel_at ?? undefined,
       },
       storageLimit: storageLimit,
       amountOfSeats: item.quantity || 1,
