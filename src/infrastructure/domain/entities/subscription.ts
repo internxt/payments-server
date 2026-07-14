@@ -11,6 +11,7 @@ export interface SubscriptionAttributes {
   currentPeriodEnd: number;
   paymentMethod?: string;
   trialEnd?: number;
+  cancelAt?: number;
 }
 
 export interface CommitmentCancellationInfo {
@@ -30,6 +31,7 @@ export class Subscription implements SubscriptionAttributes {
   currentPeriodEnd: number;
   paymentMethod?: string;
   trialEnd?: number;
+  cancelAt?: number;
 
   constructor({
     id,
@@ -41,6 +43,7 @@ export class Subscription implements SubscriptionAttributes {
     currentPeriodEnd,
     paymentMethod,
     trialEnd,
+    cancelAt,
   }: SubscriptionAttributes) {
     this.id = id;
     this.customer = customer;
@@ -51,6 +54,7 @@ export class Subscription implements SubscriptionAttributes {
     this.currentPeriodEnd = currentPeriodEnd;
     this.trialEnd = trialEnd;
     this.paymentMethod = paymentMethod;
+    this.cancelAt = cancelAt;
   }
 
   static toDomain(attributes: SubscriptionAttributes): Subscription {
@@ -63,5 +67,9 @@ export class Subscription implements SubscriptionAttributes {
 
   get isTrialing(): boolean {
     return this.status === 'trialing';
+  }
+
+  get hasScheduledCancellation(): boolean {
+    return !!this.cancelAt;
   }
 }

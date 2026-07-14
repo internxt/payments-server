@@ -148,6 +148,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       metadata: subscription.metadata,
       trialEnd: subscription.trial_end ?? undefined,
       paymentMethod,
+      cancelAt: subscription.cancel_at ?? undefined,
     });
   }
 
