@@ -1171,12 +1171,12 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(subscription as unknown as any);
+      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
 
-      expect(cancelSpy).toHaveBeenCalledWith(subscription.id, {});
+      expect(deleteSpy).toHaveBeenCalledWith(subscription.id);
       expect(updateSpy).not.toHaveBeenCalled();
 
       jest.useRealTimers();
@@ -1188,12 +1188,12 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(subscription as unknown as any);
+      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
 
-      expect(cancelSpy).toHaveBeenCalledWith(subscription.id, {});
+      expect(deleteSpy).toHaveBeenCalledWith(subscription.id);
       expect(updateSpy).not.toHaveBeenCalled();
     });
   });
@@ -1256,6 +1256,7 @@ describe('Payments Service tests', () => {
         { created: dayjs('2025-10-01T00:00:00Z').unix() },
       );
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(getPriceEntity());
       mockUpcomingInvoice();
 
       const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
@@ -1294,7 +1295,7 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
-      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+      await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         SubscriptionNotEligibleForEarlyChargeError,
       );
     });
@@ -1304,7 +1305,7 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
-      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+      await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         PaymentMethodNotFoundError,
       );
     });
@@ -1320,7 +1321,7 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'addInvoiceItems').mockResolvedValue(invoiceEntity);
       jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
 
-      await expect(paymentService.chargeRemainingSubscriptionAmount(subscription)).rejects.toThrow(
+      await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         ClientSecretNotFoundError,
       );
     });
@@ -1340,7 +1341,7 @@ describe('Payments Service tests', () => {
         .mockResolvedValue(invoiceItemsEntity);
       jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
 
-      const result = await paymentService.chargeRemainingSubscriptionAmount(subscription);
+      const result = await paymentService.createEarlyCancellationCharge(subscription);
 
       expect(result).toStrictEqual({ clientSecret: expectedClientSecret });
       expect(addInvoiceItemsSpy).toHaveBeenCalledWith(

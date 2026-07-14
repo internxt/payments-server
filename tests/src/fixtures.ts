@@ -467,6 +467,9 @@ export function getSubscription({
       commitment: {
         enabled: false,
       },
+      cancellation: {
+        scheduled: false,
+      },
       cancellationTrial: {
         redeemed: false,
       },

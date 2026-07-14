@@ -122,7 +122,6 @@ export default function (
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
           const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
           const handler = new InvoiceCompletedHandler({
-            logger: fastify.log,
             determineLifetimeConditions,
             objectStorageWebhookHandler,
             paymentService,

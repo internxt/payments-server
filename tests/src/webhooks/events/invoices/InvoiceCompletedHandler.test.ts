@@ -10,6 +10,8 @@ import { createTestServices } from '../../../helpers/services-factory';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
+import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../../../src/constants';
+import { stripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
 
 const {
   invoiceCompletedHandler,
@@ -227,6 +229,30 @@ describe('Testing the handler when an invoice is completed', () => {
         userId: mockedUser.id,
         newTier: mockedTier,
       });
+    });
+  });
+
+  describe('Invoice for early cancellation', () => {
+    test('When the invoices is for early cancellation, then the subscription is cancelled and early returned', async () => {
+      const mockedInvoice = getInvoice({
+        status: 'paid',
+        metadata: {
+          type: SUBSCRIPTION_EARLY_CANCELLATION_KEY,
+          subscriptionId: 'sub_123',
+        },
+      });
+
+      const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
+        customer: Customer.toDomain(getCustomer()),
+        invoice: mockedInvoice,
+        status: mockedInvoice.status as string,
+      };
+
+      const cancelSubscriptionSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
+
+      await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
+
+      expect(cancelSubscriptionSpy).toHaveBeenCalledWith(mockedInvoice.metadata?.subscriptionId as string);
     });
   });
 

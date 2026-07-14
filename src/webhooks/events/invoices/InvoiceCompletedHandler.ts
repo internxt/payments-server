@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
-import { FastifyBaseLogger } from 'fastify';
 import { PaymentService } from '../../../services/payment.service';
 import { PriceMetadata } from '../../../types/stripe';
 import { User, UserType } from '../../../core/users/User';
@@ -15,6 +14,18 @@ import Logger from '../../../Logger';
 import { UserNotFoundError } from '../../../errors/PaymentErrors';
 import { Customer } from '../../../infrastructure/domain/entities/customer';
 import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
+import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../constants';
+import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+
+interface InvoiceCompletedHandlerAttributes {
+  determineLifetimeConditions: DetermineLifetimeConditions;
+  objectStorageWebhookHandler: ObjectStorageWebhookHandler;
+  paymentService: PaymentService;
+  storageService: StorageService;
+  tiersService: TiersService;
+  usersService: UsersService;
+  cacheService: CacheService;
+}
 
 export interface InvoiceCompletedHandlerPayload {
   customer: Customer;
@@ -23,7 +34,6 @@ export interface InvoiceCompletedHandlerPayload {
 }
 
 export class InvoiceCompletedHandler {
-  private readonly logger: FastifyBaseLogger;
   private readonly determineLifetimeConditions: DetermineLifetimeConditions;
   private readonly objectStorageWebhookHandler: ObjectStorageWebhookHandler;
   private readonly paymentService: PaymentService;
@@ -33,7 +43,6 @@ export class InvoiceCompletedHandler {
   private readonly cacheService: CacheService;
 
   constructor({
-    logger,
     determineLifetimeConditions,
     objectStorageWebhookHandler,
     paymentService,
@@ -41,17 +50,7 @@ export class InvoiceCompletedHandler {
     tiersService,
     usersService,
     cacheService,
-  }: {
-    logger: FastifyBaseLogger;
-    determineLifetimeConditions: DetermineLifetimeConditions;
-    objectStorageWebhookHandler: ObjectStorageWebhookHandler;
-    paymentService: PaymentService;
-    storageService: StorageService;
-    tiersService: TiersService;
-    usersService: UsersService;
-    cacheService: CacheService;
-  }) {
-    this.logger = logger;
+  }: InvoiceCompletedHandlerAttributes) {
     this.determineLifetimeConditions = determineLifetimeConditions;
     this.objectStorageWebhookHandler = objectStorageWebhookHandler;
     this.paymentService = paymentService;
@@ -73,11 +72,20 @@ export class InvoiceCompletedHandler {
     const customerId = customer.id;
     const customerEmail = customer.email;
     const isInvoicePaid = invoiceStatus === 'paid';
+    const isChargeRemainingSubscriptionAmount = invoice.metadata?.type === SUBSCRIPTION_EARLY_CANCELLATION_KEY;
+    const subscriptionId = invoice.metadata?.subscriptionId;
 
     Logger.info(`Processing invoice ${invoiceId} for customer ${customerId}...`);
 
     if (!isInvoicePaid) {
       Logger.info(`Invoice ${invoiceId} not paid, skipping processing`);
+      return;
+    }
+
+    // If the invoice is for early cancellation, cancel the subscription
+    if (isChargeRemainingSubscriptionAmount && subscriptionId) {
+      Logger.info(`Invoice ${invoiceId} is for early cancellation, cancelling subscription...`);
+      await stripePaymentsAdapter.cancelSubscription(subscriptionId);
       return;
     }
 
@@ -207,7 +215,7 @@ export class InvoiceCompletedHandler {
     productId: string;
     productType: string;
     planType: string;
-    maxSpaceBytes: string;
+    maxSpaceBytes?: string;
   } {
     const product = price?.product as Stripe.Product;
     const productId = product.id;

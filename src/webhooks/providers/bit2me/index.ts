@@ -107,7 +107,6 @@ export default function ({
       const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
 
       const handler = new InvoiceCompletedHandler({
-        logger: fastify.log,
         determineLifetimeConditions,
         objectStorageWebhookHandler,
         paymentService,

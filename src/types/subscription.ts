@@ -27,11 +27,16 @@ export interface PlanSubscription {
     remainingMonths?: number;
     cancellationDate?: string;
     isElegibleForCancellation?: boolean;
+    earlyCancellationFee?: number;
   };
   storageLimit: number;
   amountOfSeats: number;
   cancellationTrial: {
     redeemed: boolean;
+  };
+  cancellation: {
+    scheduled: boolean;
+    cancelAt?: number;
   };
   seats?: {
     minimumSeats: number;
