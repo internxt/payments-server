@@ -1256,6 +1256,7 @@ describe('Payments Service tests', () => {
         { created: dayjs('2025-10-01T00:00:00Z').unix() },
       );
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(getPriceEntity());
       mockUpcomingInvoice();
 
       const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
