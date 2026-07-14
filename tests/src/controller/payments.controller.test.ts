@@ -655,4 +655,27 @@ describe('Payment controller e2e tests', () => {
       expect(body).toStrictEqual({ clientSecret: mockedClientSecret });
     });
   });
+
+  describe('Reactivate subscription', () => {
+    test('When the user reverts a scheduled cancellation, then the subscription is reactivated and a 204 is returned', async () => {
+      const mockedUser = getUser();
+      const mockedToken = getValidAuthToken(mockedUser.uuid);
+      const mockedSubscriptionEntity = getSubscriptionEntity();
+
+      (assertUser as jest.Mock).mockResolvedValue(mockedUser);
+      jest.spyOn(PaymentService.prototype, 'getActiveSubscriptionEntity').mockResolvedValue(mockedSubscriptionEntity);
+      const reactivateSpy = jest.spyOn(PaymentService.prototype, 'reactivateSubscription').mockResolvedValue();
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/subscriptions/reactivate',
+        headers: {
+          authorization: `Bearer ${mockedToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(reactivateSpy).toHaveBeenCalledWith(mockedSubscriptionEntity.id);
+    });
+  });
 });
