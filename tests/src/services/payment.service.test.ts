@@ -1198,6 +1198,29 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Reactivating a subscription', () => {
+    test('when the subscription has a scheduled cancellation, then it clears the cancel_at so it keeps renewing', async () => {
+      const subscription = getSubscriptionEntity({ cancelAt: dayjs().add(1, 'month').unix() });
+
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(subscription);
+
+      await paymentService.reactivateSubscription(subscription.id);
+
+      expect(updateSpy).toHaveBeenCalledWith(subscription.id, { cancel_at: '' });
+    });
+
+    test('when the subscription has no scheduled cancellation, then an error is thrown and no update is made', async () => {
+      const subscription = getSubscriptionEntity({ cancelAt: undefined });
+
+      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
+      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(subscription);
+
+      await expect(paymentService.reactivateSubscription(subscription.id)).rejects.toThrow(BadRequestError);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Getting the user subscription', () => {
     const makeActiveSubscription = (priceMetadata: Record<string, string> = {}, overrides = {}) => {
       const base = getCreatedSubscription();

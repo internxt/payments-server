@@ -465,6 +465,21 @@ export class PaymentService {
     await stripePaymentsAdapter.cancelSubscription(subscriptionId);
   }
 
+  /**
+   * Reverts a scheduled cancellation (cancel_at) so the subscription keeps renewing.
+   */
+  async reactivateSubscription(subscriptionId: SubscriptionId): Promise<void> {
+    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+
+    if (!subscription.hasScheduledCancellation) {
+      throw new BadRequestError('The subscription has no scheduled cancellation to revert');
+    }
+
+    await stripePaymentsAdapter.updateSubscription(subscriptionId, {
+      cancel_at: '',
+    });
+  }
+
   private calculateRemainingSubscriptionAmount(price: Price, remainingMonths: number): number {
     const subscriptionAmount = price.amount;
     const remainingAmount = subscriptionAmount * remainingMonths;

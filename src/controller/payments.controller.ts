@@ -284,6 +284,15 @@ export function paymentsController(
       return rep.send({ clientSecret });
     });
 
+    fastify.post('/subscriptions/reactivate', async (req: FastifyRequest, rep: FastifyReply) => {
+      const user = await assertUser(req, rep, usersService);
+
+      const subscription = await paymentService.getActiveSubscriptionEntity(user.customerId, UserType.Individual);
+
+      await paymentService.reactivateSubscription(subscription.id);
+      return rep.status(204).send();
+    });
+
     fastify.post<{
       Body: { customerId: string };
     }>(
