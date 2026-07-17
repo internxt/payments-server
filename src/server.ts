@@ -25,6 +25,7 @@ import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCoupon
 import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
+import { MailService } from './services/mail.service';
 import { Bit2MeService } from './services/bit2me.service';
 import { TiersService } from './services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
@@ -65,7 +66,14 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     axios,
   );
   const cacheService = new CacheService(envVariablesConfig);
-  const tiersService = new TiersService(usersService, tiersRepository, usersTiersRepository, storageService);
+  const mailService = new MailService(envVariablesConfig, axios);
+  const tiersService = new TiersService(
+    usersService,
+    tiersRepository,
+    usersTiersRepository,
+    storageService,
+    mailService,
+  );
   const licenseCodesService = new LicenseCodesService({
     paymentService,
     usersService,
