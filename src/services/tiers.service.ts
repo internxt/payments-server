@@ -1,13 +1,13 @@
-import { TiersRepository } from '../core/users/MongoDBTiersRepository';
-import { User } from '../core/users/User';
-import { UsersService } from './users.service';
-import { StorageService } from './storage.service';
-import { MailService } from './mail.service';
-import { Service, Tier } from '../core/users/Tier';
-import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import { FastifyBaseLogger } from 'fastify';
 import axios from 'axios';
+import { FastifyBaseLogger } from 'fastify';
+import { TiersRepository } from '../core/users/MongoDBTiersRepository';
+import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
+import { Service, Tier } from '../core/users/Tier';
+import { User } from '../core/users/User';
 import { BadRequestError } from '../errors/Errors';
+import { MailService } from './mail.service';
+import { StorageService } from './storage.service';
+import { UsersService } from './users.service';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -122,8 +122,8 @@ export class TiersService {
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
           break;
-        case Service.Mail:
-          await this.removeMailFeatures(userUuid);
+          // case Service.Mail:
+          //   await this.removeMailFeatures(userUuid);
           break;
         default:
           // TODO;

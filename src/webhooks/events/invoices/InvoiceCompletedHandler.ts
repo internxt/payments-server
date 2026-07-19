@@ -1,21 +1,21 @@
 import Stripe from 'stripe';
+import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../constants';
 import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifetimeConditions';
-import { PaymentService } from '../../../services/payment.service';
-import { PriceMetadata } from '../../../types/stripe';
+import { Service, Tier } from '../../../core/users/Tier';
 import { User, UserType } from '../../../core/users/User';
-import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
+import { NotFoundError } from '../../../errors/Errors';
+import { UserNotFoundError } from '../../../errors/PaymentErrors';
+import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
+import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+import { Customer } from '../../../infrastructure/domain/entities/customer';
+import Logger from '../../../Logger';
+import CacheService from '../../../services/cache.service';
+import { PaymentService } from '../../../services/payment.service';
+import { StorageService } from '../../../services/storage.service';
 import { TierNotFoundError, TiersService } from '../../../services/tiers.service';
 import { UsersService } from '../../../services/users.service';
-import { StorageService } from '../../../services/storage.service';
-import { NotFoundError } from '../../../errors/Errors';
-import CacheService from '../../../services/cache.service';
-import { Service, Tier } from '../../../core/users/Tier';
-import Logger from '../../../Logger';
-import { UserNotFoundError } from '../../../errors/PaymentErrors';
-import { Customer } from '../../../infrastructure/domain/entities/customer';
-import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
-import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../constants';
-import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+import { PriceMetadata } from '../../../types/stripe';
+import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -368,15 +368,15 @@ export class InvoiceCompletedHandler {
     }
 
     // Apply Mail features
-    try {
-      await this.tiersService.applyMailFeatures(user, tierToApply);
-      Logger.info(`Mail features applied for user ${user.uuid} with customerId ${customer.id}`);
-    } catch (error) {
-      Logger.error(`Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}`, {
-        error: (error as Error).message,
-      });
-      throw error;
-    }
+    // try {
+    //   await this.tiersService.applyMailFeatures(user, tierToApply);
+    //   Logger.info(`Mail features applied for user ${user.uuid} with customerId ${customer.id}`);
+    // } catch (error) {
+    //   Logger.error(`Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}`, {
+    //     error: (error as Error).message,
+    //   });
+    //   throw error;
+    // }
   }
 
   /**

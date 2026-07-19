@@ -1,10 +1,10 @@
+import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
+import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
+import { Service } from '../../../src/core/users/Tier';
+import { BadRequestError } from '../../../src/errors/Errors';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { getLogger, getUser, newTier, voidPromise } from '../fixtures';
-import { Service } from '../../../src/core/users/Tier';
-import { UserTier } from '../../../src/core/users/MongoDBUsersTiersRepository';
-import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-import { BadRequestError } from '../../../src/errors/Errors';
 
 describe('TiersService tests', () => {
   const { usersTiersRepository, tiersRepository, tiersService, usersService, storageService, mailService } =
@@ -276,16 +276,16 @@ describe('TiersService tests', () => {
       const removeVPNFeatures = jest
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
-      const removeMailFeatures = jest
-        .spyOn(tiersService, 'removeMailFeatures')
-        .mockImplementation(() => Promise.resolve());
+      // const removeMailFeatures = jest
+      //   .spyOn(tiersService, 'removeMailFeatures')
+      //   .mockImplementation(() => Promise.resolve());
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
-      expect(removeMailFeatures).toHaveBeenCalledWith(userWithEmail.uuid);
+      // expect(removeMailFeatures).toHaveBeenCalledWith(userWithEmail.uuid);
     });
   });
 
