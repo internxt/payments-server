@@ -20,12 +20,12 @@ export function checkoutController(usersService: UsersService, paymentsService: 
 
     fastify.post<{
       Body: {
-        customerName: string;
-        lineAddress1: string;
-        lineAddress2: string;
-        city: string;
+        customerName?: string;
+        lineAddress1?: string;
+        lineAddress2?: string;
+        city?: string;
         country: string;
-        postalCode: string;
+        postalCode?: string;
         captchaToken: string;
         companyVatId?: string;
         metadata?: Record<string, string>;
@@ -36,7 +36,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['customerName', 'lineAddress1', 'city', 'country', 'postalCode', 'captchaToken'],
+            required: ['country', 'captchaToken'],
             properties: {
               customerName: { type: 'string' },
               lineAddress1: { type: 'string' },
