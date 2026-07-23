@@ -725,6 +725,32 @@ describe('Payments Service tests', () => {
 
       expect(taxes).toStrictEqual(mockedTaxes);
     });
+
+    it('When the IP cannot be geolocated to a tax jurisdiction, then no tax is returned so the price still loads', async () => {
+      const mockedPrice = getPrice();
+      const insufficientLocationError = new Stripe.errors.StripeInvalidRequestError({
+        message: "The IP address provided is insufficient to determine the customer's tax location.",
+        type: 'invalid_request_error',
+      });
+      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(insufficientLocationError);
+
+      const taxes = await paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
+
+      expect(taxes).toBeUndefined();
+    });
+
+    it('When Stripe fails for an unrelated reason, then the error is propagated', async () => {
+      const mockedPrice = getPrice();
+      const unexpectedError = new Stripe.errors.StripeAPIError({
+        message: 'Something went wrong on our end.',
+        type: 'api_error',
+      });
+      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(unexpectedError);
+
+      await expect(
+        paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip'),
+      ).rejects.toThrow(unexpectedError);
+    });
   });
 
   describe('Get Promotion Code', () => {

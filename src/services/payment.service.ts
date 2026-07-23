@@ -1026,8 +1026,9 @@ export class PaymentService {
     customerId?: string,
     postalCode?: string,
     country?: string,
-  ): Promise<Stripe.Tax.Calculation> {
+  ): Promise<Stripe.Tax.Calculation | undefined> {
     const customerDetails: Stripe.Tax.CalculationCreateParams.CustomerDetails = {};
+    const usingIpAddress = !(postalCode && country);
 
     if (postalCode && country) {
       customerDetails.address = {
@@ -1039,19 +1040,34 @@ export class PaymentService {
       customerDetails.ip_address = ipAddress;
     }
 
-    return this.provider.tax.calculations.create({
-      customer: customerId,
-      customer_details: customerId ? undefined : customerDetails,
-      line_items: [
-        {
-          amount,
-          reference: priceId,
-          tax_behavior: 'exclusive',
-          quantity: 1,
-        },
-      ],
-      currency,
-    });
+    try {
+      return await this.provider.tax.calculations.create({
+        customer: customerId,
+        customer_details: customerId ? undefined : customerDetails,
+        line_items: [
+          {
+            amount,
+            reference: priceId,
+            tax_behavior: 'exclusive',
+            quantity: 1,
+          },
+        ],
+        currency,
+      });
+    } catch (error) {
+      const isInsufficientLocationError =
+        usingIpAddress &&
+        !customerId &&
+        error instanceof Stripe.errors.StripeError &&
+        error.message?.includes('insufficient to determine');
+
+      if (isInsufficientLocationError) {
+        Logger.warn(`Tax calculation skipped: IP ${ipAddress} is insufficient to determine tax location`);
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   /**

@@ -376,7 +376,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           }
         }
 
-        if (userAddress || (postalCode && country) || user?.customerId) {
+        if (currency === 'eur' && (userAddress || (postalCode && country) || user?.customerId)) {
           taxForPrice = await paymentsService.calculateTax(
             priceId,
             amount,
@@ -389,7 +389,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         }
 
         const taxAmount = taxForPrice?.tax_amount_exclusive ?? 0;
-        const amountTotal = taxForPrice?.amount_total ?? price.amount;
+        const amountTotal = taxForPrice?.amount_total ?? amount;
 
         return res.status(200).send({
           price: price.toJSON(),
