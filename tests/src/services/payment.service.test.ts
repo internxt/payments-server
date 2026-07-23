@@ -44,6 +44,7 @@ import {
   PaymentMethodNotFoundError,
   SubscriptionNotEligibleForEarlyChargeError,
 } from '../../../src/errors/PaymentErrors';
+import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../../../src/errors/stripeErrorCodes';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe, bit2MeService } = createTestServices();
@@ -714,7 +715,7 @@ describe('Payments Service tests', () => {
   });
 
   describe('Get tax for a price', () => {
-    it('When the params are correct, then a tax object is returned for the requested price', async () => {
+    test('When the params are correct, then a tax object is returned for the requested price', async () => {
       const mockedPrice = getPrice();
       const mockedTaxes = getTaxes();
       jest
@@ -726,11 +727,12 @@ describe('Payments Service tests', () => {
       expect(taxes).toStrictEqual(mockedTaxes);
     });
 
-    it('When the IP cannot be geolocated to a tax jurisdiction, then no tax is returned so the price still loads', async () => {
+    test('When the location is not enough to determine the tax jurisdiction, then no tax is returned so the price still loads', async () => {
       const mockedPrice = getPrice();
       const insufficientLocationError = new Stripe.errors.StripeInvalidRequestError({
         message: "The IP address provided is insufficient to determine the customer's tax location.",
         type: 'invalid_request_error',
+        code: STRIPE_TAX_LOCATION_INVALID_CODE,
       });
       jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(insufficientLocationError);
 
@@ -739,11 +741,33 @@ describe('Payments Service tests', () => {
       expect(taxes).toBeUndefined();
     });
 
-    it('When Stripe fails for an unrelated reason, then the error is propagated', async () => {
+    test('When the stored customer address is not enough to determine the tax jurisdiction, then no tax is returned so the price still loads', async () => {
       const mockedPrice = getPrice();
-      const unexpectedError = new Stripe.errors.StripeAPIError({
-        message: 'Something went wrong on our end.',
-        type: 'api_error',
+      const customerId = 'cus_customer_with_incomplete_address';
+      const insufficientLocationError = new Stripe.errors.StripeInvalidRequestError({
+        message: "The customer's address is missing or invalid for tax purposes.",
+        type: 'invalid_request_error',
+        code: STRIPE_TAX_LOCATION_INVALID_CODE,
+      });
+      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(insufficientLocationError);
+
+      const taxes = await paymentService.calculateTax(
+        mockedPrice.id,
+        mockedPrice.unit_amount as number,
+        undefined,
+        'eur',
+        customerId,
+      );
+
+      expect(taxes).toBeUndefined();
+    });
+
+    test('When Stripe fails for an unrelated reason, then the error is propagated', async () => {
+      const mockedPrice = getPrice();
+      const unexpectedError = new Stripe.errors.StripeInvalidRequestError({
+        message: 'No such price.',
+        type: 'invalid_request_error',
+        code: 'resource_missing',
       });
       jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(unexpectedError);
 

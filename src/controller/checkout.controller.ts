@@ -363,6 +363,9 @@ export function checkoutController(usersService: UsersService, paymentsService: 
 
         const price = await stripePaymentsAdapter.getPriceById(priceId, currency);
 
+        const isEuroCurrency = currency === 'eur';
+        const isUserAddressProvided = !!userAddress || (!!postalCode && !!country) || !!user?.customerId;
+
         let amount = price.amount;
 
         if (promoCodeName) {
@@ -376,7 +379,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           }
         }
 
-        if (currency === 'eur' && (userAddress || (postalCode && country) || user?.customerId)) {
+        if (isEuroCurrency && isUserAddressProvided) {
           taxForPrice = await paymentsService.calculateTax(
             priceId,
             amount,

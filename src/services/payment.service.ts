@@ -45,6 +45,7 @@ import {
   Subscription as SubscriptionEntity,
 } from '../infrastructure/domain/entities/subscription';
 import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../constants';
+import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../errors/stripeErrorCodes';
 import { Price } from '../infrastructure/domain/entities/price';
 
 export class PaymentService {
@@ -1028,7 +1029,6 @@ export class PaymentService {
     country?: string,
   ): Promise<Stripe.Tax.Calculation | undefined> {
     const customerDetails: Stripe.Tax.CalculationCreateParams.CustomerDetails = {};
-    const usingIpAddress = !(postalCode && country);
 
     if (postalCode && country) {
       customerDetails.address = {
@@ -1056,13 +1056,10 @@ export class PaymentService {
       });
     } catch (error) {
       const isInsufficientLocationError =
-        usingIpAddress &&
-        !customerId &&
-        error instanceof Stripe.errors.StripeError &&
-        error.message?.includes('insufficient to determine');
+        error instanceof Stripe.errors.StripeError && error.code === STRIPE_TAX_LOCATION_INVALID_CODE;
 
       if (isInsufficientLocationError) {
-        Logger.warn(`Tax calculation skipped: IP ${ipAddress} is insufficient to determine tax location`);
+        Logger.error('Tax calculation skipped: location is insufficient to determine the tax jurisdiction');
         return undefined;
       }
 
