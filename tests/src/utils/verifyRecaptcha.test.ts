@@ -107,4 +107,66 @@ describe('Validate Captcha token', () => {
 
     await expect(verifyRecaptcha('network-fail-token')).rejects.toThrow('Network Error');
   });
+
+  describe('Exponential backoff on transient network errors', () => {
+    const eaiAgainError = () => Object.assign(new Error('getaddrinfo EAI_AGAIN'), { code: 'EAI_AGAIN' });
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockedAxios.isAxiosError.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    test('When the request fails with a network error and then succeeds, then it retries and returns true', async () => {
+      mockedAxios.post
+        .mockRejectedValueOnce(eaiAgainError())
+        .mockResolvedValueOnce({ data: { success: true, score: 0.9 } });
+
+      const resultPromise = verifyRecaptcha('valid-token');
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+    });
+
+    test('When the network error persists across all attempts, then it retries up to the max and throws', async () => {
+      mockedAxios.post.mockRejectedValue(eaiAgainError());
+
+      const resultPromise = verifyRecaptcha('valid-token');
+      const expectation = expect(resultPromise).rejects.toThrow('EAI_AGAIN');
+      await jest.runAllTimersAsync();
+      await expectation;
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+    });
+
+    test('When the network error is not transient, then an error indicating so is thrown', async () => {
+      const otherError = Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
+      mockedAxios.post.mockRejectedValue(otherError);
+
+      const resultPromise = verifyRecaptcha('valid-token');
+      const expectation = expect(resultPromise).rejects.toThrow('connection refused');
+      await jest.runAllTimersAsync();
+      await expectation;
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+    });
+
+    test('When a validation error occurs (non-axios), then it does not retry', async () => {
+      mockedAxios.isAxiosError.mockReturnValue(false);
+      const errorCode = 'invalid-input-response';
+      mockedAxios.post.mockResolvedValue({ data: { success: false, 'error-codes': [errorCode] } });
+
+      const resultPromise = verifyRecaptcha('invalid-token');
+      const expectation = expect(resultPromise).rejects.toThrow(errorCode);
+      await jest.runAllTimersAsync();
+      await expectation;
+
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+    });
+  });
 });
