@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { encode } from 'querystring';
+import { encode } from 'node:querystring';
 import config from '../config';
 import Logger from '../Logger';
 import { isTransientNetworkError, sleep } from './networkRetry';

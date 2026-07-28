@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const TRANSIENT_NETWORK_ERRORS = ['EAI_AGAIN'];
+const TRANSIENT_NETWORK_ERRORS = new Set(['EAI_AGAIN']);
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -15,5 +15,5 @@ const getNetworkErrorCode = (err: unknown): string | undefined => {
 
 export const isTransientNetworkError = (err: unknown): boolean => {
   const code = getNetworkErrorCode(err);
-  return !!code && TRANSIENT_NETWORK_ERRORS.includes(code);
+  return !!code && TRANSIENT_NETWORK_ERRORS.has(code);
 };
