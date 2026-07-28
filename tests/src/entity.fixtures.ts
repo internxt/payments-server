@@ -75,7 +75,7 @@ export const getSubscriptionEntity = (params?: Partial<SubscriptionAttributes>):
     id: `sub_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     customer: `cus_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     metadata: {},
-    created: dayjs().unix(),
+    startDate: dayjs().unix(),
     priceId: `price_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
     currentPeriodEnd: dayjs().add(1, 'month').unix(),
     status: randomGenerator.pickone(['active', 'trialing', 'past_due', 'canceled']),

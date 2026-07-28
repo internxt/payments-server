@@ -123,7 +123,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       priceId: subscription.items.data[0].price.id,
       currentPeriodEnd: subscription.current_period_end,
       metadata: subscription.metadata,
-      created: subscription.created,
+      startDate: subscription.start_date,
       trialEnd: subscription.trial_end ?? undefined,
     });
   }
@@ -144,7 +144,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       status: subscription.status,
       currentPeriodEnd: subscription.current_period_end,
       priceId: subscription.items.data[0].price.id,
-      created: subscription.created,
+      startDate: subscription.start_date,
       metadata: subscription.metadata,
       trialEnd: subscription.trial_end ?? undefined,
       paymentMethod,
