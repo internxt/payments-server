@@ -502,7 +502,12 @@ export class PaymentService {
 
     const amountToCharge = this.calculateRemainingSubscriptionAmount(price, remainingMonths);
 
-    const defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.getDefaultPaymentMethod();
+    let defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.getDefaultPaymentMethod();
+
+    if (!defaultPaymentMethod) {
+      const customerPaymentMethod = await this.getDefaultPaymentMethod(subscriptionEntity.customer);
+      defaultPaymentMethod = customerPaymentMethod?.id;
+    }
 
     if (!defaultPaymentMethod) {
       throw new PaymentMethodNotFoundError('The customer has no payment method to charge the remaining amount');
