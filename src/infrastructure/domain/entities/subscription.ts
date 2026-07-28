@@ -6,7 +6,7 @@ export interface SubscriptionAttributes {
   customer: string;
   status: SubscriptionStatus;
   metadata: Record<string, unknown>;
-  created: number;
+  startDate: number;
   priceId: string;
   currentPeriodEnd: number;
   paymentMethod?: string;
@@ -26,7 +26,7 @@ export class Subscription implements SubscriptionAttributes {
   customer: string;
   status: SubscriptionStatus;
   metadata: Record<string, unknown>;
-  created: number;
+  startDate: number;
   priceId: string;
   currentPeriodEnd: number;
   paymentMethod?: string;
@@ -38,7 +38,7 @@ export class Subscription implements SubscriptionAttributes {
     customer,
     metadata,
     status,
-    created,
+    startDate,
     priceId,
     currentPeriodEnd,
     paymentMethod,
@@ -49,7 +49,7 @@ export class Subscription implements SubscriptionAttributes {
     this.customer = customer;
     this.status = status;
     this.metadata = metadata;
-    this.created = created;
+    this.startDate = startDate;
     this.priceId = priceId;
     this.currentPeriodEnd = currentPeriodEnd;
     this.trialEnd = trialEnd;

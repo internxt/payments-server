@@ -431,7 +431,8 @@ export class PaymentService {
    * @returns - The annual commitment cancellation info (remaining payments, amount per month, currency, cancel at)
    */
   getAnnualCommitmentCancellationInfo(subscription: SubscriptionEntity): CommitmentCancellationInfo {
-    const createdAt = dayjs.unix(subscription.created);
+    const subscriptionStartedAt = subscription.startDate;
+    const createdAt = dayjs.unix(subscriptionStartedAt);
     const now = dayjs();
 
     const monthsElapsed = now.diff(createdAt, 'month');
@@ -1213,7 +1214,7 @@ export class PaymentService {
       customer: subscription.customer as string,
       status: subscription.status,
       metadata: subscription.metadata,
-      created: subscription.created,
+      startDate: subscription.start_date,
       priceId: subscription.items.data[0].price.id,
       currentPeriodEnd: subscription.current_period_end,
       paymentMethod:

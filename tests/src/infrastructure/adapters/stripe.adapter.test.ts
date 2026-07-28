@@ -421,7 +421,7 @@ describe('Stripe Adapter', () => {
           priceId: stripeSubscription.items.data[0].price.id,
           currentPeriodEnd: stripeSubscription.current_period_end,
           metadata: stripeSubscription.metadata,
-          created: stripeSubscription.created,
+          startDate: stripeSubscription.start_date,
         }),
       );
     });
@@ -457,7 +457,7 @@ describe('Stripe Adapter', () => {
           status: stripeSubscription.status,
           currentPeriodEnd: stripeSubscription.current_period_end,
           priceId: stripeSubscription.items.data[0].price.id,
-          created: stripeSubscription.created,
+          startDate: stripeSubscription.start_date,
           metadata: stripeSubscription.metadata,
           trialEnd: undefined,
           paymentMethod: (stripeSubscription.default_payment_method as Stripe.PaymentMethod).id as string,
