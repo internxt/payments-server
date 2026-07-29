@@ -79,7 +79,6 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
       jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const updateCustomerSpy = jest
@@ -138,7 +137,6 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
       jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
       const createCustomerSpy = jest
@@ -198,7 +196,6 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
       jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
@@ -245,7 +242,6 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
       jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
@@ -437,7 +433,6 @@ describe('Checkout controller', () => {
         const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
         jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
@@ -466,7 +461,6 @@ describe('Checkout controller', () => {
         const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
         jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
@@ -638,6 +632,7 @@ describe('Checkout controller', () => {
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -672,6 +667,7 @@ describe('Checkout controller', () => {
         canExpand: false,
       });
       const createInvoiceSpy = jest.spyOn(PaymentService.prototype, 'createInvoice');
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -716,6 +712,8 @@ describe('Checkout controller', () => {
       test('When the currency is invalid, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
+
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -798,7 +796,6 @@ describe('Checkout controller', () => {
         const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
         jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
@@ -828,7 +825,6 @@ describe('Checkout controller', () => {
         const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
         jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
