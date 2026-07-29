@@ -1,5 +1,7 @@
 import { assertCaptcha } from '../../../src/utils/assertCaptcha';
+import Logger from '../../../src/Logger';
 import { ForbiddenError } from '../../../src/errors/Errors';
+import { CAPTCHA_VERIFICATION_FAILED_MESSAGE } from '../../../src/utils/captcha.constants';
 import { verifyRecaptcha } from '../../../src/utils/verifyRecaptcha';
 import { TurnstileUnavailableError, verifyTurnstile } from '../../../src/utils/verifyTurnstile';
 
@@ -17,21 +19,17 @@ jest.mock('../../../src/utils/verifyTurnstile', () => {
   };
 });
 
-jest.mock('../../../src/Logger', () => ({
-  __esModule: true,
-  default: {
-    warn: jest.fn(),
-    info: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
 const mockedVerifyTurnstile = verifyTurnstile as jest.MockedFunction<typeof verifyTurnstile>;
 const mockedVerifyRecaptcha = verifyRecaptcha as jest.MockedFunction<typeof verifyRecaptcha>;
 
 describe('Asserting that a request comes from a human', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Logger, 'warn').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('When Turnstile verifies the request, then reCAPTCHA is not consulted', async () => {

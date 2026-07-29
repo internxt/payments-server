@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { TurnstileUnavailableError, verifyTurnstile } from '../../../src/utils/verifyTurnstile';
 import config from '../../../src/config';
+import { CAPTCHA_MAX_ATTEMPTS, UNKNOWN_CAPTCHA_REJECTION_REASON } from '../../../src/utils/captcha.constants';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -40,6 +41,12 @@ describe('Validate Turnstile token', () => {
     mockedAxios.post.mockResolvedValue({ data: { success: false, 'error-codes': ['invalid-input-response'] } });
 
     await expect(verifyTurnstile('invalid-token')).rejects.toThrow('invalid-input-response');
+  });
+
+  test('When Cloudflare rejects the token without stating a reason, then the failure should still name one', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { success: false } });
+
+    await expect(verifyTurnstile('invalid-token')).rejects.toThrow(UNKNOWN_CAPTCHA_REJECTION_REASON);
   });
 
   test('When the token was already spent, then it should throw instead of treating it as unavailability', async () => {
@@ -90,7 +97,7 @@ describe('Validate Turnstile token', () => {
       await jest.runAllTimersAsync();
       await expectation;
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(CAPTCHA_MAX_ATTEMPTS);
     });
 
     test('When the network fails and then recovers, then it should return true', async () => {
@@ -113,7 +120,7 @@ describe('Validate Turnstile token', () => {
       await jest.runAllTimersAsync();
       await expectation;
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(CAPTCHA_MAX_ATTEMPTS);
     });
 
     test('When the network error is not transient, then it should fail without retrying', async () => {

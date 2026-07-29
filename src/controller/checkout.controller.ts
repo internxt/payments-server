@@ -27,7 +27,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         country: string;
         postalCode?: string;
         captchaToken?: string;
-        turnstileToken?: string;
+        turnstileToken: string;
         companyVatId?: string;
         metadata?: Record<string, string>;
       };
@@ -37,8 +37,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['country'],
-            anyOf: [{ required: ['turnstileToken'] }, { required: ['captchaToken'] }],
+            required: ['country', 'turnstileToken'],
             properties: {
               customerName: { type: 'string' },
               lineAddress1: { type: 'string' },
@@ -134,7 +133,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         priceId: string;
         token: string;
         captchaToken?: string;
-        turnstileToken?: string;
+        turnstileToken: string;
         currency?: string;
         promoCodeId?: string;
         quantity?: number;
@@ -145,8 +144,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token'],
-            anyOf: [{ required: ['turnstileToken'] }, { required: ['captchaToken'] }],
+            required: ['customerId', 'priceId', 'token','turnstileToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -215,7 +213,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         token: string;
         currency: string;
         captchaToken?: string;
-        turnstileToken?: string;
+        turnstileToken: string;
         userAddress: string;
         promoCodeId?: string;
       };
@@ -225,8 +223,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token', 'currency'],
-            anyOf: [{ required: ['turnstileToken'] }, { required: ['captchaToken'] }],
+            required: ['customerId', 'priceId', 'token', 'currency', 'turnstileToken'],
             properties: {
               customerId: {
                 type: 'string',

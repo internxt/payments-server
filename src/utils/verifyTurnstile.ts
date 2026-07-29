@@ -3,9 +3,12 @@ import { encode } from 'node:querystring';
 import config from '../config';
 import Logger from '../Logger';
 import { isTransientNetworkError, sleep } from './networkRetry';
+import {
+  CAPTCHA_MAX_ATTEMPTS,
+  CAPTCHA_RETRY_BASE_DELAY_MS,
+  UNKNOWN_CAPTCHA_REJECTION_REASON,
+} from './captcha.constants';
 
-const MAX_TURNSTILE_ATTEMPTS = 3;
-const TURNSTILE_RETRY_BASE_DELAY_MS = 300;
 const RETRYABLE_TURNSTILE_ERROR_CODE = 'internal-error';
 
 type TurnstileVerificationResponse = {
@@ -15,7 +18,13 @@ type TurnstileVerificationResponse = {
   hostname?: string;
 };
 
-export class TurnstileUnavailableError extends Error {}
+export class TurnstileUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+
+    Object.setPrototypeOf(this, TurnstileUnavailableError.prototype);
+  }
+}
 
 async function requestTurnstile(turnstileToken: string): Promise<boolean> {
   const body = {
@@ -31,24 +40,29 @@ async function requestTurnstile(turnstileToken: string): Promise<boolean> {
 
   if (!res.data.success) {
     const errorCodes = res.data['error-codes'] ?? [];
+    const rejectionReason = errorCodes.join(', ') || UNKNOWN_CAPTCHA_REJECTION_REASON;
 
     if (errorCodes.includes(RETRYABLE_TURNSTILE_ERROR_CODE)) {
-      throw new TurnstileUnavailableError(errorCodes.join(', '));
+      throw new TurnstileUnavailableError(rejectionReason);
     }
 
-    throw new Error(errorCodes.join(', '));
+    throw new Error(rejectionReason);
   }
 
   return res.data.success;
 }
 
+function isRetryableTurnstileError(err: unknown): boolean {
+  return isTransientNetworkError(err) || err instanceof TurnstileUnavailableError;
+}
+
 export async function verifyTurnstile(turnstileToken: string): Promise<boolean> {
-  for (let attempt = 0; attempt < MAX_TURNSTILE_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < CAPTCHA_MAX_ATTEMPTS; attempt++) {
     try {
       return await requestTurnstile(turnstileToken);
     } catch (err) {
-      const isLastAttempt = attempt === MAX_TURNSTILE_ATTEMPTS - 1;
-      const isRetryable = isTransientNetworkError(err) || err instanceof TurnstileUnavailableError;
+      const isLastAttempt = attempt === CAPTCHA_MAX_ATTEMPTS - 1;
+      const isRetryable = isRetryableTurnstileError(err);
 
       if (!isRetryable) {
         throw err;
@@ -58,9 +72,9 @@ export async function verifyTurnstile(turnstileToken: string): Promise<boolean> 
         throw new TurnstileUnavailableError((err as Error).message);
       }
 
-      const delay = TURNSTILE_RETRY_BASE_DELAY_MS * 2 ** attempt;
+      const delay = CAPTCHA_RETRY_BASE_DELAY_MS * 2 ** attempt;
       Logger.warn(
-        `Turnstile verification failed with a transient error, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_TURNSTILE_ATTEMPTS})`,
+        `Turnstile verification failed with a transient error, retrying in ${delay}ms (attempt ${attempt + 1}/${CAPTCHA_MAX_ATTEMPTS})`,
       );
       await sleep(delay);
     }

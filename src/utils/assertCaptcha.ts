@@ -1,5 +1,6 @@
 import { ForbiddenError } from '../errors/Errors';
 import Logger from '../Logger';
+import { CAPTCHA_VERIFICATION_FAILED_MESSAGE } from './captcha.constants';
 import { verifyRecaptcha } from './verifyRecaptcha';
 import { TurnstileUnavailableError, verifyTurnstile } from './verifyTurnstile';
 
@@ -23,7 +24,7 @@ export async function assertCaptcha({ turnstileToken, captchaToken }: CaptchaTok
 
       if (!(err instanceof TurnstileUnavailableError)) {
         Logger.warn(`Turnstile rejected the token: ${message}`);
-        throw new ForbiddenError('Token verification failed');
+        throw new ForbiddenError(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
       }
 
       Logger.warn(`Turnstile could not verify the token, falling back to reCAPTCHA: ${message}`);
@@ -31,7 +32,7 @@ export async function assertCaptcha({ turnstileToken, captchaToken }: CaptchaTok
   }
 
   if (!captchaToken) {
-    throw new ForbiddenError('Token verification failed');
+    throw new ForbiddenError(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
   }
 
   try {
@@ -42,6 +43,6 @@ export async function assertCaptcha({ turnstileToken, captchaToken }: CaptchaTok
     }
   } catch (err) {
     Logger.warn(`reCAPTCHA verification failed: ${(err as Error).message}`);
-    throw new ForbiddenError('Token verification failed');
+    throw new ForbiddenError(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
   }
 }
