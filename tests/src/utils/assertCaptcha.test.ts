@@ -90,4 +90,18 @@ describe('Asserting that a request comes from a human', () => {
 
     await expect(assertCaptcha({ captchaToken: 'captcha-token' })).rejects.toThrow(ForbiddenError);
   });
+
+  test('When the request is forbidden, then the reason is never disclosed to the caller', async () => {
+    mockedVerifyTurnstile.mockRejectedValue(new Error('invalid-input-response'));
+    const turnstileRejection = assertCaptcha({ turnstileToken: 'forged-token', captchaToken: 'captcha-token' });
+
+    mockedVerifyRecaptcha.mockRejectedValue(new Error('invalid-input-response'));
+    const recaptchaRejection = assertCaptcha({ captchaToken: 'forged-token' });
+
+    const missingTokenRejection = assertCaptcha({});
+
+    await expect(turnstileRejection).rejects.toThrow(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
+    await expect(recaptchaRejection).rejects.toThrow(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
+    await expect(missingTokenRejection).rejects.toThrow(CAPTCHA_VERIFICATION_FAILED_MESSAGE);
+  });
 });
