@@ -21,6 +21,7 @@ import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
+import * as verifyTurnstile from '../../../src/utils/verifyTurnstile';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
@@ -65,6 +66,7 @@ describe('Checkout controller', () => {
       const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: userEmail });
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       const captchaToken = 'valid_captcha_token';
+      const turnstileToken = 'valid_turnstile_token';
       const customerData = {
         customerName: 'John Doe',
         lineAddress1: 'Street 123',
@@ -73,9 +75,12 @@ describe('Checkout controller', () => {
         country: 'ES',
         postalCode: '08001',
         captchaToken,
+        turnstileToken,
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       const updateCustomerSpy = jest
         .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
@@ -120,6 +125,7 @@ describe('Checkout controller', () => {
       const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: userEmail });
       const userToken = getValidUserToken({ customerId: mockedCustomer.id });
       const captchaToken = 'valid_captcha_token';
+      const turnstileToken = 'valid_turnstile_token';
       const customerData = {
         customerName: 'John Doe',
         lineAddress1: 'Street 123',
@@ -128,9 +134,12 @@ describe('Checkout controller', () => {
         country: 'ES',
         postalCode: '08001',
         captchaToken,
+        turnstileToken,
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
       const createCustomerSpy = jest
         .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
@@ -175,6 +184,7 @@ describe('Checkout controller', () => {
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       const captchaToken = 'valid_captcha_token';
+      const turnstileToken = 'valid_turnstile_token';
       const customerData = {
         customerName: 'Company SL',
         lineAddress1: 'Street 123',
@@ -183,10 +193,13 @@ describe('Checkout controller', () => {
         country: 'ES',
         postalCode: '28001',
         captchaToken,
+        turnstileToken,
         companyVatId: 'ESB12345678',
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest
@@ -219,6 +232,7 @@ describe('Checkout controller', () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const captchaToken = 'valid_captcha_token';
+      const turnstileToken = 'valid_turnstile_token';
       const customerData = {
         customerName: 'John Doe',
         lineAddress1: 'Street 123',
@@ -227,9 +241,12 @@ describe('Checkout controller', () => {
         country: 'ES',
         postalCode: '08001',
         captchaToken,
+        turnstileToken,
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
       jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest.spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer');
@@ -247,10 +264,11 @@ describe('Checkout controller', () => {
       expect(attachVatIdSpy).not.toHaveBeenCalled();
     });
 
-    test('when captcha verification fails, then an error indicating so is thrown', async () => {
+    test('when the captcha token is rejected, then the customer is not looked up and an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
       const captchaToken = 'invalid_captcha_token';
+      const turnstileToken = 'valid_turnstile_token';
       const customerData = {
         customerName: 'John Doe',
         lineAddress1: 'Street 123',
@@ -259,9 +277,10 @@ describe('Checkout controller', () => {
         country: 'ES',
         postalCode: '08001',
         captchaToken,
+        turnstileToken,
       };
 
-      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(false);
       const findUserSpy = jest.spyOn(UsersService.prototype, 'findUserByUuid');
 
       const response = await app.inject({
@@ -284,6 +303,7 @@ describe('Checkout controller', () => {
       const mockedPrice = getPrice();
       const mockedSubscriptionResponse = getCreateSubscriptionResponse();
       const mockedCaptchaToken = 'captcha_token';
+      const mockedTurnstileToken = 'turnstile_token';
 
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
@@ -293,6 +313,7 @@ describe('Checkout controller', () => {
         .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/subscription',
@@ -304,6 +325,7 @@ describe('Checkout controller', () => {
           quantity: 1,
           token: userToken,
           captchaToken: mockedCaptchaToken,
+          turnstileToken: mockedTurnstileToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -321,6 +343,7 @@ describe('Checkout controller', () => {
         const mockedUser = getUser();
         const mockedPrice = getPrice();
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: mockedUser.customerId });
@@ -329,6 +352,7 @@ describe('Checkout controller', () => {
           .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
           .mockResolvedValue(getPriceEntity({ type: UserType.Business }));
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -340,6 +364,7 @@ describe('Checkout controller', () => {
             quantity: 1,
             token: userToken,
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -409,8 +434,11 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -420,6 +448,7 @@ describe('Checkout controller', () => {
             customerId: mockedUser.customerId,
             token: invalidUserToken,
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -434,8 +463,11 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ customerId: 'invalid_customer_id' });
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/subscription',
@@ -446,6 +478,7 @@ describe('Checkout controller', () => {
             token: userToken,
             currency: 'eur',
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -455,12 +488,16 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(403);
       });
 
-      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+      test('When Turnstile is unavailable and the reCAPTCHA fallback also rejects the token, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
+        jest
+          .spyOn(verifyTurnstile, 'verifyTurnstile')
+          .mockRejectedValue(new verifyTurnstile.TurnstileUnavailableError('Turnstile is unavailable'));
         const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
 
         const response = await app.inject({
@@ -472,6 +509,7 @@ describe('Checkout controller', () => {
             token: userToken,
             currency: 'eur',
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -503,6 +541,7 @@ describe('Checkout controller', () => {
         type: 'fiat',
       } as const;
       const mockedCaptchaToken = 'captcha_token';
+      const mockedTurnstileToken = 'turnstile_token';
 
       jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
@@ -510,6 +549,7 @@ describe('Checkout controller', () => {
       });
       jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -520,6 +560,7 @@ describe('Checkout controller', () => {
           token: userToken,
           currency: 'eur',
           captchaToken: mockedCaptchaToken,
+          turnstileToken: mockedTurnstileToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -542,6 +583,7 @@ describe('Checkout controller', () => {
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
       const mockedCaptchaToken = 'captcha_token';
+      const mockedTurnstileToken = 'turnstile_token';
       const mockedPaymentIntent: PaymentIntent = {
         id: 'payment_intent_id',
         type: 'crypto',
@@ -562,6 +604,7 @@ describe('Checkout controller', () => {
       });
       jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+      jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -572,6 +615,7 @@ describe('Checkout controller', () => {
           token: userToken,
           currency: AllowedCryptoCurrencies['Bitcoin'],
           captchaToken: mockedCaptchaToken,
+          turnstileToken: mockedTurnstileToken,
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -603,6 +647,7 @@ describe('Checkout controller', () => {
           priceId: mockedPrice.id,
           token: userToken,
           currency: AllowedCryptoCurrencies['Bitcoin'],
+          turnstileToken: 'turnstile_token',
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -635,6 +680,8 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedInvoice.lines.data[0].price?.id,
           token: userToken,
+          currency: 'eur',
+          turnstileToken: 'turnstile_token',
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -678,6 +725,7 @@ describe('Checkout controller', () => {
             priceId: 'price_id',
             token: getValidUserToken({ customerId: mockedUser.customerId }),
             currency: 'gbp',
+            turnstileToken: 'turnstile_token',
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -747,8 +795,11 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const invalidUserToken = 'malformed.token.payload';
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -759,6 +810,7 @@ describe('Checkout controller', () => {
             token: invalidUserToken,
             currency: 'eur',
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -773,8 +825,11 @@ describe('Checkout controller', () => {
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        jest.spyOn(verifyTurnstile, 'verifyTurnstile').mockResolvedValue(true);
 
         const response = await app.inject({
           path: '/checkout/payment-intent',
@@ -785,6 +840,7 @@ describe('Checkout controller', () => {
             token: userToken,
             currency: 'eur',
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
@@ -794,12 +850,16 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(403);
       });
 
-      test('When the provided captcha does not pass the validation, then an error indicating so is thrown', async () => {
+      test('When Turnstile is unavailable and the reCAPTCHA fallback also rejects the token, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
         const userToken = getValidUserToken({ invoiceId: 'invalid_customer_id' });
         const mockedCaptchaToken = 'captcha_token';
+        const mockedTurnstileToken = 'turnstile_token';
 
+        jest
+          .spyOn(verifyTurnstile, 'verifyTurnstile')
+          .mockRejectedValue(new verifyTurnstile.TurnstileUnavailableError('Turnstile is unavailable'));
         const verifyRecaptchaSpy = jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
 
         const response = await app.inject({
@@ -811,6 +871,7 @@ describe('Checkout controller', () => {
             token: userToken,
             currency: 'eur',
             captchaToken: mockedCaptchaToken,
+            turnstileToken: mockedTurnstileToken,
           },
           headers: {
             authorization: `Bearer ${authToken}`,
