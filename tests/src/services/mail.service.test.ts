@@ -1,4 +1,4 @@
-import { AxiosInstance } from 'axios';
+import { AxiosError, AxiosInstance } from 'axios';
 import { MailService } from '../../../src/services/mail.service';
 import { AppConfig } from '../../../src/config';
 
@@ -17,6 +17,13 @@ function buildService() {
   const mailService = new MailService(config, axios);
 
   return { mailService, post };
+}
+
+function axiosErrorWithStatus(status: number): AxiosError {
+  const error = new AxiosError('Request failed');
+  error.response = { status } as AxiosError['response'];
+
+  return error;
 }
 
 describe('MailService', () => {
@@ -38,11 +45,30 @@ describe('MailService', () => {
 
       await mailService.suspendAccount(uuid);
 
-      expect(post).toHaveBeenCalledWith(
-        `http://mail.local/gateway/accounts/${uuid}/suspend`,
-        {},
-        expectedParams,
-      );
+      expect(post).toHaveBeenCalledWith(`http://mail.local/gateway/accounts/${uuid}/suspend`, {}, expectedParams);
+    });
+
+    test('When the mail account does not exist, then the 404 is swallowed', async () => {
+      const { mailService, post } = buildService();
+      post.mockRejectedValue(axiosErrorWithStatus(404));
+
+      await expect(mailService.suspendAccount('user-uuid')).resolves.toBeUndefined();
+    });
+
+    test('When the request fails with a status other than 404, then the error is rethrown', async () => {
+      const { mailService, post } = buildService();
+      const error = axiosErrorWithStatus(500);
+      post.mockRejectedValue(error);
+
+      await expect(mailService.suspendAccount('user-uuid')).rejects.toThrow(error);
+    });
+
+    test('When the request fails with a non-axios error, then the error is rethrown', async () => {
+      const { mailService, post } = buildService();
+      const error = new Error('socket hang up');
+      post.mockRejectedValue(error);
+
+      await expect(mailService.suspendAccount('user-uuid')).rejects.toThrow(error);
     });
   });
 
@@ -53,11 +79,22 @@ describe('MailService', () => {
 
       await mailService.reactivateAccount(uuid);
 
-      expect(post).toHaveBeenCalledWith(
-        `http://mail.local/gateway/accounts/${uuid}/reactivate`,
-        {},
-        expectedParams,
-      );
+      expect(post).toHaveBeenCalledWith(`http://mail.local/gateway/accounts/${uuid}/reactivate`, {}, expectedParams);
+    });
+
+    test('When the mail account does not exist, then the 404 is swallowed', async () => {
+      const { mailService, post } = buildService();
+      post.mockRejectedValue(axiosErrorWithStatus(404));
+
+      await expect(mailService.reactivateAccount('user-uuid')).resolves.toBeUndefined();
+    });
+
+    test('When the request fails with a status other than 404, then the error is rethrown', async () => {
+      const { mailService, post } = buildService();
+      const error = axiosErrorWithStatus(500);
+      post.mockRejectedValue(error);
+
+      await expect(mailService.reactivateAccount('user-uuid')).rejects.toThrow(error);
     });
   });
 });

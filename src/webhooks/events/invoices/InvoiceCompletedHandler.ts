@@ -368,15 +368,15 @@ export class InvoiceCompletedHandler {
     }
 
     // Apply Mail features
-    // try {
-    //   await this.tiersService.applyMailFeatures(user, tierToApply);
-    //   Logger.info(`Mail features applied for user ${user.uuid} with customerId ${customer.id}`);
-    // } catch (error) {
-    //   Logger.error(`Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}`, {
-    //     error: (error as Error).message,
-    //   });
-    //   throw error;
-    // }
+    try {
+      await this.tiersService.applyMailFeatures(user, tierToApply);
+      Logger.info(`Mail features applied for user ${user.uuid} with customerId ${customer.id}`);
+    } catch (error) {
+      Logger.error(`Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}`, {
+        error: (error as Error).message,
+      });
+      throw error;
+    }
   }
 
   /**

@@ -122,8 +122,8 @@ export class TiersService {
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
           break;
-          // case Service.Mail:
-          //   await this.removeMailFeatures(userUuid);
+        case Service.Mail:
+          await this.removeMailFeatures(userUuid);
           break;
         default:
           // TODO;
