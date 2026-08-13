@@ -29,6 +29,9 @@ export interface PlanSubscription {
     isElegibleForCancellation?: boolean;
     earlyCancellationFee?: number;
   };
+  tax?: {
+    enabled: boolean;
+  };
   storageLimit: number;
   amountOfSeats: number;
   cancellationTrial: {

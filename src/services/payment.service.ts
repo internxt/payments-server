@@ -517,6 +517,9 @@ export class PaymentService {
       },
       default_payment_method: defaultPaymentMethod,
       pending_invoice_items_behavior: 'include',
+      automatic_tax: {
+        enabled: true,
+      },
     });
 
     await stripePaymentsAdapter.addInvoiceItems(invoice.id, subscriptionEntity.customer, {
@@ -943,6 +946,7 @@ export class PaymentService {
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
     const subscriptionEntity = this.mapToSubscriptionEntity(subscription);
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
+    const enabledTaxes = upcomingInvoice.tax ? upcomingInvoice.tax > 0 : false;
 
     let earlyCancellationFee: number | undefined;
     if (hasAnnualCommitment) {
@@ -981,6 +985,9 @@ export class PaymentService {
       },
       cancellationTrial: {
         redeemed: hasRedeemedCancellationTrial ?? false,
+      },
+      tax: {
+        enabled: enabledTaxes,
       },
       cancellation: {
         scheduled: !!subscription.cancel_at,
