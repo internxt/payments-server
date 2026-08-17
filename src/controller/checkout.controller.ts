@@ -137,6 +137,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         currency?: string;
         promoCodeId?: string;
         quantity?: number;
+        impactClickId?: string;
       };
     }>(
       '/subscription',
@@ -162,12 +163,15 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               promoCodeId: {
                 type: 'string',
               },
+              impactClickId: {
+                type: 'string'
+              }
             },
           },
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, captchaToken, token, impactClickId} = req.body;
         let tokenCustomerId;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -198,6 +202,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           priceId,
           currency,
           promoCodeId,
+          impactClickId,
           additionalOptions: {
             automatic_tax: {
               enabled: true,
@@ -218,6 +223,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         captchaToken: string;
         userAddress: string;
         promoCodeId?: string;
+        impactClickId?: string;
+
       };
     }>(
       '/payment-intent',
@@ -244,6 +251,9 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               promoCodeId: {
                 type: 'string',
               },
+              impactClickId: {
+                type: 'string'
+              }
             },
           },
         },
@@ -257,7 +267,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId, impactClickId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -304,6 +314,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           currency: currency.trim(),
           promoCodeId,
           userAddress,
+          impactClickId,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: true,
