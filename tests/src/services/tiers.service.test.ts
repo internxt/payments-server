@@ -276,16 +276,16 @@ describe('TiersService tests', () => {
       const removeVPNFeatures = jest
         .spyOn(tiersService, 'removeVPNFeatures')
         .mockImplementation(() => Promise.resolve());
-      // const removeMailFeatures = jest
-      //   .spyOn(tiersService, 'removeMailFeatures')
-      //   .mockImplementation(() => Promise.resolve());
+      const removeMailFeatures = jest
+        .spyOn(tiersService, 'removeMailFeatures')
+        .mockImplementation(() => Promise.resolve());
 
       await tiersService.removeTier(userWithEmail, productId, log);
 
       expect(findTierByProductId).toHaveBeenCalledWith({ productId });
       expect(removeDriveFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier, log);
       expect(removeVPNFeatures).toHaveBeenCalledWith(userWithEmail.uuid, mockedTier.featuresPerService['vpn']);
-      // expect(removeMailFeatures).toHaveBeenCalledWith(userWithEmail.uuid);
+      expect(removeMailFeatures).toHaveBeenCalledWith(userWithEmail.uuid);
     });
   });
 
