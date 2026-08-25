@@ -23,6 +23,8 @@ import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCoupo
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 import { Bit2MeService } from '../services/bit2me.service';
+import { DynamicConfigKey, DynamicConfigRepository } from '../core/infra/DynamicConfigRepository';
+import { MongoDBDynamicConfigRepository } from '../core/infra/MongoDBDynamicConfigRepository';
 
 const [, , filePath, provider] = process.argv;
 
@@ -57,7 +59,12 @@ function loadFromExcel(): LicenseCode[] {
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
-    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
+    const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
+
+    const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
+    const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
+
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);

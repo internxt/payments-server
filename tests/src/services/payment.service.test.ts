@@ -26,7 +26,9 @@ import {
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
-import { stripeNewVersion } from '../../../src/services/stripe';
+import { getStripeNewVersion } from '../../../src/services/stripe';
+
+const stripeNewVersion = getStripeNewVersion();
 import config from '../../../src/config';
 import { generateQrCodeUrl } from '../../../src/utils/generateQrCodeUrl';
 import jwt from 'jsonwebtoken';

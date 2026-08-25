@@ -22,7 +22,7 @@ import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
-import { stripeNewVersion } from './stripe';
+import { getStripeNewVersion } from './stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
   CustomerId,
@@ -234,7 +234,7 @@ export class PaymentService {
     const paymentMethodTypes =
       normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
 
-    const invoice = await stripeNewVersion.invoices.create({
+    const invoice = await getStripeNewVersion().invoices.create({
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
@@ -248,7 +248,7 @@ export class PaymentService {
     }
 
     const invoiceId = invoice.id;
-    const invoiceItem = await stripeNewVersion.invoiceItems.create({
+    const invoiceItem = await getStripeNewVersion().invoiceItems.create({
       customer: customerId,
       invoice: invoiceId,
       pricing: {
@@ -283,7 +283,7 @@ export class PaymentService {
         throw new BadRequestError('Customer address information is incomplete');
       }
 
-      const upcomingInvoice = await stripeNewVersion.invoices.retrieve(invoiceId);
+      const upcomingInvoice = await getStripeNewVersion().invoices.retrieve(invoiceId);
 
       const priceAmount = upcomingInvoice.total / 100;
       Logger.info(
@@ -320,7 +320,7 @@ export class PaymentService {
         description: 'Invoice paid using crypto currencies.',
       });
 
-      const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
+      const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {
         auto_advance: false,
         expand: ['payments', 'confirmation_secret'],
       });
@@ -351,7 +351,7 @@ export class PaymentService {
       };
     }
 
-    const finalizedInvoice = await stripeNewVersion.invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 

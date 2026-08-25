@@ -13,9 +13,13 @@ import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
-  readonly provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
+  provider: Stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
     apiVersion: '2025-02-24.acacia',
   });
+
+  initProvider(provider: Stripe) {
+    this.provider = provider;
+  }
 
   async createCustomer(params: Partial<CreateCustomerParams>): Promise<Customer> {
     const stripeCustomer = await this.provider.customers.create(this.toStripeCustomerParams(params));

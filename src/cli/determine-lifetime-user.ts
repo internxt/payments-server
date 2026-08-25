@@ -11,6 +11,8 @@ import {
   DisplayBillingRepository,
   MongoDBDisplayBillingRepository,
 } from '../core/users/MongoDBDisplayBillingRepository';
+import { DynamicConfigKey, DynamicConfigRepository } from '../core/infra/DynamicConfigRepository';
+import { MongoDBDynamicConfigRepository } from '../core/infra/MongoDBDynamicConfigRepository';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
@@ -23,13 +25,19 @@ import { TiersService } from '../services/tiers.service';
 import { MongoDBTiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { StorageService } from '../services/storage.service';
+import { MailService } from '../services/mail.service';
 
 const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
   try {
-    const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
+    const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
+
+    const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
+    const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
+
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
@@ -57,14 +65,14 @@ async function main() {
     const tiersRepository = new MongoDBTiersRepository(mongoClient);
     const usersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
     const storageService = new StorageService(envVariablesConfig, axios);
+    const mailService = new MailService(envVariablesConfig, axios);
 
     const tiersService = new TiersService(
       usersService,
-      paymentService,
       tiersRepository,
       usersTiersRepository,
       storageService,
-      envVariablesConfig,
+      mailService,
     );
 
     const determineLifetimeUserCondition = new DetermineLifetimeConditions(paymentService, tiersService);

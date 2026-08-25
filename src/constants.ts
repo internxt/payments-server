@@ -3,3 +3,4 @@ export const FREE_PLAN_BYTES_SPACE = 1 * 1024 * 1024 * 1024;
 export const VERIFICATION_CHARGE = 100;
 export const DEFAULT_CUSTOMER_NAME = 'Internxt User';
 export const SUBSCRIPTION_EARLY_CANCELLATION_KEY = 'subscription_early_termination';
+export const STRIPE_API_VERSION = '2025-02-24.acacia';
