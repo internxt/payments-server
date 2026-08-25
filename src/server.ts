@@ -58,8 +58,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
 
   const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
-  const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
 
+  const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
   const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
   stripePaymentsAdapter.initProvider(stripe);
   initStripeNewVersion(stripeSecretKey);
