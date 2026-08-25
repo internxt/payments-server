@@ -1,15 +1,20 @@
 import Stripe from 'stripe-next-version';
 import config from '../config';
 
-let stripeNewVersionInstance: typeof Stripe | null = null;
+let stripeNewVersionInstance: InstanceType<typeof Stripe> | null = null;
 
-export const getStripeNewVersion = (): typeof Stripe => {
+const createInstance = (stripeKey: string): InstanceType<typeof Stripe> =>
+  new Stripe(stripeKey, {
+    apiVersion: '2025-08-27.basil',
+  });
+
+export const initStripeNewVersion = (stripeKey: string): void => {
+  stripeNewVersionInstance = createInstance(stripeKey);
+};
+
+export const getStripeNewVersion = (): InstanceType<typeof Stripe> => {
   if (!stripeNewVersionInstance) {
-    stripeNewVersionInstance = new Stripe(config.STRIPE_SECRET_KEY, {
-      apiVersion: '2025-08-27.basil',
-    });
+    stripeNewVersionInstance = createInstance(config.STRIPE_SECRET_KEY);
   }
   return stripeNewVersionInstance;
 };
-
-export const stripeNewVersion = getStripeNewVersion();

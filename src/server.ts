@@ -37,6 +37,10 @@ import {
   UserFeatureOverridesRepository,
 } from './core/users/MongoDBUserFeatureOverridesRepository';
 import { HealthService } from './services/health.service';
+import { DynamicConfigKey, DynamicConfigRepository } from './core/infra/DynamicConfigRepository';
+import { MongoDBDynamicConfigRepository } from './core/infra/MongoDBDynamicConfigRepository';
+import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
+import { initStripeNewVersion } from './services/stripe';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -51,8 +55,15 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const userFeatureOverridesRepository: UserFeatureOverridesRepository = new MongoDBUserFeatureOverridesRepository(
     mongoClient,
   );
+  const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
 
-  const stripe = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
+  const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
+  const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
+
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
+  stripePaymentsAdapter.initProvider(stripe);
+  initStripeNewVersion(stripeSecretKey);
+
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
   const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);
