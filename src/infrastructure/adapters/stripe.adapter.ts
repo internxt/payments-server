@@ -11,9 +11,11 @@ import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
+import { EU_COUNTRIES } from '../../constants';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   private _provider?: Stripe;
+  public taxRegistrations = new Set<string>();
 
   get provider(): Stripe {
     if (!this._provider) {
@@ -26,6 +28,40 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
 
   initProvider(provider: Stripe) {
     this._provider = provider;
+  }
+
+  async syncTaxRegistrations(): Promise<void> {
+    const registrations = new Set<string>();
+
+    for await (const registration of this.provider.tax.registrations.list({ status: 'active' })) {
+      if (registration.country) {
+        registrations.add(registration.country.toUpperCase());
+      }
+
+      if (this.isOssUnionRegistration(registration)) {
+        EU_COUNTRIES.forEach((country) => registrations.add(country));
+      }
+    }
+
+    this.taxRegistrations = registrations;
+  }
+
+  private isOssUnionRegistration(registration: Stripe.Tax.Registration): boolean {
+    return Object.values(registration.country_options ?? {}).some(
+      (option) => (option as { type?: string })?.type === 'oss_union',
+    );
+  }
+
+  shouldCalculateTax(country?: string | null): boolean {
+    if (!country) return false;
+
+    return this.taxRegistrations.has(country.toUpperCase());
+  }
+
+  async shouldCalculateTaxForCustomer(customerId: Customer['id']): Promise<boolean> {
+    const customer = await this.getCustomer(customerId);
+
+    return this.shouldCalculateTax(customer.getAddress()?.country);
   }
 
   async createCustomer(params: Partial<CreateCustomerParams>): Promise<Customer> {

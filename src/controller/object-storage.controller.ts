@@ -133,6 +133,8 @@ export function objectStorageController(paymentService: PaymentService) {
         }
 
         try {
+          const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+
           const createdSubscription = await paymentService.createSubscription({
             customerId,
             priceId,
@@ -140,7 +142,7 @@ export function objectStorageController(paymentService: PaymentService) {
             promoCodeId,
             additionalOptions: {
               automatic_tax: {
-                enabled: true,
+                enabled: shouldCalculateTaxes,
               },
             },
           });

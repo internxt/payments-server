@@ -508,6 +508,8 @@ export class PaymentService {
       throw new PaymentMethodNotFoundError('The customer has no payment method to charge the remaining amount');
     }
 
+    const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(subscriptionEntity.customer);
+
     const invoice = await stripePaymentsAdapter.createInvoice({
       customer: subscriptionEntity.customer,
       auto_advance: false,
@@ -518,7 +520,7 @@ export class PaymentService {
       default_payment_method: defaultPaymentMethod,
       pending_invoice_items_behavior: 'include',
       automatic_tax: {
-        enabled: true,
+        enabled: shouldCalculateTaxes,
       },
     });
 
@@ -1044,7 +1046,7 @@ export class PaymentService {
         country: country,
       };
       customerDetails.address_source = 'billing';
-    } else {
+    } else if (ipAddress) {
       customerDetails.ip_address = ipAddress;
     }
 

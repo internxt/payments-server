@@ -64,6 +64,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   stripePaymentsAdapter.initProvider(stripe);
   initStripeNewVersion(stripeSecretKey);
 
+  await stripePaymentsAdapter.syncTaxRegistrations();
+
   const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
   const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
   const storageService = new StorageService(envVariablesConfig, axios);

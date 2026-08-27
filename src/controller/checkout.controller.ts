@@ -193,6 +193,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
 
         if (price.isBusinessPlan()) throw new BadRequestError('Business plan is no longer available');
 
+        const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+
         const subscriptionAttempt = await paymentsService.createSubscription({
           customerId,
           priceId,
@@ -200,7 +202,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           promoCodeId,
           additionalOptions: {
             automatic_tax: {
-              enabled: true,
+              enabled: shouldCalculateTaxes,
             },
           },
         });
@@ -297,6 +299,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new BadRequestError('The user already has the maximum storage allowed');
         }
 
+        const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+
         const result = await paymentsService.createInvoice({
           customerId,
           priceId,
@@ -306,7 +310,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           userAddress,
           additionalInvoiceOptions: {
             automatic_tax: {
-              enabled: true,
+              enabled: shouldCalculateTaxes,
             },
           },
         });
@@ -363,8 +367,9 @@ export function checkoutController(usersService: UsersService, paymentsService: 
 
         const price = await stripePaymentsAdapter.getPriceById(priceId, currency);
 
-        const isEuroCurrency = currency === 'eur';
         const isUserAddressProvided = !!userAddress || (!!postalCode && !!country) || !!user?.customerId;
+        const isCountryAllowedForTaxes = stripePaymentsAdapter.shouldCalculateTax(country);
+        const shouldCalculateTaxes = isUserAddressProvided && isCountryAllowedForTaxes;
 
         let amount = price.amount;
 
@@ -379,7 +384,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           }
         }
 
-        if (isEuroCurrency && isUserAddressProvided) {
+        if (shouldCalculateTaxes) {
           taxForPrice = await paymentsService.calculateTax(
             priceId,
             amount,
