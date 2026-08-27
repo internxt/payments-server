@@ -22,7 +22,6 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-          registry-url: "https://npm.pkg.github.com"
       - run: echo NODE_ENV=test >> ./.env
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
