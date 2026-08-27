@@ -13,6 +13,7 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import Logger from '../Logger';
 
 export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -385,6 +386,9 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         }
 
         if (shouldCalculateTaxes) {
+          Logger.info(
+            `[GET PRICE BY ID] Calculating taxes for user with customer ID: ${user?.customerId} and uuid: ${userUuid} with country: ${country}`,
+          );
           taxForPrice = await paymentsService.calculateTax(
             priceId,
             amount,
