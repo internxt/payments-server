@@ -609,9 +609,9 @@
   integrity sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==
 
 "@internxt/eslint-config-internxt@^1.0.9":
-  version "1.0.9"
-  resolved "https://npm.pkg.github.com/download/@internxt/eslint-config-internxt/1.0.9/d2dddb6a5809873ce717507f8d9dbc5964f6d0f4#d2dddb6a5809873ce717507f8d9dbc5964f6d0f4"
-  integrity sha512-e1VCBhXnGcaWZq4viz2MJ1jsgLObw4BgDKMF7F4oDEktOybe+4Bty69+oezuj+q3LAf2M7JZSgkhpLBiP7vrpw==
+  version "1.0.10"
+  resolved "https://registry.yarnpkg.com/@internxt/eslint-config-internxt/-/eslint-config-internxt-1.0.10.tgz#19025c479f84617a59484660f2f9c983ff3bc4ec"
+  integrity sha512-58fMjE/ro/eK/b4v1UBwpDtK0PvUo6o7yULRU5LVrqe4gCE4pgruI4RUJfLJ/WprfAFDQxUgJbyQMc5TtUVjiw==
   dependencies:
     "@typescript-eslint/eslint-plugin" "^5.4.0"
     "@typescript-eslint/parser" "^5.4.0"

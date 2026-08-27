@@ -41,6 +41,8 @@ afterAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
+  jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTax').mockReturnValue(true);
+  jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 });
 
 describe('Checkout controller', () => {

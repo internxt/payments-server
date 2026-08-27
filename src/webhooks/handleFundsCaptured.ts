@@ -54,6 +54,7 @@ export default async function handleFundsCaptured(
   try {
     const { type } = await paymentsService.getUserSubscription(customer.id, UserType.ObjectStorage);
     const isSubscriptionActivated = type === 'subscription';
+    const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customer.id);
 
     if (!isSubscriptionActivated) {
       await paymentsService.createSubscription({
@@ -63,7 +64,7 @@ export default async function handleFundsCaptured(
           default_payment_method: paymentIntent.payment_method as string,
           off_session: true,
           automatic_tax: {
-            enabled: true,
+            enabled: shouldCalculateTaxes,
           },
         },
       });

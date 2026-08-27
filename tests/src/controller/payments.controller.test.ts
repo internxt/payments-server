@@ -295,6 +295,7 @@ describe('Payment controller e2e tests', () => {
         const createSubscriptionSpy = jest
           .spyOn(PaymentService.prototype, 'createSubscription')
           .mockResolvedValue(subResponse);
+        jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 
         const body = {
           customerId: mockedUser.customerId,
@@ -332,6 +333,7 @@ describe('Payment controller e2e tests', () => {
         const createSubscriptionSpy = jest
           .spyOn(PaymentService.prototype, 'createSubscription')
           .mockResolvedValue(subResponse);
+        jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 
         const body = {
           customerId: mockedUser.customerId,

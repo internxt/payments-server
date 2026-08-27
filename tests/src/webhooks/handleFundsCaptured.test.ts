@@ -22,6 +22,7 @@ const { paymentService, objectStorageService, stripe } = createTestServices({
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
+  jest.spyOn(stripePaymentsAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 });
 
 describe('Handling captured funds from a payment method', () => {
