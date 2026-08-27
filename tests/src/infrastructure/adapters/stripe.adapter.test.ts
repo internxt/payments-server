@@ -17,6 +17,7 @@ import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
 import { Subscription } from '../../../../src/infrastructure/domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../../../../src/infrastructure/domain/entities/invoice';
 import { InvoiceItems } from '../../../../src/infrastructure/domain/entities/invoiceItems';
+import { EU_COUNTRIES } from '../../../../src/constants';
 
 describe('Stripe Adapter', () => {
   describe('Create customer', () => {
@@ -536,6 +537,103 @@ describe('Stripe Adapter', () => {
           id: mockedInvoiceItems.id,
         }),
       );
+    });
+  });
+
+  describe('Tax registrations', () => {
+    const asAsyncIterable = (registrations: Partial<Stripe.Tax.Registration>[]) => ({
+      async *[Symbol.asyncIterator]() {
+        for (const registration of registrations) {
+          yield registration as Stripe.Tax.Registration;
+        }
+      },
+    });
+
+    afterEach(() => {
+      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+    });
+
+    test('When a standard registration is synced, then only its country is stored', async () => {
+      jest
+        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .mockReturnValue(asAsyncIterable([{ country: 'ES', country_options: { es: { type: 'standard' } } }]) as any);
+
+      await stripePaymentsAdapter.syncTaxRegistrations();
+
+      expect(stripePaymentsAdapter.taxRegistrations.has('ES')).toBe(true);
+      expect(stripePaymentsAdapter.taxRegistrations.has('FR')).toBe(false);
+    });
+
+    test('When an OSS union registration is synced, then the whole EU is stored', async () => {
+      jest
+        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .mockReturnValue(asAsyncIterable([{ country: 'ES', country_options: { es: { type: 'oss_union' } } }]) as any);
+
+      await stripePaymentsAdapter.syncTaxRegistrations();
+
+      EU_COUNTRIES.forEach((country) => {
+        expect(stripePaymentsAdapter.taxRegistrations.has(country)).toBe(true);
+      });
+    });
+
+    test('When registrations have no country, then they are ignored', async () => {
+      jest
+        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .mockReturnValue(asAsyncIterable([{ country: undefined, country_options: {} }]) as any);
+
+      await stripePaymentsAdapter.syncTaxRegistrations();
+
+      expect(stripePaymentsAdapter.taxRegistrations.size).toBe(0);
+    });
+  });
+
+  describe('Should calculate taxes', () => {
+    afterEach(() => {
+      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+    });
+
+    test('When the country is registered, then it returns true (case-insensitive)', () => {
+      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+
+      expect(stripePaymentsAdapter.shouldCalculateTax('ES')).toBe(true);
+      expect(stripePaymentsAdapter.shouldCalculateTax('es')).toBe(true);
+    });
+
+    test('When the country is not registered, then it returns false', () => {
+      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+
+      expect(stripePaymentsAdapter.shouldCalculateTax('CN')).toBe(false);
+    });
+
+    test('When the country is missing, then it returns false', () => {
+      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+
+      expect(stripePaymentsAdapter.shouldCalculateTax(undefined)).toBe(false);
+      expect(stripePaymentsAdapter.shouldCalculateTax(null)).toBe(false);
+    });
+  });
+
+  describe('Should calculate taxes for customer', () => {
+    afterEach(() => {
+      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+    });
+
+    test("When the customer's country is registered, then it returns true", async () => {
+      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      jest
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .mockResolvedValue(getCustomer({ address: { country: 'ES' } as any }) as Stripe.Response<Stripe.Customer>);
+
+      await expect(stripePaymentsAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(true);
+    });
+
+    test("When the customer's country is not registered, then it returns false", async () => {
+      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      jest
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .mockResolvedValue(getCustomer({ address: { country: 'CN' } as any }) as Stripe.Response<Stripe.Customer>);
+
+      await expect(stripePaymentsAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(false);
     });
   });
 });
