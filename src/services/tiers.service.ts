@@ -196,12 +196,23 @@ export class TiersService {
     await this.usersService.disableVPNTier(userUuid, featureId);
   }
 
+  /**
+   * Applies the mail configuration of the given tier to the user.
+   *
+   * The tier is the source of truth for the mail entitlement, so this both reactivates the account
+   * for a tier that includes mail and suspends it for one that does not. Keeping it symmetric is
+   * what covers a plan switch: `removeTier` only runs when a plan is cancelled or refunded, never
+   * when the price of a live subscription changes.
+   */
   async applyMailFeatures(userWithEmail: { email: string; uuid: User['uuid'] }, tier: Tier): Promise<void> {
     const { enabled } = tier.featuresPerService[Service.Mail];
 
     if (enabled) {
       await this.mailService.reactivateAccount(userWithEmail.uuid);
+      return;
     }
+
+    await this.removeMailFeatures(userWithEmail.uuid);
   }
 
   async removeMailFeatures(userUuid: User['uuid']): Promise<void> {
