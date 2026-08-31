@@ -392,17 +392,33 @@ describe('TiersService tests', () => {
       expect(reactivateAccountSpy).toHaveBeenCalledWith(userWithEmail.uuid);
     });
 
-    test('When Mail is disabled, then it does not send a request to reactivate the mail account', async () => {
+    test('When Mail is disabled, then the mail account is suspended instead of reactivated', async () => {
       const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
       const tier = newTier();
 
       const reactivateAccountSpy = jest
         .spyOn(mailService, 'reactivateAccount')
         .mockImplementation(() => Promise.resolve());
+      const suspendAccountSpy = jest.spyOn(mailService, 'suspendAccount').mockImplementation(() => Promise.resolve());
 
       await tiersService.applyMailFeatures(userWithEmail, tier);
 
       expect(reactivateAccountSpy).not.toHaveBeenCalled();
+      expect(suspendAccountSpy).toHaveBeenCalledWith(userWithEmail.uuid);
+    });
+
+    test('When Mail is enabled, then the mail account is not suspended', async () => {
+      const userWithEmail = { ...getUser(), email: 'test@internxt.com' };
+      const tier = newTier();
+
+      tier.featuresPerService[Service.Mail].enabled = true;
+
+      jest.spyOn(mailService, 'reactivateAccount').mockImplementation(() => Promise.resolve());
+      const suspendAccountSpy = jest.spyOn(mailService, 'suspendAccount').mockImplementation(() => Promise.resolve());
+
+      await tiersService.applyMailFeatures(userWithEmail, tier);
+
+      expect(suspendAccountSpy).not.toHaveBeenCalled();
     });
   });
 
