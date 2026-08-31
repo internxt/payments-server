@@ -10,7 +10,7 @@ import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyRecaptcha } from '../utils/verifyRecaptcha';
+import { assertCaptcha } from '../utils/assertCaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
@@ -27,7 +27,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         city?: string;
         country: string;
         postalCode?: string;
-        captchaToken: string;
+        captchaToken?: string;
+        turnstileToken: string;
         companyVatId?: string;
         metadata?: Record<string, string>;
       };
@@ -37,7 +38,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['country', 'captchaToken'],
+            required: ['country', 'turnstileToken'],
             properties: {
               customerName: { type: 'string' },
               lineAddress1: { type: 'string' },
@@ -46,6 +47,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
               country: { type: 'string' },
               postalCode: { type: 'string' },
               captchaToken: { type: 'string' },
+              turnstileToken: { type: 'string' },
               companyVatId: { type: 'string' },
               metadata: {
                 type: 'object',
@@ -72,15 +74,12 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           postalCode,
           companyVatId,
           captchaToken,
+          turnstileToken,
           metadata,
         } = req.body;
         const { uuid: userUuid, email } = req.user.payload;
 
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
+        await assertCaptcha({ turnstileToken, captchaToken });
 
         const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
 
@@ -134,7 +133,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         customerId: string;
         priceId: string;
         token: string;
-        captchaToken: string;
+        captchaToken?: string;
+        turnstileToken: string;
         currency?: string;
         promoCodeId?: string;
         quantity?: number;
@@ -145,7 +145,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token', 'captchaToken'],
+            required: ['customerId', 'priceId', 'token','turnstileToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -160,6 +160,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
                 type: 'string',
               },
               captchaToken: { type: 'string' },
+              turnstileToken: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -168,14 +169,10 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, captchaToken, turnstileToken, token } = req.body;
         let tokenCustomerId;
 
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
+        await assertCaptcha({ turnstileToken, captchaToken });
 
         try {
           const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
@@ -218,7 +215,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         priceId: string;
         token: string;
         currency: string;
-        captchaToken: string;
+        captchaToken?: string;
+        turnstileToken: string;
         userAddress: string;
         promoCodeId?: string;
       };
@@ -228,7 +226,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         schema: {
           body: {
             type: 'object',
-            required: ['customerId', 'priceId', 'token', 'currency', 'captchaToken'],
+            required: ['customerId', 'priceId', 'token', 'currency', 'turnstileToken'],
             properties: {
               customerId: {
                 type: 'string',
@@ -243,6 +241,7 @@ export function checkoutController(usersService: UsersService, paymentsService: 
                 type: 'string',
               },
               captchaToken: { type: 'string' },
+              turnstileToken: { type: 'string' },
               userAddress: { type: 'string' },
               promoCodeId: {
                 type: 'string',
@@ -260,13 +259,10 @@ export function checkoutController(usersService: UsersService, paymentsService: 
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const { uuid, email } = req.user.payload;
-        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, userAddress, captchaToken, turnstileToken, promoCodeId } =
+          req.body;
 
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
+        await assertCaptcha({ turnstileToken, captchaToken });
 
         if (!isValidCurrency(currency)) {
           const allowedCurrencies = getAllowedCurrencies().join(', ');

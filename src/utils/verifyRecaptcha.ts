@@ -1,29 +1,15 @@
 import axios from 'axios';
-import { encode } from 'querystring';
+import { encode } from 'node:querystring';
 import config, { isProduction } from '../config';
 import Logger from '../Logger';
+import { isTransientNetworkError, sleep } from './networkRetry';
+import {
+  CAPTCHA_MAX_ATTEMPTS,
+  CAPTCHA_RETRY_BASE_DELAY_MS,
+  DEFAULT_RECAPTCHA_SCORE_THRESHOLD,
+} from './captcha.constants';
 
 const GOOGLE_RECAPTCHA_V3_ENDPOINT = config.RECAPTCHA_V3_ENDPOINT;
-
-const MAX_RECAPTCHA_ATTEMPTS = 3;
-const RECAPTCHA_RETRY_BASE_DELAY_MS = 300;
-const TRANSIENT_NETWORK_ERRORS = ['EAI_AGAIN'];
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const getNetworkErrorCode = (err: unknown): string | undefined => {
-  if (!axios.isAxiosError(err)) {
-    return undefined;
-  }
-
-  const cause = err.cause as { code?: string } | undefined;
-  return err.code ?? cause?.code;
-};
-
-const isTransientNetworkError = (err: unknown): boolean => {
-  const code = getNetworkErrorCode(err);
-  return !!code && TRANSIENT_NETWORK_ERRORS.includes(code);
-};
 
 async function requestRecaptcha(captcha: string): Promise<boolean> {
   const body = {
@@ -41,7 +27,7 @@ async function requestRecaptcha(captcha: string): Promise<boolean> {
     throw new Error(res.data['error-codes']);
   }
 
-  const scoreThreshold = config.RECAPTCHA_V3_SCORE_THRESHOLD ?? 0.5;
+  const scoreThreshold = config.RECAPTCHA_V3_SCORE_THRESHOLD ?? DEFAULT_RECAPTCHA_SCORE_THRESHOLD;
   const { score } = res.data;
 
   if (score < scoreThreshold) {
@@ -56,19 +42,19 @@ export async function verifyRecaptcha(captcha: string) {
     return true;
   }
 
-  for (let attempt = 0; attempt < MAX_RECAPTCHA_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < CAPTCHA_MAX_ATTEMPTS; attempt++) {
     try {
       return await requestRecaptcha(captcha);
     } catch (err) {
-      const isLastAttempt = attempt === MAX_RECAPTCHA_ATTEMPTS - 1;
+      const isLastAttempt = attempt === CAPTCHA_MAX_ATTEMPTS - 1;
 
       if (!isTransientNetworkError(err) || isLastAttempt) {
         throw err;
       }
 
-      const delay = RECAPTCHA_RETRY_BASE_DELAY_MS * 2 ** attempt;
+      const delay = CAPTCHA_RETRY_BASE_DELAY_MS * 2 ** attempt;
       Logger.warn(
-        `reCAPTCHA verification failed with EAI_AGAIN, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RECAPTCHA_ATTEMPTS})`,
+        `reCAPTCHA verification failed with EAI_AGAIN, retrying in ${delay}ms (attempt ${attempt + 1}/${CAPTCHA_MAX_ATTEMPTS})`,
       );
       await sleep(delay);
     }

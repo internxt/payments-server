@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { verifyRecaptcha } from '../../../src/utils/verifyRecaptcha';
 import config from '../../../src/config';
+import { CAPTCHA_MAX_ATTEMPTS, DEFAULT_RECAPTCHA_SCORE_THRESHOLD } from '../../../src/utils/captcha.constants';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -101,6 +102,20 @@ describe('Validate Captcha token', () => {
     await expect(verifyRecaptcha('below-custom-threshold')).rejects.toThrow('Score 0.6 under 0.7');
   });
 
+  test('When no threshold is configured, then the default one decides whether the score is human enough', async () => {
+    const configuredThreshold = config.RECAPTCHA_V3_SCORE_THRESHOLD;
+    (config as any).RECAPTCHA_V3_SCORE_THRESHOLD = undefined;
+    const scoreBelowDefault = DEFAULT_RECAPTCHA_SCORE_THRESHOLD - 0.1;
+
+    mockedAxios.post.mockResolvedValue({ data: { success: true, score: scoreBelowDefault } });
+
+    await expect(verifyRecaptcha('below-default-threshold')).rejects.toThrow(
+      `Score ${scoreBelowDefault} under ${DEFAULT_RECAPTCHA_SCORE_THRESHOLD}`,
+    );
+
+    (config as any).RECAPTCHA_V3_SCORE_THRESHOLD = configuredThreshold;
+  });
+
   test('When axios request fails, then it should throw network error', async () => {
     const networkError = new Error('Network Error');
     mockedAxios.post.mockRejectedValue(networkError);
@@ -141,7 +156,7 @@ describe('Validate Captcha token', () => {
       await jest.runAllTimersAsync();
       await expectation;
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(CAPTCHA_MAX_ATTEMPTS);
     });
 
     test('When the network error is not transient, then an error indicating so is thrown', async () => {
