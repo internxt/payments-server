@@ -16,6 +16,8 @@ export enum AllowedCryptoCurrencies {
 export enum AllowedFiatCurrencies {
   Euro = 'EUR',
   USDollar = 'USD',
+  IndianRupee = 'INR',
+  BrazilianReal = 'BRL',
 }
 
 const CRYPTO_CURRENCIES = new Set(Object.values(AllowedCryptoCurrencies));
