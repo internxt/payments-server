@@ -1,7 +1,10 @@
+import axios, { AxiosError, AxiosResponse } from 'axios';
 import Stripe from 'stripe';
 
+import config from '../../../../../src/config';
 import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../../../src/constants';
 import { Service } from '../../../../../src/core/users/Tier';
+import { User, UserType } from '../../../../../src/core/users/User';
 import { NotFoundError } from '../../../../../src/errors/Errors';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
@@ -13,6 +16,11 @@ import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/even
 import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
 
+jest.mock('jsonwebtoken', () => ({
+  ...jest.requireActual('jsonwebtoken'),
+  sign: jest.fn(),
+}));
+
 const {
   invoiceCompletedHandler,
   paymentService,
@@ -22,6 +30,9 @@ const {
   objectStorageWebhookHandler,
   cacheService,
   storageService,
+  usersRepository,
+  tiersRepository,
+  usersTiersRepository,
 } = createTestServices();
 
 beforeEach(() => {
@@ -257,6 +268,8 @@ describe('Testing the handler when an invoice is completed', () => {
   });
 
   describe('User Data Processing', () => {
+    const individualPurchase = { planName: 'Premium', isBusinessPlan: false };
+
     test('When user is found by email, then it should return user unique Id', async () => {
       const mockedCustomer = getCustomer({
         email: 'test@inxt.com',
@@ -272,7 +285,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
 
       const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
-      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string, individualPurchase);
 
       expect(result).toStrictEqual({
         uuid: mockedUser.uuid,
@@ -289,7 +302,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const findByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
 
       const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
-      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email, individualPurchase);
 
       expect(result).toStrictEqual({
         uuid: mockedUser.uuid,
@@ -305,7 +318,9 @@ describe('Testing the handler when an invoice is completed', () => {
 
       const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
 
-      await expect(getUserUuid(mockedCustomer.id, mockedCustomer.email)).rejects.toThrow(NotFoundError);
+      await expect(getUserUuid(mockedCustomer.id, mockedCustomer.email, individualPurchase)).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 
@@ -319,6 +334,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
       expect(result).toStrictEqual({
         productId: (mockedPrice.product as Stripe.Product).id,
+        productName: (mockedPrice.product as Stripe.Product).name,
         productType: (mockedPrice.product as Stripe.Product).metadata.type,
         planType: mockedPrice.metadata.planType,
         maxSpaceBytes: mockedPrice.metadata.maxSpaceBytes,
@@ -1092,6 +1108,219 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(loggerSpy).toHaveBeenCalledWith(
         `Error while trying to clear the cache in invoice completed handler for the customer ${customerId}. Error: ${randomError.message}`,
       );
+    });
+  });
+
+  describe('Payment confirmed for an email without a Drive account', () => {
+    const preCreateUrl = `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`;
+    const driveNotFound = new AxiosError('Not Found', '404', undefined, undefined, {
+      status: 404,
+    } as AxiosResponse);
+
+    const arrangeDriveAndLocalDatabase = ({
+      tier = newTier(),
+      existingDriveUserUuid,
+      preCreatedUserUuid = 'pre-created-user-uuid',
+    }: {
+      tier?: ReturnType<typeof newTier>;
+      existingDriveUserUuid?: string;
+      preCreatedUserUuid?: string;
+    } = {}) => {
+      const storedUsers = new Map<string, User>();
+      (usersRepository.findUserByCustomerId as jest.Mock).mockImplementation(
+        async (customerId: string) => storedUsers.get(customerId) ?? null,
+      );
+      (usersRepository.findUserByUuid as jest.Mock).mockImplementation(
+        async (uuid: string) => [...storedUsers.values()].find((user) => user.uuid === uuid) ?? null,
+      );
+      (usersRepository.insertUser as jest.Mock).mockImplementation(async (user: Omit<User, 'id'>) => {
+        storedUsers.set(user.customerId, { ...user, id: `id_${user.customerId}` });
+      });
+      (usersRepository.updateUser as jest.Mock).mockImplementation(async (customerId: string, body: Partial<User>) => {
+        const storedUser = storedUsers.get(customerId);
+        if (!storedUser) return false;
+        storedUsers.set(customerId, { ...storedUser, ...body });
+        return true;
+      });
+      (tiersRepository.findByProductId as jest.Mock).mockResolvedValue(tier);
+      (usersTiersRepository.findTierIdByUserId as jest.Mock).mockResolvedValue([]);
+
+      jest.spyOn(axios, 'get').mockImplementation(async () => {
+        if (existingDriveUserUuid) return { data: { uuid: existingDriveUserUuid } };
+        throw driveNotFound;
+      });
+      const drivePost = jest.spyOn(axios, 'post').mockImplementation(async (url: string) => {
+        if (url === preCreateUrl) return { data: { uuid: preCreatedUserUuid } };
+        return { data: {} };
+      });
+      const drivePatch = jest.spyOn(axios, 'patch').mockResolvedValue({ data: {} });
+
+      return { storedUsers, drivePost, drivePatch };
+    };
+
+    const arrangePaidInvoice = ({
+      invoiceStatus = 'paid',
+      userType = UserType.Individual,
+      productName = 'Ultimate Plan',
+    }: { invoiceStatus?: string; userType?: UserType; productName?: string } = {}) => {
+      const customer = Customer.toDomain(getCustomer({ email: 'New.Customer@inxt.com' }));
+      const invoice = getInvoice({ customer: customer.id, status: invoiceStatus as Stripe.Invoice.Status }, userType);
+      (invoice.lines.data[0].price!.product as Stripe.Product).name = productName;
+      jest
+        .spyOn(paymentService, 'getInvoiceLineItems')
+        .mockResolvedValue(invoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
+
+      return { customer, payload: { customer, invoice, status: invoiceStatus } };
+    };
+
+    const preCreateRequests = (drivePost: jest.SpyInstance) =>
+      drivePost.mock.calls.filter(([url]) => url === preCreateUrl);
+
+    test('When the payment is confirmed, then the Drive user is pre-created with the purchased plan name', async () => {
+      const { drivePost } = arrangeDriveAndLocalDatabase();
+      const { payload } = arrangePaidInvoice({ productName: 'Premium Plan' });
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toStrictEqual([
+        [preCreateUrl, { email: 'new.customer@inxt.com', planName: 'Premium Plan' }, expect.anything()],
+      ]);
+    });
+
+    test('When the payment is confirmed, then the customer is linked to the pre-created user and the plan features are applied to it', async () => {
+      const tier = newTier();
+      tier.featuresPerService[Service.Vpn].enabled = true;
+      tier.featuresPerService[Service.Mail].enabled = true;
+      const { storedUsers, drivePost, drivePatch } = arrangeDriveAndLocalDatabase({
+        tier,
+        preCreatedUserUuid: 'new-user-uuid',
+      });
+      const { customer, payload } = arrangePaidInvoice();
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(storedUsers.get(customer.id)).toMatchObject({ customerId: customer.id, uuid: 'new-user-uuid' });
+      expect(drivePatch).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/new-user-uuid`,
+        {
+          maxSpaceBytes: tier.featuresPerService[Service.Drive].maxSpaceBytes,
+          tierId: tier.featuresPerService[Service.Drive].foreignTierId,
+        },
+        expect.anything(),
+      );
+      expect(drivePost).toHaveBeenCalledWith(
+        `${config.VPN_URL}/gateway/users`,
+        { uuid: 'new-user-uuid', tierId: tier.featuresPerService[Service.Vpn].featureId },
+        expect.anything(),
+      );
+      expect(drivePost).toHaveBeenCalledWith(
+        `${config.MAIL_URL}/gateway/accounts/new-user-uuid/reactivate`,
+        {},
+        expect.anything(),
+      );
+    });
+
+    test('When the paid webhook is delivered again after a successful run, then the Drive user is not pre-created again nor duplicated', async () => {
+      const { storedUsers, drivePost } = arrangeDriveAndLocalDatabase();
+      const { customer, payload } = arrangePaidInvoice();
+
+      await invoiceCompletedHandler.run(payload);
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(1);
+      expect([...storedUsers.values()]).toStrictEqual([expect.objectContaining({ customerId: customer.id })]);
+    });
+
+    test('When the paid webhook is retried after failing before the customer was linked, then Drive is asked again and the same user is linked only once', async () => {
+      const { storedUsers, drivePost } = arrangeDriveAndLocalDatabase({ preCreatedUserUuid: 'same-user-uuid' });
+      const { customer, payload } = arrangePaidInvoice();
+      (usersRepository.insertUser as jest.Mock).mockRejectedValueOnce(new Error('Temporary database error'));
+
+      await expect(invoiceCompletedHandler.run(payload)).rejects.toThrow('Temporary database error');
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(2);
+      expect([...storedUsers.values()]).toStrictEqual([
+        expect.objectContaining({ customerId: customer.id, uuid: 'same-user-uuid' }),
+      ]);
+    });
+
+    test('When the paid webhook is retried after failing once the Drive user was pre-created, then the customer stays linked to that same user', async () => {
+      const { storedUsers, drivePost, drivePatch } = arrangeDriveAndLocalDatabase({
+        preCreatedUserUuid: 'same-user-uuid',
+      });
+      const { customer, payload } = arrangePaidInvoice();
+      drivePatch.mockRejectedValueOnce(new Error('Drive temporarily unavailable'));
+
+      await expect(invoiceCompletedHandler.run(payload)).rejects.toThrow('Drive temporarily unavailable');
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(1);
+      expect([...storedUsers.values()]).toStrictEqual([
+        expect.objectContaining({ customerId: customer.id, uuid: 'same-user-uuid' }),
+      ]);
+    });
+
+    test('When the payment is not confirmed, then nothing is created in Drive', async () => {
+      const { storedUsers, drivePost } = arrangeDriveAndLocalDatabase();
+      const { payload } = arrangePaidInvoice({ invoiceStatus: 'open' });
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(0);
+      expect(storedUsers.size).toBe(0);
+    });
+
+    test('When the customer already has a Drive account, then no user is pre-created and the plan is applied to the existing account', async () => {
+      const { storedUsers, drivePost, drivePatch } = arrangeDriveAndLocalDatabase({
+        existingDriveUserUuid: 'existing-user-uuid',
+      });
+      const { customer, payload } = arrangePaidInvoice();
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(0);
+      expect(storedUsers.get(customer.id)).toMatchObject({ uuid: 'existing-user-uuid' });
+      expect(drivePatch).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/existing-user-uuid`,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    test('When the customer is already linked to a user, then no user is pre-created and the plan is applied to that user', async () => {
+      const { storedUsers, drivePost, drivePatch } = arrangeDriveAndLocalDatabase();
+      const { customer, payload } = arrangePaidInvoice();
+      storedUsers.set(customer.id, getUser({ customerId: customer.id, uuid: 'linked-user-uuid' }));
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toHaveLength(0);
+      expect(drivePatch).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/linked-user-uuid`,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    test('When the purchase is a business plan, then no user is pre-created and the user is reported as not found', async () => {
+      const { storedUsers, drivePost } = arrangeDriveAndLocalDatabase();
+      const { payload } = arrangePaidInvoice({ userType: UserType.Business });
+
+      await expect(invoiceCompletedHandler.run(payload)).rejects.toThrow(NotFoundError);
+      expect(preCreateRequests(drivePost)).toHaveLength(0);
+      expect(storedUsers.size).toBe(0);
+    });
+
+    test('When the purchased product has no name, then the Drive user is pre-created with a generic plan name', async () => {
+      const { drivePost } = arrangeDriveAndLocalDatabase();
+      const { payload } = arrangePaidInvoice({ productName: '' });
+
+      await invoiceCompletedHandler.run(payload);
+
+      expect(preCreateRequests(drivePost)).toStrictEqual([
+        [preCreateUrl, { email: 'new.customer@inxt.com', planName: 'Internxt' }, expect.anything()],
+      ]);
     });
   });
 });

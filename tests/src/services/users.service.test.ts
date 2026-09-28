@@ -351,6 +351,35 @@ describe('UsersService tests', () => {
     });
   });
 
+  describe('Pre-create the Drive user', () => {
+    test('When a user is pre-created, then Drive receives the email and plan name and the new user id is returned', async () => {
+      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({ data: { uuid: 'pre-created-user-uuid' } });
+
+      const preCreatedUser = await usersService.preCreateUser({ email: 'new@inxt.com', planName: 'Ultimate Plan' });
+
+      expect(preCreatedUser).toStrictEqual({ uuid: 'pre-created-user-uuid' });
+      expect(axiosPostSpy).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`,
+        { email: 'new@inxt.com', planName: 'Ultimate Plan' },
+        {
+          headers: {
+            Authorization: 'Bearer undefined',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    });
+
+    test('When Drive rejects the pre-creation, then the error is propagated', async () => {
+      const driveError = new Error('Email already registered');
+      jest.spyOn(axios, 'post').mockRejectedValue(driveError);
+
+      await expect(usersService.preCreateUser({ email: 'new@inxt.com', planName: 'Ultimate Plan' })).rejects.toThrow(
+        driveError,
+      );
+    });
+  });
+
   describe('Override Drive Limit', () => {
     test('When called with a feature, then overrides the drive limit for the user', async () => {
       const mockedUser = getUser({ lifetime: true });

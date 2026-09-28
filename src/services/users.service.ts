@@ -252,6 +252,24 @@ export class UsersService {
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
   }
 
+  async preCreateUser({ email, planName }: { email: string; planName: string }): Promise<{ uuid: User['uuid'] }> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    const { data: preCreatedUser } = await this.axios.post<{ uuid: User['uuid'] }>(
+      `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`,
+      { email, planName },
+      requestConfig,
+    );
+
+    return { uuid: preCreatedUser.uuid };
+  }
+
   async enableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
     const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
 
