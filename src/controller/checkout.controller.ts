@@ -7,7 +7,7 @@ import { PaymentService } from '../services/payment.service';
 import CacheService from '../services/cache.service';
 import { User } from '../core/users/User';
 import { PaymentIntent } from '../types/payment';
-import { BadRequestError, ForbiddenError } from '../errors/Errors';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/Errors';
 import {
   AccountSetupPendingError,
   InvalidConfirmationTokenError,
@@ -15,7 +15,7 @@ import {
 } from '../errors/PaymentErrors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
-import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
+import { getAllowedCurrencies, isCryptoCurrency, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
@@ -81,6 +81,18 @@ export function checkoutController(
       ...customerDetails,
       metadata: { ...customerDetails.metadata, new_user_id: uuid },
     });
+  }
+
+  async function getEmailOfBuyerWithoutAccount(customerId: Stripe.Customer['id'], currency: string): Promise<string> {
+    if (isCryptoCurrency(currency)) {
+      throw new UnauthorizedError('Crypto payments require a logged in user');
+    }
+
+    const { email } = await stripePaymentsAdapter.getCustomer(customerId);
+
+    await preCreateBuyerWithoutAccount(email);
+
+    return email;
   }
 
   return async function (fastify: FastifyInstance) {
@@ -226,6 +238,9 @@ export function checkoutController(
             },
           },
         },
+        config: {
+          allowAnonymous: true,
+        },
       },
       async (req, res) => {
         const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
@@ -311,6 +326,7 @@ export function checkoutController(
           },
         },
         config: {
+          allowAnonymous: true,
           rateLimit: {
             max: 5,
             timeWindow: '1 minute',
@@ -319,7 +335,8 @@ export function checkoutController(
       },
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
-        const { uuid, email } = req.user.payload;
+        let email: string;
+        const driveUser = req.user?.payload;
         const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -354,10 +371,19 @@ export function checkoutController(
           throw new BadRequestError('Only lifetime plans are supported');
         }
 
-        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
+        if (driveUser) {
+          email = driveUser.email;
+          const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
+            driveUser.uuid,
+            email,
+            price.bytes.toString(),
+          );
 
-        if (!isStorageUpgradeAllowed) {
-          throw new BadRequestError('The user already has the maximum storage allowed');
+          if (!isStorageUpgradeAllowed) {
+            throw new BadRequestError('The user already has the maximum storage allowed');
+          }
+        } else {
+          email = await getEmailOfBuyerWithoutAccount(customerId, currency);
         }
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);

@@ -2,15 +2,27 @@ import { FastifyInstance } from 'fastify';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
-import { getConfirmationToken, getCustomer, getValidAuthToken, getValidUserToken } from '../fixtures';
+import {
+  getConfirmationToken,
+  getCreateSubscriptionResponse,
+  getCustomer,
+  getExpiredUserToken,
+  getValidAuthToken,
+  getValidUserToken,
+} from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
+import { PaymentIntent } from '../../../src/types/payment';
+import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
-import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { stripePaymentsAdapter, StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { UserType } from '../../../src/core/users/User';
+import { getPriceEntity } from '../entity.fixtures';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 
 jest.mock('ioredis', () => require('ioredis-mock'));
+jest.mock('../../../src/utils/fetchUserStorage');
 
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -57,6 +69,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
   jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+  jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
 });
 
 describe('Buying a plan without an account', () => {
@@ -350,6 +363,179 @@ describe('Buying a plan without an account', () => {
       });
       expect(retrieveConfirmation).not.toHaveBeenCalled();
       expect(preCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Starting a subscription', () => {
+    const customerId = 'cus_without_account';
+
+    const startSubscription = (token: string) =>
+      app.inject({
+        path: '/checkout/subscription',
+        method: 'POST',
+        body: { customerId, priceId: 'price_id', token, captchaToken: 'captcha_token' },
+      });
+
+    test('When the buyer has the payment token of the customer, then the subscription is created', async () => {
+      const subscriptionAttempt = getCreateSubscriptionResponse();
+      jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+        .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
+      jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(subscriptionAttempt);
+
+      const response = await startSubscription(getValidUserToken({ customerId }));
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual(subscriptionAttempt);
+    });
+
+    test.each([
+      ['is malformed', () => 'malformed.token.payload'],
+      ['belongs to another customer', () => getValidUserToken({ customerId: 'cus_someone_else' })],
+      ['has expired', () => getExpiredUserToken({ customerId })],
+    ])('When the payment token %s, then the subscription is rejected', async (_, token) => {
+      const createSubscription = jest.spyOn(PaymentService.prototype, 'createSubscription');
+
+      const response = await startSubscription(token());
+
+      expect(response.statusCode).toBe(403);
+      expect(createSubscription).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Paying a one-time plan', () => {
+    const email = 'new.buyer@internxt.com';
+    const lifetimePrice = getPriceEntity({ interval: 'lifetime' });
+    const paymentIntent: PaymentIntent = { id: 'payment_intent_id', clientSecret: 'client_secret', type: 'fiat' };
+
+    const payOneTimePlan = ({
+      customerId,
+      token,
+      currency = 'eur',
+    }: {
+      customerId: string;
+      token: string;
+      currency?: string;
+    }) =>
+      app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: { customerId, priceId: lifetimePrice.id, token, currency, captchaToken: 'captcha_token' },
+      });
+
+    beforeEach(() => {
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(lifetimePrice);
+    });
+
+    test('When the buyer has the payment token of the customer, then the invoice is created for the customer email', async () => {
+      const customer = getCustomer({ email });
+      jest
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
+      const { preCreate } = drivePreCreatesUser();
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(paymentIntent);
+
+      const response = await payOneTimePlan({
+        customerId: customer.id,
+        token: getValidUserToken({ customerId: customer.id }),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual(paymentIntent);
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: customer.id, userEmail: email }),
+      );
+      expect(fetchUserStorage).not.toHaveBeenCalled();
+      expect(preCreate).toHaveBeenCalledWith(
+        expect.stringContaining('/gateway/users/pre-create'),
+        { email },
+        expect.anything(),
+      );
+    });
+
+    test('When the customer email already has a Drive account, then the buyer is told to log in', async () => {
+      const customer = getCustomer({ email });
+      jest
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
+      driveHasRegisteredUser();
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await payOneTimePlan({
+        customerId: customer.id,
+        token: getValidUserToken({ customerId: customer.id }),
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    test('When the customer email already paid a plan whose account setup is pending, then the buyer is told to finish the setup', async () => {
+      const customer = getCustomer({ email });
+      jest
+        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
+      drivePreCreatesUser({ setupPending: true });
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await payOneTimePlan({
+        customerId: customer.id,
+        token: getValidUserToken({ customerId: customer.id }),
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().code).toBe('AccountSetupPending');
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    test('When the buyer wants to pay with crypto currencies, then a logged in user is required', async () => {
+      const customerId = 'cus_without_account';
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await payOneTimePlan({
+        customerId,
+        token: getValidUserToken({ customerId }),
+        currency: 'btc',
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['is malformed', () => 'malformed.token.payload'],
+      ['belongs to another customer', () => getValidUserToken({ customerId: 'cus_someone_else' })],
+      ['has expired', () => getExpiredUserToken({ customerId: 'cus_without_account' })],
+    ])('When the payment token %s, then the payment is rejected', async (_, token) => {
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await payOneTimePlan({ customerId: 'cus_without_account', token: token() });
+
+      expect(response.statusCode).toBe(403);
+      expect(createInvoice).not.toHaveBeenCalled();
+    });
+
+    test('When the buyer is logged in, then the storage limit of the Drive user is still checked', async () => {
+      const customerId = 'cus_logged_in';
+      (fetchUserStorage as jest.Mock).mockResolvedValue({ canExpand: false });
+      const createInvoice = jest.spyOn(PaymentService.prototype, 'createInvoice');
+
+      const response = await app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: {
+          customerId,
+          priceId: lifetimePrice.id,
+          token: getValidUserToken({ customerId }),
+          currency: 'eur',
+          captchaToken: 'captcha_token',
+        },
+        headers: { authorization: `Bearer ${getValidAuthToken('drive-user-uuid', undefined, { email })}` },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(fetchUserStorage).toHaveBeenCalledWith('drive-user-uuid', email, lifetimePrice.bytes.toString());
+      expect(createInvoice).not.toHaveBeenCalled();
     });
   });
 });
