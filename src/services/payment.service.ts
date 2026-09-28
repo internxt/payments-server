@@ -124,6 +124,7 @@ export class PaymentService {
     promoCodeId,
     companyName,
     companyVatId,
+    impactClickId,
     trialEnd,
     metadata,
     additionalOptions,
@@ -134,6 +135,7 @@ export class PaymentService {
     promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
     companyName?: string;
     companyVatId?: string;
+    impactClickId?: string;
     trialEnd?: number;
     metadata?: Stripe.Metadata;
     additionalOptions?: Partial<Stripe.SubscriptionCreateParams>;
@@ -177,6 +179,7 @@ export class PaymentService {
       metadata: {
         companyName: companyName ?? null,
         companyVatId: companyVatId ?? null,
+        impactClickId: impactClickId ?? null,
         ...metadata,
       },
       payment_behavior: 'default_incomplete',
@@ -230,6 +233,7 @@ export class PaymentService {
     userAddress,
     currency,
     promoCodeId,
+    impactClickId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
@@ -238,6 +242,7 @@ export class PaymentService {
     userAddress: string;
     currency: string;
     promoCodeId?: string;
+    impactClickId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
@@ -269,6 +274,9 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
+      metadata: {
+        impactClickId: impactClickId ?? null
+      }
     });
 
     if (!invoiceItem.pricing?.price_details?.price || !invoiceId) {
