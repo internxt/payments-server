@@ -351,16 +351,16 @@ describe('UsersService tests', () => {
     });
   });
 
-  describe('Pre-create the Drive user', () => {
-    test('When a user is pre-created, then Drive receives the email and plan name and the new user id is returned', async () => {
-      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({ data: { uuid: 'pre-created-user-uuid' } });
+  describe('Account setup email', () => {
+    test('When the setup email is requested, then Drive receives the plan name for that user', async () => {
+      const { uuid: userUuid } = getUser();
+      const axiosPostSpy = jest.spyOn(axios, 'post').mockResolvedValue({ status: 204 });
 
-      const preCreatedUser = await usersService.preCreateUser({ email: 'new@inxt.com', planName: 'Ultimate Plan' });
+      await usersService.sendAccountSetupEmail(userUuid, 'Ultimate Plan');
 
-      expect(preCreatedUser).toStrictEqual({ uuid: 'pre-created-user-uuid' });
       expect(axiosPostSpy).toHaveBeenCalledWith(
-        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`,
-        { email: 'new@inxt.com', planName: 'Ultimate Plan' },
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/setup-email`,
+        { planName: 'Ultimate Plan' },
         {
           headers: {
             Authorization: 'Bearer undefined',
@@ -370,13 +370,11 @@ describe('UsersService tests', () => {
       );
     });
 
-    test('When Drive rejects the pre-creation, then the error is propagated', async () => {
-      const driveError = new Error('Email already registered');
+    test('When Drive rejects the setup email request, then the error is propagated', async () => {
+      const driveError = new Error('User not found');
       jest.spyOn(axios, 'post').mockRejectedValue(driveError);
 
-      await expect(usersService.preCreateUser({ email: 'new@inxt.com', planName: 'Ultimate Plan' })).rejects.toThrow(
-        driveError,
-      );
+      await expect(usersService.sendAccountSetupEmail(getUser().uuid, 'Ultimate Plan')).rejects.toThrow(driveError);
     });
   });
 

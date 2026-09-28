@@ -122,10 +122,7 @@ export class InvoiceCompletedHandler {
     const isOldProduct = !tier;
     const email = customer.email ?? customerEmail;
 
-    const { uuid: userUuid } = await this.getUserUuid(customerId, email, {
-      planName: productName ?? FALLBACK_PLAN_NAME,
-      isBusinessPlan,
-    });
+    const { uuid: userUuid, isRegisteredInDrive } = await this.getUserUuid(customerId, email);
 
     Logger.info(
       `Tier with product ID ${tier?.productId} found to apply it to the user with customer ID: ${customerId} and User id: ${userUuid}`,
@@ -165,6 +162,12 @@ export class InvoiceCompletedHandler {
       );
     }
 
+    const isPendingAccountSetup = !isRegisteredInDrive && !isBusinessPlan;
+    if (isPendingAccountSetup) {
+      await this.usersService.sendAccountSetupEmail(userUuid, productName ?? FALLBACK_PLAN_NAME);
+      Logger.info(`Account setup email requested for user ${userUuid} with customer ID ${customerId}`);
+    }
+
     await this.handleUserCouponRelationship({
       userUuid,
       invoice,
@@ -179,29 +182,26 @@ export class InvoiceCompletedHandler {
 
   /**
    * Tries to find the user by email or customer ID and returns the user's UUID.
-   * When no user exists yet and the purchase is an individual plan, the Drive user is pre-created
-   * so it only exists after a confirmed payment. Drive returns the same UUID for the same email,
-   * so a retried webhook does not create a second user.
+   * Users found only by customer ID have no registered Drive account yet: they were pre-created at checkout.
    *
    * @param customerId - The Stripe customer ID.
    * @param customerEmail - The customer's email, or null if not available.
-   * @param purchase - The purchased plan name (shown by Drive to the user) and whether it is a business plan.
-   * @returns A promise that resolves to an object containing the user's UUID.
-   * @throws NotFoundError if the user is not found and cannot be pre-created.
+   * @returns A promise that resolves to the user's UUID and whether the user has a registered Drive account.
+   * @throws NotFoundError if the user is not found by email or customer ID.
    */
   private async getUserUuid(
     customerId: User['customerId'],
     customerEmail: string | null,
-    purchase: { planName: string; isBusinessPlan: boolean },
   ): Promise<{
     uuid: string;
+    isRegisteredInDrive: boolean;
   }> {
     // Try to find the user by email from the Drive Server
     if (customerEmail) {
       try {
         const userResponse = await this.usersService.findUserByEmail(customerEmail.toLowerCase());
         if (userResponse?.data) {
-          return { uuid: userResponse.data.uuid };
+          return { uuid: userResponse.data.uuid, isRegisteredInDrive: true };
         }
       } catch (error) {
         Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
@@ -212,16 +212,10 @@ export class InvoiceCompletedHandler {
     try {
       const userByCustomerId = await this.usersService.findUserByCustomerID(customerId);
       if (userByCustomerId) {
-        return { uuid: userByCustomerId.uuid };
+        return { uuid: userByCustomerId.uuid, isRegisteredInDrive: false };
       }
     } catch (error) {
       Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
-    }
-
-    const canPreCreateUser = !!customerEmail && !purchase.isBusinessPlan;
-    if (canPreCreateUser) {
-      Logger.info(`Pre-creating the Drive user for customer ID ${customerId} after a confirmed payment`);
-      return this.usersService.preCreateUser({ email: customerEmail.toLowerCase(), planName: purchase.planName });
     }
 
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
