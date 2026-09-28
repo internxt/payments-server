@@ -170,6 +170,42 @@ describe('Checkout customers', () => {
     });
   });
 
+  describe('Checking the customer of a buyer without an account before paying', () => {
+    const stripeHasCustomerWithEmail = (email: string) => {
+      const customer = Customer.toDomain(getCustomer({ email }));
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customer);
+      return customer;
+    };
+
+    test('When the customer email can buy, then the email is returned', async () => {
+      const customer = stripeHasCustomerWithEmail('buyer@internxt.com');
+      const { preCreate } = drivePreCreatesUser();
+
+      await expect(checkoutCustomersService.getEmailOfBuyerWithoutAccount(customer.id)).resolves.toBe(
+        'buyer@internxt.com',
+      );
+      expect(preCreate).toHaveBeenCalledWith('buyer@internxt.com');
+    });
+
+    test('When the customer email belongs to a registered Drive user, then an error indicating so is thrown', async () => {
+      const customer = stripeHasCustomerWithEmail('user@internxt.com');
+      jest.spyOn(usersService, 'preCreateUser').mockRejectedValue(new DriveAccountAlreadyExistsError());
+
+      await expect(checkoutCustomersService.getEmailOfBuyerWithoutAccount(customer.id)).rejects.toThrow(
+        DriveAccountAlreadyExistsError,
+      );
+    });
+
+    test('When the customer email already paid a plan whose setup is pending, then an error indicating so is thrown', async () => {
+      const customer = stripeHasCustomerWithEmail('buyer@internxt.com');
+      drivePreCreatesUser({ setupPending: true });
+
+      await expect(checkoutCustomersService.getEmailOfBuyerWithoutAccount(customer.id)).rejects.toThrow(
+        AccountSetupPendingError,
+      );
+    });
+  });
+
   describe('Preparing the customer of a logged in Drive user', () => {
     test('When the user has no customer yet, then one is created and linked to the user', async () => {
       const driveUser = { uuid: randomUUID(), email: 'user@internxt.com' };

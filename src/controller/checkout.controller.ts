@@ -22,18 +22,6 @@ export function checkoutController(
   paymentsService: PaymentService,
   checkoutCustomersService: CheckoutCustomersService,
 ) {
-  async function getEmailOfBuyerWithoutAccount(customerId: Stripe.Customer['id'], currency: string): Promise<string> {
-    if (isCryptoCurrency(currency)) {
-      throw new UnauthorizedError('Crypto payments require a logged in user');
-    }
-
-    const { email } = await stripePaymentsAdapter.getCustomer(customerId);
-
-    await checkoutCustomersService.preCreateBuyerWithoutAccount(email);
-
-    return email;
-  }
-
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
@@ -322,7 +310,10 @@ export function checkoutController(
             throw new BadRequestError('The user already has the maximum storage allowed');
           }
         } else {
-          email = await getEmailOfBuyerWithoutAccount(customerId, currency);
+          if (isCryptoCurrency(currency)) {
+            throw new UnauthorizedError('Crypto payments require a logged in user');
+          }
+          email = await checkoutCustomersService.getEmailOfBuyerWithoutAccount(customerId);
         }
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);

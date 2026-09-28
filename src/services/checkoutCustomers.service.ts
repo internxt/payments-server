@@ -55,6 +55,14 @@ export class CheckoutCustomersService {
     return uuid;
   }
 
+  async getEmailOfBuyerWithoutAccount(customerId: Customer['id']): Promise<string> {
+    const { email } = await this.paymentsAdapter.getCustomer(customerId);
+
+    await this.preCreateBuyerWithoutAccount(email);
+
+    return email;
+  }
+
   private async claimConfirmationToken(confirmationTokenId: string): Promise<void> {
     const confirmationToken = await this.paymentsAdapter.getConfirmationToken(confirmationTokenId);
     if (!confirmationToken.canStartPaymentAttempt()) {
