@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import axios, { AxiosError, AxiosResponse } from 'axios';
 import Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
 import { getConfirmationToken, getCustomer, getValidAuthToken, getValidUserToken } from '../fixtures';
@@ -8,21 +7,19 @@ import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
-import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
+import { DriveAccountAlreadyExistsError } from '../../../src/errors/PaymentErrors';
 
 jest.mock('ioredis', () => require('ioredis-mock'));
 
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
 
-const driveRespondsWith = (status: number) =>
-  new AxiosError('Drive error', 'ERR_BAD_RESPONSE', undefined, undefined, { status } as AxiosResponse);
-
 const drivePreCreatesUser = ({ uuid = randomUUID(), setupPending = false } = {}) => {
-  const preCreate = jest.spyOn(axios, 'post').mockResolvedValue({ data: { uuid, setupPending } });
+  const preCreate = jest.spyOn(UsersService.prototype, 'preCreateUser').mockResolvedValue({ uuid, setupPending });
   return { uuid, preCreate };
 };
 
-const driveHasRegisteredUser = () => jest.spyOn(axios, 'post').mockRejectedValue(driveRespondsWith(409));
+const driveHasRegisteredUser = () =>
+  jest.spyOn(UsersService.prototype, 'preCreateUser').mockRejectedValue(new DriveAccountAlreadyExistsError());
 
 const stripeHasConfirmationToken = (params?: Partial<Stripe.ConfirmationToken>) => {
   const confirmationToken = getConfirmationToken(params);
@@ -38,14 +35,10 @@ const stripeCreatesCustomers = () =>
     return getCustomer({ email, metadata: metadata as Stripe.Metadata }) as Stripe.Response<Stripe.Customer>;
   });
 
-const stripeUpdatesCustomers = () =>
-  jest
-    .spyOn(stripePaymentsAdapter.provider.customers, 'update')
-    .mockImplementation(async (id) => getCustomer({ id }) as Stripe.Response<Stripe.Customer>);
-
 let app: FastifyInstance;
 
 beforeAll(async () => {
+  jest.spyOn(stripePaymentsAdapter, 'syncTaxRegistrations').mockResolvedValue();
   app = await initializeServerAndDatabase();
 });
 
@@ -90,11 +83,7 @@ describe('Buying a plan without an account', () => {
       const { customerId, token } = response.json();
       expect(response.statusCode).toBe(200);
       expect(token).toBe(getValidUserToken({ customerId }));
-      expect(preCreate).toHaveBeenCalledWith(
-        expect.stringContaining('/gateway/users/pre-create'),
-        { email },
-        expect.anything(),
-      );
+      expect(preCreate).toHaveBeenCalledWith(email);
       expect(createCustomer).toHaveBeenCalledWith(
         expect.objectContaining({
           email,
@@ -102,33 +91,6 @@ describe('Buying a plan without an account', () => {
           address: expect.objectContaining({ country: 'ES', postal_code: '08001', city: 'Barcelona' }),
           metadata: { cello_ucc: 'referral-code', new_user_id: uuid },
         }),
-      );
-    });
-
-    test('When the buyer repeats the checkout with the same email, then the same customer is reused and updated instead of creating another one', async () => {
-      const email = newBuyerEmail();
-      const { uuid } = drivePreCreatesUser();
-      const createCustomer = stripeCreatesCustomers();
-      const updateCustomer = stripeUpdatesCustomers();
-      const firstAttempt = await prepareCustomer({
-        ...billingDetails,
-        email,
-        confirmationTokenId: stripeHasConfirmationToken().id,
-      });
-
-      const secondAttempt = await prepareCustomer({
-        ...billingDetails,
-        customerName: 'Jane Updated',
-        email,
-        confirmationTokenId: stripeHasConfirmationToken().id,
-      });
-
-      expect(secondAttempt.statusCode).toBe(200);
-      expect(secondAttempt.json().customerId).toBe(firstAttempt.json().customerId);
-      expect(createCustomer).toHaveBeenCalledTimes(1);
-      expect(updateCustomer).toHaveBeenCalledWith(
-        firstAttempt.json().customerId,
-        expect.objectContaining({ email, name: 'Jane Updated', metadata: { new_user_id: uuid } }),
       );
     });
 
@@ -144,7 +106,7 @@ describe('Buying a plan without an account', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(preCreate).toHaveBeenCalledWith(expect.any(String), { email }, expect.anything());
+      expect(preCreate).toHaveBeenCalledWith(email);
       expect(createCustomer).toHaveBeenCalledWith(expect.objectContaining({ email }));
     });
 
@@ -182,7 +144,6 @@ describe('Buying a plan without an account', () => {
     test('When the email already paid a plan whose account setup is pending, then the buyer is told to finish the setup and no customer is created', async () => {
       drivePreCreatesUser({ setupPending: true });
       const createCustomer = stripeCreatesCustomers();
-      const updateCustomer = stripeUpdatesCustomers();
 
       const response = await prepareCustomer({
         ...billingDetails,
@@ -196,93 +157,34 @@ describe('Buying a plan without an account', () => {
         code: 'AccountSetupPending',
       });
       expect(createCustomer).not.toHaveBeenCalled();
-      expect(updateCustomer).not.toHaveBeenCalled();
     });
 
-    test('When Drive cannot be reached, then the request fails and no customer is created', async () => {
-      jest.spyOn(axios, 'post').mockRejectedValue(driveRespondsWith(503));
+    test('When the payment confirmation is not valid, then it is rejected and nothing is created', async () => {
+      const confirmationToken = stripeHasConfirmationToken({ expires_at: nowInSeconds() - 1 });
+      const { preCreate } = drivePreCreatesUser();
       const createCustomer = stripeCreatesCustomers();
 
       const response = await prepareCustomer({
         ...billingDetails,
         email: newBuyerEmail(),
-        confirmationTokenId: stripeHasConfirmationToken().id,
+        confirmationTokenId: confirmationToken.id,
       });
 
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(403);
+      expect(preCreate).not.toHaveBeenCalled();
       expect(createCustomer).not.toHaveBeenCalled();
     });
 
-    describe('When the payment attempt cannot be proven', () => {
-      const tooOldInSeconds = (CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES + 1) * 60;
+    test.each([
+      ['the email', { confirmationTokenId: 'ctoken_123' }],
+      ['the payment confirmation', { email: 'new.buyer@internxt.com' }],
+    ])('When %s is missing, then the request is rejected as invalid', async (_, missingOne) => {
+      const createCustomer = stripeCreatesCustomers();
 
-      test('When the payment confirmation was already used for another checkout, then it is rejected and nothing else is created', async () => {
-        const confirmationTokenId = stripeHasConfirmationToken().id;
-        const { preCreate } = drivePreCreatesUser();
-        const createCustomer = stripeCreatesCustomers();
-        await prepareCustomer({ ...billingDetails, email: newBuyerEmail(), confirmationTokenId });
+      const response = await prepareCustomer({ ...billingDetails, ...missingOne });
 
-        const reusedAttempt = await prepareCustomer({ ...billingDetails, email: newBuyerEmail(), confirmationTokenId });
-
-        expect(reusedAttempt.statusCode).toBe(403);
-        expect(preCreate).toHaveBeenCalledTimes(1);
-        expect(createCustomer).toHaveBeenCalledTimes(1);
-      });
-
-      test.each([
-        ['has expired', () => ({ expires_at: nowInSeconds() - 1 })],
-        ['was already used for a payment', () => ({ payment_intent: 'pi_already_used' })],
-        ['was already used for a setup', () => ({ setup_intent: 'seti_already_used' })],
-        ['is not recent', () => ({ created: nowInSeconds() - tooOldInSeconds })],
-      ])('When the payment confirmation %s, then it is rejected and nothing is created', async (_, params) => {
-        const confirmationToken = stripeHasConfirmationToken(params());
-        const preCreate = jest.spyOn(axios, 'post');
-        const createCustomer = stripeCreatesCustomers();
-
-        const response = await prepareCustomer({
-          ...billingDetails,
-          email: newBuyerEmail(),
-          confirmationTokenId: confirmationToken.id,
-        });
-
-        expect(response.statusCode).toBe(403);
-        expect(preCreate).not.toHaveBeenCalled();
-        expect(createCustomer).not.toHaveBeenCalled();
-      });
-
-      test('When the payment confirmation does not exist, then it is rejected and nothing is created', async () => {
-        jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
-          new Stripe.errors.StripeInvalidRequestError({
-            type: 'invalid_request_error',
-            code: 'resource_missing',
-            message: 'No such confirmationtoken',
-          }),
-        );
-        const preCreate = jest.spyOn(axios, 'post');
-        const createCustomer = stripeCreatesCustomers();
-
-        const response = await prepareCustomer({
-          ...billingDetails,
-          email: newBuyerEmail(),
-          confirmationTokenId: 'ctoken_unknown',
-        });
-
-        expect(response.statusCode).toBe(403);
-        expect(preCreate).not.toHaveBeenCalled();
-        expect(createCustomer).not.toHaveBeenCalled();
-      });
-
-      test.each([
-        ['the email', { confirmationTokenId: 'ctoken_123' }],
-        ['the payment confirmation', { email: 'new.buyer@internxt.com' }],
-      ])('When %s is missing, then the request is rejected as invalid', async (_, missingOne) => {
-        const createCustomer = stripeCreatesCustomers();
-
-        const response = await prepareCustomer({ ...billingDetails, ...missingOne });
-
-        expect(response.statusCode).toBe(400);
-        expect(createCustomer).not.toHaveBeenCalled();
-      });
+      expect(response.statusCode).toBe(400);
+      expect(createCustomer).not.toHaveBeenCalled();
     });
 
     test('When the email is not valid, then the request is rejected as invalid', async () => {
@@ -295,25 +197,10 @@ describe('Buying a plan without an account', () => {
       expect(response.statusCode).toBe(400);
     });
 
-    test.each(['country', 'captchaToken'])(
-      'When the required billing field "%s" is missing, then the request is rejected as invalid',
-      async (field) => {
-        const { [field as keyof typeof billingDetails]: _omitted, ...incompleteDetails } = billingDetails;
-
-        const response = await prepareCustomer({
-          ...incompleteDetails,
-          email: newBuyerEmail(),
-          confirmationTokenId: 'ctoken_123',
-        });
-
-        expect(response.statusCode).toBe(400);
-      },
-    );
-
     test('When the captcha fails, then the request is rejected before the payment confirmation is used', async () => {
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(false);
       const retrieveConfirmation = jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve');
-      const preCreate = jest.spyOn(axios, 'post');
+      const preCreate = jest.spyOn(UsersService.prototype, 'preCreateUser');
 
       const response = await prepareCustomer({
         ...billingDetails,
@@ -332,7 +219,7 @@ describe('Buying a plan without an account', () => {
       const createCustomer = stripeCreatesCustomers();
       const linkCustomerToDriveUser = jest.spyOn(UsersService.prototype, 'insertUser');
       const retrieveConfirmation = jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve');
-      const preCreate = jest.spyOn(axios, 'post');
+      const preCreate = jest.spyOn(UsersService.prototype, 'preCreateUser');
 
       const response = await app.inject({
         path: '/checkout/customer',

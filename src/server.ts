@@ -5,6 +5,7 @@ import { FastifyInstance } from 'fastify';
 
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
+import { CheckoutCustomersService } from './services/checkoutCustomers.service';
 import { PaymentService } from './services/payment.service';
 import envVariablesConfig from './config';
 import { UsersRepository } from './core/users/UsersRepository';
@@ -96,6 +97,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
+  const checkoutCustomersService = new CheckoutCustomersService(usersService, cacheService, stripePaymentsAdapter);
 
   const fastify = await buildApp({
     paymentService,
@@ -110,6 +112,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     stripe,
     config: envVariablesConfig,
     healthService,
+    checkoutCustomersService,
   });
 
   fastify.addHook('onClose', async () => {

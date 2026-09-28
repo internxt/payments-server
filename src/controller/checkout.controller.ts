@@ -4,15 +4,10 @@ import jwt from 'jsonwebtoken';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import CacheService from '../services/cache.service';
-import { User } from '../core/users/User';
+import { CheckoutCustomersService } from '../services/checkoutCustomers.service';
 import { PaymentIntent } from '../types/payment';
 import { BadRequestError, ForbiddenError } from '../errors/Errors';
-import {
-  AccountSetupPendingError,
-  InvalidConfirmationTokenError,
-  MissingParametersError,
-} from '../errors/PaymentErrors';
+import { MissingParametersError } from '../errors/PaymentErrors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
@@ -20,69 +15,13 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { CreateCustomerParams } from '../infrastructure/domain/entities/customer';
 import Logger from '../Logger';
 
 export function checkoutController(
   usersService: UsersService,
   paymentsService: PaymentService,
-  cacheService: CacheService,
+  checkoutCustomersService: CheckoutCustomersService,
 ) {
-  async function upsertCustomerForUser(
-    uuid: User['uuid'],
-    email: string,
-    customerDetails: Partial<CreateCustomerParams>,
-  ): Promise<Stripe.Customer['id']> {
-    const userExists = await usersService.findUserByUuid(uuid).catch(() => null);
-
-    if (userExists) {
-      await stripePaymentsAdapter.updateCustomer(userExists.customerId, { ...customerDetails, email });
-      return userExists.customerId;
-    }
-
-    const { id } = await stripePaymentsAdapter.createCustomer({ ...customerDetails, email });
-    await usersService.insertUser({ customerId: id, uuid, lifetime: false });
-
-    return id;
-  }
-
-  async function claimConfirmationToken(confirmationTokenId: string): Promise<void> {
-    const confirmationToken = await stripePaymentsAdapter.getConfirmationToken(confirmationTokenId);
-    if (!confirmationToken.canStartPaymentAttempt()) {
-      throw new InvalidConfirmationTokenError();
-    }
-
-    const isFirstUse = await cacheService.markConfirmationTokenAsUsed(confirmationToken.id);
-    if (!isFirstUse) {
-      throw new InvalidConfirmationTokenError();
-    }
-  }
-
-  async function preCreateBuyerWithoutAccount(email: string): Promise<User['uuid']> {
-    const { uuid, setupPending } = await usersService.preCreateUser(email);
-
-    if (setupPending) {
-      throw new AccountSetupPendingError();
-    }
-
-    return uuid;
-  }
-
-  async function upsertCustomerForPaymentAttempt(
-    email: string,
-    confirmationTokenId: string,
-    customerDetails: Partial<CreateCustomerParams>,
-  ): Promise<Stripe.Customer['id']> {
-    await claimConfirmationToken(confirmationTokenId);
-
-    const uuid = await preCreateBuyerWithoutAccount(email);
-
-    return upsertCustomerForUser(uuid, email, {
-      ...customerDetails,
-      metadata: { ...customerDetails.metadata, new_user_id: uuid },
-    });
-  }
-
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
@@ -169,16 +108,16 @@ export function checkoutController(
         };
 
         if (driveUser) {
-          customerId = await upsertCustomerForUser(driveUser.uuid, driveUser.email, customerDetails);
+          customerId = await checkoutCustomersService.upsertCustomerForDriveUser(driveUser, customerDetails);
         } else {
           if (!anonymousEmail || !confirmationTokenId) {
             throw new MissingParametersError(['email', 'confirmationTokenId']);
           }
-          customerId = await upsertCustomerForPaymentAttempt(
-            anonymousEmail.toLowerCase(),
+          customerId = await checkoutCustomersService.upsertCustomerForPaymentAttempt({
+            email: anonymousEmail.toLowerCase(),
             confirmationTokenId,
             customerDetails,
-          );
+          });
         }
 
         if (country && companyVatId) {
