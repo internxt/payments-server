@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import {
   getCreateSubscriptionResponse,
   getCustomer,
+  getExpiredUserToken,
   getLicenseCode,
   getPaymentIntent,
   getUniqueCodes,
@@ -279,7 +280,7 @@ describe('Payment controller e2e tests', () => {
         expect(response.statusCode).toBe(200);
         expect(responseBody).toStrictEqual({
           customerId: mockedCustomer.id,
-          token: jwt.sign({ customerId: mockedCustomer.id }, config.JWT_SECRET),
+          token: getValidUserToken({ customerId: mockedCustomer.id }),
         });
         expect(attachVatIdSpy).toHaveBeenCalled();
         expect(attachVatIdSpy).toHaveBeenCalledWith(mockedCustomer.id, mockedCustomer.address?.country, companyVatId);
@@ -362,6 +363,22 @@ describe('Payment controller e2e tests', () => {
           },
         });
         expect(responseBody).toStrictEqual(subResponse);
+      });
+
+      it('When the user token has expired, then the subscription is rejected', async () => {
+        const mockedUser = getUser();
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/object-storage/subscription',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getExpiredUserToken({ customerId: mockedUser.customerId }),
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
       });
 
       it('When the user token is not provided, then an error indicating so is thrown', async () => {
@@ -482,6 +499,23 @@ describe('Payment controller e2e tests', () => {
           payment_method: paymentMethod,
         });
       });
+    });
+
+    it('When the user token has expired, then the verification is rejected', async () => {
+      const mockedUser = getUser();
+
+      const response = await app.inject({
+        method: 'POST',
+        path: '/payment-method-verification',
+        body: {
+          customerId: mockedUser.customerId,
+          token: getExpiredUserToken({ customerId: mockedUser.customerId }),
+          paymentMethod: 'pm_123',
+          priceId: 'price_id',
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
     });
 
     it('When the customer ID from the user token does not match with the real user customer ID, then an error indicating so is thrown', async () => {

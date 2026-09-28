@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
+import { signUserToken } from '../../src/utils/signUserToken';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import { PaymentIntent, PaymentIntentCrypto, PaymentIntentFiat, PromotionCode } from '../../src/types/payment';
 import { RenewalPeriod, SubscriptionCreated } from '../../src/types/subscription';
@@ -132,7 +133,12 @@ export const getValidGatewayToken = () => {
 };
 
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
-  return jwt.sign(payload, config.JWT_SECRET);
+  return signUserToken(payload);
+};
+
+export const getExpiredUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
+  const twoHoursAgoInSeconds = Math.floor(Date.now() / 1000) - 2 * 60 * 60;
+  return jwt.sign({ ...payload, iat: twoHoursAgoInSeconds, exp: twoHoursAgoInSeconds + 60 * 60 }, config.JWT_SECRET);
 };
 
 export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer => {
