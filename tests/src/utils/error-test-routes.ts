@@ -1,6 +1,7 @@
 // routes/test-routes.ts
 import { FastifyInstance } from 'fastify';
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
+import { AccountSetupPendingError } from '../../../src/errors/PaymentErrors';
 
 export async function testRoutes(app: FastifyInstance) {
   app.get('/bad-request', async () => {
@@ -9,6 +10,10 @@ export async function testRoutes(app: FastifyInstance) {
 
   app.get('/not-found', async () => {
     throw new NotFoundError('User not found');
+  });
+
+  app.get('/with-code', async () => {
+    throw new AccountSetupPendingError();
   });
 
   app.get('/unhandled', async () => {

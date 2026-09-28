@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import Stripe from 'stripe';
 
 import { ExtendedSubscription } from '../../../src/types/stripe';
@@ -7,7 +7,7 @@ import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { getActiveSubscriptions, getCoupon, getUser, newTier, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { Service } from '../../../src/core/users/Tier';
-import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { DriveAccountAlreadyExistsError, UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../src/errors/UsersErrors';
 
 jest.mock('jsonwebtoken', () => ({
@@ -434,6 +434,42 @@ describe('UsersService tests', () => {
       const result = await usersService.hasRedeemedCancellationTrial(mockedUser.customerId);
 
       expect(result).toBeFalsy();
+    });
+  });
+  describe('Pre-creating a Drive user for a buyer without an account', () => {
+    const email = 'buyer@internxt.com';
+
+    test('When Drive pre-creates the user, then its uuid and setup state are returned', async () => {
+      const preCreate = jest
+        .spyOn(axios, 'post')
+        .mockResolvedValue({ data: { uuid: 'pre-created-uuid', setupPending: false } });
+
+      await expect(usersService.preCreateUser(email)).resolves.toStrictEqual({
+        uuid: 'pre-created-uuid',
+        setupPending: false,
+      });
+      expect(preCreate).toHaveBeenCalledWith(
+        `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`,
+        { email },
+        expect.anything(),
+      );
+    });
+
+    test('When the email belongs to a registered Drive user, then an error indicating so is thrown', async () => {
+      jest
+        .spyOn(axios, 'post')
+        .mockRejectedValue(new AxiosError('Conflict', 'ERR_BAD_REQUEST', undefined, undefined, { status: 409 } as any));
+
+      await expect(usersService.preCreateUser(email)).rejects.toThrow(DriveAccountAlreadyExistsError);
+    });
+
+    test('When Drive fails for another reason, then the error is not hidden', async () => {
+      const driveError = new AxiosError('Unavailable', 'ERR_BAD_RESPONSE', undefined, undefined, {
+        status: 503,
+      } as any);
+      jest.spyOn(axios, 'post').mockRejectedValue(driveError);
+
+      await expect(usersService.preCreateUser(email)).rejects.toBe(driveError);
     });
   });
 });
