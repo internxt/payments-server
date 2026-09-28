@@ -21,6 +21,10 @@ jest.mock('jsonwebtoken', () => ({
   sign: jest.fn(),
 }));
 
+jest.mock('../../../../../src/utils/signGatewayToken', () => ({
+  signGatewayToken: jest.fn().mockReturnValue('gateway-token'),
+}));
+
 const {
   invoiceCompletedHandler,
   paymentService,
@@ -1117,6 +1121,14 @@ describe('Testing the handler when an invoice is completed', () => {
     const driveNotFound = new AxiosError('Not Found', '404', undefined, undefined, {
       status: 404,
     } as AxiosResponse);
+    const configuredDriveGatewaySecret = config.DRIVE_NEW_GATEWAY_SECRET;
+    beforeAll(() => {
+      config.DRIVE_NEW_GATEWAY_SECRET = 'drive-gateway-secret';
+    });
+    afterAll(() => {
+      config.DRIVE_NEW_GATEWAY_SECRET = configuredDriveGatewaySecret;
+    });
+
     const setupEmailUrl = (userUuid: string) => `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/${userUuid}/setup-email`;
 
     const arrangeDriveAndLocalDatabase = ({
