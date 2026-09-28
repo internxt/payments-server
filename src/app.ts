@@ -13,6 +13,7 @@ import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
+import { CheckoutCustomersService } from './services/checkoutCustomers.service';
 import webhook from './webhooks';
 import cryptoWebhook from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
@@ -39,6 +40,7 @@ interface AppDependencies {
   stripe: Stripe;
   config: AppConfig;
   healthService: HealthService;
+  checkoutCustomersService: CheckoutCustomersService;
 }
 
 export async function buildApp({
@@ -54,6 +56,7 @@ export async function buildApp({
   stripe,
   config,
   healthService,
+  checkoutCustomersService,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
@@ -69,7 +72,7 @@ export async function buildApp({
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
-  fastify.register(checkoutController(usersService, paymentService, cacheService), { prefix: '/checkout' });
+  fastify.register(checkoutController(usersService, paymentService, checkoutCustomersService), { prefix: '/checkout' });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
     gatewayController({

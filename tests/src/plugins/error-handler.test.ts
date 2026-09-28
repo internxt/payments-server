@@ -41,6 +41,19 @@ describe('Custom error handler', () => {
     });
   });
 
+  it('When an error carries a machine-readable code, then the code is returned next to the message', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/with-code',
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toStrictEqual({
+      message: 'The account setup is pending, check your email to complete it',
+      code: 'AccountSetupPending',
+    });
+  });
+
   it('When an Internal Server Error is thrown, then returns the correct status code and message', async () => {
     const res = await app.inject({
       method: 'GET',
