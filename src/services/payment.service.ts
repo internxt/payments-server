@@ -20,6 +20,7 @@ import {
 } from '../errors/PaymentErrors';
 import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
 import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
+import { getPaymentMethodTypes } from '../utils/paymentMethods';
 import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
 import { getStripeNewVersion } from './stripe';
@@ -141,12 +142,18 @@ export class PaymentService {
     let couponId;
 
     const price = await this.provider.prices.retrieve(priceId, {
-      expand: ['product'],
+      expand: ['product', 'currency_options'],
     });
     const product = price.product as Stripe.Product;
     const isBusinessProduct = !!product.metadata.type && product.metadata.type === UserType.Business;
 
     if (isBusinessProduct) throw new BadRequestError('Business plan is no longer available');
+
+    const interval = price.recurring?.interval === 'year' ? 'year' : 'month';
+
+    const subscriptionUnitAmount = price.currency_options?.[currencyValue]?.unit_amount ?? price.unit_amount;
+    const subscriptionDecimalAmount =
+      subscriptionUnitAmount !== null && subscriptionUnitAmount !== undefined ? subscriptionUnitAmount / 100 : undefined;
 
     await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
@@ -174,7 +181,11 @@ export class PaymentService {
       },
       payment_behavior: 'default_incomplete',
       payment_settings: {
-        payment_method_types: ['card', 'paypal'],
+        payment_method_types: getPaymentMethodTypes(
+          currencyValue,
+          interval,
+          subscriptionDecimalAmount,
+        ) as Stripe.SubscriptionCreateParams.PaymentSettings.PaymentMethodType[],
         save_default_payment_method: 'on_subscription',
       },
       expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
@@ -231,8 +242,7 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
-    const paymentMethodTypes =
-      normalizedCurrencyForStripe === 'eur' ? ['card', 'paypal', 'klarna'] : ['card', 'paypal'];
+    const paymentMethodTypes = getPaymentMethodTypes(normalizedCurrencyForStripe, 'lifetime');
 
     const invoice = await getStripeNewVersion().invoices.create({
       customer: customerId,
@@ -349,6 +359,21 @@ export class PaymentService {
           qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
         },
       };
+    }
+
+    const invoiceToFinalize = await getStripeNewVersion().invoices.retrieve(invoiceId);
+    const allowedPaymentMethodTypes = getPaymentMethodTypes(
+      normalizedCurrencyForStripe,
+      'lifetime',
+      invoiceToFinalize.total / 100,
+    );
+
+    if (allowedPaymentMethodTypes.join() !== paymentMethodTypes.join()) {
+      await getStripeNewVersion().invoices.update(invoiceId, {
+        payment_settings: {
+          payment_method_types: allowedPaymentMethodTypes,
+        },
+      });
     }
 
     const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {

@@ -202,6 +202,9 @@ describe('Payments Service tests', () => {
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(mockedPrice);
       jest
+        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
         .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
@@ -259,6 +262,9 @@ describe('Payments Service tests', () => {
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(mockedPrice);
       jest
+        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
         .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
@@ -274,6 +280,73 @@ describe('Payments Service tests', () => {
       });
 
       expect(paymentIntent).toEqual(mockedPaymentIntent);
+    });
+
+    test('When an INR lifetime invoice exceeds the UPI cap, then UPI is removed before finalizing it', async () => {
+      const mockedInvoice = getInvoice({
+        total: 15000000,
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'mockedPriceId',
+                },
+              },
+              currency: 'inr',
+            },
+          ],
+        },
+      });
+      const mockedPaymentIntent = getPaymentIntentResponse({});
+      const mockedFinalizedInvoice = getInvoice({
+        payments: {
+          data: [
+            {
+              payment: {
+                payment_intent: mockedPaymentIntent.id,
+              },
+            },
+          ],
+        },
+        confirmation_secret: {
+          client_secret: mockedPaymentIntent.clientSecret as string,
+        },
+      });
+      const mockedPrice = getPriceEntity({ id: 'mockedPriceId' });
+
+      jest
+        .spyOn(stripeNewVersion.invoices, 'create')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(mockedPrice);
+      jest
+        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      const updateSpy = jest
+        .spyOn(stripeNewVersion.invoices, 'update')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .mockResolvedValueOnce(mockedFinalizedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+        ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
+        client_secret: mockedPaymentIntent.clientSecret as string,
+      });
+
+      await paymentService.createInvoice({
+        customerId: mockedInvoice.customer as string,
+        priceId: 'mockedPriceId',
+        currency: 'inr',
+        userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith(mockedInvoice.id, {
+        payment_settings: { payment_method_types: ['card'] },
+      });
     });
 
     describe('Crypto payments', () => {

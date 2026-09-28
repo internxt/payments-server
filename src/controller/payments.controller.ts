@@ -22,7 +22,7 @@ import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 
-const allowedCurrency = ['eur', 'usd'];
+const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
 export function paymentsController(
   paymentService: PaymentService,
