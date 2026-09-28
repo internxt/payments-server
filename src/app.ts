@@ -69,7 +69,7 @@ export async function buildApp({
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
-  fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
+  fastify.register(checkoutController(usersService, paymentService, cacheService), { prefix: '/checkout' });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
     gatewayController({

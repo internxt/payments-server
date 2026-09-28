@@ -4,8 +4,15 @@ import jwt from 'jsonwebtoken';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
+import CacheService from '../services/cache.service';
+import { User } from '../core/users/User';
 import { PaymentIntent } from '../types/payment';
 import { BadRequestError, ForbiddenError } from '../errors/Errors';
+import {
+  AccountSetupPendingError,
+  InvalidConfirmationTokenError,
+  MissingParametersError,
+} from '../errors/PaymentErrors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
@@ -13,9 +20,69 @@ import { signUserToken } from '../utils/signUserToken';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { CreateCustomerParams } from '../infrastructure/domain/entities/customer';
 import Logger from '../Logger';
 
-export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
+export function checkoutController(
+  usersService: UsersService,
+  paymentsService: PaymentService,
+  cacheService: CacheService,
+) {
+  async function upsertCustomerForUser(
+    uuid: User['uuid'],
+    email: string,
+    customerDetails: Partial<CreateCustomerParams>,
+  ): Promise<Stripe.Customer['id']> {
+    const userExists = await usersService.findUserByUuid(uuid).catch(() => null);
+
+    if (userExists) {
+      await stripePaymentsAdapter.updateCustomer(userExists.customerId, { ...customerDetails, email });
+      return userExists.customerId;
+    }
+
+    const { id } = await stripePaymentsAdapter.createCustomer({ ...customerDetails, email });
+    await usersService.insertUser({ customerId: id, uuid, lifetime: false });
+
+    return id;
+  }
+
+  async function claimConfirmationToken(confirmationTokenId: string): Promise<void> {
+    const confirmationToken = await stripePaymentsAdapter.getConfirmationToken(confirmationTokenId);
+    if (!confirmationToken.canStartPaymentAttempt()) {
+      throw new InvalidConfirmationTokenError();
+    }
+
+    const isFirstUse = await cacheService.markConfirmationTokenAsUsed(confirmationToken.id);
+    if (!isFirstUse) {
+      throw new InvalidConfirmationTokenError();
+    }
+  }
+
+  async function preCreateBuyerWithoutAccount(email: string): Promise<User['uuid']> {
+    const { uuid, setupPending } = await usersService.preCreateUser(email);
+
+    if (setupPending) {
+      throw new AccountSetupPendingError();
+    }
+
+    return uuid;
+  }
+
+  async function upsertCustomerForPaymentAttempt(
+    email: string,
+    confirmationTokenId: string,
+    customerDetails: Partial<CreateCustomerParams>,
+  ): Promise<Stripe.Customer['id']> {
+    await claimConfirmationToken(confirmationTokenId);
+
+    const uuid = await preCreateBuyerWithoutAccount(email);
+
+    return upsertCustomerForUser(uuid, email, {
+      ...customerDetails,
+      metadata: { ...customerDetails.metadata, new_user_id: uuid },
+    });
+  }
+
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
@@ -30,6 +97,8 @@ export function checkoutController(usersService: UsersService, paymentsService: 
         captchaToken: string;
         companyVatId?: string;
         metadata?: Record<string, string>;
+        email?: string;
+        confirmationTokenId?: string;
       };
     }>(
       '/customer',
@@ -51,10 +120,13 @@ export function checkoutController(usersService: UsersService, paymentsService: 
                 type: 'object',
                 additionalProperties: { type: 'string' },
               },
+              email: { type: 'string', format: 'email' },
+              confirmationTokenId: { type: 'string' },
             },
           },
         },
         config: {
+          allowAnonymous: true,
           rateLimit: {
             max: 5,
             timeWindow: '1 hour',
@@ -73,8 +145,10 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           companyVatId,
           captchaToken,
           metadata,
+          email: anonymousEmail,
+          confirmationTokenId,
         } = req.body;
-        const { uuid: userUuid, email } = req.user.payload;
+        const driveUser = req.user?.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -82,43 +156,29 @@ export function checkoutController(usersService: UsersService, paymentsService: 
           throw new ForbiddenError('Token verification failed');
         }
 
-        const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
+        const customerDetails = {
+          name: customerName,
+          address: {
+            line1: lineAddress1,
+            line2: lineAddress2,
+            city,
+            postalCode,
+            country,
+          },
+          metadata,
+        };
 
-        if (userExists) {
-          await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
-            name: customerName,
-            email,
-            address: {
-              line1: lineAddress1,
-              line2: lineAddress2,
-              city,
-              postalCode,
-              country,
-            },
-            metadata,
-          });
-          customerId = userExists.customerId;
+        if (driveUser) {
+          customerId = await upsertCustomerForUser(driveUser.uuid, driveUser.email, customerDetails);
         } else {
-          const { id } = await stripePaymentsAdapter.createCustomer({
-            name: customerName,
-            email,
-            address: {
-              line1: lineAddress1,
-              line2: lineAddress2,
-              city,
-              postalCode,
-              country,
-            },
-            metadata,
-          });
-
-          await usersService.insertUser({
-            customerId: id,
-            uuid: userUuid,
-            lifetime: false,
-          });
-
-          customerId = id;
+          if (!anonymousEmail || !confirmationTokenId) {
+            throw new MissingParametersError(['email', 'confirmationTokenId']);
+          }
+          customerId = await upsertCustomerForPaymentAttempt(
+            anonymousEmail.toLowerCase(),
+            confirmationTokenId,
+            customerDetails,
+          );
         }
 
         if (country && companyVatId) {

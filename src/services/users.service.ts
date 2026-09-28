@@ -7,10 +7,10 @@ import { Coupon } from '../core/coupons/Coupon';
 import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
-import { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { AxiosInstance, AxiosRequestConfig, HttpStatusCode, isAxiosError } from 'axios';
 import { isProduction, type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
-import { UserNotFoundError } from '../errors/PaymentErrors';
+import { DriveAccountAlreadyExistsError, UserNotFoundError } from '../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
 import dayjs from 'dayjs';
 
@@ -250,6 +250,30 @@ export class UsersService {
     };
 
     return this.axios.get(`${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users`, requestConfig);
+  }
+
+  async preCreateUser(email: string): Promise<{ uuid: User['uuid']; setupPending: boolean }> {
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const requestConfig: AxiosRequestConfig = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    };
+
+    try {
+      const { data } = await this.axios.post<{ uuid: User['uuid']; setupPending: boolean }>(
+        `${this.config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-create`,
+        { email },
+        requestConfig,
+      );
+      return data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === HttpStatusCode.Conflict) {
+        throw new DriveAccountAlreadyExistsError();
+      }
+      throw error;
+    }
   }
 
   async enableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {

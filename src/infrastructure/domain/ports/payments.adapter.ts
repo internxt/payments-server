@@ -5,12 +5,14 @@ import { PaymentMethod } from '../entities/paymentMethod';
 import { Price } from '../entities/price';
 import { Subscription } from '../entities/subscription';
 import { InvoiceItems } from '../entities/invoiceItems';
+import { ConfirmationToken } from '../entities/confirmationToken';
 
 export interface PaymentsAdapter {
   createCustomer: (params: CreateCustomerParams) => Promise<Customer>;
   updateCustomer: (customerId: Customer['id'], params: Partial<UpdateCustomerParams>) => Promise<Customer>;
   getCustomer: (customerId: Customer['id']) => Promise<Customer>;
   searchCustomer: (email: Customer['email']) => Promise<Customer[]>;
+  getConfirmationToken: (confirmationTokenId: ConfirmationToken['id']) => Promise<ConfirmationToken>;
   retrievePaymentMethod: (paymentMethodId: PaymentMethod['id']) => Promise<PaymentMethod>;
   getPrices: (currency: string) => Promise<Price[]>;
   getPriceById: (priceId: Price['id'], currency: string) => Promise<Price>;

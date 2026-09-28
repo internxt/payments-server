@@ -1,4 +1,4 @@
-import { BadRequestError, ConflictError, InternalServerError, NotFoundError } from './Errors';
+import { BadRequestError, ConflictError, ForbiddenError, InternalServerError, NotFoundError } from './Errors';
 
 export class NotFoundSubscriptionError extends NotFoundError {
   constructor(message: string) {
@@ -88,5 +88,24 @@ export class ClientSecretNotFoundError extends NotFoundError {
 export class SubscriptionNotEligibleForEarlyChargeError extends BadRequestError {
   constructor(message = 'The subscription is not eligible for an early charge as it will end this month') {
     super(message);
+  }
+}
+
+export class InvalidConfirmationTokenError extends ForbiddenError {
+  constructor(message = 'The payment confirmation token is invalid, expired or already used') {
+    super(message);
+  }
+}
+
+export class DriveAccountAlreadyExistsError extends ConflictError {
+  constructor(message = 'The email already has an account, log in to continue') {
+    super(message);
+  }
+}
+
+export class AccountSetupPendingError extends ConflictError {
+  constructor(message = 'The account setup is pending, check your email to complete it') {
+    super(message);
+    this.code = 'AccountSetupPending';
   }
 }
