@@ -21,11 +21,11 @@ describe('Signing user token', () => {
     expect(decodedToken.invoiceId).toBe(invoiceId);
   });
 
-  test('When a token is signed, then it expires one hour later', () => {
+  test('When a token is signed, then it expires six hours later', () => {
     const token = signUserToken({ customerId: 'cus_123' });
 
     const { iat, exp } = jwt.verify(token, config.JWT_SECRET) as { iat: number; exp: number };
 
-    expect(exp - iat).toBe(60 * 60);
+    expect(exp - iat).toBe(6 * 60 * 60);
   });
 });
