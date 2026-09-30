@@ -51,7 +51,7 @@ describe('Checkout controller', () => {
     const userAuthToken = 'invalid_token';
 
     const response = await app.inject({
-      path: '/checkout/crypto/verify/payment',
+      path: '/checkout/customer',
       method: 'POST',
       headers: {
         Authorization: `Bearer ${userAuthToken}`,

@@ -42,17 +42,16 @@ export async function setupAuth(fastify: FastifyInstance, options: WithAuthOptio
   fastify.addHook('onRequest', async (request) => {
     const skipAuth = request.routeOptions?.config?.skipAuth;
     const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
+    const hasJwtToken = request.headers.authorization;
+    const shouldSkipAuthAutomatically = skipAuth || (!!hasJwtToken && allowAnonymous);
 
-    if (skipAuth) {
+    if (shouldSkipAuthAutomatically) {
       return;
     }
 
     try {
       await request.jwtVerify();
     } catch (err) {
-      if (allowAnonymous) {
-        return;
-      }
       Logger.warn(`JWT verification failed: ${(err as Error).message}`);
       throw new UnauthorizedError();
     }

@@ -355,7 +355,7 @@ export function checkoutController(
           },
         },
         config: {
-          allowAnonymous: true,
+          skipAuth: true,
         },
       },
       async (req, res) => {

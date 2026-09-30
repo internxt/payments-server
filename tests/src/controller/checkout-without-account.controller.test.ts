@@ -1,7 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
-import { getConfirmationToken, getCustomer, getValidAuthToken, getValidUserToken } from '../fixtures';
+import {
+  getConfirmationToken,
+  getCustomer,
+  getExpiredAuthToken,
+  getValidAuthToken,
+  getValidUserToken,
+} from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
@@ -237,6 +243,27 @@ describe('Buying a plan without an account', () => {
       });
       expect(retrieveConfirmation).not.toHaveBeenCalled();
       expect(preCreate).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['has expired', () => `Bearer ${getExpiredAuthToken(randomUUID())}`],
+      ['is not a valid token', () => 'Bearer invalid_token'],
+    ])('When the buyer sends a login that %s, then it is rejected and nothing is created', async (_, authorization) => {
+      const { preCreate } = drivePreCreatesUser();
+      const createCustomer = stripeCreatesCustomers();
+      const retrieveConfirmation = jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve');
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: { ...billingDetails, email: newBuyerEmail(), confirmationTokenId: 'ctoken_123' },
+        headers: { authorization: authorization() },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(preCreate).not.toHaveBeenCalled();
+      expect(createCustomer).not.toHaveBeenCalled();
+      expect(retrieveConfirmation).not.toHaveBeenCalled();
     });
   });
 });
