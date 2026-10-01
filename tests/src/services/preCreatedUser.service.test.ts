@@ -1,7 +1,8 @@
 import axios from 'axios';
 import config from '../../../src/config';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
-import { PreCreatedUser, PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUser } from '../../../src/infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
 
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('mocked-jwt-token'),

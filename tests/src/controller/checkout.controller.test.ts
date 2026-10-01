@@ -23,6 +23,7 @@ import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 import { getPriceEntity } from '../entity.fixtures';
@@ -134,7 +135,7 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
         .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
@@ -490,6 +491,9 @@ describe('Checkout controller', () => {
   describe('Create an invoice and returns the payment intent', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      jest
+        .spyOn(StripePaymentsAdapter.prototype, 'getCustomer')
+        .mockResolvedValue(Customer.toDomain(getCustomer()));
     });
 
     test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {

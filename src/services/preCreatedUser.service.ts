@@ -2,6 +2,7 @@ import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { signGatewayToken } from '../utils/signGatewayToken';
 import { AppConfig } from '../config';
 import { PreCreatedUser, PreCreatedUserStatus } from '../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../errors/PreCreatedUsersErrors';
 
 export class PreCreatedUserService {
   constructor(
@@ -58,6 +59,38 @@ export class PreCreatedUserService {
       },
       requestConfig,
     );
+  }
+
+  async getOrCreate(email: string) {
+    const existsPreCreatedUser = await this.get(email).catch((error) => {
+      if (error.response.data.code === 'USER_NOT_FOUND') {
+        return null;
+      }
+
+      throw error;
+    });
+
+    if (!existsPreCreatedUser) {
+      return await this.create(email);
+    }
+
+    return existsPreCreatedUser;
+  }
+
+  async getEligibleForPayment(email: string) {
+    const preCreatedUser = await this.get(email).catch((error) => {
+      if (error.response.data.code === 'USER_NOT_FOUND') {
+        throw new PreCreatedUserNotFoundError();
+      }
+
+      throw error;
+    });
+
+    if (preCreatedUser.isPendingStatus) {
+      throw new PreCreatedUserPendingSetupError();
+    }
+
+    return preCreatedUser;
   }
 
   private get gatewaySecret(): string {
