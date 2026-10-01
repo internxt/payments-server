@@ -26,7 +26,7 @@ import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/I
 import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBUserFeatureOverridesRepository';
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 import { KlaviyoTrackingService } from '../../../src/services/klaviyo.service';
-import { AccountSetupService } from '../../../src/services/accountSetup.service';
+import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 
 export interface TestServices {
   stripe: Stripe;
@@ -45,7 +45,7 @@ export interface TestServices {
   invoiceCompletedHandler: InvoiceCompletedHandler;
   userFeaturesOverridesService: UserFeaturesOverridesService;
   klaviyoTrackingService: KlaviyoTrackingService;
-  accountSetupService: AccountSetupService;
+  preCreatedUserService: PreCreatedUserService;
 }
 
 export interface TestRepositories {
@@ -124,7 +124,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const klaviyoTrackingService = new KlaviyoTrackingService();
-  const accountSetupService = new AccountSetupService(axios, config);
+  const preCreatedUserService = new PreCreatedUserService(axios, config);
 
   return {
     stripe,
@@ -143,7 +143,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     invoiceCompletedHandler,
     userFeaturesOverridesService,
     klaviyoTrackingService,
-    accountSetupService,
+    preCreatedUserService,
     ...repositories,
   };
 };
