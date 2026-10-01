@@ -14,8 +14,15 @@ import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
+import { AccountSetupService } from '../services/accountSetup.service';
 
-export function checkoutController(usersService: UsersService, paymentsService: PaymentService) {
+interface CheckoutControllerPayload {
+  usersService: UsersService;
+  paymentsService: PaymentService;
+  accountSetup: AccountSetupService;
+}
+
+export function checkoutController({ usersService, paymentsService, accountSetup }: CheckoutControllerPayload) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
