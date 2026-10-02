@@ -5,7 +5,7 @@ import { PreCreatedUserStatus } from '../../../src/infrastructure/domain/entitie
 import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
 import { HttpResponseError } from '../../../src/infrastructure/http/HttpResponseError';
 import { HttpErrorCode } from '../../../src/errors/httpErrorCodes';
-import { PreCreatedUserNotFoundError } from '../../../src/errors/PreCreatedUsersErrors';
+import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../../../src/errors/PreCreatedUsersErrors';
 
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('mocked-jwt-token'),
@@ -180,6 +180,62 @@ describe('Pre Created User Service tests', () => {
       jest.spyOn(httpClient, 'patch').mockRejectedValue(requestError);
 
       await expect(preCreatedUserService.update({ uuid: 'pre-created-uuid' })).rejects.toThrow(requestError);
+    });
+  });
+
+  describe('Sending the setup email to a pre-created user', () => {
+    const setupEmailUrl = `${config.DRIVE_NEW_GATEWAY_URL}/gateway/users/pre-created-uuid/setup-email`;
+
+    test('When called with a plan name, then it requests the setup email with the signed token', async () => {
+      const postSpy = jest.spyOn(httpClient, 'post').mockResolvedValue(undefined);
+
+      await preCreatedUserService.sendSetupEmail('pre-created-uuid', 'Premium 2TB');
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(postSpy).toHaveBeenCalledWith(
+        setupEmailUrl,
+        { planName: 'Premium 2TB' },
+        expect.objectContaining({ headers: expectedHeaders }),
+      );
+    });
+
+    test('When called without a plan name, then it is sent as undefined', async () => {
+      const postSpy = jest.spyOn(httpClient, 'post').mockResolvedValue(undefined);
+
+      await preCreatedUserService.sendSetupEmail('pre-created-uuid');
+
+      expect(postSpy).toHaveBeenCalledWith(
+        setupEmailUrl,
+        { planName: undefined },
+        expect.objectContaining({ headers: expectedHeaders }),
+      );
+    });
+
+    test('When the request fails, then the rejection propagates', async () => {
+      const requestError = new Error('Network error');
+      jest.spyOn(httpClient, 'post').mockRejectedValue(requestError);
+
+      await expect(preCreatedUserService.sendSetupEmail('pre-created-uuid')).rejects.toThrow(requestError);
+    });
+  });
+
+  describe('Checking if a pre-created user is eligible for payment', () => {
+    test('When the pre-created user has not completed the account setup yet, then it is returned', async () => {
+      jest.spyOn(httpClient, 'get').mockResolvedValue(gatewayResponse);
+
+      const result = await preCreatedUserService.getEligibleForPayment('n2oK7@example.com');
+
+      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
+    });
+
+    test('When the pre-created user already paid and is pending to set up the account, then a domain error is thrown', async () => {
+      jest
+        .spyOn(httpClient, 'get')
+        .mockResolvedValue({ data: { uuid: 'pre-created-uuid', status: PreCreatedUserStatus.PendingSetup } });
+
+      await expect(preCreatedUserService.getEligibleForPayment('n2oK7@example.com')).rejects.toThrow(
+        PreCreatedUserPendingSetupError,
+      );
     });
   });
 });
