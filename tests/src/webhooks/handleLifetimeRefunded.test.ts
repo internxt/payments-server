@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { getCharge, getInvoice, getLogger, getUser, newTier } from '../fixtures';
-import config from '../../../src/config';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -10,7 +9,8 @@ import { createTestServices } from '../helpers/services-factory';
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
 const logger = getLogger();
-const { paymentService, usersService, storageService, tiersService, cacheService } = createTestServices();
+const { paymentService, usersService, storageService, tiersService, cacheService, preCreatedUserService } =
+  createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -39,7 +39,7 @@ describe('Process when a lifetime is refunded', () => {
       paymentService,
       logger,
       tiersService,
-      config,
+      preCreatedUserService,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -52,6 +52,7 @@ describe('Process when a lifetime is refunded', () => {
       usersService: usersService,
       tiersService: tiersService,
       log: logger,
+      preCreatedUserService,
     });
   });
 
@@ -86,7 +87,7 @@ describe('Process when a lifetime is refunded', () => {
       paymentService,
       logger,
       tiersService,
-      config,
+      preCreatedUserService,
     );
 
     expect(findUserByCustomerIdSpy).toHaveBeenCalledWith(mockedCharge.customer);
@@ -119,7 +120,7 @@ describe('Process when a lifetime is refunded', () => {
         paymentService,
         logger,
         tiersService,
-        config,
+        preCreatedUserService,
       ),
     ).rejects.toThrow(randomError);
   });

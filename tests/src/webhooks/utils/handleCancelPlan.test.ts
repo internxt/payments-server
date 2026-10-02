@@ -2,12 +2,15 @@ import { TierNotFoundError } from '../../../../src/services/tiers.service';
 import { getCustomer, getLogger, getUser, newTier, voidPromise } from '../../fixtures';
 import { handleCancelPlan } from '../../../../src/webhooks/utils/handleCancelPlan';
 import { createTestServices } from '../../helpers/services-factory';
+import { getPreCreatedUserEntity } from '../../entity.fixtures';
 
-const { usersService, tiersService } = createTestServices();
+const { usersService, tiersService, preCreatedUserService } = createTestServices();
 
 beforeEach(() => {
   jest.resetAllMocks();
   jest.clearAllMocks();
+  jest.spyOn(preCreatedUserService, 'getEligibleForPayment').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 });
 
 describe('Handling canceled plans and refunded lifetimes', () => {
@@ -35,6 +38,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
         tiersService,
         usersService,
         log,
+        preCreatedUserService,
       }),
     ).rejects.toThrow(TierNotFoundError);
 
@@ -68,6 +72,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       tiersService,
       usersService,
       log,
+      preCreatedUserService,
     });
 
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });
@@ -105,6 +110,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       tiersService,
       usersService,
       log,
+      preCreatedUserService,
     });
 
     expect(updateUserSpy).toHaveBeenCalledWith(mockedCustomer.id, { lifetime: false });

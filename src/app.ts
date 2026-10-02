@@ -13,7 +13,7 @@ import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
-import webhook from './webhooks';
+import { webhookHandler } from './webhooks';
 import cryptoWebhook from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
@@ -103,7 +103,7 @@ export async function buildApp({
   fastify.register(healthController(healthService));
 
   fastify.register(
-    webhook(
+    webhookHandler({
       stripe,
       storageService,
       usersService,
@@ -112,7 +112,8 @@ export async function buildApp({
       cacheService,
       objectStorageService,
       tiersService,
-    ),
+      preCreatedUserService,
+    }),
   );
 
   fastify.register(
@@ -124,6 +125,7 @@ export async function buildApp({
       cacheService,
       objectStorageService,
       tiersService,
+      preCreatedUserService,
     }),
   );
 

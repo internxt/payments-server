@@ -12,6 +12,7 @@ import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
+import { getPreCreatedUserEntity } from '../../../entity.fixtures';
 
 const {
   invoiceCompletedHandler,
@@ -22,11 +23,14 @@ const {
   objectStorageWebhookHandler,
   cacheService,
   storageService,
+  preCreatedUserService,
 } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
+  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -222,7 +226,6 @@ describe('Testing the handler when an invoice is completed', () => {
         productId: (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
         customer: Customer.toDomain(mockedCustomer),
         tier: mockedTier,
-        totalQuantity: 1,
       });
       expect(updateOrInsertUserTierSpy).toHaveBeenCalledWith({
         isBusinessPlan: false,
@@ -427,7 +430,6 @@ describe('Testing the handler when an invoice is completed', () => {
         const lifetimeMockedMaxSpaceBytes = mockedMaxSpaceBytes * 5;
         const mockedIsLifetimePlan = true;
         const mockedProductId = getProduct({}).id;
-        const totalQuantity = 1;
         const mockedTier = newTier();
         const mockedLifetimeTier = newTier({ billingType: 'lifetime' });
         const determineLifetimeConditionsSpy = jest.spyOn(determineLifetimeConditions, 'determine').mockResolvedValue({
@@ -447,7 +449,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         });
 
@@ -477,7 +478,6 @@ describe('Testing the handler when an invoice is completed', () => {
         });
         const mockedIsLifetimePlan = true;
         const mockedProductId = getProduct({}).id;
-        const totalQuantity = 1;
         const mockedTier = newTier();
         const determineLifetimeConditionsSpy = jest
           .spyOn(determineLifetimeConditions, 'determine')
@@ -495,7 +495,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         });
 
@@ -525,7 +524,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
 
       const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
@@ -541,7 +539,6 @@ describe('Testing the handler when an invoice is completed', () => {
         customer: Customer.toDomain(mockedCustomer),
         isLifetimePlan: mockedIsLifetimePlan,
         productId: mockedProductId,
-        totalQuantity,
         tier: mockedTier,
       });
 
@@ -577,7 +574,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
       const loggerSpy = jest.spyOn(Logger, 'error');
@@ -592,7 +588,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
@@ -612,7 +607,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
@@ -629,7 +623,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
