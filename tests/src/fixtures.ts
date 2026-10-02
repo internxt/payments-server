@@ -159,6 +159,28 @@ export const getCustomer = (params?: Partial<Stripe.Customer>): Stripe.Customer 
   };
 };
 
+export const getConfirmationToken = (params?: Partial<Stripe.ConfirmationToken>): Stripe.ConfirmationToken => {
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  const twelveHoursInSeconds = 12 * 60 * 60;
+
+  return {
+    id: `ctoken_${randomDataGenerator.string({ length: 24, alpha: true, numeric: true })}`,
+    object: 'confirmation_token',
+    created: nowInSeconds,
+    expires_at: nowInSeconds + twelveHoursInSeconds,
+    livemode: false,
+    payment_intent: null,
+    payment_method_options: null,
+    payment_method_preview: null,
+    return_url: null,
+    setup_future_usage: null,
+    setup_intent: null,
+    shipping: null,
+    use_stripe_sdk: true,
+    ...params,
+  };
+};
+
 export const getPromotionCodeResponse = (params?: Partial<PromotionCode>): PromotionCode => {
   return {
     codeId: 'promo_id',

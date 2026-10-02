@@ -187,4 +187,16 @@ describe('Cache Service', () => {
       expect(storedTier).toBeNull();
     });
   });
+
+  describe('Single use of payment confirmation tokens', () => {
+    test('When a confirmation token is used for the first time, then it is accepted', async () => {
+      await expect(cacheService.markConfirmationTokenAsUsed('ctoken_first_use')).resolves.toBe(true);
+    });
+
+    test('When a confirmation token was already used, then it is not accepted again', async () => {
+      await cacheService.markConfirmationTokenAsUsed('ctoken_used_twice');
+
+      await expect(cacheService.markConfirmationTokenAsUsed('ctoken_used_twice')).resolves.toBe(false);
+    });
+  });
 });

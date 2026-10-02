@@ -1,4 +1,5 @@
 import {
+  getConfirmationToken,
   getCreatedSubscription,
   getCustomer,
   getInvoice,
@@ -9,7 +10,8 @@ import {
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
-import { UserNotFoundError } from '../../../../src/errors/PaymentErrors';
+import { InvalidConfirmationTokenError, UserNotFoundError } from '../../../../src/errors/PaymentErrors';
+import { ConfirmationToken } from '../../../../src/infrastructure/domain/entities/confirmationToken';
 import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/paymentMethod';
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
@@ -171,6 +173,51 @@ describe('Stripe Adapter', () => {
       } as any);
 
       await expect(stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
+    });
+  });
+
+  describe('Get a payment confirmation token', () => {
+    test('When the token exists, then it is returned with its creation, expiration and usage', async () => {
+      const stripeConfirmationToken = getConfirmationToken({
+        created: 1_700_000_000,
+        expires_at: 1_700_043_200,
+        payment_intent: 'pi_123',
+      });
+      jest
+        .spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve')
+        .mockResolvedValue(stripeConfirmationToken as Stripe.Response<Stripe.ConfirmationToken>);
+
+      const confirmationToken = await stripePaymentsAdapter.getConfirmationToken(stripeConfirmationToken.id);
+
+      expect(confirmationToken).toStrictEqual(
+        new ConfirmationToken({
+          id: stripeConfirmationToken.id,
+          createdAt: new Date(1_700_000_000_000),
+          expiresAt: new Date(1_700_043_200_000),
+          isAlreadyUsed: true,
+        }),
+      );
+    });
+
+    test('When Stripe does not know the token, then an error indicating it is invalid is thrown', async () => {
+      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
+        new Stripe.errors.StripeInvalidRequestError({
+          type: 'invalid_request_error',
+          code: 'resource_missing',
+          message: 'No such confirmationtoken',
+        }),
+      );
+
+      await expect(stripePaymentsAdapter.getConfirmationToken('ctoken_unknown')).rejects.toThrow(
+        InvalidConfirmationTokenError,
+      );
+    });
+
+    test('When Stripe fails for another reason, then the error is not hidden', async () => {
+      const stripeOutage = new Stripe.errors.StripeAPIError({ type: 'api_error', message: 'Stripe is down' });
+      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(stripeOutage);
+
+      await expect(stripePaymentsAdapter.getConfirmationToken('ctoken_123')).rejects.toBe(stripeOutage);
     });
   });
 
