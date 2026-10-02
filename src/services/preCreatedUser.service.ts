@@ -88,8 +88,12 @@ export class PreCreatedUserService {
     );
   }
 
+  /**
+   * @throws {PreCreatedUserPendingSetupError} When the user already paid and is pending to set up the account,
+   * so it must not start another purchase.
+   */
   async getOrCreate(email: string): Promise<PreCreatedUser> {
-    const existingPreCreatedUser = await this.get(email).catch((error) => {
+    const existingPreCreatedUser = await this.getEligibleForPayment(email).catch((error) => {
       if (error instanceof PreCreatedUserNotFoundError) {
         return null;
       }

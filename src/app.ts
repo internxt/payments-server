@@ -26,6 +26,7 @@ import { gatewayController } from './controller/gateway.controller';
 import { HealthService } from './services/health.service';
 import healthController from './controller/health.controller';
 import { PreCreatedUserService } from './services/preCreatedUser.service';
+import { ConfirmationTokenService } from './services/confirmationToken.service';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -41,6 +42,7 @@ interface AppDependencies {
   config: AppConfig;
   healthService: HealthService;
   preCreatedUserService: PreCreatedUserService;
+  confirmationTokenService: ConfirmationTokenService;
 }
 
 export async function buildApp({
@@ -57,6 +59,7 @@ export async function buildApp({
   config,
   healthService,
   preCreatedUserService,
+  confirmationTokenService,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
@@ -72,9 +75,17 @@ export async function buildApp({
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
-  fastify.register(checkoutController({ usersService, paymentsService: paymentService, preCreatedUserService }), {
-    prefix: '/checkout',
-  });
+  fastify.register(
+    checkoutController({
+      usersService,
+      paymentsService: paymentService,
+      preCreatedUserService,
+      confirmationTokenService,
+    }),
+    {
+      prefix: '/checkout',
+    },
+  );
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
     gatewayController({
