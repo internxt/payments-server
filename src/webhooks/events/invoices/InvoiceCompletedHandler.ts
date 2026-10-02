@@ -19,7 +19,7 @@ import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { AxiosError } from 'axios';
 import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
 import { PreCreatedUserStatus } from '../../../infrastructure/domain/entities/preCreatedUser';
-import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
+import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../../../errors/PreCreatedUsersErrors';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -522,12 +522,23 @@ export class InvoiceCompletedHandler {
    */
   private async sendSetupEmailIfNeeded(email: string, uuid: string, planName?: string): Promise<void> {
     try {
-      const preCreatedUser = await this.preCreatedUserService.get(email);
+      const preCreatedUser = await this.preCreatedUserService.getEligibleForPayment(email);
 
-      if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) return;
+      if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) {
+        Logger.info(
+          `[SEND EMAIL SETUP] User with uuid ${preCreatedUser.uuid} is pending setup, skipping sending setup email...`,
+        );
+        return;
+      }
 
       await this.preCreatedUserService.sendSetupEmail(uuid, planName);
     } catch (err) {
+      if (err instanceof PreCreatedUserNotFoundError || err instanceof PreCreatedUserPendingSetupError) {
+        Logger.info(
+          `[SEND EMAIL SETUP] Pre created user with email ${email} not found, skipping sending setup email...`,
+        );
+        return;
+      }
       const error = err as Error;
       Logger.error(`Error while sending setup email for user ${email}. Error: ${error.message}`);
       throw error;
