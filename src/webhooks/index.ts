@@ -19,17 +19,31 @@ import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandle
 import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
 import Logger from '../Logger';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
-export default function (
-  stripe: Stripe,
-  storageService: StorageService,
-  usersService: UsersService,
-  paymentService: PaymentService,
-  config: AppConfig,
-  cacheService: CacheService,
-  objectStorageService: ObjectStorageService,
-  tiersService: TiersService,
-) {
+interface WebhookHandlerPayload {
+  stripe: Stripe;
+  storageService: StorageService;
+  usersService: UsersService;
+  paymentService: PaymentService;
+  config: AppConfig;
+  cacheService: CacheService;
+  objectStorageService: ObjectStorageService;
+  tiersService: TiersService;
+  preCreatedUserService: PreCreatedUserService;
+}
+
+export function webhookHandler({
+  stripe,
+  storageService,
+  usersService,
+  paymentService,
+  config,
+  cacheService,
+  objectStorageService,
+  tiersService,
+  preCreatedUserService,
+}: WebhookHandlerPayload) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
       done(null, body);
@@ -77,7 +91,7 @@ export default function (
             objectStorageService,
             tiersService,
             fastify.log,
-            config,
+            preCreatedUserService,
           );
           break;
 
@@ -129,6 +143,7 @@ export default function (
             tiersService,
             usersService,
             cacheService,
+            preCreatedUserService,
           });
 
           await handler.run({
@@ -159,7 +174,7 @@ export default function (
                 paymentService,
                 fastify.log,
                 tiersService,
-                config,
+                preCreatedUserService,
               );
             }
           }
@@ -176,7 +191,7 @@ export default function (
             cacheService,
             tiersService,
             log: fastify.log,
-            config,
+            preCreatedUserService,
           });
           break;
 

@@ -14,6 +14,7 @@ import { DetermineLifetimeConditions } from '../../../core/users/DetermineLifeti
 import { ObjectStorageWebhookHandler } from '../../events/ObjectStorageWebhookHandler';
 import Logger from '../../../Logger';
 import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
 
 export interface CryptoWebhookDependencies {
   storageService: StorageService;
@@ -23,6 +24,7 @@ export interface CryptoWebhookDependencies {
   paymentService: PaymentService;
   tiersService: TiersService;
   usersService: UsersService;
+  preCreatedUserService: PreCreatedUserService;
 }
 
 export interface CryptoWebhookTokenPayload {
@@ -61,6 +63,7 @@ export default function ({
   paymentService,
   tiersService,
   usersService,
+  preCreatedUserService,
 }: CryptoWebhookDependencies) {
   return async function (fastify: FastifyInstance) {
     const decodeToken = async (token: string): Promise<CryptoWebhookTokenPayload> => {
@@ -114,6 +117,7 @@ export default function ({
         tiersService,
         storageService,
         usersService,
+        preCreatedUserService,
       });
 
       await handler.run({
