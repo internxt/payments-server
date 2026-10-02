@@ -1,17 +1,28 @@
 import Stripe from 'stripe';
+import { AxiosError } from 'axios';
 
 import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../../../../../src/constants';
 import { Service } from '../../../../../src/core/users/Tier';
 import { NotFoundError } from '../../../../../src/errors/Errors';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
+import { PreCreatedUserNotFoundError } from '../../../../../src/errors/PreCreatedUsersErrors';
 import { stripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
+import { PreCreatedUserStatus } from '../../../../../src/infrastructure/domain/entities/preCreatedUser';
 import Logger from '../../../../../src/Logger';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
+import { getPreCreatedUserEntity } from '../../../entity.fixtures';
+
+function axiosErrorWithStatus(status: number): AxiosError {
+  const error = new AxiosError('Request failed');
+  error.response = { status } as AxiosError['response'];
+
+  return error;
+}
 
 const {
   invoiceCompletedHandler,
@@ -22,11 +33,14 @@ const {
   objectStorageWebhookHandler,
   cacheService,
   storageService,
+  preCreatedUserService,
 } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
+  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -222,7 +236,6 @@ describe('Testing the handler when an invoice is completed', () => {
         productId: (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
         customer: Customer.toDomain(mockedCustomer),
         tier: mockedTier,
-        totalQuantity: 1,
       });
       expect(updateOrInsertUserTierSpy).toHaveBeenCalledWith({
         isBusinessPlan: false,
@@ -306,6 +319,52 @@ describe('Testing the handler when an invoice is completed', () => {
       const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
 
       await expect(getUserUuid(mockedCustomer.id, mockedCustomer.email)).rejects.toThrow(NotFoundError);
+    });
+
+    test('When the user is not found by email but exists as a pre-created user, then their unique Id is used', async () => {
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const mockedPreCreatedUser = getPreCreatedUserEntity();
+      jest.spyOn(usersService, 'findUserByEmail').mockRejectedValue(axiosErrorWithStatus(404));
+      jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(mockedPreCreatedUser);
+      const findByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID');
+
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string);
+
+      expect(result).toStrictEqual({ uuid: mockedPreCreatedUser.uuid });
+      expect(findByCustomerIdSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the user is not found by email and there is no pre-created user either, then the local lookup by customer ID is used', async () => {
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const mockedUser = getUser({ customerId: mockedCustomer.id });
+      jest.spyOn(usersService, 'findUserByEmail').mockRejectedValue(axiosErrorWithStatus(404));
+      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(new PreCreatedUserNotFoundError());
+      jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+      const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string);
+
+      expect(result).toStrictEqual({ uuid: mockedUser.uuid });
+    });
+
+    test('When looking up the pre-created user fails for any other reason, then the error propagates', async () => {
+      const mockedCustomer = getCustomer({
+        email: 'test@inxt.com',
+      });
+      const unexpectedError = new Error('Gateway is down');
+      jest.spyOn(usersService, 'findUserByEmail').mockRejectedValue(axiosErrorWithStatus(404));
+      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(unexpectedError);
+      const findByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID');
+
+      const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
+
+      await expect(getUserUuid(mockedCustomer.id, mockedCustomer.email as string)).rejects.toThrow(unexpectedError);
+      expect(findByCustomerIdSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -427,7 +486,6 @@ describe('Testing the handler when an invoice is completed', () => {
         const lifetimeMockedMaxSpaceBytes = mockedMaxSpaceBytes * 5;
         const mockedIsLifetimePlan = true;
         const mockedProductId = getProduct({}).id;
-        const totalQuantity = 1;
         const mockedTier = newTier();
         const mockedLifetimeTier = newTier({ billingType: 'lifetime' });
         const determineLifetimeConditionsSpy = jest.spyOn(determineLifetimeConditions, 'determine').mockResolvedValue({
@@ -447,7 +505,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         });
 
@@ -477,7 +534,6 @@ describe('Testing the handler when an invoice is completed', () => {
         });
         const mockedIsLifetimePlan = true;
         const mockedProductId = getProduct({}).id;
-        const totalQuantity = 1;
         const mockedTier = newTier();
         const determineLifetimeConditionsSpy = jest
           .spyOn(determineLifetimeConditions, 'determine')
@@ -495,7 +551,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         });
 
@@ -525,7 +580,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
 
       const applyDriveFeaturesSpy = jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
@@ -541,7 +595,6 @@ describe('Testing the handler when an invoice is completed', () => {
         customer: Customer.toDomain(mockedCustomer),
         isLifetimePlan: mockedIsLifetimePlan,
         productId: mockedProductId,
-        totalQuantity,
         tier: mockedTier,
       });
 
@@ -577,7 +630,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockRejectedValue(mockedError);
       const loggerSpy = jest.spyOn(Logger, 'error');
@@ -592,7 +644,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
@@ -612,7 +663,6 @@ describe('Testing the handler when an invoice is completed', () => {
       });
       const mockedIsLifetimePlan = false;
       const mockedProductId = getProduct({}).id;
-      const totalQuantity = 1;
       const mockedTier = newTier();
       jest.spyOn(tiersService, 'applyDriveFeatures').mockResolvedValue();
       jest.spyOn(tiersService, 'applyVpnFeatures').mockRejectedValue(mockedError);
@@ -629,7 +679,6 @@ describe('Testing the handler when an invoice is completed', () => {
           customer: Customer.toDomain(mockedCustomer),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
-          totalQuantity,
           tier: mockedTier,
         }),
       ).rejects.toThrow(mockedError);
@@ -1058,6 +1107,61 @@ describe('Testing the handler when an invoice is completed', () => {
       ).rejects.toThrow(randomError);
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
       expect(loggerSpy).toHaveBeenCalledWith(`Error while adding user ${mockedUser.uuid} and coupon: Random error`);
+    });
+  });
+
+  describe('Sending the setup email to a pre-created user', () => {
+    test('When the pre-created user is already pending to set up the account, then no email is sent', async () => {
+      const mockedUser = getUser();
+      jest
+        .spyOn(preCreatedUserService, 'get')
+        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.PendingSetup }));
+      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail');
+
+      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
+      await sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid, 'Premium');
+
+      expect(sendSetupEmailSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the pre-created user still has not set up the account, then the setup email is sent', async () => {
+      const mockedUser = getUser();
+      jest
+        .spyOn(preCreatedUserService, 'get')
+        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.AwaitingPayment }));
+      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
+
+      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
+      await sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid, 'Premium');
+
+      expect(sendSetupEmailSpy).toHaveBeenCalledWith(mockedUser.uuid, 'Premium');
+    });
+
+    test('When checking the pre-created user status fails, then an error is logged and the failure propagates', async () => {
+      const mockedUser = getUser();
+      const unexpectedError = new Error('Gateway is down');
+      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(unexpectedError);
+      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail');
+      const loggerSpy = jest.spyOn(Logger, 'error');
+
+      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
+
+      await expect(sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid)).rejects.toThrow(unexpectedError);
+      expect(sendSetupEmailSpy).not.toHaveBeenCalled();
+    });
+
+    test('When sending the setup email fails, then an error is logged and the failure propagates', async () => {
+      const mockedUser = getUser();
+      const unexpectedError = new Error('Mail service is down');
+      jest
+        .spyOn(preCreatedUserService, 'get')
+        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.AwaitingPayment }));
+      jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockRejectedValue(unexpectedError);
+      const loggerSpy = jest.spyOn(Logger, 'error');
+
+      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
+
+      await expect(sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid)).rejects.toThrow(unexpectedError);
     });
   });
 

@@ -2,12 +2,12 @@ import { FastifyLoggerInstance } from 'fastify';
 import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
-import { AppConfig } from '../config';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
 import { Service } from '../core/users/Tier';
+import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
 export default async function handleLifetimeRefunded(
   storageService: StorageService,
@@ -17,7 +17,7 @@ export default async function handleLifetimeRefunded(
   paymentsService: PaymentService,
   log: FastifyLoggerInstance,
   tiersService: TiersService,
-  config: AppConfig,
+  preCreatedUserService: PreCreatedUserService,
 ): Promise<void> {
   const customerId = charge.customer as string;
   const userEmail = charge.receipt_email;
@@ -56,6 +56,7 @@ export default async function handleLifetimeRefunded(
       usersService,
       tiersService,
       log,
+      preCreatedUserService,
     });
   } catch (error) {
     const err = error as Error;

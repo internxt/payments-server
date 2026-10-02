@@ -1,5 +1,4 @@
 import axios from 'axios';
-import config from '../../../src/config';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
@@ -19,10 +18,18 @@ const mockStripe = {
   },
 };
 
-const { stripe, paymentService, usersRepository, cacheService, usersService, storageService, tiersService } =
-  createTestServices({
-    stripe: mockStripe,
-  });
+const {
+  stripe,
+  paymentService,
+  usersRepository,
+  cacheService,
+  usersService,
+  storageService,
+  tiersService,
+  preCreatedUserService,
+} = createTestServices({
+  stripe: mockStripe,
+});
 const logger = getLogger();
 
 describe('handleDisputeResult()', () => {
@@ -49,7 +56,7 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService: cacheService,
-        config,
+        preCreatedUserService,
         paymentService,
         usersService,
         stripe,
@@ -89,7 +96,7 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService,
-        config,
+        preCreatedUserService,
         paymentService,
         usersService,
         stripe,
@@ -109,7 +116,7 @@ describe('handleDisputeResult()', () => {
         paymentService,
         logger,
         tiersService,
-        config,
+        preCreatedUserService,
       );
     });
   });
@@ -140,7 +147,7 @@ describe('handleDisputeResult()', () => {
       await handleDisputeResult({
         dispute: mockedDispute,
         cacheService,
-        config,
+        preCreatedUserService,
         paymentService,
         usersService,
         stripe,

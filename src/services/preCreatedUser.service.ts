@@ -2,6 +2,9 @@ import { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { signGatewayToken } from '../utils/signGatewayToken';
 import { AppConfig } from '../config';
 import { PreCreatedUser, PreCreatedUserStatus } from '../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../errors/PreCreatedUsersErrors';
+import { HttpResponseError } from '../infrastructure/http/HttpResponseError';
+import { HttpErrorCode } from '../errors/httpErrorCodes';
 
 export class PreCreatedUserService {
   constructor(
@@ -14,11 +17,14 @@ export class PreCreatedUserService {
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 
-    const preCreatedUser = await this.axios.post(this.baseUrl, { email }, requestConfig);
+    const preCreatedUser = await this.axios.post(`${this.baseUrl}/pre-create`, { email }, requestConfig);
 
     return PreCreatedUser.toDomain(preCreatedUser.data);
   }
 
+  /**
+   * @throws {PreCreatedUserNotFoundError} When the gateway has no pre-created user for that email.
+   */
   async get(email: string): Promise<PreCreatedUser> {
     const token = signGatewayToken('5m', this.gatewaySecret);
 
@@ -28,9 +34,17 @@ export class PreCreatedUserService {
       },
     });
 
-    const preCreatedUser = await this.axios.get(this.baseUrl, requestConfig);
+    try {
+      const preCreatedUser = await this.axios.get(`${this.baseUrl}/pre-create`, requestConfig);
 
-    return PreCreatedUser.toDomain(preCreatedUser.data);
+      return PreCreatedUser.toDomain(preCreatedUser.data);
+    } catch (error) {
+      if (error instanceof HttpResponseError && error.hasCode(HttpErrorCode.UserNotFound)) {
+        throw new PreCreatedUserNotFoundError();
+      }
+
+      throw error;
+    }
   }
 
   async update({
@@ -49,7 +63,7 @@ export class PreCreatedUserService {
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 
     await this.axios.patch(
-      this.baseUrl,
+      `${this.baseUrl}/pre-create`,
       {
         uuid,
         status,
@@ -58,6 +72,46 @@ export class PreCreatedUserService {
       },
       requestConfig,
     );
+  }
+
+  async sendSetupEmail(uuid: string, planName?: string): Promise<void> {
+    const token = signGatewayToken('5m', this.gatewaySecret);
+
+    const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
+
+    await this.axios.post(
+      `${this.baseUrl}/${uuid}/setup-email`,
+      {
+        planName,
+      },
+      requestConfig,
+    );
+  }
+
+  async getOrCreate(email: string): Promise<PreCreatedUser> {
+    const existingPreCreatedUser = await this.get(email).catch((error) => {
+      if (error instanceof PreCreatedUserNotFoundError) {
+        return null;
+      }
+
+      throw error;
+    });
+
+    return existingPreCreatedUser ?? this.create(email);
+  }
+
+  /**
+   * @throws {PreCreatedUserNotFoundError} When the gateway has no pre-created user for that email.
+   * @throws {PreCreatedUserPendingSetupError} When the user already paid and is pending to set up the account.
+   */
+  async getEligibleForPayment(email: string): Promise<PreCreatedUser> {
+    const preCreatedUser = await this.get(email);
+
+    if (preCreatedUser.isPendingStatus) {
+      throw new PreCreatedUserPendingSetupError();
+    }
+
+    return preCreatedUser;
   }
 
   private get gatewaySecret(): string {
@@ -69,7 +123,7 @@ export class PreCreatedUserService {
   }
 
   private get baseUrl(): string {
-    return `${this.apiHostname}/gateway/users/pre-create`;
+    return `${this.apiHostname}/gateway/users`;
   }
 
   private basicRequestConfig(token: string, args?: Partial<AxiosRequestConfig>): AxiosRequestConfig {
