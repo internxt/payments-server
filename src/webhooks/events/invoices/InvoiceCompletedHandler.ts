@@ -16,6 +16,10 @@ import { TierNotFoundError, TiersService } from '../../../services/tiers.service
 import { UsersService } from '../../../services/users.service';
 import { PriceMetadata } from '../../../types/stripe';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
+import { AxiosError } from 'axios';
+import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
+import { PreCreatedUserStatus } from '../../../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -24,6 +28,7 @@ interface InvoiceCompletedHandlerAttributes {
   storageService: StorageService;
   tiersService: TiersService;
   usersService: UsersService;
+  preCreatedUserService: PreCreatedUserService;
   cacheService: CacheService;
 }
 
@@ -41,6 +46,7 @@ export class InvoiceCompletedHandler {
   private readonly tiersService: TiersService;
   private readonly usersService: UsersService;
   private readonly cacheService: CacheService;
+  private readonly preCreatedUserService: PreCreatedUserService;
 
   constructor({
     determineLifetimeConditions,
@@ -50,6 +56,7 @@ export class InvoiceCompletedHandler {
     tiersService,
     usersService,
     cacheService,
+    preCreatedUserService,
   }: InvoiceCompletedHandlerAttributes) {
     this.determineLifetimeConditions = determineLifetimeConditions;
     this.objectStorageWebhookHandler = objectStorageWebhookHandler;
@@ -58,6 +65,7 @@ export class InvoiceCompletedHandler {
     this.tiersService = tiersService;
     this.usersService = usersService;
     this.cacheService = cacheService;
+    this.preCreatedUserService = preCreatedUserService;
   }
 
   /**
@@ -90,7 +98,6 @@ export class InvoiceCompletedHandler {
     }
 
     const items = await this.paymentService.getInvoiceLineItems(invoiceId);
-    const totalQuantity = items.data[0].quantity ?? 1;
     const price = items.data?.[0].price;
 
     if (!price) {
@@ -146,7 +153,6 @@ export class InvoiceCompletedHandler {
         productId,
         customer,
         tier,
-        totalQuantity: totalQuantity,
       });
 
       await this.updateOrInsertUserTier({
@@ -166,6 +172,8 @@ export class InvoiceCompletedHandler {
       invoiceLineItem: items.data[0],
       isLifetimePlan,
     });
+
+    await this.sendSetupEmailIfNeeded(email, userUuid, tier?.label);
 
     await this.clearUserRelatedCache(customerId, userUuid);
 
@@ -194,6 +202,22 @@ export class InvoiceCompletedHandler {
           return { uuid: userResponse.data.uuid };
         }
       } catch (error) {
+        const err = error as AxiosError;
+        const isNotFoundStatusCode = err.response?.status === 404;
+
+        if (isNotFoundStatusCode) {
+          const preCreatedUser = await this.preCreatedUserService.get(customerEmail).catch((error) => {
+            if (error instanceof PreCreatedUserNotFoundError) {
+              return null;
+            }
+
+            throw error;
+          });
+
+          if (preCreatedUser) {
+            return { uuid: preCreatedUser.uuid };
+          }
+        }
         Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
       }
     }
@@ -314,14 +338,12 @@ export class InvoiceCompletedHandler {
     customer,
     isLifetimePlan,
     productId,
-    totalQuantity,
     tier,
   }: {
     user: User & { email: string };
     customer: Customer;
     isLifetimePlan: boolean;
     productId: string;
-    totalQuantity: number;
     tier: Tier;
   }): Promise<void> {
     let tierToApply = tier;
@@ -490,6 +512,25 @@ export class InvoiceCompletedHandler {
         Logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
         throw error;
       }
+    }
+  }
+
+  /**
+   * Send the email to a pre-created user so he can complete the set up to use the purchased plan
+   * @param email - The email of the pre-created user
+   * @param uuid - The uuid of the user we want to send the email
+   */
+  private async sendSetupEmailIfNeeded(email: string, uuid: string, planName?: string): Promise<void> {
+    try {
+      const preCreatedUser = await this.preCreatedUserService.get(email);
+
+      if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) return;
+
+      await this.preCreatedUserService.sendSetupEmail(uuid, planName);
+    } catch (err) {
+      const error = err as Error;
+      Logger.error(`Error while sending setup email for user ${email}. Error: ${error.message}`);
+      throw error;
     }
   }
 

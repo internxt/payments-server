@@ -27,6 +27,9 @@ import { UserFeatureOverridesRepository } from '../../../src/core/users/MongoDBU
 import { UserFeaturesOverridesService } from '../../../src/services/userFeaturesOverride.service';
 import { KlaviyoTrackingService } from '../../../src/services/klaviyo.service';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
+import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
+
+export const gatewayHttpClient = createHttpClient();
 
 export interface TestServices {
   stripe: Stripe;
@@ -109,6 +112,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const objectStorageService = new ObjectStorageService(paymentService, config, axios);
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
+  const preCreatedUserService = new PreCreatedUserService(gatewayHttpClient, config);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
     determineLifetimeConditions,
     objectStorageWebhookHandler,
@@ -117,6 +121,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     tiersService,
     usersService,
     cacheService,
+    preCreatedUserService,
   });
   const userFeaturesOverridesService = new UserFeaturesOverridesService(
     usersService,
@@ -124,7 +129,6 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const klaviyoTrackingService = new KlaviyoTrackingService();
-  const preCreatedUserService = new PreCreatedUserService(axios, config);
 
   return {
     stripe,

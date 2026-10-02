@@ -42,6 +42,7 @@ import { MongoDBDynamicConfigRepository } from './core/infra/MongoDBDynamicConfi
 import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
 import { initStripeNewVersion } from './services/stripe';
 import { PreCreatedUserService } from './services/preCreatedUser.service';
+import { createHttpClient } from './infrastructure/http/httpClient';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -97,7 +98,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
-  const preCreatedUserService = new PreCreatedUserService(axios, envVariablesConfig);
+  const preCreatedUserService = new PreCreatedUserService(createHttpClient(), envVariablesConfig);
 
   const fastify = await buildApp({
     paymentService,
