@@ -467,14 +467,37 @@ describe('Checkout controller', () => {
         email: pendingEmail,
         confirmationTokenId: stripeToken.id,
       });
+
+      expect(rejectedResponse.statusCode).toBe(400);
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When a buyer rejected for pending setup retries with a fresh confirmation token, then the purchase goes through', async () => {
+      const { stripeToken: firstToken } = stripeKnowsToken();
+      const pendingEmail = 'pending@internxt.com';
+      driveHasNoPreCreatedUser();
+      jest.spyOn(PreCreatedUserService.prototype, 'get').mockImplementation(async (email) => {
+        if (email === pendingEmail) {
+          return new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup });
+        }
+        throw new PreCreatedUserNotFoundError();
+      });
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const rejectedResponse = await createCustomerAnonymously({
+        email: pendingEmail,
+        confirmationTokenId: firstToken.id,
+      });
+
+      const { stripeToken: freshToken } = stripeKnowsToken();
       const retryResponse = await createCustomerAnonymously({
         email: buyerEmail,
-        confirmationTokenId: stripeToken.id,
+        confirmationTokenId: freshToken.id,
       });
 
       expect(rejectedResponse.statusCode).toBe(400);
-      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
       expect(retryResponse.statusCode).toBe(200);
+      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
     });
 
     test('When the user is logged in, then no confirmation token is needed and Stripe is not asked about one', async () => {

@@ -1,7 +1,7 @@
 import config from '../../../src/config';
 import { InvalidConfirmationTokenError } from '../../../src/errors/PaymentErrors';
 import { ConfirmationToken } from '../../../src/infrastructure/domain/entities/confirmationToken';
-import { PaymentsAdapter } from '../../../src/infrastructure/domain/ports/payments.adapter';
+import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import CacheService from '../../../src/services/cache.service';
 import { ConfirmationTokenService } from '../../../src/services/confirmationToken.service';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
@@ -12,7 +12,7 @@ jest.mock('ioredis', () => require('ioredis-mock'));
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
 
 describe('Confirmation token service', () => {
-  let getConfirmationTokenFromPayments: jest.Mock;
+  let getConfirmationTokenFromPayments: jest.SpyInstance;
   let confirmationTokenService: ConfirmationTokenService;
 
   const paymentsKnowsToken = (params?: Parameters<typeof getConfirmationToken>[0]) => {
@@ -22,9 +22,9 @@ describe('Confirmation token service', () => {
   };
 
   beforeEach(() => {
-    getConfirmationTokenFromPayments = jest.fn();
-    const paymentsAdapter = { getConfirmationToken: getConfirmationTokenFromPayments } as unknown as PaymentsAdapter;
-    confirmationTokenService = new ConfirmationTokenService(paymentsAdapter, new CacheService(config));
+    jest.restoreAllMocks();
+    getConfirmationTokenFromPayments = jest.spyOn(stripePaymentsAdapter, 'getConfirmationToken');
+    confirmationTokenService = new ConfirmationTokenService(new CacheService(config));
   });
 
   test('When the token is valid and unused, then it is accepted', async () => {

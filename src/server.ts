@@ -43,6 +43,7 @@ import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter'
 import { initStripeNewVersion } from './services/stripe';
 import { PreCreatedUserService } from './services/preCreatedUser.service';
 import { createHttpClient } from './infrastructure/http/httpClient';
+import { ConfirmationTokenService } from './services/confirmationToken.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -99,6 +100,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
   const preCreatedUserService = new PreCreatedUserService(createHttpClient(), envVariablesConfig);
+  const confirmationTokenService = new ConfirmationTokenService(cacheService);
 
   const fastify = await buildApp({
     paymentService,
@@ -114,6 +116,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     config: envVariablesConfig,
     healthService,
     preCreatedUserService,
+    confirmationTokenService,
   });
 
   fastify.addHook('onClose', async () => {
