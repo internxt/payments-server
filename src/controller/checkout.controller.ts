@@ -117,7 +117,13 @@ export function checkoutController({
 
           await confirmationTokenService.validateAndClaim(confirmationTokenId);
 
-          const preCreatedUser = await preCreatedUserService.getOrCreate(email);
+          if (!confirmationTokenId) {
+            throw new BadRequestError('Confirmation token is required when there is no user token');
+          }
+
+          await confirmationTokenService.validateAndClaim(confirmationTokenId);
+
+          const preCreatedUser = await preCreatedUserService.getOrCreateEligibleForPayment(email);
 
           userUuid = preCreatedUser.uuid;
         } else {
@@ -317,7 +323,7 @@ export function checkoutController({
       },
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
-        let userUuid = req.user?.payload?.uuid;
+        const userUuid = req.user?.payload?.uuid;
         const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -353,19 +359,18 @@ export function checkoutController({
           throw new BadRequestError('Only lifetime plans are supported');
         }
 
-        if (!userUuid) {
-          const preCreatedUser = await preCreatedUserService.getEligibleForPayment(customer.email);
-          userUuid = preCreatedUser.uuid;
-        }
+        if (userUuid) {
+          const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
+            userUuid,
+            customer.email,
+            price.bytes.toString(),
+          );
 
-        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
-          userUuid,
-          customer.email,
-          price.bytes.toString(),
-        );
-
-        if (!isStorageUpgradeAllowed) {
-          throw new BadRequestError('The user already has the maximum storage allowed');
+          if (!isStorageUpgradeAllowed) {
+            throw new BadRequestError('The user already has the maximum storage allowed');
+          }
+        } else {
+          await preCreatedUserService.getEligibleForPayment(customer.email);
         }
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);

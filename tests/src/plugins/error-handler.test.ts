@@ -41,6 +41,31 @@ describe('Custom error handler', () => {
     });
   });
 
+  it('When the account setup of the buyer is pending, then returns a conflict with the code the checkout recognizes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/account-setup-pending',
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({
+      message: 'User needs to setup his account',
+      code: 'AccountSetupPending',
+    });
+  });
+
+  it('When the email already has a Drive account, then returns a conflict without code', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/account-already-exists',
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({
+      message: 'The email already has an account, log in to continue',
+    });
+  });
+
   it('When an Internal Server Error is thrown, then returns the correct status code and message', async () => {
     const res = await app.inject({
       method: 'GET',

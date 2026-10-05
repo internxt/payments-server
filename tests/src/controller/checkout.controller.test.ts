@@ -31,7 +31,8 @@ import { PreCreatedUserNotFoundError } from '../../../src/errors/PreCreatedUsers
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPriceEntity } from '../entity.fixtures';
+import { getPreCreatedUserEntity, getPriceEntity } from '../entity.fixtures';
+import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 jest.mock('ioredis', () => require('ioredis-mock'));
@@ -772,6 +773,65 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
+    });
+
+    describe('When the buyer has no account', () => {
+      const payAnonymously = (headers: Record<string, string> = {}) => {
+        const mockedUser = getUser();
+        const mockedPrice = getPriceEntity({ interval: 'lifetime' });
+        const mockedPaymentIntent: PaymentIntent = {
+          id: 'payment_intent_id',
+          clientSecret: 'client_secret',
+          type: 'fiat',
+        } as const;
+
+        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+        const eligibilitySpy = jest
+          .spyOn(PreCreatedUserService.prototype, 'getEligibleForPayment')
+          .mockResolvedValue(getPreCreatedUserEntity());
+
+        return {
+          mockedPaymentIntent,
+          eligibilitySpy,
+          response: app.inject({
+            path: '/checkout/payment-intent',
+            method: 'POST',
+            body: {
+              customerId: mockedUser.customerId,
+              priceId: mockedPrice.id,
+              token: getValidUserToken({ customerId: mockedUser.customerId }),
+              currency: 'eur',
+              captchaToken: 'captcha_token',
+            },
+            headers,
+          }),
+        };
+      };
+
+      test('When it pays a one time plan, then it is checked as a buyer without account and its storage is not looked up', async () => {
+        const { response, mockedPaymentIntent, eligibilitySpy } = payAnonymously();
+
+        const { statusCode, json } = await response;
+
+        expect(statusCode).toBe(200);
+        expect(json()).toStrictEqual(mockedPaymentIntent);
+        expect(eligibilitySpy).toHaveBeenCalledTimes(1);
+        expect(fetchUserStorage).not.toHaveBeenCalled();
+      });
+
+      test('When the checkout sends an empty bearer token, then it is treated as a buyer without account instead of being rejected', async () => {
+        const { response } = payAnonymously({ authorization: 'Bearer ' });
+
+        expect((await response).statusCode).toBe(200);
+      });
+
+      test('When the checkout sends an invalid bearer token, then it is rejected', async () => {
+        const { response } = payAnonymously({ authorization: 'Bearer invalid-token' });
+
+        expect((await response).statusCode).toBe(401);
+      });
     });
 
     test('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
