@@ -117,12 +117,6 @@ export function checkoutController({
 
           await confirmationTokenService.validateAndClaim(confirmationTokenId);
 
-          if (!confirmationTokenId) {
-            throw new BadRequestError('Confirmation token is required when there is no user token');
-          }
-
-          await confirmationTokenService.validateAndClaim(confirmationTokenId);
-
           const preCreatedUser = await preCreatedUserService.getOrCreateEligibleForPayment(email);
 
           userUuid = preCreatedUser.uuid;

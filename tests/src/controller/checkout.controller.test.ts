@@ -27,12 +27,10 @@ import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infra
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 import { PreCreatedUser, PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
-import { PreCreatedUserNotFoundError } from '../../../src/errors/PreCreatedUsersErrors';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 import { getPreCreatedUserEntity, getPriceEntity } from '../entity.fixtures';
-import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 jest.mock('ioredis', () => require('ioredis-mock'));
@@ -303,9 +301,8 @@ describe('Checkout controller', () => {
     };
 
     const driveHasNoPreCreatedUser = () => {
-      jest.spyOn(PreCreatedUserService.prototype, 'get').mockRejectedValue(new PreCreatedUserNotFoundError());
       return jest
-        .spyOn(PreCreatedUserService.prototype, 'create')
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
         .mockResolvedValue(
           new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
         );
@@ -346,14 +343,13 @@ describe('Checkout controller', () => {
       expect(createCustomerSpy).toHaveBeenCalledTimes(1);
     });
 
-    test('When the buyer already has a pre-created user awaiting payment, then it is reused without creating another one', async () => {
+    test('When Drive already has the buyer pre-created awaiting payment, then that user is the one the customer is linked to', async () => {
       const { stripeToken } = stripeKnowsToken();
-      jest
-        .spyOn(PreCreatedUserService.prototype, 'get')
+      const getOrCreatePreCreatedUserSpy = jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
         .mockResolvedValue(
           new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
         );
-      const createPreCreatedUserSpy = jest.spyOn(PreCreatedUserService.prototype, 'create');
       const getPreCreatedUserSpy = jest.spyOn(PreCreatedUserService.prototype, 'get');
       const findUserSpy = jest
         .spyOn(UsersService.prototype, 'findUserByUuid')
@@ -366,8 +362,9 @@ describe('Checkout controller', () => {
       const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
 
       expect(response.statusCode).toBe(200);
-      expect(createPreCreatedUserSpy).not.toHaveBeenCalled();
-      expect(getPreCreatedUserSpy).toHaveBeenCalledTimes(1);
+      expect(getOrCreatePreCreatedUserSpy).toHaveBeenCalledTimes(1);
+      expect(getOrCreatePreCreatedUserSpy).toHaveBeenCalledWith(buyerEmail);
+      expect(getPreCreatedUserSpy).not.toHaveBeenCalled();
       expect(findUserSpy).toHaveBeenCalledWith(preCreatedUserUuid);
     });
 
@@ -448,19 +445,15 @@ describe('Checkout controller', () => {
       expect(createCustomerSpy).not.toHaveBeenCalled();
     });
 
-    test('When the buyer has a pre-created user pending setup, then the request is rejected without consuming the confirmation token', async () => {
+    test('When the buyer has a pre-created user pending setup, then the request is rejected as a conflict and no customer is created', async () => {
       const { stripeToken } = stripeKnowsToken();
       const pendingEmail = 'pending@internxt.com';
-      jest.spyOn(PreCreatedUserService.prototype, 'get').mockImplementation(async (email) => {
-        if (email === pendingEmail) {
-          return new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup });
-        }
-        throw new PreCreatedUserNotFoundError();
-      });
       jest
-        .spyOn(PreCreatedUserService.prototype, 'create')
-        .mockResolvedValue(
-          new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockImplementation(async (email) =>
+          email === pendingEmail
+            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
+            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
         );
       const createCustomerSpy = buyerHasNoCustomer();
 
@@ -469,20 +462,21 @@ describe('Checkout controller', () => {
         confirmationTokenId: stripeToken.id,
       });
 
-      expect(rejectedResponse.statusCode).toBe(400);
+      expect(rejectedResponse.statusCode).toBe(409);
+      expect(rejectedResponse.json()).toMatchObject({ code: 'AccountSetupPending' });
       expect(createCustomerSpy).not.toHaveBeenCalled();
     });
 
     test('When a buyer rejected for pending setup retries with a fresh confirmation token, then the purchase goes through', async () => {
       const { stripeToken: firstToken } = stripeKnowsToken();
       const pendingEmail = 'pending@internxt.com';
-      driveHasNoPreCreatedUser();
-      jest.spyOn(PreCreatedUserService.prototype, 'get').mockImplementation(async (email) => {
-        if (email === pendingEmail) {
-          return new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup });
-        }
-        throw new PreCreatedUserNotFoundError();
-      });
+      jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockImplementation(async (email) =>
+          email === pendingEmail
+            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
+            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        );
       const createCustomerSpy = buyerHasNoCustomer();
 
       const rejectedResponse = await createCustomerAnonymously({
@@ -496,7 +490,7 @@ describe('Checkout controller', () => {
         confirmationTokenId: freshToken.id,
       });
 
-      expect(rejectedResponse.statusCode).toBe(400);
+      expect(rejectedResponse.statusCode).toBe(409);
       expect(retryResponse.statusCode).toBe(200);
       expect(createCustomerSpy).toHaveBeenCalledTimes(1);
     });
