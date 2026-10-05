@@ -5,7 +5,11 @@ import { PreCreatedUserStatus } from '../../../src/infrastructure/domain/entitie
 import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
 import { HttpResponseError } from '../../../src/infrastructure/http/HttpResponseError';
 import { HttpErrorCode } from '../../../src/errors/httpErrorCodes';
-import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../../../src/errors/PreCreatedUsersErrors';
+import {
+  DriveAccountAlreadyExistsError,
+  PreCreatedUserNotFoundError,
+  PreCreatedUserPendingSetupError,
+} from '../../../src/errors/PreCreatedUsersErrors';
 
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('mocked-jwt-token'),
@@ -31,12 +35,14 @@ describe('Pre Created User Service tests', () => {
   };
   const gatewayResponse = { data: { uuid: 'pre-created-uuid', status: PreCreatedUserStatus.AwaitingPayment } };
 
-  describe('Creating a pre-created user', () => {
-    test('When called, then it requests the creation of the pre-created user with the signed token', async () => {
+  describe('Getting or creating a pre-created user in the gateway', () => {
+    const conflictError = new HttpResponseError('User already registered', 409, undefined, {});
+
+    test('When called, then it asks the gateway to get or create the pre-created user with the signed token', async () => {
       const postSpy = jest.spyOn(httpClient, 'post').mockResolvedValue(gatewayResponse);
       const email = 'n2oK7@example.com';
 
-      await preCreatedUserService.create(email);
+      await preCreatedUserService.getOrCreate(email);
 
       expect(postSpy).toHaveBeenCalledTimes(1);
       expect(postSpy).toHaveBeenCalledWith(
@@ -46,19 +52,27 @@ describe('Pre Created User Service tests', () => {
       );
     });
 
-    test('When called, then it resolves with the created pre-created user', async () => {
+    test('When called, then it resolves with the pre-created user returned by the gateway', async () => {
       jest.spyOn(httpClient, 'post').mockResolvedValue(gatewayResponse);
 
-      const result = await preCreatedUserService.create('n2oK7@example.com');
+      const result = await preCreatedUserService.getOrCreate('n2oK7@example.com');
 
       expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
     });
 
-    test('When the request fails, then the rejection propagates', async () => {
+    test('When the email already has a Drive account, then an error indicating so is thrown', async () => {
+      jest.spyOn(httpClient, 'post').mockRejectedValue(conflictError);
+
+      await expect(preCreatedUserService.getOrCreate('n2oK7@example.com')).rejects.toThrow(
+        DriveAccountAlreadyExistsError,
+      );
+    });
+
+    test('When the request fails for any other reason, then the rejection propagates', async () => {
       const requestError = new Error('Network error');
       jest.spyOn(httpClient, 'post').mockRejectedValue(requestError);
 
-      await expect(preCreatedUserService.create('n2oK7@example.com')).rejects.toThrow(requestError);
+      await expect(preCreatedUserService.getOrCreate('n2oK7@example.com')).rejects.toThrow(requestError);
     });
   });
 
@@ -111,34 +125,36 @@ describe('Pre Created User Service tests', () => {
     });
   });
 
-  describe('Getting or creating a pre-created user', () => {
-    test('When the user already exists, then it is returned without creating a new one', async () => {
-      jest.spyOn(httpClient, 'get').mockResolvedValue(gatewayResponse);
-      const postSpy = jest.spyOn(httpClient, 'post');
-
-      const result = await preCreatedUserService.getOrCreate('n2oK7@example.com');
-
-      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
-      expect(postSpy).not.toHaveBeenCalled();
-    });
-
-    test('When the user does not exist yet, then it is created', async () => {
-      jest.spyOn(httpClient, 'get').mockRejectedValue(userNotFoundError);
+  describe('Getting or creating a pre-created user that is eligible for payment', () => {
+    test('When called, then a single request to the gateway gets or creates the user, so it is never looked up first', async () => {
+      const getSpy = jest.spyOn(httpClient, 'get');
       const postSpy = jest.spyOn(httpClient, 'post').mockResolvedValue(gatewayResponse);
 
-      const result = await preCreatedUserService.getOrCreate('n2oK7@example.com');
+      const result = await preCreatedUserService.getOrCreateEligibleForPayment('n2oK7@example.com');
 
       expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(getSpy).not.toHaveBeenCalled();
       expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
     });
 
-    test('When the lookup fails for any other reason, then no user is created and the rejection propagates', async () => {
-      const requestError = new Error('Network error');
-      jest.spyOn(httpClient, 'get').mockRejectedValue(requestError);
-      const postSpy = jest.spyOn(httpClient, 'post');
+    test('When the user is pending to set up the account, then an error indicating so is thrown', async () => {
+      jest
+        .spyOn(httpClient, 'post')
+        .mockResolvedValue({ data: { uuid: 'pre-created-uuid', status: PreCreatedUserStatus.PendingSetup } });
 
-      await expect(preCreatedUserService.getOrCreate('n2oK7@example.com')).rejects.toThrow(requestError);
-      expect(postSpy).not.toHaveBeenCalled();
+      await expect(preCreatedUserService.getOrCreateEligibleForPayment('n2oK7@example.com')).rejects.toThrow(
+        PreCreatedUserPendingSetupError,
+      );
+    });
+
+    test('When the email already has a Drive account, then an error indicating so is thrown', async () => {
+      jest
+        .spyOn(httpClient, 'post')
+        .mockRejectedValue(new HttpResponseError('User already registered', 409, undefined, {}));
+
+      await expect(preCreatedUserService.getOrCreateEligibleForPayment('n2oK7@example.com')).rejects.toThrow(
+        DriveAccountAlreadyExistsError,
+      );
     });
   });
 

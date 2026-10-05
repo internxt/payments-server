@@ -1,8 +1,12 @@
-import { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { AxiosInstance, AxiosRequestConfig, HttpStatusCode } from 'axios';
 import { signGatewayToken } from '../utils/signGatewayToken';
 import { AppConfig } from '../config';
 import { PreCreatedUser, PreCreatedUserStatus } from '../infrastructure/domain/entities/preCreatedUser';
-import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../errors/PreCreatedUsersErrors';
+import {
+  DriveAccountAlreadyExistsError,
+  PreCreatedUserNotFoundError,
+  PreCreatedUserPendingSetupError,
+} from '../errors/PreCreatedUsersErrors';
 import { HttpResponseError } from '../infrastructure/http/HttpResponseError';
 import { HttpErrorCode } from '../errors/httpErrorCodes';
 
@@ -12,14 +16,22 @@ export class PreCreatedUserService {
     private readonly config: AppConfig,
   ) {}
 
-  async create(email: string): Promise<PreCreatedUser> {
+  async getOrCreate(email: string): Promise<PreCreatedUser> {
     const token = signGatewayToken('5m', this.gatewaySecret);
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 
-    const preCreatedUser = await this.axios.post(`${this.baseUrl}/pre-create`, { email }, requestConfig);
+    try {
+      const preCreatedUser = await this.axios.post(`${this.baseUrl}/pre-create`, { email }, requestConfig);
 
-    return PreCreatedUser.toDomain(preCreatedUser.data);
+      return PreCreatedUser.toDomain(preCreatedUser.data);
+    } catch (error) {
+      if (error instanceof HttpResponseError && error.status === HttpStatusCode.Conflict) {
+        throw new DriveAccountAlreadyExistsError();
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -88,16 +100,19 @@ export class PreCreatedUserService {
     );
   }
 
-  async getOrCreate(email: string): Promise<PreCreatedUser> {
-    const existingPreCreatedUser = await this.get(email).catch((error) => {
-      if (error instanceof PreCreatedUserNotFoundError) {
-        return null;
-      }
+  /**
+   * @throws {PreCreatedUserPendingSetupError} When the user already paid and is pending to set up the account,
+   * so it must not start another purchase.
+   * @throws {DriveAccountAlreadyExistsError} When the email already has a Drive account.
+   */
+  async getOrCreateEligibleForPayment(email: string): Promise<PreCreatedUser> {
+    const preCreatedUser = await this.getOrCreate(email);
 
-      throw error;
-    });
+    if (preCreatedUser.isPendingStatus) {
+      throw new PreCreatedUserPendingSetupError();
+    }
 
-    return existingPreCreatedUser ?? this.create(email);
+    return preCreatedUser;
   }
 
   /**

@@ -42,8 +42,8 @@ export async function setupAuth(fastify: FastifyInstance, options: WithAuthOptio
   fastify.addHook('onRequest', async (request) => {
     const skipAuth = request.routeOptions?.config?.skipAuth;
     const allowAnonymous = request.routeOptions?.config?.allowAnonymous;
-    const userAuthorization = request.headers.authorization;
-    const shouldAvoidAuth = allowAnonymous && !userAuthorization;
+    const hasBearerToken = /^Bearer\s+\S+/i.test(request.headers.authorization ?? '');
+    const shouldAvoidAuth = allowAnonymous && !hasBearerToken;
 
     if (skipAuth || shouldAvoidAuth) {
       return;
