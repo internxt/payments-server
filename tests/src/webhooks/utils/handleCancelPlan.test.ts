@@ -11,7 +11,7 @@ const { usersService, tiersService, preCreatedUserService } = createTestServices
 beforeEach(() => {
   jest.resetAllMocks();
   jest.clearAllMocks();
-  jest.spyOn(preCreatedUserService, 'getEligibleForPayment').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUserEntity());
   jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 });
 
@@ -154,16 +154,44 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       };
     };
 
-    it('When a pre-created user is eligible for payment, then it is marked as cancelled', async () => {
-      const { params } = setUpCancellation();
-      const mockedPreCreatedUser = getPreCreatedUserEntity();
+    it.each([PreCreatedUserStatus.AwaitingPayment, PreCreatedUserStatus.PendingSetup])(
+      'When the pre-created user is %s, then it is marked as cancelled',
+      async (status) => {
+        const { params } = setUpCancellation();
+        const mockedPreCreatedUser = getPreCreatedUserEntity({ status });
 
-      jest.spyOn(preCreatedUserService, 'getEligibleForPayment').mockResolvedValue(mockedPreCreatedUser);
+        jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(mockedPreCreatedUser);
+        const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
+
+        await handleCancelPlan(params);
+
+        expect(updateSpy).toHaveBeenCalledWith({
+          uuid: mockedPreCreatedUser.uuid,
+          status: PreCreatedUserStatus.Cancelled,
+        });
+      },
+    );
+
+    it('When the cancellation is notified twice, then the pre-created user ends up cancelled the same way both times', async () => {
+      const { params } = setUpCancellation();
+      const mockedPreCreatedUser = getPreCreatedUserEntity({ status: PreCreatedUserStatus.PendingSetup });
+
+      jest.spyOn(preCreatedUserService, 'get').mockResolvedValueOnce(mockedPreCreatedUser);
+      jest
+        .spyOn(preCreatedUserService, 'get')
+        .mockResolvedValueOnce(
+          getPreCreatedUserEntity({ ...mockedPreCreatedUser, status: PreCreatedUserStatus.Cancelled }),
+        );
       const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 
       await handleCancelPlan(params);
+      await handleCancelPlan(params);
 
-      expect(updateSpy).toHaveBeenCalledWith({
+      expect(updateSpy).toHaveBeenNthCalledWith(1, {
+        uuid: mockedPreCreatedUser.uuid,
+        status: PreCreatedUserStatus.Cancelled,
+      });
+      expect(updateSpy).toHaveBeenNthCalledWith(2, {
         uuid: mockedPreCreatedUser.uuid,
         status: PreCreatedUserStatus.Cancelled,
       });
@@ -172,9 +200,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     it('When there is no pre-created user for that email, then nothing is updated and the handler completes', async () => {
       const { params } = setUpCancellation();
 
-      jest
-        .spyOn(preCreatedUserService, 'getEligibleForPayment')
-        .mockRejectedValue(new PreCreatedUserNotFoundError());
+      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(new PreCreatedUserNotFoundError());
       const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 
       await expect(handleCancelPlan(params)).resolves.toBeUndefined();
@@ -186,7 +212,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       const { params } = setUpCancellation();
       const unexpectedError = new Error('Gateway is down');
 
-      jest.spyOn(preCreatedUserService, 'getEligibleForPayment').mockRejectedValue(unexpectedError);
+      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(unexpectedError);
       const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 
       await expect(handleCancelPlan(params)).rejects.toThrow(unexpectedError);

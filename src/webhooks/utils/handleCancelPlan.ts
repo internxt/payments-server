@@ -54,20 +54,21 @@ export const handleCancelPlan = async ({
 
   await tiersService.deleteTierFromUser(userId, tierToRemove.id);
 
-  try {
-    const preCreatedUser = await preCreatedUserService.getEligibleForPayment(customerEmail);
+  const preCreatedUser = await preCreatedUserService.get(customerEmail).catch((error) => {
+    if (error instanceof PreCreatedUserNotFoundError) {
+      return null;
+    }
 
+    throw error;
+  });
+
+  if (preCreatedUser) {
     await preCreatedUserService.update({
       uuid: preCreatedUser.uuid,
       status: PreCreatedUserStatus.Cancelled,
     });
-  } catch (error) {
-    if (error instanceof PreCreatedUserNotFoundError) {
-      log.info(`[CANCEL PLAN HANDLER]: The preCreatedUser with email ${customerEmail} does not exist. Continuing...`);
-      return;
-    }
-
-    throw error;
+  } else {
+    log.info(`[CANCEL PLAN HANDLER]: The preCreatedUser with email ${customerEmail} does not exist. Continuing...`);
   }
 
   log.info(
