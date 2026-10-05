@@ -245,6 +245,53 @@ describe('Testing the handler when an invoice is completed', () => {
     });
   });
 
+  describe('Account setup email', () => {
+    const runNewProductPurchase = async (preCreatedUser?: ReturnType<typeof getPreCreatedUserEntity>) => {
+      const mockedCustomer = getCustomer();
+      const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
+      const mockedTier = newTier();
+      const mockedUser = getUser();
+
+      jest
+        .spyOn(paymentService, 'getInvoiceLineItems')
+        .mockResolvedValue(mockedInvoice.lines as Stripe.Response<Stripe.ApiList<Stripe.InvoiceLineItem>>);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
+      jest
+        .spyOn(invoiceCompletedHandler as any, 'getUserUuid')
+        .mockResolvedValue({ uuid: preCreatedUser?.uuid ?? mockedUser.uuid, preCreatedUser });
+      jest.spyOn(invoiceCompletedHandler as any, 'updateOrInsertUser').mockResolvedValue(voidPromise);
+      jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
+      jest.spyOn(invoiceCompletedHandler as any, 'handleNewProduct').mockResolvedValue(voidPromise);
+      jest.spyOn(invoiceCompletedHandler as any, 'updateOrInsertUserTier').mockResolvedValue(voidPromise);
+      jest.spyOn(invoiceCompletedHandler as any, 'handleUserCouponRelationship').mockResolvedValue(voidPromise);
+      jest.spyOn(invoiceCompletedHandler as any, 'clearUserRelatedCache').mockResolvedValue(voidPromise);
+      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
+      const getPreCreatedUserSpy = jest.spyOn(preCreatedUserService, 'get');
+
+      await invoiceCompletedHandler.run({
+        customer: Customer.toDomain(mockedCustomer),
+        invoice: mockedInvoice,
+        status: mockedInvoice.status as string,
+      });
+
+      return { sendSetupEmailSpy, getPreCreatedUserSpy, mockedUser, mockedTier };
+    };
+
+    test('When the buyer was found as a pre-created user, then the setup email is requested for it with the plan name', async () => {
+      const preCreatedUser = getPreCreatedUserEntity();
+      const { sendSetupEmailSpy, mockedTier } = await runNewProductPurchase(preCreatedUser);
+
+      expect(sendSetupEmailSpy).toHaveBeenCalledWith(preCreatedUser.uuid, mockedTier.label);
+    });
+
+    test('When the buyer is not a pre-created user, then the gateway is not asked about pre-created users nor setup emails', async () => {
+      const { sendSetupEmailSpy, getPreCreatedUserSpy } = await runNewProductPurchase();
+
+      expect(sendSetupEmailSpy).not.toHaveBeenCalled();
+      expect(getPreCreatedUserSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Invoice for early cancellation', () => {
     test('When the invoices is for early cancellation, then the subscription is cancelled and early returned', async () => {
       const mockedInvoice = getInvoice({
@@ -333,7 +380,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const getUserUuid = invoiceCompletedHandler['getUserUuid'].bind(invoiceCompletedHandler);
       const result = await getUserUuid(mockedCustomer.id, mockedCustomer.email as string);
 
-      expect(result).toStrictEqual({ uuid: mockedPreCreatedUser.uuid });
+      expect(result).toStrictEqual({ uuid: mockedPreCreatedUser.uuid, preCreatedUser: mockedPreCreatedUser });
       expect(findByCustomerIdSpy).not.toHaveBeenCalled();
     });
 
@@ -352,7 +399,7 @@ describe('Testing the handler when an invoice is completed', () => {
       expect(result).toStrictEqual({ uuid: mockedUser.uuid });
     });
 
-    test('When looking up the pre-created user fails for any other reason, then the error propagates', async () => {
+    test('When looking up the pre-created user fails for any other reason, then the error propagates so the webhook is retried', async () => {
       const mockedCustomer = getCustomer({
         email: 'test@inxt.com',
       });
@@ -1107,61 +1154,6 @@ describe('Testing the handler when an invoice is completed', () => {
       ).rejects.toThrow(randomError);
       expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
       expect(loggerSpy).toHaveBeenCalledWith(`Error while adding user ${mockedUser.uuid} and coupon: Random error`);
-    });
-  });
-
-  describe('Sending the setup email to a pre-created user', () => {
-    test('When the pre-created user is already pending to set up the account, then no email is sent', async () => {
-      const mockedUser = getUser();
-      jest
-        .spyOn(preCreatedUserService, 'get')
-        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.PendingSetup }));
-      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail');
-
-      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
-      await sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid, 'Premium');
-
-      expect(sendSetupEmailSpy).not.toHaveBeenCalled();
-    });
-
-    test('When the pre-created user still has not set up the account, then the setup email is sent', async () => {
-      const mockedUser = getUser();
-      jest
-        .spyOn(preCreatedUserService, 'get')
-        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.AwaitingPayment }));
-      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
-
-      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
-      await sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid, 'Premium');
-
-      expect(sendSetupEmailSpy).toHaveBeenCalledWith(mockedUser.uuid, 'Premium');
-    });
-
-    test('When checking the pre-created user status fails, then an error is logged and the failure propagates', async () => {
-      const mockedUser = getUser();
-      const unexpectedError = new Error('Gateway is down');
-      jest.spyOn(preCreatedUserService, 'get').mockRejectedValue(unexpectedError);
-      const sendSetupEmailSpy = jest.spyOn(preCreatedUserService, 'sendSetupEmail');
-      const loggerSpy = jest.spyOn(Logger, 'error');
-
-      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
-
-      await expect(sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid)).rejects.toThrow(unexpectedError);
-      expect(sendSetupEmailSpy).not.toHaveBeenCalled();
-    });
-
-    test('When sending the setup email fails, then an error is logged and the failure propagates', async () => {
-      const mockedUser = getUser();
-      const unexpectedError = new Error('Mail service is down');
-      jest
-        .spyOn(preCreatedUserService, 'get')
-        .mockResolvedValue(getPreCreatedUserEntity({ status: PreCreatedUserStatus.AwaitingPayment }));
-      jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockRejectedValue(unexpectedError);
-      const loggerSpy = jest.spyOn(Logger, 'error');
-
-      const sendSetupEmailIfNeeded = invoiceCompletedHandler['sendSetupEmailIfNeeded'].bind(invoiceCompletedHandler);
-
-      await expect(sendSetupEmailIfNeeded('test@inxt.com', mockedUser.uuid)).rejects.toThrow(unexpectedError);
     });
   });
 

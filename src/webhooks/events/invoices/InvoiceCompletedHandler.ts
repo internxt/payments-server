@@ -18,8 +18,8 @@ import { PriceMetadata } from '../../../types/stripe';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { AxiosError } from 'axios';
 import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
-import { PreCreatedUserStatus } from '../../../infrastructure/domain/entities/preCreatedUser';
-import { PreCreatedUserNotFoundError, PreCreatedUserPendingSetupError } from '../../../errors/PreCreatedUsersErrors';
+import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
+import { PreCreatedUser } from '../../../infrastructure/domain/entities/preCreatedUser';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -127,7 +127,7 @@ export class InvoiceCompletedHandler {
     const isOldProduct = !tier;
     const email = customer.email ?? customerEmail;
 
-    const { uuid: userUuid } = await this.getUserUuid(customerId, email);
+    const { uuid: userUuid, preCreatedUser } = await this.getUserUuid(customerId, email);
 
     Logger.info(
       `Tier with product ID ${tier?.productId} found to apply it to the user with customer ID: ${customerId} and User id: ${userUuid}`,
@@ -173,7 +173,9 @@ export class InvoiceCompletedHandler {
       isLifetimePlan,
     });
 
-    await this.sendSetupEmailIfNeeded(email, userUuid, tier?.label);
+    if (preCreatedUser) {
+      await this.preCreatedUserService.sendSetupEmail(preCreatedUser.uuid, tier?.label);
+    }
 
     await this.clearUserRelatedCache(customerId, userUuid);
 
@@ -193,6 +195,7 @@ export class InvoiceCompletedHandler {
     customerEmail: string | null,
   ): Promise<{
     uuid: string;
+    preCreatedUser?: PreCreatedUser;
   }> {
     // Try to find the user by email from the Drive Server
     if (customerEmail) {
@@ -215,7 +218,7 @@ export class InvoiceCompletedHandler {
           });
 
           if (preCreatedUser) {
-            return { uuid: preCreatedUser.uuid };
+            return { uuid: preCreatedUser.uuid, preCreatedUser };
           }
         }
         Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
@@ -512,36 +515,6 @@ export class InvoiceCompletedHandler {
         Logger.error(`Error while adding user ${userUuid} and coupon: ${error.message}`);
         throw error;
       }
-    }
-  }
-
-  /**
-   * Send the email to a pre-created user so he can complete the set up to use the purchased plan
-   * @param email - The email of the pre-created user
-   * @param uuid - The uuid of the user we want to send the email
-   */
-  private async sendSetupEmailIfNeeded(email: string, uuid: string, planName?: string): Promise<void> {
-    try {
-      const preCreatedUser = await this.preCreatedUserService.getEligibleForPayment(email);
-
-      if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) {
-        Logger.info(
-          `[SEND EMAIL SETUP] User with uuid ${preCreatedUser.uuid} is pending setup, skipping sending setup email...`,
-        );
-        return;
-      }
-
-      await this.preCreatedUserService.sendSetupEmail(uuid, planName);
-    } catch (err) {
-      if (err instanceof PreCreatedUserNotFoundError || err instanceof PreCreatedUserPendingSetupError) {
-        Logger.info(
-          `[SEND EMAIL SETUP] Pre created user with email ${email} not found, skipping sending setup email...`,
-        );
-        return;
-      }
-      const error = err as Error;
-      Logger.error(`Error while sending setup email for user ${email}. Error: ${error.message}`);
-      throw error;
     }
   }
 
