@@ -8,10 +8,7 @@ import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-
-function signUserToken(customerId: string) {
-  return jwt.sign({ customerId }, config.JWT_SECRET);
-}
+import { signUserToken } from '../utils/signUserToken';
 
 export function objectStorageController(paymentService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -74,7 +71,7 @@ export function objectStorageController(paymentService: PaymentService) {
           customerId = id;
         }
 
-        return res.send({ customerId, token: signUserToken(customerId) });
+        return res.send({ customerId, token: signUserToken({ customerId }) });
       },
     );
 

@@ -3,6 +3,7 @@ import {
   getCreateSubscriptionResponse,
   getCryptoCurrency,
   getCustomer,
+  getExpiredUserToken,
   getInvoice,
   getPrice,
   getRawCryptoInvoiceResponse,
@@ -1068,6 +1069,20 @@ describe('Checkout controller', () => {
   });
 
   describe('Verify the crypto payment', () => {
+    test('When the payment token has expired, then the verification is rejected', async () => {
+      const verifyCryptoPaymentSpy = jest.spyOn(PaymentService.prototype, 'verifyCryptoPayment');
+
+      const response = await app.inject({
+        path: '/checkout/crypto/verify/payment',
+        method: 'POST',
+        body: { token: getExpiredUserToken({ invoiceId: 'in_123' }) },
+        headers: { authorization: `Bearer ${getValidAuthToken(getUser().uuid)}` },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(verifyCryptoPaymentSpy).not.toHaveBeenCalled();
+    });
+
     test('When the crypto payment invoice has an status of paid, then true is returned indicating the invoice has been paid', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid);
