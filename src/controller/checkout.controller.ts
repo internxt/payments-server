@@ -16,17 +16,20 @@ import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
 import { UserNotFoundError } from '../errors/PaymentErrors';
+import { ConfirmationTokenService } from '../services/confirmationToken.service';
 
 interface CheckoutControllerPayload {
   usersService: UsersService;
   paymentsService: PaymentService;
   preCreatedUserService: PreCreatedUserService;
+  confirmationTokenService: ConfirmationTokenService;
 }
 
 export function checkoutController({
   usersService,
   paymentsService,
   preCreatedUserService,
+  confirmationTokenService,
 }: CheckoutControllerPayload) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
@@ -34,6 +37,7 @@ export function checkoutController({
     fastify.post<{
       Body: {
         email?: string;
+        confirmationTokenId?: string;
         customerName?: string;
         lineAddress1?: string;
         lineAddress2?: string;
@@ -52,7 +56,8 @@ export function checkoutController({
             type: 'object',
             required: ['country', 'captchaToken'],
             properties: {
-              email: { type: 'string' },
+              email: { type: 'string', format: 'email' },
+              confirmationTokenId: { type: 'string', minLength: 1 },
               customerName: { type: 'string' },
               lineAddress1: { type: 'string' },
               lineAddress2: { type: 'string' },
@@ -82,6 +87,7 @@ export function checkoutController({
 
         const {
           email,
+          confirmationTokenId,
           customerName,
           lineAddress1,
           lineAddress2,
@@ -104,6 +110,12 @@ export function checkoutController({
           if (!email) {
             throw new BadRequestError('Email is required when there is no user token');
           }
+
+          if (!confirmationTokenId) {
+            throw new BadRequestError('Confirmation token is required when there is no user token');
+          }
+
+          await confirmationTokenService.validateAndClaim(confirmationTokenId);
 
           const preCreatedUser = await preCreatedUserService.getOrCreateEligibleForPayment(email);
 
