@@ -41,6 +41,7 @@ import { DynamicConfigKey, DynamicConfigRepository } from './core/infra/DynamicC
 import { MongoDBDynamicConfigRepository } from './core/infra/MongoDBDynamicConfigRepository';
 import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
 import { initStripeNewVersion } from './services/stripe';
+import { PreCreatedUserService } from './services/preCreatedUser.service';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -96,6 +97,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
+  const preCreatedUserService = new PreCreatedUserService(axios, envVariablesConfig);
 
   const fastify = await buildApp({
     paymentService,
@@ -110,6 +112,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
     stripe,
     config: envVariablesConfig,
     healthService,
+    preCreatedUserService,
   });
 
   fastify.addHook('onClose', async () => {

@@ -25,6 +25,7 @@ import { UserFeaturesOverridesService } from './services/userFeaturesOverride.se
 import { gatewayController } from './controller/gateway.controller';
 import { HealthService } from './services/health.service';
 import healthController from './controller/health.controller';
+import { PreCreatedUserService } from './services/preCreatedUser.service';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -39,6 +40,7 @@ interface AppDependencies {
   stripe: Stripe;
   config: AppConfig;
   healthService: HealthService;
+  preCreatedUserService: PreCreatedUserService;
 }
 
 export async function buildApp({
@@ -54,6 +56,7 @@ export async function buildApp({
   stripe,
   config,
   healthService,
+  preCreatedUserService,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
@@ -69,7 +72,9 @@ export async function buildApp({
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
-  fastify.register(checkoutController(usersService, paymentService), { prefix: '/checkout' });
+  fastify.register(checkoutController({ usersService, paymentsService: paymentService, preCreatedUserService }), {
+    prefix: '/checkout',
+  });
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
     gatewayController({
