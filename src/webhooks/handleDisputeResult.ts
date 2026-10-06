@@ -2,11 +2,11 @@ import Stripe from 'stripe';
 import { UsersService } from '../services/users.service';
 import { StorageService } from '../services/storage.service';
 import CacheService from '../services/cache.service';
-import { AppConfig } from '../config';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
 import { FastifyBaseLogger } from 'fastify';
 import { TiersService } from '../services/tiers.service';
+import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
 interface HandleDisputeResultProps {
   dispute: Stripe.Dispute;
@@ -17,7 +17,7 @@ interface HandleDisputeResultProps {
   cacheService: CacheService;
   tiersService: TiersService;
   log: FastifyBaseLogger;
-  config: AppConfig;
+  preCreatedUserService: PreCreatedUserService;
 }
 
 export async function handleDisputeResult({
@@ -29,7 +29,7 @@ export async function handleDisputeResult({
   cacheService,
   tiersService,
   log,
-  config,
+  preCreatedUserService,
 }: HandleDisputeResultProps) {
   if (dispute.status !== 'lost') {
     return;
@@ -53,7 +53,7 @@ export async function handleDisputeResult({
         paymentService,
         log,
         tiersService,
-        config,
+        preCreatedUserService,
       );
     } else {
       await paymentService.cancelSubscription(subscriptionId as string);

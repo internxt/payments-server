@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import {
+  getConfirmationToken,
   getCreateSubscriptionResponse,
   getCryptoCurrency,
   getCustomer,
@@ -22,12 +23,17 @@ import Stripe from 'stripe';
 import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
 import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
+import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
+import { PreCreatedUser, PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
+import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPriceEntity } from '../entity.fixtures';
+import { getPreCreatedUserEntity, getPriceEntity } from '../entity.fixtures';
 
 jest.mock('../../../src/utils/fetchUserStorage');
+jest.mock('ioredis', () => require('ioredis-mock'));
 
 let app: FastifyInstance;
 
@@ -134,7 +140,7 @@ describe('Checkout controller', () => {
       };
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('User not found'));
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
         .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
@@ -278,6 +284,233 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(403);
       expect(findUserSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Create customer without an account (POST method)', () => {
+    const buyerEmail = 'buyer@internxt.com';
+    const preCreatedUserUuid = 'pre-created-uuid';
+    const nowInSeconds = () => Math.floor(Date.now() / 1000);
+
+    const stripeKnowsToken = (params?: Parameters<typeof getConfirmationToken>[0]) => {
+      const stripeToken = getConfirmationToken(params);
+      const retrieveSpy = jest
+        .spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve')
+        .mockResolvedValue(stripeToken as Stripe.Response<Stripe.ConfirmationToken>);
+      return { stripeToken, retrieveSpy };
+    };
+
+    const driveHasNoPreCreatedUser = () => {
+      return jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockResolvedValue(
+          new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        );
+    };
+
+    const buyerHasNoCustomer = () => {
+      jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
+      jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
+      return jest
+        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id', email: buyerEmail })));
+    };
+
+    const createCustomerAnonymously = (body: Record<string, unknown>) =>
+      app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: { country: 'ES', captchaToken: 'valid_captcha_token', ...body },
+      });
+
+    beforeEach(() => {
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+    });
+
+    test('When the buyer has no account and the confirmation token is valid, then the customer and the pre-created user are created', async () => {
+      const { stripeToken } = stripeKnowsToken();
+      const createPreCreatedUserSpy = driveHasNoPreCreatedUser();
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({
+        customerId: 'new_customer_id',
+        token: getValidUserToken({ customerId: 'new_customer_id' }),
+      });
+      expect(createPreCreatedUserSpy).toHaveBeenCalledWith(buyerEmail);
+      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test('When Drive already has the buyer pre-created awaiting payment, then that user is the one the customer is linked to', async () => {
+      const { stripeToken } = stripeKnowsToken();
+      const getOrCreatePreCreatedUserSpy = jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockResolvedValue(
+          new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        );
+      const getPreCreatedUserSpy = jest.spyOn(PreCreatedUserService.prototype, 'get');
+      const findUserSpy = jest
+        .spyOn(UsersService.prototype, 'findUserByUuid')
+        .mockRejectedValue(new UserNotFoundError());
+      jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
+      jest
+        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id' })));
+
+      const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
+
+      expect(response.statusCode).toBe(200);
+      expect(getOrCreatePreCreatedUserSpy).toHaveBeenCalledTimes(1);
+      expect(getOrCreatePreCreatedUserSpy).toHaveBeenCalledWith(buyerEmail);
+      expect(getPreCreatedUserSpy).not.toHaveBeenCalled();
+      expect(findUserSpy).toHaveBeenCalledWith(preCreatedUserUuid);
+    });
+
+    test('When the same confirmation token is used twice, then the second attempt is rejected and nothing else is created', async () => {
+      const { stripeToken } = stripeKnowsToken();
+      const createPreCreatedUserSpy = driveHasNoPreCreatedUser();
+      const createCustomerSpy = buyerHasNoCustomer();
+      await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
+
+      const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
+
+      expect(response.statusCode).toBe(403);
+      expect(createPreCreatedUserSpy).toHaveBeenCalledTimes(1);
+      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['has expired', () => ({ expires_at: nowInSeconds() - 1 })],
+      ['was already used for a payment', () => ({ payment_intent: 'pi_already_used' })],
+      [
+        'is older than the maximum age',
+        () => ({ created: nowInSeconds() - (CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES + 1) * 60 }),
+      ],
+    ])('When the confirmation token %s, then the request is rejected and nothing is created', async (_, params) => {
+      const { stripeToken } = stripeKnowsToken(params());
+      const createPreCreatedUserSpy = driveHasNoPreCreatedUser();
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
+
+      expect(response.statusCode).toBe(403);
+      expect(createPreCreatedUserSpy).not.toHaveBeenCalled();
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When Stripe does not know the confirmation token, then the request is rejected and nothing is created', async () => {
+      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
+        new Stripe.errors.StripeInvalidRequestError({
+          type: 'invalid_request_error',
+          code: 'resource_missing',
+          message: 'No such confirmationtoken',
+        }),
+      );
+      const createPreCreatedUserSpy = driveHasNoPreCreatedUser();
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: 'ctoken_unknown' });
+
+      expect(response.statusCode).toBe(403);
+      expect(createPreCreatedUserSpy).not.toHaveBeenCalled();
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the confirmation token is missing, then the request is rejected', async () => {
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ email: buyerEmail });
+
+      expect(response.statusCode).toBe(400);
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the email is missing, then the request is rejected', async () => {
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ confirmationTokenId: 'ctoken_123' });
+
+      expect(response.statusCode).toBe(400);
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the email has an invalid format, then the request is rejected', async () => {
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await createCustomerAnonymously({ email: 'not-an-email', confirmationTokenId: 'ctoken_123' });
+
+      expect(response.statusCode).toBe(400);
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When the buyer has a pre-created user pending setup, then the request is rejected as a conflict and no customer is created', async () => {
+      const { stripeToken } = stripeKnowsToken();
+      const pendingEmail = 'pending@internxt.com';
+      jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockImplementation(async (email) =>
+          email === pendingEmail
+            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
+            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        );
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const rejectedResponse = await createCustomerAnonymously({
+        email: pendingEmail,
+        confirmationTokenId: stripeToken.id,
+      });
+
+      expect(rejectedResponse.statusCode).toBe(409);
+      expect(rejectedResponse.json()).toMatchObject({ code: 'AccountSetupPending' });
+      expect(createCustomerSpy).not.toHaveBeenCalled();
+    });
+
+    test('When a buyer rejected for pending setup retries with a fresh confirmation token, then the purchase goes through', async () => {
+      const { stripeToken: firstToken } = stripeKnowsToken();
+      const pendingEmail = 'pending@internxt.com';
+      jest
+        .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
+        .mockImplementation(async (email) =>
+          email === pendingEmail
+            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
+            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+        );
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const rejectedResponse = await createCustomerAnonymously({
+        email: pendingEmail,
+        confirmationTokenId: firstToken.id,
+      });
+
+      const { stripeToken: freshToken } = stripeKnowsToken();
+      const retryResponse = await createCustomerAnonymously({
+        email: buyerEmail,
+        confirmationTokenId: freshToken.id,
+      });
+
+      expect(rejectedResponse.statusCode).toBe(409);
+      expect(retryResponse.statusCode).toBe(200);
+      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test('When the user is logged in, then no confirmation token is needed and Stripe is not asked about one', async () => {
+      const mockedUser = getUser();
+      const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: buyerEmail });
+      const retrieveSpy = jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve');
+      const createCustomerSpy = buyerHasNoCustomer();
+
+      const response = await app.inject({
+        path: '/checkout/customer',
+        method: 'POST',
+        body: { country: 'ES', captchaToken: 'valid_captcha_token' },
+        headers: { Authorization: `Bearer ${userAuthToken}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(createCustomerSpy).toHaveBeenCalledTimes(1);
+      expect(retrieveSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -490,6 +723,7 @@ describe('Checkout controller', () => {
   describe('Create an invoice and returns the payment intent', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
     });
 
     test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
@@ -533,6 +767,65 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
+    });
+
+    describe('When the buyer has no account', () => {
+      const payAnonymously = (headers: Record<string, string> = {}) => {
+        const mockedUser = getUser();
+        const mockedPrice = getPriceEntity({ interval: 'lifetime' });
+        const mockedPaymentIntent: PaymentIntent = {
+          id: 'payment_intent_id',
+          clientSecret: 'client_secret',
+          type: 'fiat',
+        } as const;
+
+        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+        const eligibilitySpy = jest
+          .spyOn(PreCreatedUserService.prototype, 'getEligibleForPayment')
+          .mockResolvedValue(getPreCreatedUserEntity());
+
+        return {
+          mockedPaymentIntent,
+          eligibilitySpy,
+          response: app.inject({
+            path: '/checkout/payment-intent',
+            method: 'POST',
+            body: {
+              customerId: mockedUser.customerId,
+              priceId: mockedPrice.id,
+              token: getValidUserToken({ customerId: mockedUser.customerId }),
+              currency: 'eur',
+              captchaToken: 'captcha_token',
+            },
+            headers,
+          }),
+        };
+      };
+
+      test('When it pays a one time plan, then it is checked as a buyer without account and its storage is not looked up', async () => {
+        const { response, mockedPaymentIntent, eligibilitySpy } = payAnonymously();
+
+        const { statusCode, json } = await response;
+
+        expect(statusCode).toBe(200);
+        expect(json()).toStrictEqual(mockedPaymentIntent);
+        expect(eligibilitySpy).toHaveBeenCalledTimes(1);
+        expect(fetchUserStorage).not.toHaveBeenCalled();
+      });
+
+      test('When the checkout sends an empty bearer token, then it is treated as a buyer without account instead of being rejected', async () => {
+        const { response } = payAnonymously({ authorization: 'Bearer ' });
+
+        expect((await response).statusCode).toBe(200);
+      });
+
+      test('When the checkout sends an invalid bearer token, then it is rejected', async () => {
+        const { response } = payAnonymously({ authorization: 'Bearer invalid-token' });
+
+        expect((await response).statusCode).toBe(401);
+      });
     });
 
     test('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {

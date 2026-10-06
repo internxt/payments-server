@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { Invoice, InvoiceStatus } from '../../src/infrastructure/domain/entities/invoice';
 import { getInvoice, getInvoiceItems } from './fixtures';
 import { InvoiceItems } from '../../src/infrastructure/domain/entities/invoiceItems';
+import { PreCreatedUser, PreCreatedUserStatus } from '../../src/infrastructure/domain/entities/preCreatedUser';
 
 const randomGenerator = new Chance();
 
@@ -108,3 +109,10 @@ export const getInvoiceItemsEntity = (params?: Partial<InvoiceItems>): Invoice =
     ...params,
   });
 };
+
+export const getPreCreatedUserEntity = (params?: Partial<PreCreatedUser>): PreCreatedUser =>
+  PreCreatedUser.toDomain({
+    uuid: randomGenerator.guid(),
+    status: PreCreatedUserStatus.AwaitingPayment,
+    ...params,
+  });

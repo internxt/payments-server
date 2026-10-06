@@ -3,9 +3,11 @@ import Redis from 'ioredis';
 import { type AppConfig } from '../config';
 import { Tier } from '../core/users/Tier';
 import Logger from '../Logger';
+import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../constants';
 
 const FIFTEEN_MINS_EXPIRATION_IN_SECONDS = 15 * 60;
 const FOUR_HOURS_EXPIRATION_IN_SECONDS = 4 * 60 * 60;
+const CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS = CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES * 60;
 
 export default class CacheService {
   private readonly redis: Redis;
@@ -41,6 +43,10 @@ export default class CacheService {
 
   private buildUserTierKey(userUuid: string): string {
     return `user-tier-${userUuid}`;
+  }
+
+  private buildUsedConfirmationTokenKey(confirmationTokenId: string): string {
+    return `used-confirmation-token-${confirmationTokenId}`;
   }
 
   private async safeAwait<T>(promise: Promise<T>): Promise<T | null> {
@@ -116,6 +122,18 @@ export default class CacheService {
     await this.safeAwait(
       this.redis.set(this.buildUserTierKey(userUuid), JSON.stringify(tier), 'EX', FIFTEEN_MINS_EXPIRATION_IN_SECONDS),
     );
+  }
+
+  async markConfirmationTokenAsUsed(confirmationTokenId: string): Promise<boolean> {
+    const result = await this.redis.set(
+      this.buildUsedConfirmationTokenKey(confirmationTokenId),
+      '1',
+      'EX',
+      CONFIRMATION_TOKEN_EXPIRATION_IN_SECONDS,
+      'NX',
+    );
+
+    return result === 'OK';
   }
 
   async clearSubscription(customerId: string, userType: UserType = UserType.Individual): Promise<void> {

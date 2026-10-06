@@ -7,6 +7,7 @@ export function registerErrorHandler(app: FastifyInstance) {
     if (error instanceof HttpError) {
       return reply.status(error.statusCode).send({
         message: error.message,
+        ...(error.code && { code: error.code }),
       });
     }
 

@@ -15,23 +15,29 @@ import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
+import { UserNotFoundError } from '../errors/PaymentErrors';
+import { ConfirmationTokenService } from '../services/confirmationToken.service';
 
 interface CheckoutControllerPayload {
   usersService: UsersService;
   paymentsService: PaymentService;
   preCreatedUserService: PreCreatedUserService;
+  confirmationTokenService: ConfirmationTokenService;
 }
 
 export function checkoutController({
   usersService,
   paymentsService,
   preCreatedUserService,
+  confirmationTokenService,
 }: CheckoutControllerPayload) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
     fastify.post<{
       Body: {
+        email?: string;
+        confirmationTokenId?: string;
         customerName?: string;
         lineAddress1?: string;
         lineAddress2?: string;
@@ -50,6 +56,8 @@ export function checkoutController({
             type: 'object',
             required: ['country', 'captchaToken'],
             properties: {
+              email: { type: 'string', format: 'email' },
+              confirmationTokenId: { type: 'string', minLength: 1 },
               customerName: { type: 'string' },
               lineAddress1: { type: 'string' },
               lineAddress2: { type: 'string' },
@@ -66,6 +74,7 @@ export function checkoutController({
           },
         },
         config: {
+          allowAnonymous: true,
           rateLimit: {
             max: 5,
             timeWindow: '1 hour',
@@ -74,7 +83,11 @@ export function checkoutController({
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
+        let userUuid: string;
+
         const {
+          email,
+          confirmationTokenId,
           customerName,
           lineAddress1,
           lineAddress2,
@@ -85,7 +98,7 @@ export function checkoutController({
           captchaToken,
           metadata,
         } = req.body;
-        const { uuid: userUuid, email } = req.user.payload;
+        const userToken = req.user?.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -93,12 +106,38 @@ export function checkoutController({
           throw new ForbiddenError('Token verification failed');
         }
 
-        const userExists = await usersService.findUserByUuid(userUuid).catch(() => null);
+        if (!userToken) {
+          if (!email) {
+            throw new BadRequestError('Email is required when there is no user token');
+          }
+
+          if (!confirmationTokenId) {
+            throw new BadRequestError('Confirmation token is required when there is no user token');
+          }
+
+          await confirmationTokenService.validateAndClaim(confirmationTokenId);
+
+          const preCreatedUser = await preCreatedUserService.getOrCreateEligibleForPayment(email);
+
+          userUuid = preCreatedUser.uuid;
+        } else {
+          userUuid = userToken.uuid;
+        }
+
+        const customerEmail = email ?? userToken?.email;
+
+        const userExists = await usersService.findUserByUuid(userUuid).catch((error) => {
+          if (error instanceof UserNotFoundError) {
+            return null;
+          }
+
+          throw error;
+        });
 
         if (userExists) {
           await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
             name: customerName,
-            email,
+            email: customerEmail,
             address: {
               line1: lineAddress1,
               line2: lineAddress2,
@@ -112,7 +151,7 @@ export function checkoutController({
         } else {
           const { id } = await stripePaymentsAdapter.createCustomer({
             name: customerName,
-            email,
+            email: customerEmail,
             address: {
               line1: lineAddress1,
               line2: lineAddress2,
@@ -175,6 +214,13 @@ export function checkoutController({
                 type: 'string',
               },
             },
+          },
+        },
+        config: {
+          allowAnonymous: true,
+          rateLimit: {
+            max: 15,
+            timeWindow: '1 hour',
           },
         },
       },
@@ -262,15 +308,16 @@ export function checkoutController({
           },
         },
         config: {
+          allowAnonymous: true,
           rateLimit: {
-            max: 5,
-            timeWindow: '1 minute',
+            max: 15,
+            timeWindow: '1 hour',
           },
         },
       },
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
-        const { uuid, email } = req.user.payload;
+        const userUuid = req.user?.payload?.uuid;
         const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -299,16 +346,25 @@ export function checkoutController({
           throw new ForbiddenError();
         }
 
+        const customer = await stripePaymentsAdapter.getCustomer(customerId);
         const price = await stripePaymentsAdapter.getPriceById(priceId);
 
         if (price.interval !== 'lifetime') {
           throw new BadRequestError('Only lifetime plans are supported');
         }
 
-        const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(uuid, email, price.bytes.toString());
+        if (userUuid) {
+          const { canExpand: isStorageUpgradeAllowed } = await fetchUserStorage(
+            userUuid,
+            customer.email,
+            price.bytes.toString(),
+          );
 
-        if (!isStorageUpgradeAllowed) {
-          throw new BadRequestError('The user already has the maximum storage allowed');
+          if (!isStorageUpgradeAllowed) {
+            throw new BadRequestError('The user already has the maximum storage allowed');
+          }
+        } else {
+          await preCreatedUserService.getEligibleForPayment(customer.email);
         }
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
@@ -316,7 +372,7 @@ export function checkoutController({
         const result = await paymentsService.createInvoice({
           customerId,
           priceId,
-          userEmail: email,
+          userEmail: customer.email,
           currency: currency.trim(),
           promoCodeId,
           userAddress,
@@ -368,6 +424,10 @@ export function checkoutController({
         },
         config: {
           allowAnonymous: true,
+          rateLimit: {
+            max: 20,
+            timeWindow: '15 minute',
+          },
         },
       },
       async (req, res) => {

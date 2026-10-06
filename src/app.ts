@@ -13,7 +13,7 @@ import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
-import webhook from './webhooks';
+import { webhookHandler } from './webhooks';
 import cryptoWebhook from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
@@ -26,6 +26,7 @@ import { gatewayController } from './controller/gateway.controller';
 import { HealthService } from './services/health.service';
 import healthController from './controller/health.controller';
 import { PreCreatedUserService } from './services/preCreatedUser.service';
+import { ConfirmationTokenService } from './services/confirmationToken.service';
 
 interface AppDependencies {
   paymentService: PaymentService;
@@ -41,6 +42,7 @@ interface AppDependencies {
   config: AppConfig;
   healthService: HealthService;
   preCreatedUserService: PreCreatedUserService;
+  confirmationTokenService: ConfirmationTokenService;
 }
 
 export async function buildApp({
@@ -57,6 +59,7 @@ export async function buildApp({
   config,
   healthService,
   preCreatedUserService,
+  confirmationTokenService,
 }: AppDependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
@@ -72,9 +75,17 @@ export async function buildApp({
   fastify.register(productsController(productsService, cacheService, config), {
     prefix: '/products',
   });
-  fastify.register(checkoutController({ usersService, paymentsService: paymentService, preCreatedUserService }), {
-    prefix: '/checkout',
-  });
+  fastify.register(
+    checkoutController({
+      usersService,
+      paymentsService: paymentService,
+      preCreatedUserService,
+      confirmationTokenService,
+    }),
+    {
+      prefix: '/checkout',
+    },
+  );
   fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
   fastify.register(
     gatewayController({
@@ -92,7 +103,7 @@ export async function buildApp({
   fastify.register(healthController(healthService));
 
   fastify.register(
-    webhook(
+    webhookHandler({
       stripe,
       storageService,
       usersService,
@@ -101,7 +112,8 @@ export async function buildApp({
       cacheService,
       objectStorageService,
       tiersService,
-    ),
+      preCreatedUserService,
+    }),
   );
 
   fastify.register(
@@ -113,6 +125,7 @@ export async function buildApp({
       cacheService,
       objectStorageService,
       tiersService,
+      preCreatedUserService,
     }),
   );
 

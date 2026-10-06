@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-import { UserNotFoundError } from '../../errors/PaymentErrors';
+import { InvalidConfirmationTokenError, UserNotFoundError } from '../../errors/PaymentErrors';
 import { PaymentsAdapter } from '../domain/ports/payments.adapter';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
 import envVariablesConfig from '../../config';
@@ -12,6 +12,7 @@ import { Subscription } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
 import { EU_COUNTRIES } from '../../constants';
+import { ConfirmationToken } from '../domain/entities/confirmationToken';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   private _provider?: Stripe;
@@ -97,6 +98,19 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     }
 
     return customers.data.map((customer) => Customer.toDomain(customer));
+  }
+
+  async getConfirmationToken(confirmationTokenId: ConfirmationToken['id']): Promise<ConfirmationToken> {
+    try {
+      const confirmationToken = await this.provider.confirmationTokens.retrieve(confirmationTokenId);
+
+      return ConfirmationToken.toDomain(confirmationToken);
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+        throw new InvalidConfirmationTokenError();
+      }
+      throw error;
+    }
   }
 
   async retrievePaymentMethod(paymentMethodId: PaymentMethod['id']): Promise<PaymentMethod> {

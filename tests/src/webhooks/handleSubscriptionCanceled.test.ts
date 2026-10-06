@@ -1,7 +1,6 @@
 import { TierNotFoundError } from '../../../src/services/tiers.service';
 import { FastifyBaseLogger } from 'fastify';
 import { getCreatedSubscription, getCustomer, getLogger, getProduct, getUser, newTier } from '../fixtures';
-import config from '../../../src/config';
 import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscriptionCanceled';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -13,8 +12,15 @@ jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
 const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
-const { paymentService, usersService, storageService, cacheService, objectStorageService, tiersService } =
-  createTestServices();
+const {
+  paymentService,
+  usersService,
+  storageService,
+  cacheService,
+  objectStorageService,
+  tiersService,
+  preCreatedUserService,
+} = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -42,7 +48,7 @@ describe('Process when a subscription is cancelled', () => {
       objectStorageService,
       tiersService,
       logger,
-      config,
+      preCreatedUserService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -55,6 +61,7 @@ describe('Process when a subscription is cancelled', () => {
       usersService,
       tiersService,
       log: logger,
+      preCreatedUserService,
     });
   });
 
@@ -91,7 +98,7 @@ describe('Process when a subscription is cancelled', () => {
       objectStorageService,
       tiersService,
       logger,
-      config,
+      preCreatedUserService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -127,7 +134,7 @@ describe('Process when a subscription is cancelled', () => {
         objectStorageService,
         tiersService,
         logger,
-        config,
+        preCreatedUserService,
       ),
     ).rejects.toThrow(randomError);
   });

@@ -4,7 +4,6 @@ import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
-import { AppConfig } from '../config';
 import Stripe from 'stripe';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
@@ -14,6 +13,7 @@ import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter
 import { Customer } from '../infrastructure/domain/entities/customer';
 import { klaviyoService } from '../services/klaviyo.service';
 import Logger from '../Logger';
+import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -56,13 +56,13 @@ export default async function handleSubscriptionCanceled(
   objectStorageService: ObjectStorageService,
   tiersService: TiersService,
   log: FastifyBaseLogger,
-  config: AppConfig,
+  preCreatedUserService: PreCreatedUserService,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
   const { metadata: productMetadata } = await paymentService.getProduct(productId);
   const customer = await stripePaymentsAdapter.getCustomer(customerId);
-  
+
   if (isObjectStorageProduct(productMetadata)) {
     await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
     return;
@@ -99,11 +99,12 @@ export default async function handleSubscriptionCanceled(
       usersService,
       tiersService,
       log,
+      preCreatedUserService,
     });
   } catch (error) {
     const err = error as Error;
     log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
-    
+
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }

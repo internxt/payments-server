@@ -16,6 +16,10 @@ import { TierNotFoundError, TiersService } from '../../../services/tiers.service
 import { UsersService } from '../../../services/users.service';
 import { PriceMetadata } from '../../../types/stripe';
 import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
+import { AxiosError } from 'axios';
+import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
+import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
+import { PreCreatedUser } from '../../../infrastructure/domain/entities/preCreatedUser';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -24,6 +28,7 @@ interface InvoiceCompletedHandlerAttributes {
   storageService: StorageService;
   tiersService: TiersService;
   usersService: UsersService;
+  preCreatedUserService: PreCreatedUserService;
   cacheService: CacheService;
 }
 
@@ -41,6 +46,7 @@ export class InvoiceCompletedHandler {
   private readonly tiersService: TiersService;
   private readonly usersService: UsersService;
   private readonly cacheService: CacheService;
+  private readonly preCreatedUserService: PreCreatedUserService;
 
   constructor({
     determineLifetimeConditions,
@@ -50,6 +56,7 @@ export class InvoiceCompletedHandler {
     tiersService,
     usersService,
     cacheService,
+    preCreatedUserService,
   }: InvoiceCompletedHandlerAttributes) {
     this.determineLifetimeConditions = determineLifetimeConditions;
     this.objectStorageWebhookHandler = objectStorageWebhookHandler;
@@ -58,6 +65,7 @@ export class InvoiceCompletedHandler {
     this.tiersService = tiersService;
     this.usersService = usersService;
     this.cacheService = cacheService;
+    this.preCreatedUserService = preCreatedUserService;
   }
 
   /**
@@ -90,7 +98,6 @@ export class InvoiceCompletedHandler {
     }
 
     const items = await this.paymentService.getInvoiceLineItems(invoiceId);
-    const totalQuantity = items.data[0].quantity ?? 1;
     const price = items.data?.[0].price;
 
     if (!price) {
@@ -120,7 +127,7 @@ export class InvoiceCompletedHandler {
     const isOldProduct = !tier;
     const email = customer.email ?? customerEmail;
 
-    const { uuid: userUuid } = await this.getUserUuid(customerId, email);
+    const { uuid: userUuid, preCreatedUser } = await this.getUserUuid(customerId, email);
 
     Logger.info(
       `Tier with product ID ${tier?.productId} found to apply it to the user with customer ID: ${customerId} and User id: ${userUuid}`,
@@ -146,7 +153,6 @@ export class InvoiceCompletedHandler {
         productId,
         customer,
         tier,
-        totalQuantity: totalQuantity,
       });
 
       await this.updateOrInsertUserTier({
@@ -167,6 +173,10 @@ export class InvoiceCompletedHandler {
       isLifetimePlan,
     });
 
+    if (preCreatedUser) {
+      await this.preCreatedUserService.sendSetupEmail(preCreatedUser.uuid, tier?.label);
+    }
+
     await this.clearUserRelatedCache(customerId, userUuid);
 
     Logger.info(`Invoice ${invoiceId} processed successfully for user ${userUuid}`);
@@ -185,6 +195,7 @@ export class InvoiceCompletedHandler {
     customerEmail: string | null,
   ): Promise<{
     uuid: string;
+    preCreatedUser?: PreCreatedUser;
   }> {
     // Try to find the user by email from the Drive Server
     if (customerEmail) {
@@ -194,6 +205,22 @@ export class InvoiceCompletedHandler {
           return { uuid: userResponse.data.uuid };
         }
       } catch (error) {
+        const err = error as AxiosError;
+        const isNotFoundStatusCode = err.response?.status === 404;
+
+        if (isNotFoundStatusCode) {
+          const preCreatedUser = await this.preCreatedUserService.get(customerEmail).catch((error) => {
+            if (error instanceof PreCreatedUserNotFoundError) {
+              return null;
+            }
+
+            throw error;
+          });
+
+          if (preCreatedUser) {
+            return { uuid: preCreatedUser.uuid, preCreatedUser };
+          }
+        }
         Logger.warn(`Failed to find user by email ${customerEmail} and customer ID ${customerId}. Error: ${error}`);
       }
     }
@@ -314,14 +341,12 @@ export class InvoiceCompletedHandler {
     customer,
     isLifetimePlan,
     productId,
-    totalQuantity,
     tier,
   }: {
     user: User & { email: string };
     customer: Customer;
     isLifetimePlan: boolean;
     productId: string;
-    totalQuantity: number;
     tier: Tier;
   }): Promise<void> {
     let tierToApply = tier;
