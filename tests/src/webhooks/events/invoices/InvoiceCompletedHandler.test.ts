@@ -695,10 +695,7 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(mockedError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
-        {
-          error: mockedError.message,
-        },
+        `Failed to apply drive features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}. Error: ${mockedError.message}`,
       );
     });
 
@@ -730,10 +727,7 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(mockedError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}`,
-        {
-          error: mockedError.message,
-        },
+        `Failed to apply VPN features for user ${mockedUser.uuid} with customerId ${mockedCustomer.id}. Error: ${mockedError.message}`,
       );
     });
   });

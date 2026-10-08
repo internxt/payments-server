@@ -375,9 +375,9 @@ export class InvoiceCompletedHandler {
       await this.tiersService.applyDriveFeatures(user, tierToApply, lifetimeMaxSpaceBytesToApply);
       Logger.info(`Drive features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      Logger.error(`Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}`, {
-        error: (error as Error).message,
-      });
+      Logger.error(
+        `Failed to apply drive features for user ${user.uuid} with customerId ${customer.id}. Error: ${(error as Error).message}`,
+      );
       throw error;
     }
 
@@ -386,9 +386,9 @@ export class InvoiceCompletedHandler {
       await this.tiersService.applyVpnFeatures(user, tierToApply);
       Logger.info(`VPN features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      Logger.error(`Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}`, {
-        error: (error as Error).message,
-      });
+      Logger.error(
+        `Failed to apply VPN features for user ${user.uuid} with customerId ${customer.id}. Error: ${(error as Error).message}`,
+      );
       throw error;
     }
 
@@ -397,9 +397,9 @@ export class InvoiceCompletedHandler {
       await this.tiersService.applyMailFeatures(user, tierToApply);
       Logger.info(`Mail features applied for user ${user.uuid} with customerId ${customer.id}`);
     } catch (error) {
-      Logger.error(`Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}`, {
-        error: (error as Error).message,
-      });
+      Logger.error(
+        `Failed to apply Mail features for user ${user.uuid} with customerId ${customer.id}. Error: ${(error as Error).message}`,
+      );
       throw error;
     }
   }
