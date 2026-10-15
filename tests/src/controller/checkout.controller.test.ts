@@ -552,6 +552,58 @@ describe('Checkout controller', () => {
       expect(responseBody).toStrictEqual(mockedSubscriptionResponse);
     });
 
+    describe('Tracking the Google Ads click', () => {
+      const subscribe = (gclid?: string) => {
+        const mockedUser = getUser();
+        const mockedPrice = getPrice();
+
+        jest
+          .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+          .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
+        const createSubscriptionSpy = jest
+          .spyOn(PaymentService.prototype, 'createSubscription')
+          .mockResolvedValue(getCreateSubscriptionResponse());
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        return {
+          createSubscriptionSpy,
+          response: app.inject({
+            path: '/checkout/subscription',
+            method: 'POST',
+            body: {
+              customerId: mockedUser.customerId,
+              priceId: mockedPrice.id,
+              currency: mockedPrice.currency,
+              token: getValidUserToken({ customerId: mockedUser.customerId }),
+              captchaToken: 'captcha_token',
+              gclid,
+            },
+            headers: {
+              authorization: `Bearer ${getValidAuthToken(mockedUser.uuid)}`,
+            },
+          }),
+        };
+      };
+
+      test('When the buyer comes from a Google Ads click, then the click ID is saved in the subscription metadata', async () => {
+        const { response, createSubscriptionSpy } = subscribe('gclid_123');
+
+        expect((await response).statusCode).toBe(200);
+        expect(createSubscriptionSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: { gclid: 'gclid_123' },
+          }),
+        );
+      });
+
+      test('When the buyer does not come from a Google Ads click, then no metadata is added to the subscription', async () => {
+        const { response, createSubscriptionSpy } = subscribe();
+
+        expect((await response).statusCode).toBe(200);
+        expect(createSubscriptionSpy.mock.calls[0][0].metadata).toBeUndefined();
+      });
+    });
+
     describe('Handling errors', () => {
       test('When the subscription is a business plan, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
@@ -767,6 +819,39 @@ describe('Checkout controller', () => {
 
       expect(response.statusCode).toBe(200);
       expect(responseBody).toStrictEqual(mockedPaymentIntent);
+    });
+
+    test('When the buyer comes from a Google Ads click, then the click ID is used to create the invoice', async () => {
+      const mockedUser = getUser();
+      const mockedPrice = getPriceEntity({ interval: 'lifetime' });
+
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      (fetchUserStorage as jest.Mock).mockResolvedValue({ canExpand: true });
+      const createInvoiceSpy = jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue({
+        id: 'payment_intent_id',
+        clientSecret: 'client_secret',
+        type: 'fiat',
+      });
+      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+      const response = await app.inject({
+        path: '/checkout/payment-intent',
+        method: 'POST',
+        body: {
+          customerId: mockedUser.customerId,
+          priceId: mockedPrice.id,
+          token: getValidUserToken({ customerId: mockedUser.customerId }),
+          currency: 'eur',
+          captchaToken: 'captcha_token',
+          gclid: 'gclid_123',
+        },
+        headers: {
+          authorization: `Bearer ${getValidAuthToken(mockedUser.uuid)}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(createInvoiceSpy).toHaveBeenCalledWith(expect.objectContaining({ gclid: 'gclid_123' }));
     });
 
     describe('When the buyer has no account', () => {
