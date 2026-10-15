@@ -259,6 +259,69 @@ describe('Payments Service tests', () => {
       expect(paymentIntent).toEqual(mockedPaymentIntent);
     });
 
+    test('When the buyer comes from a Google Ads click, then the click ID is saved in the invoice item metadata', async () => {
+      const mockedPaymentIntent = getPaymentIntentResponse({ type: 'fiat' });
+      const mockedInvoice = getInvoice({
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'mockedPriceId',
+                },
+              },
+              currency: 'eur',
+            },
+          ],
+        },
+        payments: {
+          data: [
+            {
+              payment: {
+                payment_intent: mockedPaymentIntent.id,
+              },
+            },
+          ],
+        },
+        confirmation_secret: {
+          client_secret: mockedPaymentIntent.clientSecret as string,
+        },
+      });
+
+      jest
+        .spyOn(stripeNewVersion.invoices, 'create')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      const invoiceItemsCreateSpy = jest
+        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(getPriceEntity({ id: 'mockedPriceId' }));
+      jest
+        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest
+        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+        ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
+        client_secret: mockedPaymentIntent.clientSecret as string,
+      });
+
+      await paymentService.createInvoice({
+        customerId: mockedInvoice.customer as string,
+        priceId: 'mockedPriceId',
+        currency: 'eur',
+        userEmail: mockedInvoice.customer_email as string,
+        userAddress: '1.1.1.1',
+        gclid: 'gclid_123',
+      });
+
+      expect(invoiceItemsCreateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: { gclid: 'gclid_123' },
+        }),
+      );
+    });
+
     test('When an INR lifetime invoice exceeds the UPI cap, then UPI is removed before finalizing it', async () => {
       const mockedInvoice = getInvoice({
         total: 15000000,

@@ -79,16 +79,8 @@ export function checkoutController({
         let customerId: Stripe.Customer['id'];
         let userUuid: string;
 
-        const {
-          email,
-          confirmationTokenId,
-          customerName,
-          country,
-          postalCode,
-          companyVatId,
-          captchaToken,
-          metadata,
-        } = req.body;
+        const { email, confirmationTokenId, customerName, country, postalCode, companyVatId, captchaToken, metadata } =
+          req.body;
         const userToken = req.user?.payload;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -172,6 +164,8 @@ export function checkoutController({
         captchaToken: string;
         currency?: string;
         promoCodeId?: string;
+        quantity?: number;
+        gclid?: string;
       };
     }>(
       '/subscription',
@@ -197,6 +191,9 @@ export function checkoutController({
               promoCodeId: {
                 type: 'string',
               },
+              gclid: {
+                type: 'string',
+              },
             },
           },
         },
@@ -209,7 +206,7 @@ export function checkoutController({
         },
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, captchaToken, token } = req.body;
+        const { customerId, priceId, currency, promoCodeId, captchaToken, token, gclid } = req.body;
         let tokenCustomerId;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
@@ -247,6 +244,7 @@ export function checkoutController({
               enabled: shouldCalculateTaxes,
             },
           },
+          metadata: gclid ? { gclid } : undefined,
         });
 
         return res.status(200).send(subscriptionAttempt);
@@ -261,6 +259,7 @@ export function checkoutController({
         currency: string;
         captchaToken: string;
         promoCodeId?: string;
+        gclid?: string;
       };
     }>(
       '/payment-intent',
@@ -286,6 +285,9 @@ export function checkoutController({
               promoCodeId: {
                 type: 'string',
               },
+              gclid: {
+                type: 'string',
+              },
             },
           },
         },
@@ -300,7 +302,7 @@ export function checkoutController({
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const userUuid = req.user?.payload?.uuid;
-        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, captchaToken, promoCodeId, gclid } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -356,6 +358,7 @@ export function checkoutController({
           priceId,
           currency: currency.trim(),
           promoCodeId,
+          gclid,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: shouldCalculateTaxes,
