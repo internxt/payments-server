@@ -230,6 +230,7 @@ export class PaymentService {
     userAddress,
     currency,
     promoCodeId,
+    gclid,
     additionalInvoiceOptions,
   }: {
     customerId: string;
@@ -238,6 +239,7 @@ export class PaymentService {
     userAddress: string;
     currency: string;
     promoCodeId?: string;
+    gclid?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
@@ -269,6 +271,7 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
+      metadata: gclid ? { gclid } : undefined,
     });
 
     if (!invoiceItem.pricing?.price_details?.price || !invoiceId) {
