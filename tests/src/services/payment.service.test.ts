@@ -23,8 +23,6 @@ import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
 import { getStripeNewVersion } from '../../../src/services/stripe';
-
-const stripeNewVersion = getStripeNewVersion();
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import {
   getCustomerEntity,
@@ -39,6 +37,8 @@ import {
   SubscriptionNotEligibleForEarlyChargeError,
 } from '../../../src/errors/PaymentErrors';
 import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../../../src/errors/stripeErrorCodes';
+
+const stripeNewVersion = getStripeNewVersion();
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe } = createTestServices();
@@ -310,8 +310,6 @@ describe('Payments Service tests', () => {
         customerId: mockedInvoice.customer as string,
         priceId: 'mockedPriceId',
         currency: 'eur',
-        userEmail: mockedInvoice.customer_email as string,
-        userAddress: '1.1.1.1',
         gclid: 'gclid_123',
       });
 
