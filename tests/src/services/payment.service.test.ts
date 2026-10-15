@@ -384,25 +384,6 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Mark an invoice as paid', () => {
-    it('When the invoice id is invalid, then it throws an error', async () => {
-      await expect(paymentService.markInvoiceAsPaid('invalid-invoice-id')).rejects.toThrow();
-    });
-
-    it('When the invoice id is valid, then it marks it as paid', async () => {
-      const { id: invoiceId } = getInvoice();
-      const paySpy = jest
-        .spyOn(stripe.invoices, 'pay')
-        .mockImplementation(() => Promise.resolve(null as unknown as Stripe.Response<Stripe.Invoice>));
-
-      await paymentService.markInvoiceAsPaid(invoiceId);
-
-      expect(paySpy).toHaveBeenCalledWith(invoiceId, {
-        paid_out_of_band: true,
-      });
-    });
-  });
-
   describe('Get User default payment method', () => {
     const mockProvider = {
       paymentMethods: {

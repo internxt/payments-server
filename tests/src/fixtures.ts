@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { signUserToken } from '../../src/utils/signUserToken';
+import { PAYMENTS_TOKEN_EXPIRATION } from '../../src/constants';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import { PaymentIntent, PromotionCode } from '../../src/types/payment';
 import { RenewalPeriod, SubscriptionCreated } from '../../src/types/subscription';
@@ -99,7 +99,7 @@ export const getValidGatewayToken = () => {
 };
 
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
-  return signUserToken(payload);
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: PAYMENTS_TOKEN_EXPIRATION });
 };
 
 export const getExpiredUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {

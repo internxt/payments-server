@@ -1126,27 +1126,6 @@ export class PaymentService {
     };
   }
 
-  private validateInvoiceId(invoiceId: Invoice['id']): boolean {
-    const regex = /^in_[a-zA-Z0-9]+$/;
-    return regex.test(invoiceId);
-  }
-
-  async markInvoiceAsPaid(invoiceId: Invoice['id']): Promise<void> {
-    const validInvoiceId = this.validateInvoiceId(invoiceId);
-
-    if (!validInvoiceId) {
-      throw new BadRequestError(`Invalid invoice id ${invoiceId}`);
-    }
-
-    await this.provider.invoices.pay(invoiceId, {
-      paid_out_of_band: true,
-    });
-  }
-
-  async updateInvoice(invoiceId: Invoice['id'], data: Stripe.InvoiceUpdateParams) {
-    return this.provider.invoices.update(invoiceId, data);
-  }
-
   /**
    * Temporal, we need to extract this to the adapter and start using the Subscription entity everywhere.
    * But we added this map so we can start using the Entity in existing code for now to avoid breaking changes or
