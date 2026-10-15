@@ -41,12 +41,6 @@ describe('Payment method types', () => {
       expect(result).toStrictEqual(['card', 'upi']);
     });
 
-    test('When the currency is a crypto one, then it falls back to the EUR methods', () => {
-      const result = getPaymentMethodTypes('BTC', 'lifetime');
-
-      expect(result).toStrictEqual(['card', 'paypal', 'klarna']);
-    });
-
     test('When the currency is not supported, then it throws', () => {
       expect(() => getPaymentMethodTypes('gbp', 'month')).toThrow(BadRequestError);
     });

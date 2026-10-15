@@ -39,9 +39,6 @@ export function checkoutController({
         email?: string;
         confirmationTokenId?: string;
         customerName?: string;
-        lineAddress1?: string;
-        lineAddress2?: string;
-        city?: string;
         country: string;
         postalCode?: string;
         captchaToken: string;
@@ -59,9 +56,6 @@ export function checkoutController({
               email: { type: 'string', format: 'email' },
               confirmationTokenId: { type: 'string', minLength: 1 },
               customerName: { type: 'string' },
-              lineAddress1: { type: 'string' },
-              lineAddress2: { type: 'string' },
-              city: { type: 'string' },
               country: { type: 'string' },
               postalCode: { type: 'string' },
               captchaToken: { type: 'string' },
@@ -89,9 +83,6 @@ export function checkoutController({
           email,
           confirmationTokenId,
           customerName,
-          lineAddress1,
-          lineAddress2,
-          city,
           country,
           postalCode,
           companyVatId,
@@ -139,9 +130,6 @@ export function checkoutController({
             name: customerName,
             email: customerEmail,
             address: {
-              line1: lineAddress1,
-              line2: lineAddress2,
-              city,
               postalCode,
               country,
             },
@@ -153,9 +141,6 @@ export function checkoutController({
             name: customerName,
             email: customerEmail,
             address: {
-              line1: lineAddress1,
-              line2: lineAddress2,
-              city,
               postalCode,
               country,
             },
@@ -187,7 +172,6 @@ export function checkoutController({
         captchaToken: string;
         currency?: string;
         promoCodeId?: string;
-        quantity?: number;
       };
     }>(
       '/subscription',
@@ -276,7 +260,6 @@ export function checkoutController({
         token: string;
         currency: string;
         captchaToken: string;
-        userAddress: string;
         promoCodeId?: string;
       };
     }>(
@@ -300,7 +283,6 @@ export function checkoutController({
                 type: 'string',
               },
               captchaToken: { type: 'string' },
-              userAddress: { type: 'string' },
               promoCodeId: {
                 type: 'string',
               },
@@ -318,7 +300,7 @@ export function checkoutController({
       async (req, res): Promise<PaymentIntent> => {
         let tokenCustomerId: string;
         const userUuid = req.user?.payload?.uuid;
-        const { customerId, priceId, token, currency, userAddress, captchaToken, promoCodeId } = req.body;
+        const { customerId, priceId, token, currency, captchaToken, promoCodeId } = req.body;
 
         const verifiedCaptcha = await verifyRecaptcha(captchaToken);
 
@@ -372,10 +354,8 @@ export function checkoutController({
         const result = await paymentsService.createInvoice({
           customerId,
           priceId,
-          userEmail: customer.email,
           currency: currency.trim(),
           promoCodeId,
-          userAddress,
           additionalInvoiceOptions: {
             automatic_tax: {
               enabled: shouldCalculateTaxes,
@@ -483,67 +463,6 @@ export function checkoutController({
             decimalAmountWithTax: amountTotal / 100,
           },
         });
-      },
-    );
-
-    fastify.get(
-      '/crypto/currencies',
-      {
-        config: {
-          skipAuth: true,
-          rateLimit: {
-            max: 5,
-            timeWindow: '1 minute',
-          },
-        },
-      },
-      async (req, res) => {
-        const cryptoCurrencies = await paymentsService.getCryptoCurrencies();
-        return res.status(200).send(cryptoCurrencies);
-      },
-    );
-
-    fastify.post<{
-      Body: {
-        token: string;
-      };
-    }>(
-      '/crypto/verify/payment',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['token'],
-            properties: {
-              token: {
-                type: 'string',
-                description: 'The user token generated when creating the payment intent that contains the invoice id',
-              },
-            },
-          },
-        },
-        config: {
-          rateLimit: {
-            max: 3,
-            timeWindow: '1 minute',
-          },
-        },
-      },
-      async (req, res) => {
-        let decodedInvoiceId: string;
-        const { token } = req.body;
-
-        try {
-          const { invoiceId } = jwt.verify(token, config.JWT_SECRET) as {
-            invoiceId: string;
-          };
-          decodedInvoiceId = invoiceId;
-        } catch {
-          throw new ForbiddenError();
-        }
-
-        const result = await paymentsService.verifyCryptoPayment(decodedInvoiceId);
-        return res.status(200).send(result);
       },
     );
   };

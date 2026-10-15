@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { UserSubscription, UserType } from '../core/users/User';
-import { Bit2MeService } from './bit2me.service';
 import { BadRequestError, NotFoundError } from '../errors/Errors';
 import {
   NotFoundSubscriptionError,
@@ -18,10 +17,8 @@ import {
   ClientSecretNotFoundError,
   SubscriptionNotEligibleForEarlyChargeError,
 } from '../errors/PaymentErrors';
-import { generateQrCodeUrl } from '../utils/generateQrCodeUrl';
-import { AllowedCryptoCurrencies, isCryptoCurrency, normalizeForBit2Me, normalizeForStripe } from '../utils/currency';
+import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
-import { signUserToken } from '../utils/signUserToken';
 import Logger from '../Logger';
 import { getStripeNewVersion } from './stripe';
 import { LicenseCode } from '../core/users/LicenseCode';
@@ -53,7 +50,6 @@ export class PaymentService {
   constructor(
     private readonly provider: Stripe,
     private readonly productsRepository: ProductsRepository,
-    private readonly bit2MeService: Bit2MeService,
   ) {}
 
   async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
@@ -153,7 +149,9 @@ export class PaymentService {
 
     const subscriptionUnitAmount = price.currency_options?.[currencyValue]?.unit_amount ?? price.unit_amount;
     const subscriptionDecimalAmount =
-      subscriptionUnitAmount !== null && subscriptionUnitAmount !== undefined ? subscriptionUnitAmount / 100 : undefined;
+      subscriptionUnitAmount !== null && subscriptionUnitAmount !== undefined
+        ? subscriptionUnitAmount / 100
+        : undefined;
 
     await this.checkIfUserAlreadyHasASubscription(customerId, product);
 
@@ -221,21 +219,17 @@ export class PaymentService {
    * - `client_secret`: to be used with Stripe Elements,
    * - `invoice_id`: the ID of the created invoice,
    * - `invoice_status`: the current status of the invoice (e.g., `paid`, `open`, etc.).
-   * - `type`: the type of payment intent (e.g., `fiat`, `crypto`).
+   * - `type`: the type of payment intent (always `fiat`).
    */
   async createInvoice({
     customerId,
     priceId,
-    userEmail,
-    userAddress,
     currency,
     promoCodeId,
     additionalInvoiceOptions,
   }: {
     customerId: string;
     priceId: string;
-    userEmail: string;
-    userAddress: string;
     currency: string;
     promoCodeId?: string;
     additionalInvoiceOptions?: Partial<Stripe.InvoiceCreateParams>;
@@ -273,92 +267,6 @@ export class PaymentService {
 
     if (!invoiceItem.pricing?.price_details?.price || !invoiceId) {
       throw new BadRequestError('Invoice item does not have a price.');
-    }
-
-    const price = await stripePaymentsAdapter.getPriceById(invoiceItem.pricing?.price_details?.price);
-    const isLifetime = price.interval === 'lifetime';
-
-    if (isLifetime && isCryptoCurrency(currency)) {
-      const normalizedCurrencyForBit2Me = normalizeForBit2Me(currency);
-
-      const customer = await stripePaymentsAdapter.getCustomer(customerId);
-
-      const customerName = customer.name;
-      const customerAddress = customer.address?.line1;
-      const customerCity = customer.address?.city;
-      const customerCountry = customer.address?.country;
-      const customerPostalCode = customer.address?.postalCode;
-
-      if (!customerName || !customerAddress || !customerCity || !customerCountry || !customerPostalCode) {
-        throw new BadRequestError('Customer address information is incomplete');
-      }
-
-      const upcomingInvoice = await getStripeNewVersion().invoices.retrieve(invoiceId);
-
-      const priceAmount = upcomingInvoice.total / 100;
-      Logger.info(
-        `Crypto payment amount: ${priceAmount} ${normalizedCurrencyForBit2Me}. Raw invoice: ${upcomingInvoice.total}`,
-      );
-
-      const cryptoInvoicePayload = this.bit2MeService.generateInvoicePayload({
-        currency: normalizedCurrencyForStripe.toUpperCase(),
-        customerId,
-        priceAmount: priceAmount,
-        priceId,
-        stripeInvoiceId: invoiceId,
-        userData: {
-          name: customerName,
-          email: userEmail,
-          userPublicAddress: userAddress,
-          address: customerAddress,
-          city: customerCity,
-          country: customerCountry,
-          postalCode: customerPostalCode,
-        },
-        userEmail,
-      });
-
-      Logger.info(`Crypto invoice payload for customer ${customer.id}: ${JSON.stringify(cryptoInvoicePayload)}`);
-
-      const cryptoInvoice = await this.bit2MeService.createCryptoInvoice(cryptoInvoicePayload);
-
-      await this.updateInvoice(invoiceId, {
-        metadata: {
-          provider: 'bit2me',
-          cryptoInvoiceId: cryptoInvoice.invoiceId,
-        },
-        description: 'Invoice paid using crypto currencies.',
-      });
-
-      const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {
-        auto_advance: false,
-        expand: ['payments', 'confirmation_secret'],
-      });
-
-      const paymentIntentForFinalizedInvoice = finalizedInvoice.payments?.data[0].payment.payment_intent;
-
-      const checkoutPayload = await this.bit2MeService.checkoutInvoice(
-        cryptoInvoice.invoiceId,
-        normalizedCurrencyForBit2Me as AllowedCryptoCurrencies,
-      );
-
-      const secureToken = signUserToken({
-        invoiceId: checkoutPayload.invoiceId,
-      });
-
-      return {
-        id: paymentIntentForFinalizedInvoice as string,
-        type: 'crypto',
-        token: secureToken,
-        payload: {
-          paymentRequestUri: checkoutPayload.paymentRequestUri,
-          payAmount: checkoutPayload.payAmount,
-          payCurrency: checkoutPayload.payCurrency,
-          paymentAddress: checkoutPayload.paymentAddress,
-          url: checkoutPayload.url,
-          qrUrl: generateQrCodeUrl({ data: checkoutPayload.paymentRequestUri }),
-        },
-      };
     }
 
     const invoiceToFinalize = await getStripeNewVersion().invoices.retrieve(invoiceId);
@@ -1470,18 +1378,6 @@ export class PaymentService {
       type,
       value,
     });
-  }
-
-  async getCryptoCurrencies() {
-    const currencies = await this.bit2MeService.getCurrencies();
-
-    return currencies.filter((c) => c.type === 'crypto');
-  }
-
-  async verifyCryptoPayment(invoiceId: string) {
-    const invoice = await this.bit2MeService.getInvoice(invoiceId);
-
-    return invoice.status === 'paid';
   }
 
   private hasAnnualCommitment(price: Stripe.Price): boolean {

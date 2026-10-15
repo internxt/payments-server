@@ -26,7 +26,6 @@ import { ProductsRepository } from './core/users/ProductsRepository';
 import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { MailService } from './services/mail.service';
-import { Bit2MeService } from './services/bit2me.service';
 import { TiersService } from './services/tiers.service';
 import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
@@ -69,8 +68,7 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
 
   await stripePaymentsAdapter.syncTaxRegistrations();
 
-  const bit2MeService = new Bit2MeService(envVariablesConfig, axios);
-  const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+  const paymentService = new PaymentService(stripe, productsRepository);
   const storageService = new StorageService(envVariablesConfig, axios);
   const usersService = new UsersService(
     usersRepository,

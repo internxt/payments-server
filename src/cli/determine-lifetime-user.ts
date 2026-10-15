@@ -20,7 +20,6 @@ import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsReposito
 import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
 import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
-import { Bit2MeService } from '../services/bit2me.service';
 import { TiersService } from '../services/tiers.service';
 import { MongoDBTiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
@@ -44,14 +43,7 @@ async function main() {
     const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
     const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
 
-    const bit2MeService = new Bit2MeService(
-      envVariablesConfig,
-      axios,
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY,
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_KEY,
-      envVariablesConfig.CRYPTO_PAYMENTS_PROCESSOR_API_URL,
-    );
-    const paymentService = new PaymentService(stripe, productsRepository, bit2MeService);
+    const paymentService = new PaymentService(stripe, productsRepository);
     const usersService = new UsersService(
       usersRepository,
       paymentService,

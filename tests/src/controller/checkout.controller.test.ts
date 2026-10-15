@@ -2,12 +2,9 @@ import { FastifyInstance } from 'fastify';
 import {
   getConfirmationToken,
   getCreateSubscriptionResponse,
-  getCryptoCurrency,
   getCustomer,
-  getExpiredUserToken,
   getInvoice,
   getPrice,
-  getRawCryptoInvoiceResponse,
   getTaxes,
   getUser,
   getValidAuthToken,
@@ -20,8 +17,6 @@ import { PaymentService } from '../../../src/services/payment.service';
 import { PaymentIntent } from '../../../src/types/payment';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
-import { AllowedCryptoCurrencies } from '../../../src/utils/currency';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
 import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
@@ -31,6 +26,7 @@ import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 import { getPreCreatedUserEntity, getPriceEntity } from '../entity.fixtures';
+import { AllowedFiatCurrencies } from '../../../src/utils/currency';
 
 jest.mock('../../../src/utils/fetchUserStorage');
 jest.mock('ioredis', () => require('ioredis-mock'));
@@ -76,9 +72,6 @@ describe('Checkout controller', () => {
       const captchaToken = 'valid_captcha_token';
       const customerData = {
         customerName: 'John Doe',
-        lineAddress1: 'Street 123',
-        lineAddress2: 'Apt 4B',
-        city: 'Barcelona',
         country: 'ES',
         postalCode: '08001',
         captchaToken,
@@ -109,9 +102,6 @@ describe('Checkout controller', () => {
         name: customerData.customerName,
         email: userEmail,
         address: {
-          line1: customerData.lineAddress1,
-          line2: customerData.lineAddress2,
-          city: customerData.city,
           postalCode: customerData.postalCode,
           country: customerData.country,
         },
@@ -131,9 +121,6 @@ describe('Checkout controller', () => {
       const captchaToken = 'valid_captcha_token';
       const customerData = {
         customerName: 'John Doe',
-        lineAddress1: 'Street 123',
-        lineAddress2: 'Apt 4B',
-        city: 'Barcelona',
         country: 'ES',
         postalCode: '08001',
         captchaToken,
@@ -165,9 +152,6 @@ describe('Checkout controller', () => {
         name: customerData.customerName,
         email: userEmail,
         address: {
-          line1: customerData.lineAddress1,
-          line2: customerData.lineAddress2,
-          city: customerData.city,
           postalCode: customerData.postalCode,
           country: customerData.country,
         },
@@ -186,9 +170,6 @@ describe('Checkout controller', () => {
       const captchaToken = 'valid_captcha_token';
       const customerData = {
         customerName: 'Company SL',
-        lineAddress1: 'Street 123',
-        lineAddress2: 'Floor 2',
-        city: 'Madrid',
         country: 'ES',
         postalCode: '28001',
         captchaToken,
@@ -230,9 +211,6 @@ describe('Checkout controller', () => {
       const captchaToken = 'valid_captcha_token';
       const customerData = {
         customerName: 'John Doe',
-        lineAddress1: 'Street 123',
-        lineAddress2: 'Apt 4B',
-        city: 'Barcelona',
         country: 'ES',
         postalCode: '08001',
         captchaToken,
@@ -262,9 +240,6 @@ describe('Checkout controller', () => {
       const captchaToken = 'invalid_captcha_token';
       const customerData = {
         customerName: 'John Doe',
-        lineAddress1: 'Street 123',
-        lineAddress2: 'Apt 4B',
-        city: 'Barcelona',
         country: 'ES',
         postalCode: '08001',
         captchaToken,
@@ -537,7 +512,6 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedPrice.id,
           currency: mockedPrice.currency,
-          quantity: 1,
           token: userToken,
           captchaToken: mockedCaptchaToken,
         },
@@ -573,7 +547,6 @@ describe('Checkout controller', () => {
             customerId: mockedUser.customerId,
             priceId: mockedPrice.id,
             currency: mockedPrice.currency,
-            quantity: 1,
             token: userToken,
             captchaToken: mockedCaptchaToken,
           },
@@ -828,59 +801,6 @@ describe('Checkout controller', () => {
       });
     });
 
-    test('when the user want to pay a one time plan using crypto currencies, then an invoice is created and the specific payload containing the QR Link is returned', async () => {
-      const mockedUser = getUser();
-      const mockedInvoice = getInvoice();
-      const mockedPrice = getPriceEntity({
-        bytes: 123456789,
-        interval: 'lifetime',
-      });
-      const authToken = getValidAuthToken(mockedUser.uuid);
-      const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-      const mockedCaptchaToken = 'captcha_token';
-      const mockedPaymentIntent: PaymentIntent = {
-        id: 'payment_intent_id',
-        type: 'crypto',
-        payload: {
-          paymentRequestUri: 'payment_request_uri',
-          qrUrl: 'qr_url',
-          url: 'url',
-          payAmount: 0.01,
-          payCurrency: 'BTC',
-          paymentAddress: 'payment_address',
-        },
-        token: getValidUserToken({ invoiceId: 'invoice_id' }),
-      } as const;
-
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      (fetchUserStorage as jest.Mock).mockResolvedValue({
-        canExpand: true,
-      });
-      jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
-      jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
-
-      const response = await app.inject({
-        path: '/checkout/payment-intent',
-        method: 'POST',
-        body: {
-          customerId: mockedUser.customerId,
-          priceId: mockedInvoice.lines.data[0].price?.id,
-          token: userToken,
-          currency: AllowedCryptoCurrencies['Bitcoin'],
-          captchaToken: mockedCaptchaToken,
-        },
-        headers: {
-          authorization: `Bearer ${authToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedPaymentIntent);
-      expect(responseBody.payload.qrUrl).toBeDefined();
-    });
-
     test('When the user wants to pay a subscription plan creating an invoice, then an error indicating so is thrown', async () => {
       const mockedUser = getUser();
       const mockedPrice = getPriceEntity({
@@ -898,7 +818,7 @@ describe('Checkout controller', () => {
           customerId: mockedUser.customerId,
           priceId: mockedPrice.id,
           token: userToken,
-          currency: AllowedCryptoCurrencies['Bitcoin'],
+          currency: AllowedFiatCurrencies['Euro'],
         },
         headers: {
           authorization: `Bearer ${authToken}`,
@@ -1336,98 +1256,6 @@ describe('Checkout controller', () => {
           },
         });
       });
-    });
-  });
-
-  describe('Get crypto currencies', () => {
-    test('When the currencies are requested, then the available currencies are returned', async () => {
-      const mockedCurrencies = [
-        getCryptoCurrency(),
-        getCryptoCurrency({
-          name: AllowedCryptoCurrencies['Ethereum'],
-        }),
-      ];
-      jest.spyOn(PaymentService.prototype, 'getCryptoCurrencies').mockResolvedValue(mockedCurrencies);
-
-      const response = await app.inject({
-        path: '/checkout/crypto/currencies',
-        method: 'GET',
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedCurrencies);
-    });
-  });
-
-  describe('Verify the crypto payment', () => {
-    test('When the payment token has expired, then the verification is rejected', async () => {
-      const verifyCryptoPaymentSpy = jest.spyOn(PaymentService.prototype, 'verifyCryptoPayment');
-
-      const response = await app.inject({
-        path: '/checkout/crypto/verify/payment',
-        method: 'POST',
-        body: { token: getExpiredUserToken({ invoiceId: 'in_123' }) },
-        headers: { authorization: `Bearer ${getValidAuthToken(getUser().uuid)}` },
-      });
-
-      expect(response.statusCode).toBe(403);
-      expect(verifyCryptoPaymentSpy).not.toHaveBeenCalled();
-    });
-
-    test('When the crypto payment invoice has an status of paid, then true is returned indicating the invoice has been paid', async () => {
-      const mockedUser = getUser();
-      const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const mockedInvoice = getRawCryptoInvoiceResponse({
-        status: 'paid',
-      });
-      const invoiceToken = getValidUserToken({ invoiceId: mockedInvoice.invoiceId });
-
-      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
-
-      const response = await app.inject({
-        path: `/checkout/crypto/verify/payment`,
-        method: 'POST',
-        body: {
-          token: invoiceToken,
-        },
-        headers: {
-          authorization: `Bearer ${userAuthToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toBeTruthy();
-    });
-
-    test('When the crypto payment invoice has another status than paid, then false is returned indicating the invoice has not been paid', async () => {
-      const mockedUser = getUser();
-      const userAuthToken = getValidAuthToken(mockedUser.uuid);
-      const mockedInvoice = getRawCryptoInvoiceResponse({
-        status: 'pending',
-      });
-      const invoiceToken = getValidUserToken({ invoiceId: mockedInvoice.invoiceId });
-
-      jest.spyOn(Bit2MeService.prototype, 'getInvoice').mockResolvedValue(mockedInvoice);
-
-      const response = await app.inject({
-        path: `/checkout/crypto/verify/payment`,
-        method: 'POST',
-        body: {
-          token: invoiceToken,
-        },
-        headers: {
-          authorization: `Bearer ${userAuthToken}`,
-        },
-      });
-
-      const responseBody = response.json();
-
-      expect(response.statusCode).toBe(200);
-      expect(responseBody).toBeFalsy();
     });
   });
 });
