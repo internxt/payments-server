@@ -14,7 +14,6 @@ import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
 import { UsersService } from './services/users.service';
 import { webhookHandler } from './webhooks';
-import cryptoWebhook from './webhooks/providers/bit2me/index';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { ObjectStorageService } from './services/objectStorage.service';
 import { TiersService } from './services/tiers.service';
@@ -105,19 +104,6 @@ export async function buildApp({
   fastify.register(
     webhookHandler({
       stripe,
-      storageService,
-      usersService,
-      paymentService,
-      config,
-      cacheService,
-      objectStorageService,
-      tiersService,
-      preCreatedUserService,
-    }),
-  );
-
-  fastify.register(
-    cryptoWebhook({
       storageService,
       usersService,
       paymentService,

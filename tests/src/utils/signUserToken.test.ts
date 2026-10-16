@@ -12,15 +12,6 @@ describe('Signing user token', () => {
     expect(decodedToken.customerId).toBe(customerId);
   });
 
-  test('When invoice Id is provided, then the token is signed with the invoice Id', () => {
-    const invoiceId = 'in_123';
-    const token = signUserToken({ invoiceId });
-
-    const decodedToken = jwt.verify(token, config.JWT_SECRET) as { invoiceId: string };
-
-    expect(decodedToken.invoiceId).toBe(invoiceId);
-  });
-
   test('When a token is signed, then it expires six hours later', () => {
     const token = signUserToken({ customerId: 'cus_123' });
 

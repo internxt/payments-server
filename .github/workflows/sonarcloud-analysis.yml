@@ -26,9 +26,6 @@ jobs:
       - run: echo SERVER_PORT=8000 >> ./.env
       - run: echo STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }} >> ./.env
       - run: echo JWT_SECRET=JWT_SECRET >> ./.env
-      - run: echo CRYPTO_PAYMENTS_PROCESSOR_SECRET_KEY=secret >> ./.env
-      - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_KEY=api-key >> ./.env
-      - run: echo CRYPTO_PAYMENTS_PROCESSOR_API_URL=url >> ./.env
       - run: echo DRIVE_NEW_GATEWAY_SECRET=secret >> ./.env
       - run: echo DRIVE_NEW_GATEWAY_URL=http://localhost:8003 >> ./.env
       - run: echo CHART_API_URL=api_url >> ./.env

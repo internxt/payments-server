@@ -1,28 +1,12 @@
 import Stripe from 'stripe';
 import { UserType } from '../core/users/User';
 
-export interface PaymentIntentCrypto {
-  type: 'crypto';
-  id: string;
-  token: string;
-  payload: {
-    paymentRequestUri: string;
-    payAmount: number;
-    payCurrency: string;
-    paymentAddress: string;
-    url: string;
-    qrUrl: string;
-  };
-}
-
-export interface PaymentIntentFiat {
+export interface PaymentIntent {
   type: 'fiat';
   clientSecret: string | null;
   id: string;
   invoiceStatus?: string;
 }
-
-export type PaymentIntent = PaymentIntentCrypto | PaymentIntentFiat;
 
 export interface PromotionCode {
   promoCodeName: Stripe.PromotionCode['code'];

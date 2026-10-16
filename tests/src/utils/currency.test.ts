@@ -1,27 +1,21 @@
 import { BadRequestError } from '../../../src/errors/Errors';
 import {
   ALL_CURRENCIES,
-  AllowedCryptoCurrencies,
   AllowedFiatCurrencies,
   getAllowedCurrencies,
-  isCryptoCurrency,
   isFiatCurrency,
   isValidCurrency,
-  normalizeForBit2Me,
   normalizeForStripe,
 } from '../../../src/utils/currency';
 
 describe('Currency Adapter Service', () => {
   describe('Get allowed currencies', () => {
     test('When called, then it returns the list of allowed currencies', () => {
-      const allowedCryptoCurrencies = Object.values(AllowedCryptoCurrencies);
       const allowedFiatCurrencies = Object.values(AllowedFiatCurrencies);
-
-      const expected = [...allowedFiatCurrencies, ...allowedCryptoCurrencies];
 
       const result = getAllowedCurrencies();
 
-      expect(result).toStrictEqual(expected);
+      expect(result).toStrictEqual(allowedFiatCurrencies);
     });
   });
 
@@ -38,10 +32,8 @@ describe('Currency Adapter Service', () => {
       expect(result).toBe('usd');
     });
 
-    test('When a valid cryptocurrency is provided, then it returns fallback fiat currency that is eur in lowercase format', () => {
-      const result = normalizeForStripe('BTC');
-
-      expect(result).toBe('eur');
+    test('When a cryptocurrency is provided, then it throws an error because it is no longer supported', () => {
+      expect(() => normalizeForStripe('BTC')).toThrow(BadRequestError);
     });
 
     test('When an unsupported currency is provided, then it throws an error', () => {
@@ -49,57 +41,21 @@ describe('Currency Adapter Service', () => {
     });
 
     test('When currency has whitespace, then it normalizes correctly', () => {
-      const result = normalizeForStripe('  EUR  ');
       const currency = 'INVALID';
       const badRequestError = new BadRequestError(
         `Currency ${currency} is not supported. Allowed currencies: ${ALL_CURRENCIES.join(', ')}`,
       );
+
+      expect(() => normalizeForStripe('  EUR  ')).not.toThrow();
       expect(() => normalizeForStripe(currency)).toThrow(badRequestError);
-    });
-  });
-
-  describe('Normalize currency for Bit2Me', () => {
-    test('When a fiat currency is provided, then an error indicating that Bit2Me does not support these currencies is thrown', () => {
-      const currency = 'EUR';
-      const badRequestError = new BadRequestError(
-        `Currency ${currency} is not supported by Bit2Me. Allowed currencies: ${ALL_CURRENCIES.join(', ')}`,
-      );
-      expect(() => normalizeForBit2Me(currency)).toThrow(badRequestError);
-    });
-
-    test('When a valid cryptocurrency is provided, then it returns uppercase format', () => {
-      const result = normalizeForBit2Me('btc');
-
-      expect(result).toBe('BTC');
-    });
-
-    test('When an unsupported currency is provided, then it throws an error', () => {
-      expect(() => normalizeForBit2Me('INVALID')).toThrow('Currency INVALID is not supported by Bit2Me');
-    });
-  });
-
-  describe('Check if the currency is crypto', () => {
-    const validCryptos = Object.values(AllowedCryptoCurrencies);
-
-    test.each(validCryptos)('When %s cryptocurrency is provided, then it returns true', (crypto) => {
-      expect(isCryptoCurrency(crypto)).toBe(true);
-    });
-
-    test.each(validCryptos)('When %s cryptocurrency in lowercase is provided, then it returns true', (crypto) => {
-      expect(isCryptoCurrency(crypto.toLowerCase())).toBe(true);
-    });
-
-    test('When an invalid currency is provided, then it returns false', () => {
-      const result = isCryptoCurrency('INVALID');
-      expect(result).toBe(false);
     });
   });
 
   describe('Check if the currency is fiat', () => {
     const validFiats = Object.values(AllowedFiatCurrencies);
 
-    test.each(validFiats)('When %s fiat currency is provided, then it returns false', (fiat) => {
-      expect(isCryptoCurrency(fiat)).toBe(false);
+    test.each(validFiats)('When %s fiat currency is provided, then it returns true', (fiat) => {
+      expect(isFiatCurrency(fiat)).toBe(true);
     });
 
     test('When an invalid currency is provided, then it returns false', () => {
@@ -109,7 +65,7 @@ describe('Currency Adapter Service', () => {
   });
 
   describe('Check if the currency is valid', () => {
-    const allValidCurrencies = [...Object.values(AllowedCryptoCurrencies), ...Object.values(AllowedFiatCurrencies)];
+    const allValidCurrencies = Object.values(AllowedFiatCurrencies);
 
     test.each(allValidCurrencies)('When valid currency %s is provided, then it returns true', (currency) => {
       expect(isValidCurrency(currency)).toBe(true);
@@ -122,7 +78,7 @@ describe('Currency Adapter Service', () => {
       },
     );
 
-    const invalidCurrencies = ['INVALID', 'XYZ', '123', ''];
+    const invalidCurrencies = ['INVALID', 'XYZ', '123', '', 'BTC'];
 
     test.each(invalidCurrencies)('When invalid currency "%s" is provided, then it returns false', (currency) => {
       expect(isValidCurrency(currency)).toBe(false);

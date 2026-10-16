@@ -4,7 +4,6 @@ import { TiersService } from '../../../src/services/tiers.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import { UsersService } from '../../../src/services/users.service';
 import { StorageService } from '../../../src/services/storage.service';
-import { Bit2MeService } from '../../../src/services/bit2me.service';
 import { ObjectStorageService } from '../../../src/services/objectStorage.service';
 import { MailService } from '../../../src/services/mail.service';
 import { ProductsService } from '../../../src/services/products.service';
@@ -35,7 +34,6 @@ export interface TestServices {
   paymentService: PaymentService;
   usersService: UsersService;
   storageService: StorageService;
-  bit2MeService: Bit2MeService;
   objectStorageService: ObjectStorageService;
   mailService: MailService;
   productsService: ProductsService;
@@ -82,8 +80,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
   const repositories = createRepositories();
 
   const stripe = overrides.stripe ?? new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
-  const bit2MeService = new Bit2MeService(config, axios);
-  const paymentService = new PaymentService(stripe, repositories.productsRepository, bit2MeService);
+  const paymentService = new PaymentService(stripe, repositories.productsRepository);
   const storageService = new StorageService(config, axios);
   const usersService = new UsersService(
     repositories.usersRepository,
@@ -135,7 +132,6 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     paymentService,
     usersService,
     storageService,
-    bit2MeService,
     objectStorageService,
     mailService,
     productsService,

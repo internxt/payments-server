@@ -3,24 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
 import config from '../../src/config';
-import { signUserToken } from '../../src/utils/signUserToken';
+import { PAYMENTS_TOKEN_EXPIRATION } from '../../src/constants';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
-import { PaymentIntent, PaymentIntentCrypto, PaymentIntentFiat, PromotionCode } from '../../src/types/payment';
+import { PaymentIntent, PromotionCode } from '../../src/types/payment';
 import { RenewalPeriod, SubscriptionCreated } from '../../src/types/subscription';
 import { Coupon } from '../../src/core/coupons/Coupon';
-import {
-  CreateCryptoInvoicePayload,
-  Currency,
-  ParsedCreatedInvoiceResponse,
-  ParsedInvoiceResponse,
-  RawCreateInvoiceResponse,
-  RawInvoiceResponse,
-} from '../../src/types/bit2me';
+
 import { Tier } from '../../src/core/users/Tier';
 import { ObjectId } from 'mongodb';
 import { LicenseCode } from '../../src/core/users/LicenseCode';
-import { Bit2MePaymentStatusCallback } from '../../src/webhooks/providers/bit2me';
-import { AllowedCryptoCurrencies } from '../../src/utils/currency';
 import Stripe from 'stripe';
 import {
   CUSTOMER_BASE,
@@ -79,31 +70,6 @@ export const getLicenseCode = (params?: Partial<LicenseCode>) => {
   };
 };
 
-export const getCryptoInvoiceWebhook = (params?: Partial<Bit2MePaymentStatusCallback>): Bit2MePaymentStatusCallback => {
-  return {
-    id: randomDataGenerator.string({ length: 16 }),
-    foreignId: `inv_${randomDataGenerator.string({ length: 16 })}`,
-    cryptoAddress: {
-      currency: AllowedCryptoCurrencies['Bitcoin'],
-      address: randomDataGenerator.hash({ length: 34 }),
-    },
-    currencySent: {
-      currency: AllowedCryptoCurrencies['Bitcoin'],
-      amount: '0.01',
-      remainingAmount: '0',
-    },
-    currencyReceived: {
-      currency: AllowedCryptoCurrencies['Bitcoin'],
-    },
-    token: 'mocked-token',
-    transactions: [],
-    fees: [],
-    error: [],
-    status: 'paid',
-    ...params,
-  };
-};
-
 export const getValidAuthToken = (
   userUuid: string,
   workspaces?: {
@@ -133,7 +99,7 @@ export const getValidGatewayToken = () => {
 };
 
 export const getValidUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
-  return signUserToken(payload);
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: PAYMENTS_TOKEN_EXPIRATION });
 };
 
 export const getExpiredUserToken = (payload: { customerId?: string; invoiceId?: string }): string => {
@@ -523,112 +489,12 @@ export const getActiveSubscriptions = (
   }));
 };
 
-export function getPaymentIntentResponse(params: Partial<PaymentIntentFiat>): PaymentIntentFiat;
-export function getPaymentIntentResponse(params: Partial<PaymentIntentCrypto>): PaymentIntentCrypto;
 export function getPaymentIntentResponse(params: Partial<PaymentIntent>): PaymentIntent {
-  if (params.type === 'crypto') {
-    const cryptoParams = params as Partial<PaymentIntentCrypto>;
-    return {
-      id: cryptoParams.id ?? 'crypto-id',
-      type: 'crypto',
-      token: 'encoded-invoice-id',
-      payload: {
-        paymentRequestUri: 'mock-address',
-        url: 'https://mock.crypto.url',
-        qrUrl: 'https://mock.qr.url',
-        payAmount: cryptoParams.payload?.payAmount ?? 0.01,
-        payCurrency: cryptoParams.payload?.payCurrency ?? 'BTC',
-        paymentAddress: cryptoParams.payload?.paymentAddress ?? 'mock-address',
-      },
-    };
-  }
-
-  const fiatParams = params as Partial<PaymentIntentFiat>;
   return {
-    id: fiatParams.id ?? 'fiat-id',
+    id: params.id ?? 'fiat-id',
     type: 'fiat',
-    clientSecret: fiatParams.clientSecret ?? 'client_secret',
-    invoiceStatus: fiatParams.invoiceStatus ?? 'open',
-  };
-}
-
-export function getRawCreateInvoiceResponse(params: Partial<RawCreateInvoiceResponse> = {}): RawCreateInvoiceResponse {
-  return {
-    invoiceId: randomDataGenerator.guid(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    paidAt: null,
-    foreignId: randomDataGenerator.string({ length: 16 }),
-    priceAmount: randomDataGenerator.floating({ min: 5, max: 100, fixed: 2 }).toString(),
-    priceCurrency: 'EUR',
-    status: 'pending',
-    customerEmail: randomDataGenerator.email(),
-    receiveCurrencyName: 'Bitcoin',
-    title: randomDataGenerator.sentence({ words: 4 }),
-    description: randomDataGenerator.sentence(),
-    successUrl: `${config.DRIVE_WEB_URL}/checkout/success`,
-    cancelUrl: `${config.DRIVE_WEB_URL}/checkout/cancel`,
-    paymentAddress: randomDataGenerator.hash({ length: 34 }),
-    paymentRequestUri: `bitcoin:${randomDataGenerator.hash({ length: 34 })}?amount=${randomDataGenerator.floating({
-      min: 5,
-      max: 100,
-      fixed: 2,
-    })}`,
-    payAmount: randomDataGenerator.floating({ min: 5, max: 100, fixed: 2 }),
-    payCurrency: 'BTC',
-    merchant: {
-      merchantId: randomDataGenerator.guid(),
-      name: 'Internxt',
-    },
-    url: `https://checkout.internxt.com/invoice/${randomDataGenerator.guid()}`,
-    ...params,
-  };
-}
-
-export function getParsedInvoiceResponse(params: Partial<ParsedInvoiceResponse> = {}): ParsedInvoiceResponse {
-  return {
-    invoiceId: randomDataGenerator.guid(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    expiredAt: new Date(Date.now() + 3600000),
-    paidAt: null,
-    foreignId: randomDataGenerator.string({ length: 16 }),
-    priceAmount: randomDataGenerator.floating({ min: 10, max: 100 }),
-    underpaidAmount: 0,
-    overpaidAmount: 0,
-    priceCurrency: 'EUR',
-    status: 'pending',
-    customerEmail: randomDataGenerator.email(),
-    receiveCurrencyName: 'Bitcoin',
-    title: 'Mock Invoice',
-    description: 'Mock description',
-    successUrl: 'https://mock/success',
-    cancelUrl: 'https://mock/cancel',
-    paymentAddress: randomDataGenerator.hash({ length: 34 }),
-    paymentRequestUri: 'bitcoin:address?amount=0.01',
-    payAmount: 0.01,
-    payCurrency: 'BTC',
-    merchant: {
-      merchantId: randomDataGenerator.guid(),
-      name: 'Internxt',
-    },
-    url: 'https://mock.crypto.url',
-    ...params,
-  };
-}
-
-export function getParsedCreatedInvoiceResponse(
-  params: Partial<ParsedCreatedInvoiceResponse> = {},
-  rawInvoiceResponse?: RawInvoiceResponse,
-): ParsedCreatedInvoiceResponse {
-  const raw = rawInvoiceResponse ?? getRawCreateInvoiceResponse();
-
-  return {
-    ...raw,
-    createdAt: new Date(raw.createdAt),
-    updatedAt: new Date(raw.updatedAt),
-    priceAmount: parseFloat(raw.priceAmount),
-    ...params,
+    clientSecret: params.clientSecret ?? 'client_secret',
+    invoiceStatus: params.invoiceStatus ?? 'open',
   };
 }
 
@@ -700,92 +566,6 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
     child: jest.fn(),
   };
 };
-
-export const getPayloadForCryptoInvoice = (
-  params?: Partial<CreateCryptoInvoicePayload>,
-): CreateCryptoInvoicePayload => {
-  const payload: CreateCryptoInvoicePayload = {
-    foreignId: 'invoice-123',
-    priceAmount: 100,
-    priceCurrency: AllowedCryptoCurrencies['Bitcoin'],
-    title: 'Test Invoice',
-    description: 'Payment for product',
-    successUrl: 'https://success.url',
-    cancelUrl: 'https://cancel.url',
-    purchaserEmail: 'test@internxt.com',
-    securityToken: 'secure-token',
-    shopper: {
-      type: 'personal',
-      email: 'test@internxt.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      dateOfBirth: '1990-01-01',
-      ipAddress: '127.0.0.1',
-      addressLine: '123 Main St',
-      city: 'New York',
-      countryOfResidence: 'US',
-      postalCode: '10001',
-    },
-    ...params,
-  };
-
-  return payload;
-};
-
-export const getRawCryptoInvoiceResponse = (params?: Partial<RawInvoiceResponse>): RawInvoiceResponse => {
-  const now = new Date();
-
-  const rawResponse = {
-    invoiceId: randomUUID(),
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-    expiredAt: new Date(now.getTime() + 100000).toISOString(),
-    paidAt: null,
-    foreignId: 'foreign-123',
-    priceAmount: '99.99',
-    priceCurrency: 'EUR',
-    status: 'waitingPayment',
-    customerEmail: 'test@example.com',
-    receiveCurrencyName: 'BTC',
-    title: 'Test Invoice',
-    description: 'Test invoice description',
-    successUrl: 'https://example.com/success',
-    cancelUrl: 'https://example.com/cancel',
-    underpaidAmount: '0.00',
-    overpaidAmount: '0.00',
-    paymentAddress: 'bc1address',
-    paymentRequestUri: 'bitcoin:bc1address?amount=0.001',
-    payAmount: 0.001,
-    payCurrency: 'BTC',
-    merchant: {
-      merchantId: 'merchant-1',
-      name: 'Internxt',
-    },
-    url: 'https://bit2me.com/checkout-url',
-    ...params,
-  };
-
-  return rawResponse;
-};
-
-export const getCryptoCurrency = (params?: Partial<Currency>): Currency => ({
-  currencyId: AllowedCryptoCurrencies['Bitcoin'],
-  name: 'Bitcoin',
-  type: 'crypto',
-  receiveType: true,
-  networks: [
-    {
-      platformId: 'bitcoin-mainnet',
-      name: 'Bitcoin Network',
-    },
-    {
-      platformId: 'lightning',
-      name: 'Lightning Network',
-    },
-  ],
-  imageUrl: 'https://example.com/icons/btc.svg',
-  ...params,
-});
 
 export const getInvoice = (
   params?: DeepPartial<Partial<Stripe.Invoice>>,
@@ -916,30 +696,6 @@ export function getDispute(params?: Partial<Stripe.Dispute>): Stripe.Dispute {
     ...params,
   };
 }
-
-export const getCurrency = (params?: Partial<Currency>): Currency => {
-  return {
-    currencyId: 'BTC',
-    name: 'Bitcoin',
-    type: 'crypto',
-    receiveType: true,
-    networks: [
-      {
-        platformId: 'bitcoin',
-        name: 'bitcoin',
-      },
-    ],
-    imageUrl: 'https://some-image.jpg',
-    ...params,
-  };
-};
-
-export const getCurrencies = (count = 2, paramsArray: Partial<Currency>[] = []): Currency[] => {
-  return Array.from({ length: count }, (_, index) => ({
-    ...getCurrency(),
-    ...paramsArray[index],
-  }));
-};
 
 export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe.PaymentMethod => {
   return {
