@@ -2546,9 +2546,9 @@ fast-json-stringify@^6.0.0:
     rfdc "^1.2.0"
 
 fast-jwt@^6.2.0:
-  version "6.2.4"
-  resolved "https://registry.yarnpkg.com/fast-jwt/-/fast-jwt-6.2.4.tgz#cc2c1595a46aa04789f01aa6b7dd0ba47aa36ffa"
-  integrity sha512-IoQa53wI6TbARU2yelb0L44ggFQnP2qVcwswCSYHbCAWuwpr70icDb3QjG0v01I8Tt01rVGDkN/rRvpk0lKFTA==
+  version "6.3.5"
+  resolved "https://registry.yarnpkg.com/fast-jwt/-/fast-jwt-6.3.5.tgz#3ce8a5d16b8be069e7ec980381cf092015be035e"
+  integrity sha512-H05ACsqy2i91TwJeLLHcTgQu6cmcmwdyvfIavjtv3ig+sQZRPsSiksXR3QFPvdk0aXmJdKIePE0OsvO4ndt4zw==
   dependencies:
     "@lukeed/ms" "^2.0.2"
     asn1.js "^5.4.1"
