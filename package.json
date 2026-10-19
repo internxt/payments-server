@@ -47,7 +47,7 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.1.0",
     "@fastify/rate-limit": "^11.1.0",
-    "axios": "^1.18.1",
+    "axios": "^1.20.0",
     "dayjs": "^1.11.21",
     "dotenv": "^16.4.5",
     "fastify": "^5.12.5",
