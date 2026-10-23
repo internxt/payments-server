@@ -9,30 +9,33 @@
     "dev": "nodemon src/index.ts",
     "start": "node .",
     "build": "tsc",
+    "lint": "eslint \"{src,tests,scripts}/**/*.ts\"",
+    "lint:fix": "yarn run lint --fix",
     "test": "jest --detectOpenHandles",
     "find-deadcode": "ts-prune -e",
     "test:cov": "jest --coverage",
     "spec": "jest --testMatch='**/*.spec.ts'",
     "cli": "nodemon src/cli/load-license-codes.ts",
     "cli:determine-lifetime": "nodemon src/cli/determine-lifetime-user.ts",
-    "generate:stripe-fixtures": "npx ts-node scripts/generate-stripe-fixtures.ts"
+    "generate:stripe-fixtures": "npx ts-node scripts/generate-stripe-fixtures.ts",
+    "prepare": "husky || true"
   },
   "engines": {
     "node": ">=24.11.0"
   },
   "devDependencies": {
-    "@internxt/eslint-config-internxt": "^1.0.9",
+    "@internxt/eslint-config-internxt": "^2.1.1",
     "@internxt/prettier-config": "2.0.0",
     "@types/chance": "^1.1.6",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
-    "@typescript-eslint/eslint-plugin": "^8.14.0",
-    "@typescript-eslint/parser": "^8.14.0",
     "chance": "^1.1.12",
     "eslint": "^10.6.0",
+    "husky": "^9.1.7",
     "ioredis-mock": "^8.9.0",
     "jest": "^30.4.2",
+    "lint-staged": "^17.6.0",
     "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.14",
     "pino-pretty": "^13.1.3",
@@ -41,6 +44,7 @@
     "ts-node": "^10.9.2",
     "ts-prune": "^0.10.3",
     "typescript": "^5.6.3",
+    "typescript-eslint": "^8.72.0",
     "xlsx": "^0.18.5"
   },
   "dependencies": {
@@ -57,5 +61,11 @@
     "stripe": "=17.7.0",
     "stripe-next-version": "npm:stripe@=18.5.0",
     "uuid": "^14.0.1"
+  },
+  "lint-staged": {
+    "{src,tests,scripts}/**/*.ts": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   }
 }
