@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { FastifyBaseLogger } from 'fastify';
 import { TiersRepository } from '../core/users/MongoDBTiersRepository';
 import { UsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { Service, Tier } from '../core/users/Tier';
@@ -8,6 +7,7 @@ import { BadRequestError } from '../errors/Errors';
 import { MailService } from './mail.service';
 import { StorageService } from './storage.service';
 import { UsersService } from './users.service';
+import Logger from '../Logger';
 
 export class TierNotFoundError extends Error {
   constructor(message: string) {
@@ -100,7 +100,7 @@ export class TiersService {
     return tier;
   }
 
-  async removeTier(userWithEmail: User & { email: string }, productId: string, log: FastifyBaseLogger): Promise<void> {
+  async removeTier(userWithEmail: User & { email: string }, productId: string): Promise<void> {
     const tier = await this.tiersRepository.findByProductId({ productId });
     const { uuid: userUuid } = userWithEmail;
 
@@ -117,7 +117,7 @@ export class TiersService {
 
       switch (s) {
         case Service.Drive:
-          await this.removeDriveFeatures(userUuid, tier, log);
+          await this.removeDriveFeatures(userUuid, tier);
           break;
         case Service.Vpn:
           await this.removeVPNFeatures(userUuid, tier.featuresPerService['vpn']);
@@ -152,7 +152,7 @@ export class TiersService {
     );
   }
 
-  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier, log: FastifyBaseLogger): Promise<void> {
+  async removeDriveFeatures(userUuid: User['uuid'], tier: Tier): Promise<void> {
     const freeTier = await this.getTierProductsByProductsId('free');
     const features = tier.featuresPerService[Service.Drive];
 
@@ -163,12 +163,12 @@ export class TiersService {
       } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
           const { status, data } = error.response;
-          log.error(
+          Logger.error(
             `Failed to delete workspace for user ${userUuid}. Status: ${status}, Response: ${JSON.stringify(data)}`,
           );
           throw data;
         } else {
-          log.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
+          Logger.error(`Unexpected error deleting workspace for user ${userUuid}: ${error}`);
           throw error;
         }
       }

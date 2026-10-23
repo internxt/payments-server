@@ -1,6 +1,5 @@
 import { TierNotFoundError } from '../../../src/services/tiers.service';
-import { FastifyBaseLogger } from 'fastify';
-import { getCreatedSubscription, getCustomer, getLogger, getProduct, getUser, newTier } from '../fixtures';
+import { getCreatedSubscription, getCustomer, getProduct, getUser, newTier } from '../fixtures';
 import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscriptionCanceled';
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
@@ -9,8 +8,6 @@ import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stri
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
-
-const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
 
 const {
   paymentService,
@@ -47,7 +44,6 @@ describe('Process when a subscription is cancelled', () => {
       cacheService,
       objectStorageService,
       tiersService,
-      logger,
       preCreatedUserService,
     );
 
@@ -60,7 +56,6 @@ describe('Process when a subscription is cancelled', () => {
       productId: mockedSubscription.items.data[0].price.product,
       usersService,
       tiersService,
-      log: logger,
       preCreatedUserService,
     });
   });
@@ -97,7 +92,6 @@ describe('Process when a subscription is cancelled', () => {
       cacheService,
       objectStorageService,
       tiersService,
-      logger,
       preCreatedUserService,
     );
 
@@ -133,7 +127,6 @@ describe('Process when a subscription is cancelled', () => {
         cacheService,
         objectStorageService,
         tiersService,
-        logger,
         preCreatedUserService,
       ),
     ).rejects.toThrow(randomError);

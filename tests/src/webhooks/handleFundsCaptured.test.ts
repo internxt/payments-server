@@ -1,14 +1,12 @@
 import Stripe from 'stripe';
-import { getPaymentIntent, getLogger, getCustomer, getCreateSubscriptionResponse } from '../fixtures';
-import { FastifyBaseLogger } from 'fastify';
+import { getPaymentIntent, getCustomer, getCreateSubscriptionResponse } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { ConflictError, InternalServerError } from '../../../src/errors/Errors';
 import { UserSubscription, UserType } from '../../../src/core/users/User';
 import { createTestServices } from '../helpers/services-factory';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
-
-const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
+import Logger from '../../../src/Logger';
 
 const stripeMock = {
   paymentIntents: {
@@ -31,7 +29,7 @@ describe('Handling captured funds from a payment method', () => {
       const mockPaymentIntent = getPaymentIntent();
       const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
-      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
       expect(getCustomerSpy).not.toHaveBeenCalled();
     });
@@ -44,7 +42,7 @@ describe('Handling captured funds from a payment method', () => {
       });
       const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
-      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
       expect(getCustomerSpy).not.toHaveBeenCalled();
     });
@@ -57,7 +55,7 @@ describe('Handling captured funds from a payment method', () => {
       });
       const getCustomerSpy = jest.spyOn(stripePaymentsAdapter, 'getCustomer');
 
-      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
       expect(getCustomerSpy).not.toHaveBeenCalled();
     });
@@ -85,7 +83,7 @@ describe('Handling captured funds from a payment method', () => {
         .spyOn(objectStorageService, 'initObjectStorageUser')
         .mockResolvedValue();
 
-      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
       expect(cancelPaymentIntentSpy).not.toHaveBeenCalled();
       expect(getUserSubscriptionSpy).toHaveBeenCalledWith(mockCustomer.id, UserType.ObjectStorage);
@@ -128,7 +126,7 @@ describe('Handling captured funds from a payment method', () => {
         .mockResolvedValue();
 
       await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe),
       ).rejects.toThrow(unexpectedError);
 
       expect(getUserSubscriptionSpy).not.toHaveBeenCalled();
@@ -160,7 +158,7 @@ describe('Handling captured funds from a payment method', () => {
         .spyOn(objectStorageService, 'initObjectStorageUser')
         .mockResolvedValue();
 
-      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+      await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
       expect(cancelPaymentIntentSpy).toHaveBeenCalledWith(mockPaymentIntent.id);
       expect(getUserSubscriptionSpy).toHaveBeenCalledWith(mockCustomer.id, UserType.ObjectStorage);
@@ -195,7 +193,7 @@ describe('Handling captured funds from a payment method', () => {
         .mockResolvedValue();
 
       await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe),
       ).rejects.toThrow(unexpectedError);
 
       expect(cancelPaymentIntentSpy).toHaveBeenCalledWith(mockPaymentIntent.id);
@@ -225,7 +223,7 @@ describe('Handling captured funds from a payment method', () => {
       .spyOn(objectStorageService, 'initObjectStorageUser')
       .mockResolvedValue();
 
-    await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger);
+    await handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe);
 
     expect(cancelPaymentIntentSpy).toHaveBeenCalledWith(mockPaymentIntent.id);
     expect(getUserSubscriptionSpy).toHaveBeenCalledWith(mockCustomer.id, UserType.ObjectStorage);
@@ -270,10 +268,12 @@ describe('Handling captured funds from a payment method', () => {
         message: 'Conflict',
       });
 
+      const loggerErrorSpy = jest.spyOn(Logger, 'error');
+
       await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe),
       ).rejects.toThrow(ConflictError);
-      expect(logger.error).toHaveBeenCalledWith('The user already has an Object Storage account activated');
+      expect(loggerErrorSpy).toHaveBeenCalledWith('The user already has an Object Storage account activated');
     });
 
     it('if an unexpected error occurs while initializing the object storage account, then an error indicating so is thrown', async () => {
@@ -294,7 +294,7 @@ describe('Handling captured funds from a payment method', () => {
       jest.spyOn(objectStorageService, 'initObjectStorageUser').mockRejectedValue(unexpectedError);
 
       await expect(
-        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe, logger),
+        handleFundsCaptured(mockPaymentIntent, paymentService, objectStorageService, stripe),
       ).rejects.toThrow(unexpectedError);
     });
   });

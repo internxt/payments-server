@@ -4,7 +4,6 @@ import { StorageService } from '../services/storage.service';
 import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
-import { FastifyBaseLogger } from 'fastify';
 import { TiersService } from '../services/tiers.service';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
@@ -16,7 +15,6 @@ interface HandleDisputeResultProps {
   storageService: StorageService;
   cacheService: CacheService;
   tiersService: TiersService;
-  log: FastifyBaseLogger;
   preCreatedUserService: PreCreatedUserService;
 }
 
@@ -28,7 +26,6 @@ export async function handleDisputeResult({
   storageService,
   cacheService,
   tiersService,
-  log,
   preCreatedUserService,
 }: HandleDisputeResultProps) {
   if (dispute.status !== 'lost') {
@@ -51,7 +48,6 @@ export async function handleDisputeResult({
         charge,
         cacheService,
         paymentService,
-        log,
         tiersService,
         preCreatedUserService,
       );

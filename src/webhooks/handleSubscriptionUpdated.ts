@@ -1,14 +1,12 @@
-import { FastifyBaseLogger } from 'fastify';
 import Stripe from 'stripe';
 import CacheService from '../services/cache.service';
 import { PaymentService } from '../services/payment.service';
-import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
-import { AppConfig } from '../config';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
+import Logger from '../Logger';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {
   return !!meta && !!meta.type && meta.type === 'object-storage';
@@ -18,26 +16,22 @@ async function handleObjectStorageScheduledForCancelation(
   customer: Customer,
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
-  logger: FastifyBaseLogger,
 ): Promise<void> {
-  logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
+  Logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
   await objectStorageService.suspendAccount({
     customerId: customer.id,
   });
 
-  logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
+  Logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
 }
 
 export default async function handleSubscriptionUpdated(
-  storageService: StorageService,
   usersService: UsersService,
   subscription: Stripe.Subscription,
   cacheService: CacheService,
   paymentService: PaymentService,
   objectStorageService: ObjectStorageService,
-  log: FastifyBaseLogger,
-  config: AppConfig,
 ): Promise<void> {
   let uuid = '';
   const customerId = subscription.customer as string;
@@ -49,18 +43,19 @@ export default async function handleSubscriptionUpdated(
   const { metadata: productMetadata } = product;
 
   if (isObjectStorageProduct(productMetadata)) {
-    log.info(`Object storage customer ${customerId} with sub ${subscription.id} updated its sub`);
+    Logger.info(`Object storage customer ${customerId} with sub ${subscription.id} updated its sub`);
 
     if (isSubscriptionCanceled) {
-      log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been canceled`);
+      Logger.info(`Object storage customer ${customerId} with sub ${subscription.id} has been canceled`);
     } else if (subscriptionScheduledForCancelation) {
-      log.info(`Object storage customer ${customerId} with sub ${subscription.id} has been scheduled for cancelation`);
+      Logger.info(
+        `Object storage customer ${customerId} with sub ${subscription.id} has been scheduled for cancelation`,
+      );
 
       await handleObjectStorageScheduledForCancelation(
         await stripePaymentsAdapter.getCustomer(customerId),
         subscription,
         objectStorageService,
-        log,
       );
     }
     return;
@@ -73,7 +68,7 @@ export default async function handleSubscriptionUpdated(
       return;
     }
   } catch (error) {
-    log.error(`Error in handleSubscriptionUpdated trying to fetch the customer by ID ${customerId}`);
+    Logger.error(`Error in handleSubscriptionUpdated trying to fetch the customer by ID ${customerId}`);
     return;
   }
 
@@ -82,7 +77,7 @@ export default async function handleSubscriptionUpdated(
   try {
     await cacheService.clearSubscription(customerId, productType);
   } catch (err) {
-    log.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
+    Logger.error(`Error in handleSubscriptionUpdated after trying to clear ${customerId} subscription`);
   }
 
   if (productType === UserType.Business) {

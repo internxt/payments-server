@@ -1,9 +1,9 @@
 import Stripe from 'stripe';
-import { FastifyLoggerInstance } from 'fastify';
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UsersService } from '../services/users.service';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import Logger from '../Logger';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
   return (
@@ -45,7 +45,6 @@ export default async function handleInvoicePaymentFailed(
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
   usersService: UsersService,
-  logger: FastifyLoggerInstance,
 ): Promise<void> {
   if (!invoice.customer) {
     throw new Error('No customer found for this payment');
@@ -60,27 +59,27 @@ export default async function handleInvoicePaymentFailed(
       const user = await usersService.findUserByCustomerID(customer.id);
       if (user) {
         await usersService.notifyFailedPayment(user.uuid);
-        logger.info(`Drive payment failure notification sent for customer ${customer.id} (user UUID: ${user.uuid})`);
+        Logger.info(`Drive payment failure notification sent for customer ${customer.id} (user UUID: ${user.uuid})`);
       } else {
-        logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
+        Logger.warn(`User not found for customer ${customer.id}. Skipping failed payment notification.`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to send payment notification for customer ${customer.id}. Error: ${errorMessage}`);
+      Logger.error(`Failed to send payment notification for customer ${customer.id}. Error: ${errorMessage}`);
     }
-    logger.info(
+    Logger.info(
       `Invoice ${invoice.id} does not contain an object storage product. Skipping object storage suspension...`,
     );
     return;
   }
 
-  logger.info(
+  Logger.info(
     `Handling invoice not paid ${invoice.id} for customer ${customer.id} > Suspending object storage account..`,
   );
 
   await objectStorageService.suspendAccount({ customerId: customer.id });
 
-  logger.info(
+  Logger.info(
     `Handling invoice not paid ${invoice.id} for customer ${customer.id} > Object storage account suspended..`,
   );
 }
