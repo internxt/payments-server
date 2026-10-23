@@ -1,4 +1,3 @@
-import { FastifyLoggerInstance } from 'fastify';
 import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
@@ -8,6 +7,7 @@ import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
 import { Service } from '../core/users/Tier';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
+import Logger from '../Logger';
 
 export default async function handleLifetimeRefunded(
   storageService: StorageService,
@@ -15,7 +15,6 @@ export default async function handleLifetimeRefunded(
   charge: Stripe.Charge,
   cacheService: CacheService,
   paymentsService: PaymentService,
-  log: FastifyLoggerInstance,
   tiersService: TiersService,
   preCreatedUserService: PreCreatedUserService,
 ): Promise<void> {
@@ -35,7 +34,7 @@ export default async function handleLifetimeRefunded(
     productId = product.id;
   }
 
-  log.info(
+  Logger.info(
     `[LIFETIME REFUNDED]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,
   );
 
@@ -44,7 +43,7 @@ export default async function handleLifetimeRefunded(
     await cacheService.clearUsedUserPromoCodes(customerId);
     await cacheService.clearUserTier(uuid);
   } catch (err) {
-    log.error(`Error in handleLifetimeRefunded after trying to clear ${customerId} subscription`);
+    Logger.error(`Error in handleLifetimeRefunded after trying to clear ${customerId} subscription`);
   }
 
   try {
@@ -55,12 +54,11 @@ export default async function handleLifetimeRefunded(
       productId,
       usersService,
       tiersService,
-      log,
       preCreatedUserService,
     });
   } catch (error) {
     const err = error as Error;
-    log.error(`[LIFETIME REFUNDED/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
+    Logger.error(`[LIFETIME REFUNDED/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
     if (!(error instanceof TierNotFoundError)) {
       throw error;
     }

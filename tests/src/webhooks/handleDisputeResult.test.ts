@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { getCharge, getDispute, getInvoice, getLogger, getUser, voidPromise } from '../fixtures';
+import { getCharge, getDispute, getInvoice, getUser, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
@@ -30,7 +30,6 @@ const {
 } = createTestServices({
   stripe: mockStripe,
 });
-const logger = getLogger();
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
@@ -61,7 +60,6 @@ describe('handleDisputeResult()', () => {
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 
@@ -101,7 +99,6 @@ describe('handleDisputeResult()', () => {
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 
@@ -114,7 +111,6 @@ describe('handleDisputeResult()', () => {
         mockedCharge,
         cacheService,
         paymentService,
-        logger,
         tiersService,
         preCreatedUserService,
       );
@@ -152,7 +148,6 @@ describe('handleDisputeResult()', () => {
         usersService,
         stripe,
         storageService,
-        log: logger,
         tiersService,
       });
 

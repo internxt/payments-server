@@ -1,5 +1,4 @@
 import Stripe from 'stripe';
-import { FastifyBaseLogger } from 'fastify';
 
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
@@ -8,13 +7,13 @@ import { UserType } from '../core/users/User';
 import axios from 'axios';
 import { VERIFICATION_CHARGE } from '../constants';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import Logger from '../Logger';
 
 export default async function handleFundsCaptured(
   paymentIntent: Stripe.PaymentIntent,
   paymentsService: PaymentService,
   objectStorageService: ObjectStorageService,
   stripe: Stripe,
-  logger: FastifyBaseLogger,
 ): Promise<void> {
   const isMissingType = !paymentIntent.metadata.type;
   const isNotObjectStorage = paymentIntent.metadata.type !== 'object-storage';
@@ -28,13 +27,13 @@ export default async function handleFundsCaptured(
     return;
   }
 
-  logger.info(
+  Logger.info(
     `Received successful payment intent ${paymentIntent.id} from customer ${paymentIntent.customer as string}`,
   );
 
   const customer = await stripePaymentsAdapter.getCustomer(paymentIntent.customer as string);
 
-  logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
+  Logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 
   const isPaymentIntentCanceled = paymentIntent.status === 'canceled';
 
@@ -44,7 +43,7 @@ export default async function handleFundsCaptured(
     }
   } catch (error) {
     const err = error as Error;
-    logger.error(
+    Logger.error(
       `[OBJECT STORAGE] Unexpected error while attempting to cancel the verification payment intent for user ${customer.id}. Error: ${err.message}`,
     );
 
@@ -71,7 +70,7 @@ export default async function handleFundsCaptured(
     }
   } catch (error) {
     const err = error as Error;
-    logger.error(
+    Logger.error(
       `[OBJECT STORAGE] Unexpected error while attempting to create a user subscription for user ${customer.id}. Error: ${err.message}`,
     );
 
@@ -88,15 +87,15 @@ export default async function handleFundsCaptured(
       const { status, data } = error.response;
 
       if (status === 409) {
-        logger.error('The user already has an Object Storage account activated');
+        Logger.error('The user already has an Object Storage account activated');
         throw new ConflictError(error.message);
       }
 
-      logger.error(`Unexpected error from Object Storage service [status=${status}]: ${JSON.stringify(data)}`);
+      Logger.error(`Unexpected error from Object Storage service [status=${status}]: ${JSON.stringify(data)}`);
     }
 
     throw error;
   }
 
-  logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) has been initialized!`);
+  Logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) has been initialized!`);
 }

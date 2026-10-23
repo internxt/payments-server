@@ -1,5 +1,5 @@
 import { TierNotFoundError } from '../../../../src/services/tiers.service';
-import { getCustomer, getLogger, getUser, newTier, voidPromise } from '../../fixtures';
+import { getCustomer, getUser, newTier, voidPromise } from '../../fixtures';
 import { handleCancelPlan } from '../../../../src/webhooks/utils/handleCancelPlan';
 import { createTestServices } from '../../helpers/services-factory';
 import { getPreCreatedUserEntity } from '../../entity.fixtures';
@@ -18,7 +18,6 @@ beforeEach(() => {
 describe('Handling canceled plans and refunded lifetimes', () => {
   it('When the tier id to remove the user-tier relationship does not exists, then an error indicating so is thrown', async () => {
     const mockedCustomer = getCustomer();
-    const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: false });
     const mockedTier = newTier();
     const mockedRandomTier = newTier({
@@ -39,7 +38,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
         productId: mockedRandomTier.productId,
         tiersService,
         usersService,
-        log,
         preCreatedUserService,
       }),
     ).rejects.toThrow(TierNotFoundError);
@@ -48,7 +46,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     expect(removeTierSpy).toHaveBeenCalledWith(
       { ...mockedUser, email: mockedCustomer.email as string },
       mockedRandomTier.productId,
-      log,
     );
     expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).not.toHaveBeenCalled();
@@ -56,7 +53,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
 
   it('When the user cancels a subscription, then the tier is removed and the free space is applied', async () => {
     const mockedCustomer = getCustomer();
-    const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: false });
     const mockedTier = newTier();
 
@@ -73,7 +69,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       productId: mockedTier.productId,
       tiersService,
       usersService,
-      log,
       preCreatedUserService,
     });
 
@@ -81,7 +76,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     expect(removeTierSpy).toHaveBeenCalledWith(
       { ...mockedUser, email: mockedCustomer.email as string },
       mockedTier.productId,
-      log,
     );
     expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
@@ -89,7 +83,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
 
   it('When the user cancels a lifetime (refund), then the lifetime field is set to false, the tier is removed and the free space is applied', async () => {
     const mockedCustomer = getCustomer();
-    const log = getLogger();
     const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: true });
     const mockedTier = newTier({ billingType: 'lifetime' });
 
@@ -111,7 +104,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       productId: mockedTier.productId,
       tiersService,
       usersService,
-      log,
       preCreatedUserService,
     });
 
@@ -120,7 +112,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
     expect(removeTierSpy).toHaveBeenCalledWith(
       { ...mockedUser, email: mockedCustomer.email as string },
       mockedTier.productId,
-      log,
     );
     expect(userTiersSpy).toHaveBeenCalledWith(mockedUser.id);
     expect(deleteTierFromUserSpy).toHaveBeenCalledWith(mockedUser.id, mockedTier.id);
@@ -129,7 +120,6 @@ describe('Handling canceled plans and refunded lifetimes', () => {
   describe('Cancelling the pre-created user', () => {
     const setUpCancellation = () => {
       const mockedCustomer = getCustomer();
-      const log = getLogger();
       const mockedUser = getUser({ customerId: mockedCustomer.id, lifetime: false });
       const mockedTier = newTier();
 
@@ -141,14 +131,12 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       jest.spyOn(tiersService, 'deleteTierFromUser').mockImplementation(voidPromise);
 
       return {
-        log,
         params: {
           customerEmail: mockedCustomer.email as string,
           customerId: mockedCustomer.id,
           productId: mockedTier.productId,
           tiersService,
           usersService,
-          log,
           preCreatedUserService,
         },
       };

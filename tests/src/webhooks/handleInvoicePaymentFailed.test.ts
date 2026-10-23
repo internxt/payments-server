@@ -1,11 +1,9 @@
-import { FastifyBaseLogger } from 'fastify';
-import { getCustomer, getInvoice, getLogger, getProduct } from '../fixtures';
+import { getCustomer, getInvoice, getProduct } from '../fixtures';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { createTestServices } from '../helpers/services-factory';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
-
-const logger: jest.Mocked<FastifyBaseLogger> = getLogger();
+import Logger from '../../../src/Logger';
 
 const { paymentService, usersService, objectStorageService } = createTestServices();
 
@@ -30,13 +28,7 @@ describe('Handle Invoice Payment Failed', () => {
       const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
       const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
 
-      await handleInvoicePaymentFailed(
-        mockedInvoice as any,
-        objectStorageService,
-        paymentService,
-        usersService,
-        logger,
-      );
+      await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
       expect(getCustomerSpy).toHaveBeenCalledWith(customerId);
       expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
@@ -58,7 +50,7 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error('Gateway error'));
 
     await expect(
-      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger),
+      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService),
     ).resolves.toBeUndefined();
   });
 
@@ -74,9 +66,9 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(new Error(errorMessage));
-    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerErrorSpy = jest.spyOn(Logger, 'error');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`,
@@ -95,9 +87,9 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockRejectedValue(nonErrorObject);
-    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerErrorSpy = jest.spyOn(Logger, 'error');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       `Failed to send payment notification for customer ${customerId}. Error: ${String(nonErrorObject)}`,
@@ -114,9 +106,9 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockRejectedValue(new Error(errorMessage));
-    const loggerErrorSpy = jest.spyOn(logger, 'error');
+    const loggerErrorSpy = jest.spyOn(Logger, 'error');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       `Failed to send payment notification for customer ${customerId}. Error: ${errorMessage}`,
@@ -127,7 +119,7 @@ describe('Handle Invoice Payment Failed', () => {
     const mockedInvoice = getInvoice({ customer: null });
 
     await expect(
-      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger),
+      handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService),
     ).rejects.toThrow('No customer found for this payment');
   });
 
@@ -143,7 +135,7 @@ describe('Handle Invoice Payment Failed', () => {
     const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
     const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount').mockResolvedValue();
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(findUserByCustomerIDSpy).not.toHaveBeenCalled();
     expect(notifyFailedPaymentSpy).not.toHaveBeenCalled();
@@ -161,9 +153,9 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser as any);
     jest.spyOn(usersService, 'notifyFailedPayment').mockResolvedValue();
-    const loggerInfoSpy = jest.spyOn(logger, 'info');
+    const loggerInfoSpy = jest.spyOn(Logger, 'info');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(loggerInfoSpy).toHaveBeenCalledWith(
       `Drive payment failure notification sent for customer ${customerId} (user UUID: ${mockedUser.uuid})`,
@@ -179,9 +171,9 @@ describe('Handle Invoice Payment Failed', () => {
     jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(null as any);
-    const loggerWarnSpy = jest.spyOn(logger, 'warn');
+    const loggerWarnSpy = jest.spyOn(Logger, 'warn');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(loggerWarnSpy).toHaveBeenCalledWith(
       `User not found for customer ${customerId}. Skipping failed payment notification.`,
@@ -201,7 +193,7 @@ describe('Handle Invoice Payment Failed', () => {
     const notifyFailedPaymentSpy = jest.spyOn(usersService, 'notifyFailedPayment');
     const suspendAccountSpy = jest.spyOn(objectStorageService, 'suspendAccount');
 
-    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService, logger);
+    await handleInvoicePaymentFailed(mockedInvoice as any, objectStorageService, paymentService, usersService);
 
     expect(notifyFailedPaymentSpy).toHaveBeenCalledWith('test-uuid-123');
     expect(suspendAccountSpy).not.toHaveBeenCalled();

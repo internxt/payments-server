@@ -1,5 +1,4 @@
 import { UserType } from './../core/users/User';
-import { FastifyBaseLogger } from 'fastify';
 import CacheService from '../services/cache.service';
 import { StorageService } from '../services/storage.service';
 import { UsersService } from '../services/users.service';
@@ -24,7 +23,6 @@ async function handleObjectStorageSubscriptionCancelled(
   subscription: Stripe.Subscription,
   objectStorageService: ObjectStorageService,
   paymentService: PaymentService,
-  logger: FastifyBaseLogger,
 ): Promise<void> {
   const activeSubscriptions = await paymentService.getActiveSubscriptions(customer.id);
   const objectStorageActiveSubscriptions = activeSubscriptions.filter(
@@ -32,19 +30,19 @@ async function handleObjectStorageSubscriptionCancelled(
   );
 
   if (objectStorageActiveSubscriptions.length > 0) {
-    logger.info(
+    Logger.info(
       `Preventing removal of an object storage customer ${customer.id} with sub ${subscription.id} due to the existence of another active subscription`,
     );
     return;
   }
 
-  logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
+  Logger.info(`Deleting object storage customer ${customer.id} with sub ${subscription.id}`);
 
   await objectStorageService.suspendAccount({
     customerId: customer.id,
   });
 
-  logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
+  Logger.info(`Object storage customer ${customer.id} with sub ${subscription.id} deleted successfully`);
 }
 
 export default async function handleSubscriptionCanceled(
@@ -55,7 +53,6 @@ export default async function handleSubscriptionCanceled(
   cacheService: CacheService,
   objectStorageService: ObjectStorageService,
   tiersService: TiersService,
-  log: FastifyBaseLogger,
   preCreatedUserService: PreCreatedUserService,
 ): Promise<void> {
   const customerId = subscription.customer as string;
@@ -64,7 +61,7 @@ export default async function handleSubscriptionCanceled(
   const customer = await stripePaymentsAdapter.getCustomer(customerId);
 
   if (isObjectStorageProduct(productMetadata)) {
-    await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService, log);
+    await handleObjectStorageSubscriptionCancelled(customer, subscription, objectStorageService, paymentService);
     return;
   }
 
@@ -72,7 +69,7 @@ export default async function handleSubscriptionCanceled(
 
   const productType = productMetadata?.type === UserType.Business ? UserType.Business : UserType.Individual;
 
-  log.info(
+  Logger.info(
     `[SUB CANCEL]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,
   );
 
@@ -81,11 +78,11 @@ export default async function handleSubscriptionCanceled(
     await cacheService.clearUsedUserPromoCodes(customerId);
     await cacheService.clearUserTier(uuid);
   } catch (err) {
-    log.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
+    Logger.error(`Error in handleSubscriptionCanceled after trying to clear ${customerId} subscription`);
   }
 
   if (hasBoughtALifetime && productType === UserType.Individual) {
-    log.info(`User with uuid ${uuid} has a lifetime subscription. No need to downgrade the user.`);
+    Logger.info(`User with uuid ${uuid} has a lifetime subscription. No need to downgrade the user.`);
     // This user has switched from a subscription to a lifetime, therefore we do not want to downgrade his space
     // The space should not be set to Free plan.
     return;
@@ -98,12 +95,11 @@ export default async function handleSubscriptionCanceled(
       productId,
       usersService,
       tiersService,
-      log,
       preCreatedUserService,
     });
   } catch (error) {
     const err = error as Error;
-    log.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
+    Logger.error(`[SUB CANCEL/ERROR]: Error canceling tier product. ERROR: ${err.stack ?? err.message}`);
 
     if (!(error instanceof TierNotFoundError)) {
       throw error;
