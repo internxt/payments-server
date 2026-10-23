@@ -45,7 +45,7 @@ describe('Testing business endpoints', () => {
       const updateWorkspaceSpy = jest.spyOn(UsersService.prototype, 'updateWorkspace').mockResolvedValue();
 
       const response = await app.inject({
-        path: `/business/subscription`,
+        path: '/business/subscription',
         method: 'PATCH',
         body: {
           workspaceId: 'workspace_id',

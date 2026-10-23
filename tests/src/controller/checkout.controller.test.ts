@@ -1227,7 +1227,7 @@ describe('Checkout controller', () => {
           .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id`,
+          path: '/checkout/price-by-id',
           query: {
             priceId: mockedPrice.id,
             promoCodeName: promoCode.promoCodeName,
@@ -1274,7 +1274,7 @@ describe('Checkout controller', () => {
           .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id`,
+          path: '/checkout/price-by-id',
           query: {
             priceId: mockedPrice.id,
             promoCodeName: promoCode.promoCodeName,
@@ -1321,7 +1321,7 @@ describe('Checkout controller', () => {
         jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
-          path: `/checkout/price-by-id`,
+          path: '/checkout/price-by-id',
           method: 'GET',
           query: {
             priceId: mockedPrice.id,

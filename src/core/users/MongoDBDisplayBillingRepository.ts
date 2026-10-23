@@ -2,11 +2,11 @@ import { Collection, MongoClient } from 'mongodb';
 
 enum OS {
   Android = 'android',
-  IOS = 'ios'
+  IOS = 'ios',
 }
 export interface DisplayBilling {
   display: boolean;
-  oses: { [key in OS]: string }[]
+  oses: { [key in OS]: string }[];
 }
 
 export interface DisplayBillingRepository {

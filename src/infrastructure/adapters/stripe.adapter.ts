@@ -120,7 +120,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
 
   async getPrices(currency: string = 'eur'): Promise<Price[]> {
     const prices = await this.provider.prices.search({
-      query: `metadata["show"]:"1" active:"true" currency:"eur"`,
+      query: 'metadata["show"]:"1" active:"true" currency:"eur"',
       expand: ['data.currency_options', 'data.product'],
       limit: 100,
     });

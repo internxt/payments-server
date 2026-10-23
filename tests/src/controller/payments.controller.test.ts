@@ -60,7 +60,6 @@ describe('Payment controller e2e tests', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    // eslint-disable-next-line quotes
     it("When the code doesn't exist, then it returns 404 status code", async () => {
       const mockedUniqueCode = getUniqueCodes();
 

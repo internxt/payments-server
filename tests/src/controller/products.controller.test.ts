@@ -43,7 +43,7 @@ describe('Testing products endpoints', () => {
       jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser').mockResolvedValueOnce(mockedTier);
 
       const response = await app.inject({
-        path: `/products`,
+        path: '/products',
         method: 'GET',
         headers: {
           Authorization: `Bearer ${mockedUserToken}`,
@@ -69,7 +69,7 @@ describe('Testing products endpoints', () => {
       const loggerErrorSpy = jest.spyOn(Logger, 'error');
 
       const response = await app.inject({
-        path: `/products`,
+        path: '/products',
         method: 'GET',
         headers: {
           Authorization: `Bearer ${mockedUserToken}`,
@@ -101,7 +101,7 @@ describe('Testing products endpoints', () => {
       };
 
       const response = await app.inject({
-        path: `/products`,
+        path: '/products',
         method: 'GET',
         headers: {
           Authorization: `Bearer ${mockedUserToken}`,
@@ -122,7 +122,7 @@ describe('Testing products endpoints', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new Error('Unexpected error'));
 
       const response = await app.inject({
-        path: `/products/tier`,
+        path: '/products/tier',
         method: 'GET',
         headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
@@ -143,7 +143,7 @@ describe('Testing products endpoints', () => {
       jest.spyOn(TiersService.prototype, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
 
       const response = await app.inject({
-        path: `/products/tier`,
+        path: '/products/tier',
         method: 'GET',
         headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
@@ -162,7 +162,7 @@ describe('Testing products endpoints', () => {
       jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
       const response = await app.inject({
-        path: `/products/tier`,
+        path: '/products/tier',
         method: 'GET',
         headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
@@ -185,7 +185,7 @@ describe('Testing products endpoints', () => {
       jest.spyOn(TiersService.prototype, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
 
       const response = await app.inject({
-        path: `/products/tier`,
+        path: '/products/tier',
         method: 'GET',
         headers: { Authorization: `Bearer ${mockedUserToken}` },
       });
@@ -205,7 +205,7 @@ describe('Testing products endpoints', () => {
       const getTierUserSpy = jest.spyOn(ProductsService.prototype, 'getApplicableTierForUser');
 
       const response = await app.inject({
-        path: `/products/tier`,
+        path: '/products/tier',
         method: 'GET',
         headers: { Authorization: `Bearer ${mockedUserToken}` },
       });

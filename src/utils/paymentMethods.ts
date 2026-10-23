@@ -1,7 +1,6 @@
 import { PriceInterval } from '../infrastructure/domain/entities/price';
 import { normalizeForStripe } from './currency';
 
-
 const PAYMENT_METHODS: Record<string, Record<PriceInterval, string[]>> = {
   eur: {
     month: ['card', 'paypal'],
@@ -39,7 +38,6 @@ const PAYMENT_METHOD_LIMITS: Record<string, Partial<Record<PriceInterval, Record
     lifetime: { pix: PIX_MAX_DECIMAL_AMOUNT },
   },
 };
-
 
 export function getPaymentMethodTypes(
   currency: string,

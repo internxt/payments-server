@@ -4,5 +4,5 @@ import { Coupon } from './Coupon';
 export interface UserCoupon {
   id: string;
   user: User['id'];
-  coupon: Coupon['id']
+  coupon: Coupon['id'];
 }

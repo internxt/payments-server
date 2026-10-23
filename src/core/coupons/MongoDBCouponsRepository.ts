@@ -2,12 +2,10 @@ import { Collection, MongoClient, ObjectId, WithId } from 'mongodb';
 import { CouponsRepository } from './CouponsRepository';
 import { Coupon } from './Coupon';
 
-interface CouponDocument extends WithId<
-  Omit<Coupon, 'id' | 'user' | 'coupon' >
-> {
+interface CouponDocument extends WithId<Omit<Coupon, 'id' | 'user' | 'coupon'>> {
   user: ObjectId;
   coupon: ObjectId;
-};
+}
 
 function toDomain(doc: CouponDocument): Coupon {
   return {

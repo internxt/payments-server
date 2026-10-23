@@ -56,7 +56,9 @@ export function productsController(productsService: ProductsService, cacheServic
             return rep.status(200).send(cachedUserTier);
           }
         } catch (cacheError) {
-          Logger.error(`[TIER PRODUCT/CACHE_READ_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
+          Logger.error(
+            `[TIER PRODUCT/CACHE_READ_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`,
+          );
         }
 
         const mergedFeatures = await productsService.getApplicableTierForUser({
@@ -67,7 +69,9 @@ export function productsController(productsService: ProductsService, cacheServic
         try {
           await cacheService.setUserTier(userUuid, mergedFeatures);
         } catch (cacheError) {
-          Logger.error(`[TIER PRODUCT/CACHE_WRITE_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`);
+          Logger.error(
+            `[TIER PRODUCT/CACHE_WRITE_ERROR]: ${(cacheError as Error).message || cacheError} for user ${userUuid}`,
+          );
         }
 
         return rep.status(200).send(mergedFeatures);
