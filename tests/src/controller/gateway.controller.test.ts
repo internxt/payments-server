@@ -37,7 +37,7 @@ describe('Gateway endpoints', () => {
       const clearUserTierSpy = jest.spyOn(CacheService.prototype, 'clearUserTier').mockResolvedValue();
 
       const response = await app.inject({
-        path: `/gateway/activate`,
+        path: '/gateway/activate',
         method: 'POST',
         body: {
           userUuid,
@@ -64,7 +64,7 @@ describe('Gateway endpoints', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
 
       const response = await app.inject({
-        path: `/gateway/activate`,
+        path: '/gateway/activate',
         method: 'POST',
         body: {
           userUuid,
@@ -91,7 +91,7 @@ describe('Gateway endpoints', () => {
         .mockRejectedValue(licenseCodeRedeemedError);
 
       const response = await app.inject({
-        path: `/gateway/is-unique-code-available`,
+        path: '/gateway/is-unique-code-available',
         method: 'GET',
         query: {
           code,
@@ -118,7 +118,7 @@ describe('Gateway endpoints', () => {
       const userSpy = jest.spyOn(LicenseCodesService.prototype, 'isLicenseCodeAvailable').mockResolvedValue(true);
 
       const response = await app.inject({
-        path: `/gateway/is-unique-code-available`,
+        path: '/gateway/is-unique-code-available',
         method: 'GET',
         query: {
           code,
@@ -146,7 +146,7 @@ describe('Gateway endpoints', () => {
       jest.spyOn(LicenseCodesService.prototype, 'isLicenseCodeAvailable').mockRejectedValue(notFoundError);
 
       const response = await app.inject({
-        path: `/gateway/is-unique-code-available`,
+        path: '/gateway/is-unique-code-available',
         method: 'GET',
         query: {
           code,
@@ -169,7 +169,7 @@ describe('Gateway endpoints', () => {
       jest.spyOn(LicenseCodesService.prototype, 'reactivateLicenseCode').mockResolvedValue();
 
       const response = await app.inject({
-        path: `/gateway/reactivate-license-code`,
+        path: '/gateway/reactivate-license-code',
         method: 'POST',
         body: {
           code,

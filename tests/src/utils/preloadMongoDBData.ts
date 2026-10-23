@@ -41,7 +41,7 @@ export const preloadData = async (client: MongoClient) => {
   ]);
 
   await db.collection('products').insertMany([
-    { userType: UserType.Business, customerId: `prod_QSIkFOC1iCrHAd` },
-    { userType: UserType.Business, paymentGatewayId: `prod_QSIpZDVYVLVil1` },
+    { userType: UserType.Business, customerId: 'prod_QSIkFOC1iCrHAd' },
+    { userType: UserType.Business, paymentGatewayId: 'prod_QSIpZDVYVLVil1' },
   ]);
 };

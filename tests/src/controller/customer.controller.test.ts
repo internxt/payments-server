@@ -134,7 +134,7 @@ describe('Customer controller', () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(userNotFoundError);
 
       const response = await app.inject({
-        path: `/customer/cancellation-trial`,
+        path: '/customer/cancellation-trial',
         method: 'POST',
         headers: {
           authorization: `Bearer ${mockedToken}`,
@@ -151,7 +151,7 @@ describe('Customer controller', () => {
       jest.spyOn(UsersService.prototype, 'hasRedeemedCancellationTrial').mockResolvedValue(true);
 
       const response = await app.inject({
-        path: `/customer/cancellation-trial`,
+        path: '/customer/cancellation-trial',
         method: 'POST',
         headers: {
           authorization: `Bearer ${mockedToken}`,
@@ -172,7 +172,7 @@ describe('Customer controller', () => {
       const redeemSpy = jest.spyOn(UsersService.prototype, 'redeemCancellationTrial').mockResolvedValue();
 
       const response = await app.inject({
-        path: `/customer/cancellation-trial`,
+        path: '/customer/cancellation-trial',
         method: 'POST',
         headers: {
           authorization: `Bearer ${mockedToken}`,
