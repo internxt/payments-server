@@ -807,18 +807,6 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Retrieve an invoice given its ID', () => {
-    it('When an invoice is requested, then the correct invoice object is returned', async () => {
-      const mockedInvoice = getInvoice();
-
-      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
-
-      const invoice = await paymentService.getInvoice(mockedInvoice.id);
-
-      expect(invoice).toStrictEqual(mockedInvoice);
-    });
-  });
-
   describe('Subscribe', () => {
     const customerId = 'cus_test_123';
     const recurringPriceId = 'price_recurring_123';
@@ -1142,6 +1130,41 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Changing the subscription plan', () => {
+    const mockPlanChange = () => {
+      const subscription = getCreatedSubscription();
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription as any]);
+      jest
+        .spyOn(stripe.prices, 'retrieve')
+        .mockResolvedValue(getPrice({ product: getProduct({ params: { metadata: {} } }) }) as any);
+      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue({ payment_intent: null } as any);
+      return jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as any);
+    };
+
+    test('When the plan is changed with a coupon, then the coupon is applied to the subscription', async () => {
+      const updateSpy = mockPlanChange();
+
+      await paymentService.updateSubscriptionPrice({
+        customerId: 'cus_test',
+        priceId: 'price_new',
+        couponCode: 'coupon_1',
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ discounts: [{ coupon: 'coupon_1' }], billing_cycle_anchor: 'now' }),
+      );
+    });
+
+    test('When the plan is changed without a coupon, then the current discounts of the subscription are kept', async () => {
+      const updateSpy = mockPlanChange();
+
+      await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(updateSpy.mock.calls[0][1]).not.toHaveProperty('discounts');
+    });
+  });
+
   describe('Getting the user subscription', () => {
     const makeActiveSubscription = (priceMetadata: Record<string, string> = {}, overrides = {}) => {
       const base = getCreatedSubscription();
@@ -1165,8 +1188,10 @@ describe('Payments Service tests', () => {
       } as any;
     };
 
-    const mockUpcomingInvoice = () => {
-      jest.spyOn(stripe.invoices, 'retrieveUpcoming').mockResolvedValue({ total: 999 } as any);
+    const mockUpcomingInvoice = (
+      totals: { total: number; total_excluding_tax: number | null } = { total: 999, total_excluding_tax: 999 },
+    ) => {
+      jest.spyOn(stripe.invoices, 'createPreview').mockResolvedValue(totals as any);
     };
 
     test('when the user has no active subscription, then it returns a free plan', async () => {
@@ -1214,6 +1239,24 @@ describe('Payments Service tests', () => {
       }
 
       jest.useRealTimers();
+    });
+
+    test('when the next invoice includes taxes, then the subscription shows taxes as enabled', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice({ total: 1210, total_excluding_tax: 1000 });
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.plan.tax?.enabled).toBe(true);
+    });
+
+    test('when the next invoice has no taxes, then the subscription shows taxes as disabled', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice({ total: 1000, total_excluding_tax: 1000 });
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.plan.tax?.enabled).toBe(false);
     });
 
     test('when the user has a business subscription, then it returns the subscription with business type', async () => {

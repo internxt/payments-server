@@ -127,7 +127,7 @@ export class PaymentService {
     customerId: string;
     priceId: string;
     currency?: string;
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+    promoCodeId?: string;
     companyName?: string;
     companyVatId?: string;
     trialEnd?: number;
@@ -631,30 +631,29 @@ export class PaymentService {
     }: {
       customerId: CustomerId;
       priceId: PriceId;
-      couponCode: string;
+      couponCode?: string;
     },
     userType: UserType = UserType.Individual,
   ) {
     let is3DSecureRequired = false;
     let clientSecret = '';
 
+    const additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {
+      billing_cycle_anchor: 'now',
+      ...(couponCode && { discounts: [{ coupon: couponCode }] }),
+    };
+
     const updatedSubscription =
       userType === UserType.Individual
         ? await this.updateIndividualSub({
             customerId: customerId,
             priceId: priceId,
-            additionalOptions: {
-              coupon: couponCode,
-              billing_cycle_anchor: 'now',
-            },
+            additionalOptions,
           })
         : await this.updateBusinessSub({
             customerId: customerId,
             priceId: priceId,
-            additionalOptions: {
-              coupon: couponCode,
-              billing_cycle_anchor: 'now',
-            },
+            additionalOptions,
           });
 
     const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
@@ -871,7 +870,7 @@ export class PaymentService {
       }
     }
 
-    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
+    const upcomingInvoice = await this.provider.invoices.createPreview({ customer: customerId });
 
     const storageLimit =
       Number(
@@ -884,7 +883,8 @@ export class PaymentService {
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
     const subscriptionEntity = this.mapToSubscriptionEntity(subscription);
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
-    const enabledTaxes = upcomingInvoice.tax ? upcomingInvoice.tax > 0 : false;
+    const enabledTaxes =
+      upcomingInvoice.total_excluding_tax !== null && upcomingInvoice.total > upcomingInvoice.total_excluding_tax;
 
     let earlyCancellationFee: number | undefined;
     if (hasAnnualCommitment) {
@@ -1099,10 +1099,6 @@ export class PaymentService {
     return this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.price.product', 'data.discounts'],
     });
-  }
-
-  getInvoice(invoiceId: Stripe.Invoice['id']) {
-    return this.provider.invoices.retrieve(invoiceId);
   }
 
   getProduct(productId: Stripe.Product['id']) {

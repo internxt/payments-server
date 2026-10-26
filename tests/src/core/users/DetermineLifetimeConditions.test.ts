@@ -179,10 +179,24 @@ describe('Determining Lifetime conditions', () => {
       expect(result).toEqual([]);
     });
 
+    it('When the invoice has not been paid, then the invoice is skipped', async () => {
+      const customer = getCustomer();
+      const invoice = getInvoice();
+      invoice.status = 'open';
+      invoice.paid_out_of_band = true;
+      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
+      invoice.metadata = {};
+
+      //@ts-ignore
+      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
+
+      expect(result).toStrictEqual([]);
+    });
+
     it('When the invoice is paid out of band, then the invoice is returned directly', async () => {
       const customer = getCustomer();
       const invoice = getInvoice();
-      invoice.paid = true;
+      invoice.status = 'paid';
       invoice.paid_out_of_band = true;
       invoice.lines.data[0].price!.metadata!.planType = 'one_time';
       invoice.metadata = {};
@@ -198,7 +212,7 @@ describe('Determining Lifetime conditions', () => {
       const invoice = getInvoice();
       invoice.metadata = { chargeId: 'ch_123' };
       invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.paid = true;
+      invoice.status = 'paid';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
@@ -215,7 +229,7 @@ describe('Determining Lifetime conditions', () => {
       const invoice = getInvoice();
       invoice.metadata = { chargeId: 'ch_123' };
       invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.paid = true;
+      invoice.status = 'paid';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
@@ -232,7 +246,7 @@ describe('Determining Lifetime conditions', () => {
       const invoice = getInvoice();
       invoice.metadata = { chargeId: 'ch_123' };
       invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.paid = true;
+      invoice.status = 'paid';
 
       jest
         .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')

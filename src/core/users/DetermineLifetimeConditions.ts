@@ -125,7 +125,7 @@ export class DetermineLifetimeConditions {
   private async getPaidInvoices(customer: Stripe.Customer, invoices: Stripe.Invoice[]): Promise<Stripe.Invoice[]> {
     const paidInvoices = await Promise.all(
       invoices
-        .filter((invoice) => invoice.paid)
+        .filter((invoice) => invoice.status === 'paid')
         .map(async (invoice) => {
           const line = invoice.lines.data[0];
 
