@@ -1087,9 +1087,26 @@ export class PaymentService {
   }
 
   async getInvoiceLineItems(invoiceId: string) {
-    return this.provider.invoices.listLineItems(invoiceId, {
-      expand: ['data.price.product', 'data.discounts'],
+    return getStripeNewVersion().invoices.listLineItems(invoiceId, {
+      expand: ['data.pricing.price_details.price', 'data.discounts'],
     });
+  }
+
+  async getInvoice(invoiceId: string): Promise<Stripe.Invoice> {
+    return getStripeNewVersion().invoices.retrieve(invoiceId, { expand: ['discounts'] });
+  }
+
+  async getInvoiceIdFromCharge(charge: Stripe.Charge): Promise<Stripe.Invoice['id'] | undefined> {
+    const paymentIntentId =
+      typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+    if (!paymentIntentId) return undefined;
+
+    const { data: invoicePayments } = await getStripeNewVersion().invoicePayments.list({
+      payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+    });
+    const invoice = invoicePayments[0]?.invoice;
+
+    return typeof invoice === 'string' ? invoice : invoice?.id;
   }
 
   getProduct(productId: Stripe.Product['id']) {

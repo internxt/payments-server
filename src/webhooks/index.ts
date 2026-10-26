@@ -67,9 +67,11 @@ export function webhookHandler({
       Logger.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {
-        case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, usersService);
+        case 'invoice.payment_failed': {
+          const invoice = await paymentService.getInvoice(event.data.object.id);
+          await handleInvoicePaymentFailed(invoice, objectStorageService, paymentService, usersService);
           break;
+        }
 
         case 'payment_intent.amount_capturable_updated':
           await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe);
@@ -120,7 +122,7 @@ export function webhookHandler({
         }
 
         case 'invoice.paid': {
-          const invoice = event.data.object;
+          const invoice = await paymentService.getInvoice(event.data.object.id);
           const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
@@ -173,7 +175,6 @@ export function webhookHandler({
           const dispute = event.data.object;
           await handleDisputeResult({
             dispute,
-            stripe,
             paymentService,
             usersService,
             storageService,

@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { getCharge, getDispute, getInvoice, getUser, voidPromise } from '../fixtures';
+import { getStripeNewVersion } from '../../../src/services/stripe';
+import { NotFoundError } from '../../../src/errors/Errors';
+import { getCharge, getDispute, getUser, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
@@ -9,17 +11,9 @@ jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   default: jest.fn(),
 }));
 
-const mockStripe = {
-  charges: {
-    retrieve: jest.fn(),
-  },
-  invoices: {
-    retrieve: jest.fn(),
-  },
-};
+const stripeNewVersion = getStripeNewVersion();
 
 const {
-  stripe,
   paymentService,
   usersRepository,
   cacheService,
@@ -27,134 +21,103 @@ const {
   storageService,
   tiersService,
   preCreatedUserService,
-} = createTestServices({
-  stripe: mockStripe,
-});
+} = createTestServices();
+
+const mockDisputedCharge = ({
+  customerId,
+  invoiceId,
+  subscriptionId,
+}: {
+  customerId: string;
+  invoiceId?: string;
+  subscriptionId?: string;
+}) => {
+  const charge = getCharge({ customer: customerId, payment_intent: 'pi_disputed' });
+  jest.spyOn(stripeNewVersion.charges, 'retrieve').mockResolvedValue(charge as any);
+  jest
+    .spyOn(stripeNewVersion.invoicePayments, 'list')
+    .mockResolvedValue({ data: invoiceId ? [{ invoice: invoiceId }] : [] } as any);
+  jest.spyOn(stripeNewVersion.invoices, 'retrieve').mockResolvedValue({
+    id: invoiceId,
+    parent: { subscription_details: { subscription: subscriptionId } },
+  } as any);
+  return charge;
+};
+
+const handleDispute = (dispute = getDispute()) =>
+  handleDisputeResult({
+    dispute,
+    cacheService,
+    preCreatedUserService,
+    paymentService,
+    usersService,
+    storageService,
+    tiersService,
+  });
 
 describe('handleDisputeResult()', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('Dispute Status is Lost', () => {
-    it('When the status is lost and the user has a subscription, then the subscription is cancelled and the storage is downgraded', async () => {
+    test('When the status is lost and the user has a subscription, then the subscription of the disputed invoice is cancelled', async () => {
       const mockedUser = getUser();
-      const mockedInvoice = getInvoice();
-      const mockedCharge = getCharge({
-        invoice: mockedInvoice.id,
+      mockDisputedCharge({
+        customerId: mockedUser.customerId,
+        invoiceId: 'in_disputed',
+        subscriptionId: 'sub_disputed',
       });
-      const mockedDispute = getDispute({
-        charge: mockedCharge.id,
-      });
-
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
-      jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
+      const cancelSubscription = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
-      await handleDisputeResult({
-        dispute: mockedDispute,
-        cacheService: cacheService,
-        preCreatedUserService,
-        paymentService,
-        usersService,
-        stripe,
-        storageService,
-        tiersService,
-      });
+      await handleDispute();
 
-      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
-      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockedCharge.invoice);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedCharge.customer);
-      expect(paymentService.cancelSubscription).toHaveBeenCalledWith(mockedInvoice.subscription);
+      expect(cancelSubscription).toHaveBeenCalledWith('sub_disputed');
     });
 
-    it('When the status is lost and the user has a lifetime, then the lifetime param is changed to false and the storage is downgraded', async () => {
-      const mockedUser = getUser({
-        lifetime: true,
-      });
-      const mockedInvoice = getInvoice({
-        customer: mockedUser.customerId,
-      });
-      const mockedCharge = getCharge({
-        customer: mockedUser.customerId,
-        invoice: mockedInvoice.id,
-      });
-      const mockedDispute = getDispute({
-        charge: mockedCharge.id,
-      });
-
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
+    test('When the status is lost and the user has a lifetime, then the lifetime is removed', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      const charge = mockDisputedCharge({ customerId: mockedUser.customerId, invoiceId: 'in_disputed' });
       (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
       (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
       jest.spyOn(usersService, 'updateUser').mockImplementation(voidPromise);
       jest.spyOn(axios, 'request').mockImplementation(voidPromise);
 
-      await handleDisputeResult({
-        dispute: mockedDispute,
-        cacheService,
-        preCreatedUserService,
-        paymentService,
-        usersService,
-        stripe,
-        storageService,
-        tiersService,
-      });
+      await handleDispute();
 
-      expect(stripe.charges.retrieve).toHaveBeenCalledWith(mockedCharge.id);
-      expect(stripe.invoices.retrieve).toHaveBeenCalledWith(mockedCharge.invoice);
-      expect(usersRepository.findUserByCustomerId).toHaveBeenCalledWith(mockedCharge.customer);
       expect(handleLifetimeRefunded).toHaveBeenCalledWith(
         storageService,
         usersService,
-        mockedCharge,
+        charge,
         cacheService,
         paymentService,
         tiersService,
         preCreatedUserService,
       );
     });
+
+    test('When the status is lost but the subscription charge does not belong to an invoice, then an error indicating so is thrown', async () => {
+      const mockedUser = getUser();
+      mockDisputedCharge({ customerId: mockedUser.customerId });
+      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
+      const cancelSubscription = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
+
+      await expect(handleDispute()).rejects.toThrow(NotFoundError);
+      expect(cancelSubscription).not.toHaveBeenCalled();
+    });
   });
 
   describe('Dispute Status is Not Lost', () => {
-    it('When the status is different to lost, then nothing is changed', async () => {
-      const mockedUser = getUser({
-        lifetime: true,
-      });
-      const mockedInvoice = getInvoice({
-        customer: mockedUser.customerId,
-      });
-      const mockedCharge = getCharge({
-        customer: mockedUser.customerId,
-        invoice: mockedInvoice.id,
-      });
-      const mockedDispute = getDispute({
-        status: 'needs_response',
-        charge: mockedCharge.id,
-      });
+    test('When the status is different to lost, then nothing is changed', async () => {
+      const mockedUser = getUser({ lifetime: true });
+      mockDisputedCharge({ customerId: mockedUser.customerId, invoiceId: 'in_disputed' });
+      const cancelSubscription = jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
 
-      (stripe.charges.retrieve as jest.Mock).mockResolvedValue(mockedCharge);
-      (stripe.invoices.retrieve as jest.Mock).mockResolvedValue(mockedInvoice);
-      (usersRepository.findUserByCustomerId as jest.Mock).mockResolvedValue(mockedUser);
-      (handleLifetimeRefunded as jest.Mock).mockImplementation(voidPromise);
-      jest.spyOn(paymentService, 'cancelSubscription').mockImplementation(voidPromise);
+      await handleDispute(getDispute({ status: 'needs_response' }));
 
-      await handleDisputeResult({
-        dispute: mockedDispute,
-        cacheService,
-        preCreatedUserService,
-        paymentService,
-        usersService,
-        stripe,
-        storageService,
-        tiersService,
-      });
-
-      expect(stripe.charges.retrieve).not.toHaveBeenCalled();
-      expect(stripe.invoices.retrieve).not.toHaveBeenCalled();
-      expect(usersRepository.findUserByCustomerId).not.toHaveBeenCalled();
-      expect(paymentService.cancelSubscription).not.toHaveBeenCalled();
+      expect(cancelSubscription).not.toHaveBeenCalled();
       expect(handleLifetimeRefunded).not.toHaveBeenCalled();
     });
   });

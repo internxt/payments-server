@@ -20,19 +20,17 @@ export default async function handleLifetimeRefunded(
 ): Promise<void> {
   const customerId = charge.customer as string;
   const userEmail = charge.receipt_email;
-  const invoiceId = charge.invoice as string;
+  const invoiceId = await paymentsService.getInvoiceIdFromCharge(charge);
+
+  if (!invoiceId) {
+    Logger.info(`[LIFETIME REFUNDED]: Charge ${charge.id} of customer ${customerId} does not belong to an invoice`);
+    return;
+  }
+
   const { uuid, lifetime } = await usersService.findUserByCustomerID(customerId);
 
   const invoice = await paymentsService.getInvoiceLineItems(invoiceId);
-  const product = invoice.data[0].price?.product;
-
-  let productId: string = '';
-
-  if (typeof product === 'string') {
-    productId = product;
-  } else if (product && 'id' in product) {
-    productId = product.id;
-  }
+  const productId = invoice.data[0]?.pricing?.price_details?.product ?? '';
 
   Logger.info(
     `[LIFETIME REFUNDED]: User with customerId ${customerId} found. The uuid of the user is: ${uuid} and productId: ${productId}`,

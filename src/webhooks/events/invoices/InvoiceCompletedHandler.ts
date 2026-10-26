@@ -97,14 +97,18 @@ export class InvoiceCompletedHandler {
       return;
     }
 
-    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
-    const price = items.data?.[0].price;
+    const items = await this.paymentService.getInvoiceLineItems(invoiceId as string);
+    const priceDetails = items.data?.[0]?.pricing?.price_details;
 
-    if (!price) {
+    if (!priceDetails) {
       throw new NotFoundError(`There is no price in the invoice ${invoiceId}. Customer ID: ${customerId}`);
     }
 
-    const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(price);
+    const product = await this.paymentService.getProduct(priceDetails.product);
+    const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(
+      priceDetails.price as unknown as Stripe.Price,
+      product,
+    );
 
     const isLifetimePlan = planType === 'one_time';
     const isBusinessPlan = productType === UserType.Business;
@@ -238,13 +242,15 @@ export class InvoiceCompletedHandler {
     throw new NotFoundError(`User with email ${customerEmail} and customer ID ${customerId} not found`);
   }
 
-  private getPriceData(price: Stripe.Price): {
+  private getPriceData(
+    price: Stripe.Price,
+    product: Stripe.Product,
+  ): {
     productId: string;
     productType: string;
     planType: string;
     maxSpaceBytes?: string;
   } {
-    const product = price?.product as Stripe.Product;
     const productId = product.id;
     const productType = product.metadata?.type;
     const metadata = price.metadata as PriceMetadata;
@@ -499,11 +505,12 @@ export class InvoiceCompletedHandler {
     try {
       const userData = await this.usersService.findUserByUuid(userUuid);
 
-      const areDiscounts = isLifetimePlan ? invoiceLineItem.discounts.length > 0 : !!invoice.discount?.coupon;
+      const invoiceDiscount = invoice.discounts?.[0] as Stripe.Discount | undefined;
+      const areDiscounts = isLifetimePlan ? invoiceLineItem.discounts.length > 0 : !!invoiceDiscount?.coupon;
       if (areDiscounts) {
         const coupon = isLifetimePlan
           ? (invoiceLineItem.discounts[0] as Stripe.Discount).coupon
-          : invoice.discount?.coupon;
+          : invoiceDiscount?.coupon;
 
         if (coupon) {
           await this.usersService.storeCouponUsedByUser(userData, coupon.id);
