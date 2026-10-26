@@ -160,7 +160,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    const subscription = await this.provider.subscriptions.create({
+    const subscription = await getStripeNewVersion().subscriptions.create({
       customer: customerId,
       currency: currencyValue,
       items: [
@@ -187,7 +187,7 @@ export class PaymentService {
         ) as Stripe.SubscriptionCreateParams.PaymentSettings.PaymentMethodType[],
         save_default_payment_method: 'on_subscription',
       },
-      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      expand: ['latest_invoice.confirmation_secret', 'latest_invoice.payments', 'pending_setup_intent'],
       trial_end: trialEnd ? trialEnd : undefined,
       ...additionalOptions,
     });
@@ -199,11 +199,14 @@ export class PaymentService {
         subscriptionId: subscription.id,
       };
     } else {
+      const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
+      const paymentIntent = latestInvoice.payments?.data[0]?.payment.payment_intent;
+
       return {
         type: 'payment',
-        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        clientSecret: latestInvoice.confirmation_secret?.client_secret as string,
         subscriptionId: subscription.id,
-        paymentIntentId: (subscription.latest_invoice as any).payment_intent.id,
+        paymentIntentId: typeof paymentIntent === 'string' ? paymentIntent : paymentIntent?.id,
       };
     }
   }
@@ -326,7 +329,7 @@ export class PaymentService {
     const isRecurring = price.type === 'recurring';
 
     if (isRecurring) {
-      await this.provider.subscriptions.create({
+      await getStripeNewVersion().subscriptions.create({
         customer: customerId,
         items: [
           {
@@ -335,7 +338,7 @@ export class PaymentService {
         ],
       });
     } else {
-      const invoice = await this.provider.invoices.create({
+      const invoice = await getStripeNewVersion().invoices.create({
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
@@ -345,15 +348,15 @@ export class PaymentService {
         },
       });
 
-      await this.provider.invoiceItems.create({
+      await getStripeNewVersion().invoiceItems.create({
         customer: customerId,
-        price: priceId,
+        pricing: { price: priceId },
         quantity: 0,
         description: licenseCode?.provider ? `Affiliate sale via ${licenseCode.provider}` : 'One-time charge',
         invoice: invoice.id,
       });
 
-      await this.provider.invoices.pay(invoice.id, {
+      await getStripeNewVersion().invoices.pay(invoice.id as string, {
         paid_out_of_band: true,
       });
     }
@@ -395,7 +398,7 @@ export class PaymentService {
     const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
 
     if (hasAnnualCommitment && !isElegibleForCancellation) {
-      await this.provider.subscriptions.update(subscriptionId, {
+      await getStripeNewVersion().subscriptions.update(subscriptionId, {
         cancel_at: cancelAt,
       });
       return;
@@ -554,7 +557,7 @@ export class PaymentService {
       throw new IncompatibleSubscriptionTypesError('The new price is not an individual price');
     }
 
-    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
+    const updatedSubscription = await getStripeNewVersion().subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
       items: [
@@ -601,7 +604,7 @@ export class PaymentService {
       throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
     }
 
-    const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
+    const updatedSubscription = await getStripeNewVersion().subscriptions.update(businessActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: additionalOptions?.proration_behavior ?? 'none',
       items: [
@@ -657,20 +660,18 @@ export class PaymentService {
             additionalOptions,
           });
 
-    const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+    const latestInvoice = await getStripeNewVersion().invoices.retrieve(updatedSubscription.latest_invoice as string, {
+      expand: ['payments.data.payment.payment_intent'],
+    });
+    const paymentIntent = latestInvoice.payments?.data[0]?.payment.payment_intent as Stripe.PaymentIntent | undefined;
 
-    if (getLatestInvoice.payment_intent) {
-      const getPaymentIntent: Stripe.PaymentIntent = await this.provider.paymentIntents.retrieve(
-        getLatestInvoice.payment_intent as string,
-      );
-      if (
-        getPaymentIntent.status === 'requires_action' &&
-        getPaymentIntent.next_action?.type === 'use_stripe_sdk' &&
-        getPaymentIntent.client_secret
-      ) {
-        is3DSecureRequired = true;
-        clientSecret = getPaymentIntent.client_secret;
-      }
+    if (
+      paymentIntent?.status === 'requires_action' &&
+      paymentIntent.next_action?.type === 'use_stripe_sdk' &&
+      paymentIntent.client_secret
+    ) {
+      is3DSecureRequired = true;
+      clientSecret = paymentIntent.client_secret;
     }
 
     return {
@@ -691,13 +692,13 @@ export class PaymentService {
 
     if (!subscriptionId) throw new Error('Subscription not found');
 
-    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
+    const { id, customer } = await getStripeNewVersion().paymentMethods.attach(paymentMethodId, {
       customer: customerId,
     });
 
     if (!id || !customer) throw new Error('Payment method not attached');
 
-    return this.provider.subscriptions.update(subscriptionId, {
+    return getStripeNewVersion().subscriptions.update(subscriptionId, {
       default_payment_method: id,
     });
   }
@@ -706,32 +707,6 @@ export class PaymentService {
     const res = await this.provider.customers.list({ email: customerEmail as string });
 
     return res.data;
-  }
-
-  async getPlanIdFromLastPayment(
-    customerId: CustomerId,
-    pagination: { limit?: number; startingAfter?: string },
-  ): Promise<string | null> {
-    const res = await this.provider.paymentIntents.list({
-      customer: customerId,
-      limit: pagination.limit,
-      starting_after: pagination.startingAfter,
-    });
-
-    const lastPaymentIntent = res.data
-      .filter((pi) => pi.status === 'succeeded')
-      .sort((a, b) => b.created - a.created)
-      .at(0);
-
-    if (!lastPaymentIntent) {
-      return null;
-    }
-
-    const checkout = await this.provider.checkout.sessions.list({ payment_intent: lastPaymentIntent.id });
-    const checkoutLines = await this.provider.checkout.sessions.listLineItems(checkout.data[0].id);
-    const productId = checkoutLines.data[0].price?.product;
-
-    return productId as string;
   }
 
   async getInvoicesFromUser(
@@ -1264,7 +1239,7 @@ export class PaymentService {
     amount: number,
     additionalOptions?: Partial<Stripe.PaymentIntentCreateParams>,
   ) {
-    return this.provider.paymentIntents.create({
+    return getStripeNewVersion().paymentIntents.create({
       customer: customerId,
       currency,
       amount,

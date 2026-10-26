@@ -454,7 +454,7 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'update')
+        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'update')
         .mockResolvedValue(stripeSubscription as any);
 
       const params = { cancel_at: 1800000000 };
@@ -467,7 +467,7 @@ describe('Stripe Adapter', () => {
           customer: stripeSubscription.customer as string,
           status: stripeSubscription.status,
           priceId: stripeSubscription.items.data[0].price.id,
-          currentPeriodEnd: stripeSubscription.current_period_end,
+          currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           metadata: stripeSubscription.metadata,
           startDate: stripeSubscription.start_date,
         }),
@@ -478,7 +478,9 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'update').mockResolvedValue(stripeSubscription as any);
+      jest
+        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'update')
+        .mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, {});
 
@@ -530,9 +532,9 @@ describe('Stripe Adapter', () => {
 
   describe('Creating an invoice', () => {
     test('When creating an invoice, then the invoice is created and the entity is mapped and returned', async () => {
-      const mockedInvoice = getInvoice();
+      const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
+      jest.spyOn(stripePaymentsAdapter.newVersionProvider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
 
       const invoice = await stripePaymentsAdapter.createInvoice({
         customer: mockedInvoice.customer as string,
@@ -541,7 +543,7 @@ describe('Stripe Adapter', () => {
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
           id: mockedInvoice.id,
-          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
       );
@@ -550,16 +552,18 @@ describe('Stripe Adapter', () => {
 
   describe('Finalizing an invoice', () => {
     test('When finalizing an invoice, then the invoice is finalized and the entity is mapped and returned', async () => {
-      const mockedInvoice = getInvoice();
+      const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
+      jest
+        .spyOn(stripePaymentsAdapter.newVersionProvider.invoices, 'finalizeInvoice')
+        .mockResolvedValue(mockedInvoice as any);
 
       const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id);
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
           id: mockedInvoice.id,
-          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
       );
@@ -570,7 +574,7 @@ describe('Stripe Adapter', () => {
     test('When adding invoice items, then the invoice items are added and the entity is mapped and returned', async () => {
       const mockedInvoiceItems = getInvoiceItems();
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({
+      jest.spyOn(stripePaymentsAdapter.newVersionProvider.invoiceItems, 'create').mockResolvedValue({
         ...mockedInvoiceItems,
         lastResponse: {} as any,
       });

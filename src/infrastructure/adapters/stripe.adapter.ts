@@ -180,14 +180,14 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     subscriptionId: string,
     params: Partial<Stripe.SubscriptionUpdateParams>,
   ): Promise<Subscription> {
-    const subscription = await this.provider.subscriptions.update(subscriptionId, params);
+    const subscription = await this.newVersionProvider.subscriptions.update(subscriptionId, params);
 
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
       status: subscription.status,
       priceId: subscription.items.data[0].price.id,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       metadata: subscription.metadata,
       startDate: subscription.start_date,
       trialEnd: subscription.trial_end ?? undefined,
@@ -219,11 +219,11 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async cancelSubscription(subscriptionId: string): Promise<void> {
-    await this.provider.subscriptions.cancel(subscriptionId);
+    await this.newVersionProvider.subscriptions.cancel(subscriptionId);
   }
 
   async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>): Promise<Invoice> {
-    const invoice = await this.provider.invoices.create(params);
+    const invoice = await this.newVersionProvider.invoices.create(params);
 
     return Invoice.toDomain({
       id: invoice.id,
@@ -237,7 +237,11 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     customerId: string,
     params: Partial<Stripe.InvoiceItemCreateParams>,
   ): Promise<InvoiceItems> {
-    const invoice = await this.provider.invoiceItems.create({ invoice: invoiceId, customer: customerId, ...params });
+    const invoice = await this.newVersionProvider.invoiceItems.create({
+      invoice: invoiceId,
+      customer: customerId,
+      ...params,
+    });
 
     return InvoiceItems.toDomain({
       id: invoice.id,
@@ -245,7 +249,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async finalizeInvoice(invoiceId: Invoice['id']): Promise<Invoice> {
-    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await this.newVersionProvider.invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 

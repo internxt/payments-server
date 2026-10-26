@@ -4,10 +4,8 @@ import {
   getCharge,
   getCoupon,
   getCreatedSubscription,
-  getCreateSubscriptionResponse,
   getCustomer,
   getInvoice,
-  getInvoices,
   getPaymentIntent,
   getPaymentIntentResponse,
   getPaymentMethod,
@@ -70,30 +68,41 @@ describe('Payments Service tests', () => {
   });
 
   describe('Creating a subscription', () => {
-    it('When trying to create a subscription with the correct params, then it is successfully created', async () => {
-      const mockedSubscriptionResponse = getCreateSubscriptionResponse();
-      const mockedCreateSubscription = getCreatedSubscription();
+    const mockSubscriptionCreation = (createdSubscription: Partial<Stripe.Subscription>) => {
+      jest
+        .spyOn(stripe.prices, 'retrieve')
+        .mockResolvedValue(getPrice({ product: getProduct({ params: { metadata: {} } }) }) as any);
+      jest.spyOn(stripeNewVersion.subscriptions, 'list').mockResolvedValue({ data: [] } as any);
+      return jest
+        .spyOn(stripeNewVersion.subscriptions, 'create')
+        .mockResolvedValue({ id: 'sub_new', ...createdSubscription } as any);
+    };
 
-      const subscriptionCreatedSpy = jest
-        .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() => Promise.resolve(mockedSubscriptionResponse));
-
-      const subscription = await paymentService.createSubscription({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
+    test('When the subscription needs a payment, then the secret and the id of that payment are returned', async () => {
+      mockSubscriptionCreation({
+        pending_setup_intent: null,
+        latest_invoice: {
+          confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' },
+          payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_new' } }] },
+        } as Stripe.Invoice,
       });
 
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
+      const subscription = await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(subscription).toStrictEqual({
+        type: 'payment',
+        clientSecret: 'pi_secret',
+        subscriptionId: 'sub_new',
+        paymentIntentId: 'pi_new',
       });
-      expect(subscription).toEqual(mockedSubscriptionResponse);
+    });
+
+    test('When the subscription starts without a payment, then the secret to save the payment method is returned', async () => {
+      mockSubscriptionCreation({ pending_setup_intent: { client_secret: 'seti_secret' } as Stripe.SetupIntent });
+
+      const subscription = await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(subscription).toStrictEqual({ type: 'setup', clientSecret: 'seti_secret', subscriptionId: 'sub_new' });
     });
 
     it('When trying to create a business subscription, then an error is thrown', async () => {
@@ -766,7 +775,7 @@ describe('Payments Service tests', () => {
       const mockedUser = getUser();
       const mockedPaymentIntent = getPaymentIntent();
       const paymentIntentSpy = jest
-        .spyOn(stripe.paymentIntents, 'create')
+        .spyOn(stripeNewVersion.paymentIntents, 'create')
         .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
 
       const paymentIntent = await paymentService.paymentIntent(mockedUser.customerId, 'eur', 100);
@@ -788,7 +797,7 @@ describe('Payments Service tests', () => {
         metadata,
       });
       const paymentIntentSpy = jest
-        .spyOn(stripe.paymentIntents, 'create')
+        .spyOn(stripeNewVersion.paymentIntents, 'create')
         .mockResolvedValue(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>);
 
       const paymentIntent = await paymentService.paymentIntent(mockedUser.customerId, 'eur', 100, {
@@ -846,7 +855,7 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
       const subscriptionCreateSpy = jest
-        .spyOn(stripe.subscriptions, 'create')
+        .spyOn(stripeNewVersion.subscriptions, 'create')
         .mockResolvedValue(mockedSubscription as Stripe.Response<Stripe.Subscription>);
 
       const result = await paymentService.subscribe(customerId, recurringPriceId);
@@ -882,13 +891,13 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
       const invoiceCreateSpy = jest
-        .spyOn(stripe.invoices, 'create')
+        .spyOn(stripeNewVersion.invoices, 'create')
         .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
       const invoiceItemCreateSpy = jest
-        .spyOn(stripe.invoiceItems, 'create')
+        .spyOn(stripeNewVersion.invoiceItems, 'create')
         .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
       const invoicePaySpy = jest
-        .spyOn(stripe.invoices, 'pay')
+        .spyOn(stripeNewVersion.invoices, 'pay')
         .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
 
       const result = await paymentService.subscribe(customerId, oneTimePriceId);
@@ -905,7 +914,7 @@ describe('Payments Service tests', () => {
       });
       expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
         customer: customerId,
-        price: oneTimePriceId,
+        pricing: { price: oneTimePriceId },
         quantity: 0,
         description: 'One-time charge',
         invoice: mockedInvoice.id,
@@ -939,12 +948,12 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripe.prices, 'retrieve').mockResolvedValue(mockedPrice as Stripe.Response<Stripe.Price>);
       const invoiceCreateSpy = jest
-        .spyOn(stripe.invoices, 'create')
+        .spyOn(stripeNewVersion.invoices, 'create')
         .mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
       const invoiceItemCreateSpy = jest
-        .spyOn(stripe.invoiceItems, 'create')
+        .spyOn(stripeNewVersion.invoiceItems, 'create')
         .mockResolvedValue({} as Stripe.Response<Stripe.InvoiceItem>);
-      jest.spyOn(stripe.invoices, 'pay').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
+      jest.spyOn(stripeNewVersion.invoices, 'pay').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
 
       const result = await paymentService.subscribe(customerId, oneTimePriceId, licenseCode);
 
@@ -959,7 +968,7 @@ describe('Payments Service tests', () => {
       });
       expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
         customer: customerId,
-        price: oneTimePriceId,
+        pricing: { price: oneTimePriceId },
         quantity: 0,
         description: expect.stringContaining(licenseCode.provider),
         invoice: mockedInvoice.id,
@@ -1071,8 +1080,10 @@ describe('Payments Service tests', () => {
 
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as unknown as any);
-      const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(undefined as any);
+      const updateSpy = jest
+        .spyOn(stripeNewVersion.subscriptions, 'update')
+        .mockResolvedValue(subscription as unknown as any);
+      const cancelSpy = jest.spyOn(stripeNewVersion.subscriptions, 'cancel').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
 
@@ -1093,7 +1104,7 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
       const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
+      const updateSpy = jest.spyOn(stripeNewVersion.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
 
@@ -1110,7 +1121,7 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
       const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
-      const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
+      const updateSpy = jest.spyOn(stripeNewVersion.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
 
@@ -1207,14 +1218,20 @@ describe('Payments Service tests', () => {
   });
 
   describe('Changing the subscription plan', () => {
-    const mockPlanChange = () => {
+    const mockPlanChange = (latestInvoicePaymentIntent?: Partial<Stripe.PaymentIntent>) => {
       const subscription = getCreatedSubscription();
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription as any]);
       jest
         .spyOn(stripe.prices, 'retrieve')
         .mockResolvedValue(getPrice({ product: getProduct({ params: { metadata: {} } }) }) as any);
-      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue({ payment_intent: null } as any);
-      return jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as any);
+      jest.spyOn(stripeNewVersion.invoices, 'retrieve').mockResolvedValue({
+        payments: {
+          data: latestInvoicePaymentIntent
+            ? [{ payment: { type: 'payment_intent', payment_intent: latestInvoicePaymentIntent } }]
+            : [],
+        },
+      } as any);
+      return jest.spyOn(stripeNewVersion.subscriptions, 'update').mockResolvedValue(subscription as any);
     };
 
     test('When the plan is changed with a coupon, then the coupon is applied to the subscription', async () => {
@@ -1238,6 +1255,26 @@ describe('Payments Service tests', () => {
       await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
 
       expect(updateSpy.mock.calls[0][1]).not.toHaveProperty('discounts');
+    });
+
+    test('When the payment of the new plan needs 3D Secure, then the secret to confirm it is returned', async () => {
+      mockPlanChange({
+        status: 'requires_action',
+        next_action: { type: 'use_stripe_sdk' } as Stripe.PaymentIntent.NextAction,
+        client_secret: 'pi_secret',
+      });
+
+      const result = await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(result).toStrictEqual({ is3DSecureRequired: true, clientSecret: 'pi_secret' });
+    });
+
+    test('When the payment of the new plan succeeds without extra steps, then 3D Secure is not requested', async () => {
+      mockPlanChange({ status: 'succeeded', next_action: null, client_secret: 'pi_secret' });
+
+      const result = await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(result).toStrictEqual({ is3DSecureRequired: false, clientSecret: '' });
     });
   });
 
@@ -1424,6 +1461,24 @@ describe('Payments Service tests', () => {
           metadata: { price_id: subscription.priceId },
         }),
       );
+    });
+
+    test('When the remaining amount is charged, then the secret to pay the final invoice in Stripe is returned', async () => {
+      const subscription = getSubscriptionEntity({ paymentMethod: 'pm_test_default' });
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
+      jest.spyOn(stripeNewVersion.invoices, 'create').mockResolvedValue({ id: 'in_early', status: 'draft' } as any);
+      jest.spyOn(stripeNewVersion.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
+      jest.spyOn(stripeNewVersion.invoices, 'finalizeInvoice').mockResolvedValue({
+        id: 'in_early',
+        status: 'open',
+        confirmation_secret: { client_secret: 'pi_early_secret', type: 'payment_intent' },
+      } as any);
+
+      const result = await paymentService.createEarlyCancellationCharge(subscription);
+
+      expect(result).toStrictEqual({ clientSecret: 'pi_early_secret' });
     });
   });
 });
