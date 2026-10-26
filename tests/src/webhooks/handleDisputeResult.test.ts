@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { handleDisputeResult } from '../../../src/webhooks/handleDisputeResult';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
-import { getStripeNewVersion } from '../../../src/services/stripe';
 import { NotFoundError } from '../../../src/errors/Errors';
 import { getCharge, getDispute, getUser, voidPromise } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
@@ -11,9 +10,8 @@ jest.mock('../../../src/webhooks/handleLifetimeRefunded', () => ({
   default: jest.fn(),
 }));
 
-const stripeNewVersion = getStripeNewVersion();
-
 const {
+  stripe,
   paymentService,
   usersRepository,
   cacheService,
@@ -33,11 +31,11 @@ const mockDisputedCharge = ({
   subscriptionId?: string;
 }) => {
   const charge = getCharge({ customer: customerId, payment_intent: 'pi_disputed' });
-  jest.spyOn(stripeNewVersion.charges, 'retrieve').mockResolvedValue(charge as any);
+  jest.spyOn(stripe.charges, 'retrieve').mockResolvedValue(charge as any);
   jest
-    .spyOn(stripeNewVersion.invoicePayments, 'list')
+    .spyOn(stripe.invoicePayments, 'list')
     .mockResolvedValue({ data: invoiceId ? [{ invoice: invoiceId }] : [] } as any);
-  jest.spyOn(stripeNewVersion.invoices, 'retrieve').mockResolvedValue({
+  jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue({
     id: invoiceId,
     parent: { subscription_details: { subscription: subscriptionId } },
   } as any);

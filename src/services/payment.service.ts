@@ -20,7 +20,6 @@ import {
 import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
 import Logger from '../Logger';
-import { getStripeNewVersion } from './stripe';
 import { getInvoicePriceId, getInvoiceProductId } from '../utils/invoice';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
@@ -160,7 +159,7 @@ export class PaymentService {
       couponId = await this.checkIfCouponIsAplicable(customerId, promoCodeId);
     }
 
-    const subscription = await getStripeNewVersion().subscriptions.create({
+    const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
       items: [
@@ -242,9 +241,12 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
-    const paymentMethodTypes = getPaymentMethodTypes(normalizedCurrencyForStripe, 'lifetime');
+    const paymentMethodTypes = getPaymentMethodTypes(
+      normalizedCurrencyForStripe,
+      'lifetime',
+    ) as Stripe.InvoiceCreateParams.PaymentSettings.PaymentMethodType[];
 
-    const invoice = await getStripeNewVersion().invoices.create({
+    const invoice = await this.provider.invoices.create({
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
@@ -258,7 +260,7 @@ export class PaymentService {
     }
 
     const invoiceId = invoice.id;
-    const invoiceItem = await getStripeNewVersion().invoiceItems.create({
+    const invoiceItem = await this.provider.invoiceItems.create({
       customer: customerId,
       invoice: invoiceId,
       pricing: {
@@ -276,22 +278,22 @@ export class PaymentService {
       throw new BadRequestError('Invoice item does not have a price.');
     }
 
-    const invoiceToFinalize = await getStripeNewVersion().invoices.retrieve(invoiceId);
+    const invoiceToFinalize = await this.provider.invoices.retrieve(invoiceId);
     const allowedPaymentMethodTypes = getPaymentMethodTypes(
       normalizedCurrencyForStripe,
       'lifetime',
       invoiceToFinalize.total / 100,
-    );
+    ) as Stripe.InvoiceUpdateParams.PaymentSettings.PaymentMethodType[];
 
     if (allowedPaymentMethodTypes.join() !== paymentMethodTypes.join()) {
-      await getStripeNewVersion().invoices.update(invoiceId, {
+      await this.provider.invoices.update(invoiceId, {
         payment_settings: {
           payment_method_types: allowedPaymentMethodTypes,
         },
       });
     }
 
-    const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 
@@ -329,7 +331,7 @@ export class PaymentService {
     const isRecurring = price.type === 'recurring';
 
     if (isRecurring) {
-      await getStripeNewVersion().subscriptions.create({
+      await this.provider.subscriptions.create({
         customer: customerId,
         items: [
           {
@@ -338,7 +340,7 @@ export class PaymentService {
         ],
       });
     } else {
-      const invoice = await getStripeNewVersion().invoices.create({
+      const invoice = await this.provider.invoices.create({
         customer: customerId,
         auto_advance: false,
         pending_invoice_items_behavior: 'include',
@@ -348,7 +350,7 @@ export class PaymentService {
         },
       });
 
-      await getStripeNewVersion().invoiceItems.create({
+      await this.provider.invoiceItems.create({
         customer: customerId,
         pricing: { price: priceId },
         quantity: 0,
@@ -356,7 +358,7 @@ export class PaymentService {
         invoice: invoice.id,
       });
 
-      await getStripeNewVersion().invoices.pay(invoice.id as string, {
+      await this.provider.invoices.pay(invoice.id as string, {
         paid_out_of_band: true,
       });
     }
@@ -398,7 +400,7 @@ export class PaymentService {
     const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
 
     if (hasAnnualCommitment && !isElegibleForCancellation) {
-      await getStripeNewVersion().subscriptions.update(subscriptionId, {
+      await this.provider.subscriptions.update(subscriptionId, {
         cancel_at: cancelAt,
       });
       return;
@@ -497,7 +499,7 @@ export class PaymentService {
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
-    const res = await getStripeNewVersion().subscriptions.list({
+    const res = await this.provider.subscriptions.list({
       customer: customerId,
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
@@ -523,7 +525,7 @@ export class PaymentService {
   }
 
   async getSubscriptionById(subscriptionId: string) {
-    return getStripeNewVersion().subscriptions.retrieve(subscriptionId, {
+    return this.provider.subscriptions.retrieve(subscriptionId, {
       expand: ['plan.product'],
     });
   }
@@ -557,7 +559,7 @@ export class PaymentService {
       throw new IncompatibleSubscriptionTypesError('The new price is not an individual price');
     }
 
-    const updatedSubscription = await getStripeNewVersion().subscriptions.update(individualActiveSubscription.id, {
+    const updatedSubscription = await this.provider.subscriptions.update(individualActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: 'none',
       items: [
@@ -604,7 +606,7 @@ export class PaymentService {
       throw new InvalidSeatNumberError('The new price does not allow the current amount of seats');
     }
 
-    const updatedSubscription = await getStripeNewVersion().subscriptions.update(businessActiveSubscription.id, {
+    const updatedSubscription = await this.provider.subscriptions.update(businessActiveSubscription.id, {
       cancel_at_period_end: false,
       proration_behavior: additionalOptions?.proration_behavior ?? 'none',
       items: [
@@ -660,7 +662,7 @@ export class PaymentService {
             additionalOptions,
           });
 
-    const latestInvoice = await getStripeNewVersion().invoices.retrieve(updatedSubscription.latest_invoice as string, {
+    const latestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string, {
       expand: ['payments.data.payment.payment_intent'],
     });
     const paymentIntent = latestInvoice.payments?.data[0]?.payment.payment_intent as Stripe.PaymentIntent | undefined;
@@ -692,13 +694,13 @@ export class PaymentService {
 
     if (!subscriptionId) throw new Error('Subscription not found');
 
-    const { id, customer } = await getStripeNewVersion().paymentMethods.attach(paymentMethodId, {
+    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
       customer: customerId,
     });
 
     if (!id || !customer) throw new Error('Payment method not attached');
 
-    return getStripeNewVersion().subscriptions.update(subscriptionId, {
+    return this.provider.subscriptions.update(subscriptionId, {
       default_payment_method: id,
     });
   }
@@ -715,7 +717,7 @@ export class PaymentService {
     subscriptionId?: SubscriptionId,
     status?: Stripe.Invoice['status'],
   ): Promise<Invoice[]> {
-    const res = await getStripeNewVersion().invoices.list({
+    const res = await this.provider.invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
@@ -730,7 +732,7 @@ export class PaymentService {
   async getPricesByIds(priceIds: Stripe.Price['id'][]): Promise<Map<Stripe.Price['id'], Stripe.Price>> {
     const uniquePriceIds = [...new Set(priceIds)];
     const prices: Stripe.Price[] = await Promise.all(
-      uniquePriceIds.map((priceId) => getStripeNewVersion().prices.retrieve(priceId)),
+      uniquePriceIds.map((priceId) => this.provider.prices.retrieve(priceId)),
     );
 
     return new Map(prices.map((price) => [price.id, price]));
@@ -1087,13 +1089,13 @@ export class PaymentService {
   }
 
   async getInvoiceLineItems(invoiceId: string) {
-    return getStripeNewVersion().invoices.listLineItems(invoiceId, {
+    return this.provider.invoices.listLineItems(invoiceId, {
       expand: ['data.pricing.price_details.price', 'data.discounts'],
     });
   }
 
   async getInvoice(invoiceId: string): Promise<Stripe.Invoice> {
-    return getStripeNewVersion().invoices.retrieve(invoiceId, { expand: ['discounts'] });
+    return this.provider.invoices.retrieve(invoiceId, { expand: ['discounts'] });
   }
 
   async getInvoiceIdFromCharge(charge: Stripe.Charge): Promise<Stripe.Invoice['id'] | undefined> {
@@ -1101,7 +1103,7 @@ export class PaymentService {
       typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
     if (!paymentIntentId) return undefined;
 
-    const { data: invoicePayments } = await getStripeNewVersion().invoicePayments.list({
+    const { data: invoicePayments } = await this.provider.invoicePayments.list({
       payment: { type: 'payment_intent', payment_intent: paymentIntentId },
     });
     const invoice = invoicePayments[0]?.invoice;
@@ -1256,7 +1258,7 @@ export class PaymentService {
     amount: number,
     additionalOptions?: Partial<Stripe.PaymentIntentCreateParams>,
   ) {
-    return getStripeNewVersion().paymentIntents.create({
+    return this.provider.paymentIntents.create({
       customer: customerId,
       currency,
       amount,
@@ -1265,11 +1267,11 @@ export class PaymentService {
   }
 
   async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
-    return getStripeNewVersion().charges.retrieve(chargeId);
+    return this.provider.charges.retrieve(chargeId);
   }
 
   async getPaymentIntent(paymentIntentId: Stripe.PaymentIntent['id']): Promise<Stripe.PaymentIntent> {
-    return getStripeNewVersion().paymentIntents.retrieve(paymentIntentId);
+    return this.provider.paymentIntents.retrieve(paymentIntentId);
   }
 
   getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {

@@ -502,7 +502,6 @@ export const getPaymentIntent = (params?: Partial<Stripe.PaymentIntent>): Stripe
   return {
     ...PAYMENT_INTENT_BASE,
     id: `pi_${randomDataGenerator.string({ length: 14 })}`,
-    invoice: `in_${randomDataGenerator.string({ length: 14 })}`,
     amount: 2000,
     client_secret: `pi_${randomDataGenerator.string({ length: 24 })}`,
     payment_method_types: ['card', 'link'],
@@ -567,11 +566,7 @@ export const getLogger = (): jest.Mocked<FastifyBaseLogger> => {
   };
 };
 
-export const getInvoice = (
-  params?: DeepPartial<Partial<Stripe.Invoice>>,
-  userType = UserType.Individual,
-  productId?: string,
-): Stripe.Invoice => {
+export const getInvoice = (params?: DeepPartial<Partial<Stripe.Invoice>>, productId?: string): Stripe.Invoice => {
   const generatedProductId = productId ?? `prod_${randomDataGenerator.string({ length: 12 })}`;
   const generatedPriceId = `price_${randomDataGenerator.string({ length: 12 })}`;
 
@@ -591,23 +586,6 @@ export const getInvoice = (
             type: 'price_details',
             unit_amount_decimal: null,
             price_details: { price: generatedPriceId, product: generatedProductId },
-          },
-          price: {
-            ...PRICE_BASE,
-            id: generatedPriceId,
-            metadata: {
-              maxSpaceBytes: `${randomDataGenerator.natural({ length: 8 })}`,
-              type: userType as string,
-            },
-            product: {
-              ...PRODUCT_BASE,
-              id: generatedProductId,
-              type: 'service',
-              metadata: {
-                type: userType,
-              },
-              name: 'Ultimate Plan',
-            },
           },
         },
       ],
@@ -686,7 +664,6 @@ export function getCharge(params?: Partial<Stripe.Charge>): Stripe.Charge {
     balance_transaction: `txn_${randomDataGenerator.string({ length: 10 })}`,
     captured: true,
     customer: `cus_${randomDataGenerator.string({ length: 20 })}`,
-    invoice: `in_${randomDataGenerator.string({ length: 16 })}`,
     payment_method: `card_${randomDataGenerator.string({ length: 10 })}`,
     receipt_email: 'example@inxt.com',
     ...params,

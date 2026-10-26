@@ -6,10 +6,9 @@ import { BadRequestError, InternalServerError } from '../../../../src/errors/Err
 import { createTestServices } from '../../helpers/services-factory';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
-import { getStripeNewVersion } from '../../../../src/services/stripe';
 
 describe('Determining Lifetime conditions', () => {
-  const { paymentService, tiersService, determineLifetimeConditions } = createTestServices();
+  const { stripe, paymentService, tiersService, determineLifetimeConditions } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,7 +85,6 @@ describe('Determining Lifetime conditions', () => {
   });
 
   describe('The user already has a lifetime plan', () => {
-    const stripeNewVersion = getStripeNewVersion();
     const lifetimePrice = (maxSpaceBytes: string) =>
       getPrice({ metadata: { planType: 'one_time', maxSpaceBytes }, product: `prod_${maxSpaceBytes}` });
     const paidWithCard = (paymentIntentId: string) =>
@@ -117,16 +115,16 @@ describe('Determining Lifetime conditions', () => {
       charges?: Pick<Stripe.Charge, 'id' | 'refunded' | 'disputed'>[];
     }) => {
       jest
-        .spyOn(stripeNewVersion.invoices, 'list')
-        .mockImplementation(async (params: any) => ({ data: invoicesByCustomer[params.customer] ?? [] }) as any);
+        .spyOn(stripe.invoices, 'list')
+        .mockImplementation((async (params: any) => ({ data: invoicesByCustomer[params.customer] ?? [] })) as any);
       jest
-        .spyOn(stripeNewVersion.prices, 'retrieve')
+        .spyOn(stripe.prices, 'retrieve')
         .mockImplementation(async (priceId: string) => prices.find((price) => price.id === priceId) as any);
       jest
-        .spyOn(stripeNewVersion.paymentIntents, 'retrieve')
+        .spyOn(stripe.paymentIntents, 'retrieve')
         .mockImplementation(async (paymentIntentId: string) => ({ latest_charge: `ch_of_${paymentIntentId}` }) as any);
       jest
-        .spyOn(stripeNewVersion.charges, 'retrieve')
+        .spyOn(stripe.charges, 'retrieve')
         .mockImplementation(
           async (chargeId: string) =>
             (charges.find((charge) => charge.id === chargeId) ?? { refunded: false, disputed: false }) as any,
@@ -198,7 +196,7 @@ describe('Determining Lifetime conditions', () => {
       const { maxSpaceBytes } = await stackLifetimesFor([customer]);
 
       expect(maxSpaceBytes).toBe(1000);
-      expect(stripeNewVersion.charges.retrieve).not.toHaveBeenCalled();
+      expect(stripe.charges.retrieve).not.toHaveBeenCalled();
     });
 
     test('When a lifetime was free thanks to a full discount, then its storage is stacked', async () => {

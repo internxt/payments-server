@@ -13,8 +13,7 @@ import { PreCreatedUserStatus } from '../../../../../src/infrastructure/domain/e
 import Logger from '../../../../../src/Logger';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { getCustomer, getInvoice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
-import { getStripeNewVersion } from '../../../../../src/services/stripe';
+import { getCustomer, getInvoice, getPrice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
 import { getPreCreatedUserEntity } from '../../../entity.fixtures';
 
@@ -46,24 +45,24 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-const stripeNewVersion = getStripeNewVersion();
+const getLinePrice = (invoice: Stripe.Invoice, productParams?: Partial<Stripe.Product>): Stripe.Price => {
+  const priceDetails = invoice.lines.data[0].pricing?.price_details;
+  return getPrice({
+    id: priceDetails?.price,
+    metadata: { maxSpaceBytes: '1099511627776', type: 'individual' },
+    product: getProduct({ params: { id: priceDetails?.product, ...productParams } }),
+  });
+};
 
-const mockStripeLineItems = (invoice: Stripe.Invoice) => {
-  const products = invoice.lines.data.map((line) => line.price?.product as Stripe.Product | undefined);
+const mockStripeLineItems = (invoice: Stripe.Invoice, price: Stripe.Price | null = getLinePrice(invoice)) => {
   const lineItems = invoice.lines.data.map((line) => ({
     ...line,
-    pricing: line.price
-      ? {
-          type: 'price_details',
-          unit_amount_decimal: null,
-          price_details: { price: line.price, product: (line.price.product as Stripe.Product).id },
-        }
+    pricing: price
+      ? { ...line.pricing, price_details: { price, product: (price.product as Stripe.Product).id } }
       : null,
   }));
-  jest
-    .spyOn(stripe.products, 'retrieve')
-    .mockImplementation(async (productId: string) => products.find((product) => product?.id === productId) as any);
-  return jest.spyOn(stripeNewVersion.invoices, 'listLineItems').mockResolvedValue({ data: lineItems } as any);
+  jest.spyOn(stripe.products, 'retrieve').mockResolvedValue(price?.product as any);
+  return jest.spyOn(stripe.invoices, 'listLineItems').mockResolvedValue({ data: lineItems } as any);
 };
 
 describe('Testing the handler when an invoice is completed', () => {
@@ -77,7 +76,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: mockedInvoice.status as string,
       };
       const loggerSpy = jest.spyOn(Logger, 'info');
-      const getInvoiceLineItemsSpy = jest.spyOn(stripeNewVersion.invoices, 'listLineItems');
+      const getInvoiceLineItemsSpy = jest.spyOn(stripe.invoices, 'listLineItems');
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
@@ -87,23 +86,13 @@ describe('Testing the handler when an invoice is completed', () => {
 
     test('When there is no price in the line item, then an error indicating so is thrown', async () => {
       const mockedCustomer = getCustomer();
-      const mockedInvoice = getInvoice({
-        customer: mockedCustomer.id,
-        status: 'paid',
-        lines: {
-          data: [
-            {
-              price: null,
-            },
-          ],
-        },
-      });
+      const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
         customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
-      const getInvoiceLineItemsSpy = mockStripeLineItems(mockedInvoice);
+      const getInvoiceLineItemsSpy = mockStripeLineItems(mockedInvoice, null);
 
       await expect(invoiceCompletedHandler.run(invoiceCompletedHandlerPayload)).rejects.toThrow(NotFoundError);
       expect(getInvoiceLineItemsSpy).toHaveBeenCalledWith(mockedInvoice.id, expect.anything());
@@ -111,30 +100,13 @@ describe('Testing the handler when an invoice is completed', () => {
 
     test('When the user purchases an object storage product, then the object storage conditions are applied', async () => {
       const mockedCustomer = getCustomer();
-      const mockedInvoice = getInvoice({
-        customer: mockedCustomer.id,
-        status: 'paid',
-        lines: {
-          data: [
-            {
-              price: {
-                product: {
-                  metadata: {
-                    type: 'object-storage',
-                  },
-                  id: 'prod_1',
-                },
-              },
-            },
-          ],
-        },
-      });
+      const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
         customer: Customer.toDomain(mockedCustomer),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
-      mockStripeLineItems(mockedInvoice);
+      mockStripeLineItems(mockedInvoice, getLinePrice(mockedInvoice, { metadata: { type: 'object-storage' } }));
       const reactivateObjectStorageAccountSpy = jest
         .spyOn(objectStorageWebhookHandler, 'reactivateObjectStorageAccount')
         .mockResolvedValue();
@@ -177,9 +149,10 @@ describe('Testing the handler when an invoice is completed', () => {
         status: mockedInvoice.status as string,
       };
       const mockedUser = getUser();
-      const maxSpaceBytes = Number(mockedInvoice.lines.data[0].price?.metadata.maxSpaceBytes);
+      const linePrice = getLinePrice(mockedInvoice);
+      const maxSpaceBytes = Number(linePrice.metadata.maxSpaceBytes);
 
-      mockStripeLineItems(mockedInvoice);
+      mockStripeLineItems(mockedInvoice, linePrice);
       const getTierProductsByProductIdsSpy = jest
         .spyOn(tiersService, 'getTierProductsByProductsId')
         .mockRejectedValue(new TierNotFoundError('Tier not found'));
@@ -196,7 +169,7 @@ describe('Testing the handler when an invoice is completed', () => {
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
       expect(getTierProductsByProductIdsSpy).toHaveBeenCalledWith(
-        (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        mockedInvoice.lines.data[0].pricing?.price_details?.product,
         'subscription',
       );
       expect(handleOldProductSpy).toHaveBeenCalledWith(mockedUser.uuid, maxSpaceBytes);
@@ -237,14 +210,14 @@ describe('Testing the handler when an invoice is completed', () => {
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
       expect(getTierProductsByProductIdsSpy).toHaveBeenCalledWith(
-        (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        mockedInvoice.lines.data[0].pricing?.price_details?.product,
         'subscription',
       );
       expect(handleOldProductSpy).not.toHaveBeenCalled();
       expect(handleNewProductSpy).toHaveBeenCalledWith({
         user: { ...mockedUser, email: mockedCustomer.email as string },
         isLifetimePlan: false,
-        productId: (mockedInvoice.lines.data[0].price!.product as Stripe.Product).id,
+        productId: mockedInvoice.lines.data[0].pricing?.price_details?.product,
         customer: Customer.toDomain(mockedCustomer),
         tier: mockedTier,
       });
@@ -426,8 +399,7 @@ describe('Testing the handler when an invoice is completed', () => {
 
   describe('Get price data', () => {
     test('When the price data is required, then the needed data is returned', () => {
-      const mockedInvoice = getInvoice();
-      const mockedPrice = mockedInvoice.lines.data[0].price as Stripe.Price;
+      const mockedPrice = getLinePrice(getInvoice());
 
       const getPriceData = invoiceCompletedHandler['getPriceData'].bind(invoiceCompletedHandler);
       const result = getPriceData(mockedPrice, mockedPrice.product as Stripe.Product);

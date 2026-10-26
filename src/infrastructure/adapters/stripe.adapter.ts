@@ -11,9 +11,8 @@ import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
-import { EU_COUNTRIES } from '../../constants';
+import { EU_COUNTRIES, STRIPE_API_VERSION } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
-import { getStripeNewVersion } from '../../services/stripe';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   private _provider?: Stripe;
@@ -22,14 +21,10 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   get provider(): Stripe {
     if (!this._provider) {
       this._provider = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
-        apiVersion: '2025-02-24.acacia',
+        apiVersion: STRIPE_API_VERSION,
       });
     }
     return this._provider;
-  }
-
-  get newVersionProvider() {
-    return getStripeNewVersion();
   }
 
   initProvider(provider: Stripe) {
@@ -180,7 +175,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     subscriptionId: string,
     params: Partial<Stripe.SubscriptionUpdateParams>,
   ): Promise<Subscription> {
-    const subscription = await this.newVersionProvider.subscriptions.update(subscriptionId, params);
+    const subscription = await this.provider.subscriptions.update(subscriptionId, params);
 
     return Subscription.toDomain({
       id: subscription.id,
@@ -195,7 +190,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription> {
-    const subscription = await this.newVersionProvider.subscriptions.retrieve(subscriptionId, {
+    const subscription = await this.provider.subscriptions.retrieve(subscriptionId, {
       expand: ['plan.product'],
     });
 
@@ -219,14 +214,14 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async cancelSubscription(subscriptionId: string): Promise<void> {
-    await this.newVersionProvider.subscriptions.cancel(subscriptionId);
+    await this.provider.subscriptions.cancel(subscriptionId);
   }
 
   async createInvoice(params?: Partial<Stripe.InvoiceCreateParams>): Promise<Invoice> {
-    const invoice = await this.newVersionProvider.invoices.create(params);
+    const invoice = await this.provider.invoices.create(params);
 
     return Invoice.toDomain({
-      id: invoice.id,
+      id: invoice.id as string,
       clientSecretId: invoice.confirmation_secret?.client_secret,
       status: invoice.status as InvoiceStatus,
     });
@@ -237,7 +232,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     customerId: string,
     params: Partial<Stripe.InvoiceItemCreateParams>,
   ): Promise<InvoiceItems> {
-    const invoice = await this.newVersionProvider.invoiceItems.create({
+    const invoice = await this.provider.invoiceItems.create({
       invoice: invoiceId,
       customer: customerId,
       ...params,
@@ -249,12 +244,12 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async finalizeInvoice(invoiceId: Invoice['id']): Promise<Invoice> {
-    const finalizedInvoice = await this.newVersionProvider.invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 
     return Invoice.toDomain({
-      id: finalizedInvoice.id,
+      id: finalizedInvoice.id as string,
       clientSecretId: finalizedInvoice.confirmation_secret?.client_secret,
       status: finalizedInvoice.status as InvoiceStatus,
     });

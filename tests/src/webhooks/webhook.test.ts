@@ -8,10 +8,9 @@ import { ObjectStorageService } from '../../../src/services/objectStorage.servic
 import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { PaymentMethod } from '../../../src/infrastructure/domain/entities/paymentMethod';
-import { getStripeNewVersion } from '../../../src/services/stripe';
 
 let app: FastifyInstance;
 
@@ -69,7 +68,7 @@ describe('Webhook events', () => {
       const mockedInvoice = getInvoice();
       const currentInvoice = getInvoice({ id: mockedInvoice.id });
       const retrieveInvoice = jest
-        .spyOn(getStripeNewVersion().invoices, 'retrieve')
+        .spyOn(stripePaymentsAdapter.provider.invoices, 'retrieve')
         .mockResolvedValue(currentInvoice as any);
       const event = {
         id: 'evt_2',
@@ -153,7 +152,7 @@ describe('Webhook events', () => {
           status: 'paid',
         });
         const currentInvoice = getInvoice({ id: mockedInvoice.id, customer: mockedInvoice.customer, status: 'paid' });
-        jest.spyOn(getStripeNewVersion().invoices, 'retrieve').mockResolvedValue(currentInvoice as any);
+        jest.spyOn(stripePaymentsAdapter.provider.invoices, 'retrieve').mockResolvedValue(currentInvoice as any);
         const mockedCustomer = getCustomer();
         const event = {
           id: 'evt_2',

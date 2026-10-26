@@ -4,22 +4,18 @@ import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import handleLifetimeRefunded from '../../../src/webhooks/handleLifetimeRefunded';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-import { getStripeNewVersion } from '../../../src/services/stripe';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
-const { paymentService, usersService, storageService, tiersService, cacheService, preCreatedUserService } =
+const { stripe, paymentService, usersService, storageService, tiersService, cacheService, preCreatedUserService } =
   createTestServices();
-const stripeNewVersion = getStripeNewVersion();
 
 const mockRefundedInvoice = (invoiceId?: string) => {
   const invoiceLineItems = getInvoice().lines;
   jest
-    .spyOn(stripeNewVersion.invoicePayments, 'list')
+    .spyOn(stripe.invoicePayments, 'list')
     .mockResolvedValue({ data: invoiceId ? [{ invoice: invoiceId }] : [] } as any);
-  const listLineItems = jest
-    .spyOn(stripeNewVersion.invoices, 'listLineItems')
-    .mockResolvedValue(invoiceLineItems as any);
+  const listLineItems = jest.spyOn(stripe.invoices, 'listLineItems').mockResolvedValue(invoiceLineItems as any);
   return { invoiceLineItems, listLineItems };
 };
 

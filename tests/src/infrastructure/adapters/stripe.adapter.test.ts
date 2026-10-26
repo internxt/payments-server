@@ -242,7 +242,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -289,7 +288,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'month',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -319,7 +317,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -362,7 +359,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -388,7 +384,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -412,7 +407,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -454,7 +448,7 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'update')
+        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'update')
         .mockResolvedValue(stripeSubscription as any);
 
       const params = { cancel_at: 1800000000 };
@@ -478,9 +472,7 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest
-        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'update')
-        .mockResolvedValue(stripeSubscription as any);
+      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'update').mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, {});
 
@@ -494,7 +486,7 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const retrieveSpy = jest
-        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'retrieve')
+        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve')
         .mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
@@ -519,9 +511,7 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest
-        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'retrieve')
-        .mockResolvedValue(stripeSubscription as any);
+      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve').mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
 
@@ -534,7 +524,7 @@ describe('Stripe Adapter', () => {
     test('When creating an invoice, then the invoice is created and the entity is mapped and returned', async () => {
       const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest.spyOn(stripePaymentsAdapter.newVersionProvider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
 
       const invoice = await stripePaymentsAdapter.createInvoice({
         customer: mockedInvoice.customer as string,
@@ -542,7 +532,7 @@ describe('Stripe Adapter', () => {
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
-          id: mockedInvoice.id,
+          id: mockedInvoice.id as string,
           clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
@@ -554,15 +544,13 @@ describe('Stripe Adapter', () => {
     test('When finalizing an invoice, then the invoice is finalized and the entity is mapped and returned', async () => {
       const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest
-        .spyOn(stripePaymentsAdapter.newVersionProvider.invoices, 'finalizeInvoice')
-        .mockResolvedValue(mockedInvoice as any);
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
 
-      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id);
+      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id as string);
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
-          id: mockedInvoice.id,
+          id: mockedInvoice.id as string,
           clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
@@ -574,7 +562,7 @@ describe('Stripe Adapter', () => {
     test('When adding invoice items, then the invoice items are added and the entity is mapped and returned', async () => {
       const mockedInvoiceItems = getInvoiceItems();
 
-      jest.spyOn(stripePaymentsAdapter.newVersionProvider.invoiceItems, 'create').mockResolvedValue({
+      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({
         ...mockedInvoiceItems,
         lastResponse: {} as any,
       });
