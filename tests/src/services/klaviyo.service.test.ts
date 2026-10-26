@@ -43,7 +43,9 @@ describe('KlaviyoTrackingService', () => {
     });
 
     test('When instantiated with valid config, then it initializes correctly', () => {
-      expect(() => createTestServices({ stripe: {} as any, httpClient: {} as any }).klaviyoTrackingService).not.toThrow();
+      expect(
+        () => createTestServices({ stripe: {} as any, httpClient: {} as any }).klaviyoTrackingService,
+      ).not.toThrow();
     });
   });
 

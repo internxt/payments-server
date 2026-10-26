@@ -1004,7 +1004,7 @@ describe('Testing the handler when an invoice is completed', () => {
         }),
       ).rejects.toThrow(usersTiersError);
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Error while updating or inserting the user-tier relationship. Error: Error: User tiers error`,
+        'Error while updating or inserting the user-tier relationship. Error: Error: User tiers error',
       );
     });
   });
