@@ -68,17 +68,11 @@ export function webhookHandler({
 
       switch (event.type) {
         case 'invoice.payment_failed':
-          await handleInvoicePaymentFailed(
-            event.data.object,
-            objectStorageService,
-            paymentService,
-            usersService,
-            fastify.log,
-          );
+          await handleInvoicePaymentFailed(event.data.object, objectStorageService, paymentService, usersService);
           break;
 
         case 'payment_intent.amount_capturable_updated':
-          await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe, fastify.log);
+          await handleFundsCaptured(event.data.object, paymentService, objectStorageService, stripe);
           break;
 
         case 'customer.subscription.deleted':
@@ -90,21 +84,17 @@ export function webhookHandler({
             cacheService,
             objectStorageService,
             tiersService,
-            fastify.log,
             preCreatedUserService,
           );
           break;
 
         case 'customer.subscription.updated':
           await handleSubscriptionUpdated(
-            storageService,
             usersService,
             event.data.object,
             cacheService,
             paymentService,
             objectStorageService,
-            fastify.log,
-            config,
           );
           break;
 
@@ -172,7 +162,6 @@ export function webhookHandler({
                 event.data.object,
                 cacheService,
                 paymentService,
-                fastify.log,
                 tiersService,
                 preCreatedUserService,
               );
@@ -190,7 +179,6 @@ export function webhookHandler({
             storageService,
             cacheService,
             tiersService,
-            log: fastify.log,
             preCreatedUserService,
           });
           break;

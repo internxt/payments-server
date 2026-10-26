@@ -61,7 +61,6 @@ describe('Webhook events', () => {
         expect.any(PaymentService),
         expect.any(ObjectStorageService),
         expect.any(Stripe),
-        app.log,
       );
     });
 
@@ -96,7 +95,6 @@ describe('Webhook events', () => {
         expect.any(ObjectStorageService),
         expect.any(PaymentService),
         expect.any(UsersService),
-        app.log,
       );
     });
 
