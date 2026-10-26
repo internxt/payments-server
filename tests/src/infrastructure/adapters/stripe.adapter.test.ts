@@ -492,7 +492,7 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const retrieveSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve')
+        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'retrieve')
         .mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
@@ -503,7 +503,7 @@ describe('Stripe Adapter', () => {
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
           status: stripeSubscription.status,
-          currentPeriodEnd: stripeSubscription.current_period_end,
+          currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           priceId: stripeSubscription.items.data[0].price.id,
           startDate: stripeSubscription.start_date,
           metadata: stripeSubscription.metadata,
@@ -517,7 +517,9 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve').mockResolvedValue(stripeSubscription as any);
+      jest
+        .spyOn(stripePaymentsAdapter.newVersionProvider.subscriptions, 'retrieve')
+        .mockResolvedValue(stripeSubscription as any);
 
       const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
 

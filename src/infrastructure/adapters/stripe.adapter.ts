@@ -13,6 +13,7 @@ import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
 import { EU_COUNTRIES } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
+import { getStripeNewVersion } from '../../services/stripe';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
   private _provider?: Stripe;
@@ -25,6 +26,10 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       });
     }
     return this._provider;
+  }
+
+  get newVersionProvider() {
+    return getStripeNewVersion();
   }
 
   initProvider(provider: Stripe) {
@@ -190,7 +195,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 
   async getSubscription(subscriptionId: string): Promise<Subscription> {
-    const subscription = await this.provider.subscriptions.retrieve(subscriptionId, {
+    const subscription = await this.newVersionProvider.subscriptions.retrieve(subscriptionId, {
       expand: ['plan.product'],
     });
 
@@ -203,7 +208,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       id: subscription.id,
       customer: subscription.customer as string,
       status: subscription.status,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       priceId: subscription.items.data[0].price.id,
       startDate: subscription.start_date,
       metadata: subscription.metadata,

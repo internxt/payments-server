@@ -493,12 +493,12 @@ export class PaymentService {
   }
 
   async getActiveSubscriptions(customerId: CustomerId): Promise<ExtendedSubscription[]> {
-    const res = await this.provider.subscriptions.list({
+    const res = await getStripeNewVersion().subscriptions.list({
       customer: customerId,
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
-    const transformedData: ExtendedSubscription[] = res.data.map((subscription) => {
+    const transformedData: ExtendedSubscription[] = res.data.map((subscription: Stripe.Subscription) => {
       const untypedSubscription = subscription as any;
       if ('plan' in untypedSubscription) {
         return {
@@ -519,7 +519,7 @@ export class PaymentService {
   }
 
   async getSubscriptionById(subscriptionId: string) {
-    return this.provider.subscriptions.retrieve(subscriptionId, {
+    return getStripeNewVersion().subscriptions.retrieve(subscriptionId, {
       expand: ['plan.product'],
     });
   }
@@ -948,7 +948,7 @@ export class PaymentService {
       amount: price.unit_amount!,
       currency: price.currency,
       interval: itemInterval,
-      nextPayment: subscription.current_period_end,
+      nextPayment: subscription.items.data[0].current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       productId: price?.product as string,
@@ -1136,7 +1136,7 @@ export class PaymentService {
       metadata: subscription.metadata,
       startDate: subscription.start_date,
       priceId: subscription.items.data[0].price.id,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       paymentMethod:
         typeof subscription.default_payment_method === 'string'
           ? subscription.default_payment_method

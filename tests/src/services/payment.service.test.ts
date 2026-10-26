@@ -35,6 +35,7 @@ import {
   ClientSecretNotFoundError,
   PaymentMethodNotFoundError,
   SubscriptionNotEligibleForEarlyChargeError,
+  NotFoundSubscriptionError,
 } from '../../../src/errors/PaymentErrors';
 import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../../../src/errors/stripeErrorCodes';
 
@@ -1130,6 +1131,70 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Active subscriptions', () => {
+    const mockStripeSubscriptions = (subscriptions: Stripe.Subscription[]) =>
+      jest.spyOn(stripeNewVersion.subscriptions, 'list').mockResolvedValue({ data: subscriptions } as any);
+
+    const withProductType = (subscription: Stripe.Subscription, type?: string) =>
+      ({
+        ...subscription,
+        plan: {
+          ...subscription.items.data[0].plan,
+          product: getProduct({ params: { metadata: type ? { type } : {} } }),
+        },
+      }) as unknown as Stripe.Subscription;
+
+    test('When the customer has subscriptions in several states, then only the active, trialing and past due ones are returned', async () => {
+      const active = getCreatedSubscription({ status: 'active' });
+      const trialing = getCreatedSubscription({ status: 'trialing' });
+      const pastDue = getCreatedSubscription({ status: 'past_due' });
+      const canceled = getCreatedSubscription({ status: 'canceled' });
+      mockStripeSubscriptions([active, trialing, pastDue, canceled]);
+
+      const subscriptions = await paymentService.getActiveSubscriptions('cus_test');
+
+      expect(subscriptions.map((subscription) => subscription.id)).toStrictEqual([active.id, trialing.id, pastDue.id]);
+    });
+
+    const mockBusinessProducts = (businessSubscriptions: Stripe.Subscription[]) =>
+      jest.spyOn(paymentService['productsRepository'], 'findByType').mockResolvedValue(
+        businessSubscriptions.map((subscription) => ({
+          paymentGatewayId: subscription.items.data[0].price.product,
+        })) as any,
+      );
+
+    test('When the customer has an individual and a business subscription, then each type gets its own subscription', async () => {
+      const individual = withProductType(getCreatedSubscription({ status: 'active' }));
+      const business = withProductType(getCreatedSubscription({ status: 'active' }), UserType.Business);
+      mockStripeSubscriptions([business, individual]);
+      mockBusinessProducts([business]);
+
+      const individualEntity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Individual);
+      const businessEntity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Business);
+
+      expect(individualEntity.id).toBe(individual.id);
+      expect(businessEntity.id).toBe(business.id);
+    });
+
+    test('When the customer has an active subscription, then its period ends when the billing period of its item ends', async () => {
+      const subscription = withProductType(getCreatedSubscription({ status: 'active' }));
+      mockStripeSubscriptions([subscription]);
+
+      const entity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Individual);
+
+      expect(entity.currentPeriodEnd).toBe(subscription.items.data[0].current_period_end);
+    });
+
+    test('When the customer has no active subscription of the requested type, then an error indicating so is thrown', async () => {
+      mockStripeSubscriptions([withProductType(getCreatedSubscription({ status: 'active' }))]);
+      mockBusinessProducts([]);
+
+      await expect(paymentService.getActiveSubscriptionEntity('cus_test', UserType.Business)).rejects.toThrow(
+        NotFoundSubscriptionError,
+      );
+    });
+  });
+
   describe('Changing the subscription plan', () => {
     const mockPlanChange = () => {
       const subscription = getCreatedSubscription();
@@ -1182,8 +1247,7 @@ describe('Payments Service tests', () => {
           intervalCount: 1,
           nickname: 'monthly',
         },
-        items: { ...base.items, data: [{ ...base.items.data[0], price }] },
-        current_period_end: 1800000000,
+        items: { ...base.items, data: [{ ...base.items.data[0], price, current_period_end: 1800000000 }] },
         ...overrides,
       } as any;
     };
@@ -1239,6 +1303,15 @@ describe('Payments Service tests', () => {
       }
 
       jest.useRealTimers();
+    });
+
+    test('when the user has an active subscription, then the next payment is due when the current billing period ends', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice();
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.nextPayment).toBe(1800000000);
     });
 
     test('when the next invoice includes taxes, then the subscription shows taxes as enabled', async () => {
