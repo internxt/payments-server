@@ -494,53 +494,64 @@ describe('Payments Service tests', () => {
     const { id: subscriptionId } = getCreatedSubscription();
     const mockPagination = { limit: 10, startingAfter: 'inv_123' };
 
-    beforeEach(() => {
-      jest.clearAllMocks();
+    const mockStripeInvoices = (invoices: Stripe.Invoice[]) =>
+      jest.spyOn(stripeNewVersion.invoices, 'list').mockResolvedValue({ data: invoices } as any);
+
+    const mockStripePrices = (prices: Stripe.Price[]) =>
+      jest
+        .spyOn(stripeNewVersion.prices, 'retrieve')
+        .mockImplementation(async (priceId: string) => prices.find((price) => price.id === priceId) as any);
+
+    const planPrice = (type: string) => getPrice({ metadata: { maxSpaceBytes: '1099511627776', type } });
+
+    const invoiceFor = (price: Stripe.Price) =>
+      getInvoice({
+        invoice_pdf: 'https://pay.stripe.com/invoice/pdf',
+        lines: { data: [{ pricing: { price_details: { price: price.id, product: price.product as string } } }] },
+      });
+
+    const toDriveInvoice = (invoice: Stripe.Invoice, price: Stripe.Price) => ({
+      id: invoice.id,
+      created: invoice.created,
+      pdf: invoice.invoice_pdf,
+      bytesInPlan: price.metadata.maxSpaceBytes,
+      product: price.product,
+      total: invoice.total,
+      currency: invoice.currency,
     });
 
-    it('When userType is Individual, then returns filtered invoices with individual type', async () => {
-      const mockedInvoices = getInvoice(undefined, UserType.Individual);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoices]);
+    test('When an individual user requests their invoices, then their paid plan invoices are returned with the plan storage and product', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const individualInvoice = invoiceFor(individualPrice);
+      const listInvoices = mockStripeInvoices([individualInvoice, invoiceFor(businessPrice)]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([
-        {
-          id: mockedInvoices.id,
-          created: mockedInvoices.created,
-          pdf: mockedInvoices.invoice_pdf,
-          bytesInPlan: mockedInvoices.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: mockedInvoices.lines.data[0].price?.product,
-          total: mockedInvoices.total,
-          currency: mockedInvoices.currency,
-        },
-      ]);
+      expect(listInvoices).toHaveBeenCalledWith(expect.objectContaining({ customer: customerId, status: 'paid' }));
+      expect(result).toStrictEqual([toDriveInvoice(individualInvoice, individualPrice)]);
     });
 
-    it('When userType is Business, then returns filtered invoices with business type', async () => {
-      const mockedInvoices = getInvoice(undefined, UserType.Business);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoices]);
+    test('When a business user requests their invoices, then only the business plan invoices are returned', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const businessInvoice = invoiceFor(businessPrice);
+      mockStripeInvoices([invoiceFor(individualPrice), businessInvoice]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Business);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([
-        {
-          id: mockedInvoices.id,
-          created: mockedInvoices.created,
-          pdf: mockedInvoices.invoice_pdf,
-          bytesInPlan: mockedInvoices.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: mockedInvoices.lines.data[0].price?.product,
-          total: mockedInvoices.total,
-          currency: mockedInvoices.currency,
-        },
-      ]);
+      expect(result).toStrictEqual([toDriveInvoice(businessInvoice, businessPrice)]);
     });
 
-    it('When a subscriptionId is provided, then filters invoices by subscriptionId', async () => {
-      const mockedInvoices = getInvoices();
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
+    test('When the invoices of a subscription are requested, then all the invoices of that subscription are returned', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const individualInvoice = invoiceFor(individualPrice);
+      const businessInvoice = invoiceFor(businessPrice);
+      const listInvoices = mockStripeInvoices([individualInvoice, businessInvoice]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(
         customerId,
@@ -549,36 +560,34 @@ describe('Payments Service tests', () => {
         subscriptionId,
       );
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(
-        customerId,
-        mockPagination,
-        subscriptionId,
-        'paid',
-      );
-      expect(result).toEqual(
-        mockedInvoices.map((invoice) => ({
-          id: invoice.id,
-          created: invoice.created,
-          pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: invoice.lines.data[0].price?.product,
-          total: invoice.total,
-          currency: invoice.currency,
-        })),
-      );
+      expect(listInvoices).toHaveBeenCalledWith(expect.objectContaining({ subscription: subscriptionId }));
+      expect(result).toStrictEqual([
+        toDriveInvoice(individualInvoice, individualPrice),
+        toDriveInvoice(businessInvoice, businessPrice),
+      ]);
     });
 
-    it('When no invoices match the filters, then returns an empty array', async () => {
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([]);
+    test('When several invoices are for the same plan, then the plan price is fetched only once', async () => {
+      const price = planPrice(UserType.Individual);
+      mockStripeInvoices([invoiceFor(price), invoiceFor(price), invoiceFor(price)]);
+      const retrievePrice = mockStripePrices([price]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(3);
+      expect(retrievePrice).toHaveBeenCalledTimes(1);
     });
 
-    it('When getInvoicesFromUser throws an error, then it propagates the error', async () => {
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockRejectedValue(new Error('Service error'));
+    test('When the user has no paid invoices, then an empty list is returned', async () => {
+      mockStripeInvoices([]);
+
+      const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
+
+      expect(result).toStrictEqual([]);
+    });
+
+    test('When the invoices cannot be fetched, then the error is propagated', async () => {
+      jest.spyOn(stripeNewVersion.invoices, 'list').mockRejectedValue(new Error('Service error'));
 
       await expect(paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual)).rejects.toThrow(
         'Service error',
@@ -800,7 +809,9 @@ describe('Payments Service tests', () => {
     it('When a charge is requested, then the correct charge object is returned', async () => {
       const mockedCharge = getCharge();
 
-      jest.spyOn(stripe.charges, 'retrieve').mockResolvedValue(mockedCharge as Stripe.Response<Stripe.Charge>);
+      jest
+        .spyOn(stripeNewVersion.charges, 'retrieve')
+        .mockResolvedValue(mockedCharge as Stripe.Response<Stripe.Charge>);
 
       const charge = await paymentService.retrieveCustomerChargeByChargeId(mockedCharge.id);
 

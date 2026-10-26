@@ -21,6 +21,7 @@ import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
 import Logger from '../Logger';
 import { getStripeNewVersion } from './stripe';
+import { getInvoicePriceId, getInvoiceProductId } from '../utils/invoice';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
   CustomerId,
@@ -739,21 +740,29 @@ export class PaymentService {
     subscriptionId?: SubscriptionId,
     status?: Stripe.Invoice['status'],
   ): Promise<Invoice[]> {
-    const res = await this.provider.invoices.list({
+    const res = await getStripeNewVersion().invoices.list({
       customer: customerId,
       limit: pagination.limit,
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
       ...(status && { status }),
+      expand: ['data.payments'],
     });
 
     return res.data;
   }
 
-  private invoiceType(invoice: Stripe.Invoice, userType: UserType) {
-    return userType === UserType.Business
-      ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
-      : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+  async getPricesByIds(priceIds: Stripe.Price['id'][]): Promise<Map<Stripe.Price['id'], Stripe.Price>> {
+    const uniquePriceIds = [...new Set(priceIds)];
+    const prices: Stripe.Price[] = await Promise.all(
+      uniquePriceIds.map((priceId) => getStripeNewVersion().prices.retrieve(priceId)),
+    );
+
+    return new Map(prices.map((price) => [price.id, price]));
+  }
+
+  private invoiceType(priceMetadata: Stripe.Metadata | undefined, userType: UserType) {
+    return userType === UserType.Business ? priceMetadata?.type === 'business' : priceMetadata?.type !== 'business';
   }
 
   async getDriveInvoices(
@@ -765,26 +774,33 @@ export class PaymentService {
     const { limit, startingAfter } = pagination;
 
     const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId, 'paid');
+    const pricesById = await this.getPricesByIds(
+      invoices.map(getInvoicePriceId).filter((priceId): priceId is string => !!priceId),
+    );
+    const getPriceMetadata = (invoice: Stripe.Invoice) => {
+      const priceId = getInvoicePriceId(invoice);
+      return priceId ? pricesById.get(priceId)?.metadata : undefined;
+    };
 
     const invoicesMapped = invoices
       .filter((invoice) =>
         invoice.created &&
         invoice.invoice_pdf &&
-        invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
-        invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+        getPriceMetadata(invoice)?.maxSpaceBytes &&
+        getPriceMetadata(invoice)?.type !== 'object-storage' &&
         subscriptionId
           ? true
-          : this.invoiceType(invoice, userType),
+          : this.invoiceType(getPriceMetadata(invoice), userType),
       )
       .map((invoice) => {
         return {
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0]?.price?.metadata?.maxSpaceBytes,
+          bytesInPlan: getPriceMetadata(invoice)?.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
-          product: invoice.lines.data[0]?.price?.product,
+          product: getInvoiceProductId(invoice),
         };
       });
 
@@ -1257,7 +1273,11 @@ export class PaymentService {
   }
 
   async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
-    return this.provider.charges.retrieve(chargeId);
+    return getStripeNewVersion().charges.retrieve(chargeId);
+  }
+
+  async getPaymentIntent(paymentIntentId: Stripe.PaymentIntent['id']): Promise<Stripe.PaymentIntent> {
+    return getStripeNewVersion().paymentIntents.retrieve(paymentIntentId);
   }
 
   getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {

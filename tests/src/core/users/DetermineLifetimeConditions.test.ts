@@ -1,10 +1,12 @@
 import { TierNotFoundError } from '../../../../src/services/tiers.service';
-import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice, getInvoices } from '../../fixtures';
+import Stripe from 'stripe';
+import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice } from '../../fixtures';
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
 import { createTestServices } from '../../helpers/services-factory';
 import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
+import { getStripeNewVersion } from '../../../../src/services/stripe';
 
 describe('Determining Lifetime conditions', () => {
   const { paymentService, tiersService, determineLifetimeConditions } = createTestServices();
@@ -84,46 +86,233 @@ describe('Determining Lifetime conditions', () => {
   });
 
   describe('The user already has a lifetime plan', () => {
-    it('When the user already has a lifetime, then the storage should be stacked', async () => {
-      const totalMaxSpaceBytes = 3;
+    const stripeNewVersion = getStripeNewVersion();
+    const lifetimePrice = (maxSpaceBytes: string) =>
+      getPrice({ metadata: { planType: 'one_time', maxSpaceBytes }, product: `prod_${maxSpaceBytes}` });
+    const paidWithCard = (paymentIntentId: string) =>
+      ({ type: 'payment_intent', payment_intent: paymentIntentId }) as Stripe.InvoicePayment.Payment;
+    const paidOutOfBand = {
+      type: 'payment_record',
+      payment_record: 'pr_test',
+    } as unknown as Stripe.InvoicePayment.Payment;
 
-      const mockedUser = getUser({ lifetime: true });
-      const mockedTier = newTier();
-      const mockedPrice = getPrice();
+    const paidInvoice = (
+      price: Stripe.Price,
+      { payment, metadata = {} }: { payment?: Stripe.InvoicePayment.Payment; metadata?: Stripe.Metadata } = {},
+    ) =>
+      getInvoice({
+        status: 'paid',
+        metadata,
+        lines: { data: [{ pricing: { price_details: { price: price.id, product: price.product as string } } }] },
+        payments: { data: payment ? [{ status: 'paid', payment }] : [] },
+      });
 
-      const baseLineItem = {
-        lines: {
-          data: [
-            {
-              price: {
-                ...mockedPrice,
-                metadata: {
-                  maxSpaceBytes: '1',
-                },
-              },
-            },
+    const mockStripe = ({
+      invoicesByCustomer,
+      prices,
+      charges = [],
+    }: {
+      invoicesByCustomer: Record<string, Stripe.Invoice[]>;
+      prices: Stripe.Price[];
+      charges?: Pick<Stripe.Charge, 'id' | 'refunded' | 'disputed'>[];
+    }) => {
+      jest
+        .spyOn(stripeNewVersion.invoices, 'list')
+        .mockImplementation(async (params: any) => ({ data: invoicesByCustomer[params.customer] ?? [] }) as any);
+      jest
+        .spyOn(stripeNewVersion.prices, 'retrieve')
+        .mockImplementation(async (priceId: string) => prices.find((price) => price.id === priceId) as any);
+      jest
+        .spyOn(stripeNewVersion.paymentIntents, 'retrieve')
+        .mockImplementation(async (paymentIntentId: string) => ({ latest_charge: `ch_of_${paymentIntentId}` }) as any);
+      jest
+        .spyOn(stripeNewVersion.charges, 'retrieve')
+        .mockImplementation(
+          async (chargeId: string) =>
+            (charges.find((charge) => charge.id === chargeId) ?? { refunded: false, disputed: false }) as any,
+        );
+    };
+
+    const stackLifetimesFor = async (customers: Stripe.Customer[]) => {
+      const user = getUser({ lifetime: true, customerId: customers[0].id });
+      const tier = newTier({ billingType: 'lifetime' });
+      jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'lifetime' } as any);
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customers[0]));
+      jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue(customers);
+      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(tier);
+      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
+
+      const result = await determineLifetimeConditions.determine(user, tier.productId);
+
+      return { ...result, expectedTier: tier };
+    };
+
+    test('When the user already has paid lifetimes, then their storage is stacked and the lifetime tier is returned', async () => {
+      const customer = getCustomer();
+      const firstPrice = lifetimePrice('1000');
+      const secondPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(firstPrice, { payment: paidWithCard('pi_first') }),
+            paidInvoice(secondPrice, { payment: paidWithCard('pi_second') }),
           ],
         },
-      };
+        prices: [firstPrice, secondPrice],
+      });
 
-      const mockedInvoices = getInvoices(3, [{ ...baseLineItem }, { ...baseLineItem }, { ...baseLineItem }]);
-      const mockedCustomer = getCustomer();
+      const { maxSpaceBytes, tier, expectedTier } = await stackLifetimesFor([customer]);
 
-      jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'free' });
-      jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedTier);
-      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
-      jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([getCustomer({ id: mockedUser.customerId })]);
-      //@ts-ignore
-      jest.spyOn(determineLifetimeConditions, 'getPaidInvoices').mockResolvedValue(mockedInvoices);
-      //@ts-ignore
-      jest.spyOn(determineLifetimeConditions, 'getHigherTier').mockResolvedValue(mockedTier);
+      expect(maxSpaceBytes).toBe(3000);
+      expect(tier).toStrictEqual(expectedTier);
+    });
 
-      const { maxSpaceBytes, tier } = await determineLifetimeConditions.determine(mockedUser, mockedTier.productId);
+    test('When the user has several accounts with the same email, then the lifetimes of all of them are stacked', async () => {
+      const customer = getCustomer();
+      const otherCustomer = getCustomer({ id: 'cus_other' });
+      const firstPrice = lifetimePrice('1000');
+      const secondPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [paidInvoice(firstPrice, { payment: paidWithCard('pi_first') })],
+          [otherCustomer.id]: [paidInvoice(secondPrice, { payment: paidWithCard('pi_second') })],
+        },
+        prices: [firstPrice, secondPrice],
+      });
 
-      expect(maxSpaceBytes).toStrictEqual(totalMaxSpaceBytes);
-      expect(tier).toStrictEqual(mockedTier);
+      const { maxSpaceBytes } = await stackLifetimesFor([customer, otherCustomer]);
+
+      expect(maxSpaceBytes).toBe(3000);
+    });
+
+    test('When a lifetime was paid outside Stripe, then its storage is stacked', async () => {
+      const customer = getCustomer();
+      const price = lifetimePrice('1000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [paidInvoice(price, { payment: paidOutOfBand, metadata: { chargeId: 'external_charge' } })],
+        },
+        prices: [price],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+      expect(stripeNewVersion.charges.retrieve).not.toHaveBeenCalled();
+    });
+
+    test('When a lifetime was free thanks to a full discount, then its storage is stacked', async () => {
+      const customer = getCustomer();
+      const price = lifetimePrice('1000');
+      mockStripe({ invoicesByCustomer: { [customer.id]: [paidInvoice(price)] }, prices: [price] });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+    });
+
+    test('When a lifetime payment was refunded, then its storage is not stacked', async () => {
+      const customer = getCustomer();
+      const keptPrice = lifetimePrice('1000');
+      const refundedPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(keptPrice, { payment: paidWithCard('pi_kept') }),
+            paidInvoice(refundedPrice, { payment: paidWithCard('pi_refunded') }),
+          ],
+        },
+        prices: [keptPrice, refundedPrice],
+        charges: [{ id: 'ch_of_pi_refunded', refunded: true, disputed: false }],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+    });
+
+    test('When a lifetime payment was disputed, then its storage is not stacked', async () => {
+      const customer = getCustomer();
+      const keptPrice = lifetimePrice('1000');
+      const disputedPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(keptPrice, { payment: paidWithCard('pi_kept') }),
+            paidInvoice(disputedPrice, { payment: paidWithCard('pi_disputed') }),
+          ],
+        },
+        prices: [keptPrice, disputedPrice],
+        charges: [{ id: 'ch_of_pi_disputed', refunded: false, disputed: true }],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+    });
+
+    test('When the invoice points to a specific charge, then that charge decides whether the lifetime counts', async () => {
+      const customer = getCustomer();
+      const keptPrice = lifetimePrice('1000');
+      const refundedPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(keptPrice, { payment: paidWithCard('pi_kept') }),
+            paidInvoice(refundedPrice, { payment: paidWithCard('pi_other'), metadata: { chargeId: 'ch_refunded' } }),
+          ],
+        },
+        prices: [keptPrice, refundedPrice],
+        charges: [{ id: 'ch_refunded', refunded: true, disputed: false }],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+    });
+
+    test('When a lifetime was paid with a direct charge, then that charge decides whether the lifetime counts', async () => {
+      const customer = getCustomer();
+      const keptPrice = lifetimePrice('1000');
+      const refundedPrice = lifetimePrice('2000');
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(keptPrice, { payment: paidWithCard('pi_kept') }),
+            paidInvoice(refundedPrice, { payment: { type: 'charge', charge: 'ch_direct' } }),
+          ],
+        },
+        prices: [keptPrice, refundedPrice],
+        charges: [{ id: 'ch_direct', refunded: true, disputed: false }],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
+    });
+
+    test('When an invoice is not for a lifetime plan, unpaid or without a plan price, then its storage is not stacked', async () => {
+      const customer = getCustomer();
+      const lifetime = lifetimePrice('1000');
+      const subscriptionPrice = getPrice({ metadata: { planType: 'subscription', maxSpaceBytes: '2000' } });
+      const unpaidLifetime = lifetimePrice('4000');
+      const unpaidInvoice = { ...paidInvoice(unpaidLifetime), status: 'open' } as Stripe.Invoice;
+      const invoiceWithoutPrice = getInvoice({ status: 'paid', lines: { data: [{ pricing: null }] } });
+      mockStripe({
+        invoicesByCustomer: {
+          [customer.id]: [
+            paidInvoice(lifetime, { payment: paidWithCard('pi_lifetime') }),
+            paidInvoice(subscriptionPrice, { payment: paidWithCard('pi_subscription') }),
+            unpaidInvoice,
+            invoiceWithoutPrice,
+          ],
+        },
+        prices: [lifetime, subscriptionPrice, unpaidLifetime],
+      });
+
+      const { maxSpaceBytes } = await stackLifetimesFor([customer]);
+
+      expect(maxSpaceBytes).toBe(1000);
     });
   });
 
@@ -142,120 +331,6 @@ describe('Determining Lifetime conditions', () => {
 
       //@ts-ignore
       await expect(determineLifetimeConditions.handleStackingLifetime(user)).rejects.toThrow(tierNotFoundError);
-    });
-
-    it('When we want to fetch the higher tier and the max space bytes, then the correct tier and bytes are returned', async () => {
-      const user = getUser({ lifetime: true });
-      const customer = getCustomer({ id: user.customerId });
-      const invoice = getInvoice();
-      const mockedTier = newTier({ billingType: 'lifetime' });
-
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customer));
-      jest.spyOn(paymentService, 'getCustomersByEmail').mockResolvedValue([customer]);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([invoice]);
-      //@ts-ignore
-      jest.spyOn(determineLifetimeConditions, 'getPaidInvoices').mockResolvedValue([invoice]);
-      jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([mockedTier]);
-      //@ts-ignore
-      jest.spyOn(determineLifetimeConditions, 'getHigherTier').mockResolvedValue(mockedTier);
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.handleStackingLifetime(user);
-
-      expect(result.tier).toEqual(mockedTier);
-      expect(result.maxSpaceBytes).toBe(Number.parseInt(invoice.lines.data[0].price?.metadata?.maxSpaceBytes ?? '0'));
-    });
-  });
-
-  describe('Get paid invoices', () => {
-    it('When there is no metadata in the invoice, then the invoice should be skipped', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.lines.data[0].price!.metadata = {};
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toEqual([]);
-    });
-
-    it('When the invoice has not been paid, then the invoice is skipped', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.status = 'open';
-      invoice.paid_out_of_band = true;
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.metadata = {};
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toStrictEqual([]);
-    });
-
-    it('When the invoice is paid out of band, then the invoice is returned directly', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.status = 'paid';
-      invoice.paid_out_of_band = true;
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.metadata = {};
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toEqual([invoice]);
-    });
-
-    it('When the invoice is paid and it has not been refunded nor disputed, then the invoice is returned', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.status = 'paid';
-
-      jest
-        .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
-        .mockResolvedValue({ refunded: false, disputed: false } as any);
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toEqual([invoice]);
-    });
-
-    it('When the invoice is paid but it has been refunded, then the invoice is returned', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.status = 'paid';
-
-      jest
-        .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
-        .mockResolvedValue({ refunded: true, disputed: false } as any);
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toStrictEqual([]);
-    });
-
-    it('When the invoice is paid and it has has been disputed, then the invoice is returned', async () => {
-      const customer = getCustomer();
-      const invoice = getInvoice();
-      invoice.metadata = { chargeId: 'ch_123' };
-      invoice.lines.data[0].price!.metadata!.planType = 'one_time';
-      invoice.status = 'paid';
-
-      jest
-        .spyOn(paymentService, 'retrieveCustomerChargeByChargeId')
-        .mockResolvedValue({ refunded: false, disputed: true } as any);
-
-      //@ts-ignore
-      const result = await determineLifetimeConditions.getPaidInvoices(customer, [invoice]);
-
-      expect(result).toStrictEqual([]);
     });
   });
 

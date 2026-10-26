@@ -9,6 +9,7 @@ import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
+import { getInvoiceProductId } from '../utils/invoice';
 
 export function objectStorageController(paymentService: PaymentService) {
   return async function (fastify: FastifyInstance) {
@@ -221,22 +222,22 @@ export function objectStorageController(paymentService: PaymentService) {
       }
 
       const productPromises = userInvoices
-        .map((invoice) => invoice.lines.data[0]?.price?.product)
-        .filter(Boolean)
-        .map((productId) => paymentService.getProduct(productId as string));
+        .map(getInvoiceProductId)
+        .filter((productId): productId is string => !!productId)
+        .map((productId) => paymentService.getProduct(productId));
 
       const productDetails = await Promise.all(productPromises);
 
       const objectStorageProduct = productDetails.find((product) => product.metadata?.type === 'object-storage');
 
       const objectStorageInvoices = userInvoices
-        .filter((invoice) => invoice.lines.data[0].price?.product === objectStorageProduct?.id)
+        .filter((invoice) => getInvoiceProductId(invoice) === objectStorageProduct?.id)
         .map((invoice) => ({
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
           total: invoice.total,
-          product: invoice.lines.data[0].price?.product,
+          product: getInvoiceProductId(invoice),
         }));
 
       return res.status(200).send(objectStorageInvoices);

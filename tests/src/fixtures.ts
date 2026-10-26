@@ -573,6 +573,7 @@ export const getInvoice = (
   productId?: string,
 ): Stripe.Invoice => {
   const generatedProductId = productId ?? `prod_${randomDataGenerator.string({ length: 12 })}`;
+  const generatedPriceId = `price_${randomDataGenerator.string({ length: 12 })}`;
 
   return {
     ...INVOICE_BASE,
@@ -586,9 +587,14 @@ export const getInvoice = (
         {
           ...INVOICE_BASE.lines.data[0],
           id: `il_${randomDataGenerator.string({ length: 24 })}`,
+          pricing: {
+            type: 'price_details',
+            unit_amount_decimal: null,
+            price_details: { price: generatedPriceId, product: generatedProductId },
+          },
           price: {
             ...PRICE_BASE,
-            id: `price_${randomDataGenerator.string({ length: 12 })}`,
+            id: generatedPriceId,
             metadata: {
               maxSpaceBytes: `${randomDataGenerator.natural({ length: 8 })}`,
               type: userType as string,
