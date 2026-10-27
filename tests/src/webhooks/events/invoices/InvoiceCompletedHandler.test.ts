@@ -48,7 +48,7 @@ afterEach(() => jest.restoreAllMocks());
 const getLinePrice = (invoice: Stripe.Invoice, productParams?: Partial<Stripe.Product>): Stripe.Price => {
   const priceDetails = invoice.lines.data[0].pricing?.price_details;
   return getPrice({
-    id: priceDetails?.price,
+    id: priceDetails?.price as string,
     metadata: { maxSpaceBytes: '1099511627776', type: 'individual' },
     product: getProduct({ params: { id: priceDetails?.product, ...productParams } }),
   });
@@ -999,9 +999,7 @@ describe('Testing the handler when an invoice is completed', () => {
             {
               discounts: [
                 {
-                  coupon: {
-                    id: 'mocked-coupon',
-                  },
+                  source: { type: 'coupon', coupon: 'mocked-coupon' },
                 } as any,
               ],
             },
@@ -1020,10 +1018,7 @@ describe('Testing the handler when an invoice is completed', () => {
         isLifetimePlan: true,
       });
 
-      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(
-        mockedUser,
-        (mockedInvoice.lines.data[0].discounts[0] as Stripe.Discount).coupon.id,
-      );
+      expect(storeCouponUsedByUserSpy).toHaveBeenCalledWith(mockedUser, 'mocked-coupon');
     });
 
     test('When subscription plan has discount, then it should store coupon from invoice', async () => {
@@ -1031,9 +1026,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedInvoice = getInvoice({
         discounts: [
           {
-            coupon: {
-              id: 'mocked-coupon',
-            },
+            source: { type: 'coupon', coupon: 'mocked-coupon' },
           } as any,
         ],
       });
@@ -1081,9 +1074,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedInvoice = getInvoice({
         discounts: [
           {
-            coupon: {
-              id: 'mocked-coupon',
-            },
+            source: { type: 'coupon', coupon: 'mocked-coupon' },
           } as any,
         ],
       });
@@ -1113,9 +1104,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedInvoice = getInvoice({
         discounts: [
           {
-            coupon: {
-              id: 'mocked-coupon',
-            },
+            source: { type: 'coupon', coupon: 'mocked-coupon' },
           } as any,
         ],
       });

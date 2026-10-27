@@ -11,8 +11,8 @@ export interface PaymentIntent {
 export interface PromotionCode {
   promoCodeName: Stripe.PromotionCode['code'];
   codeId: Stripe.PromotionCode['id'];
-  amountOff: Stripe.PromotionCode['coupon']['amount_off'];
-  percentOff: Stripe.PromotionCode['coupon']['percent_off'];
+  amountOff: Stripe.Coupon['amount_off'];
+  percentOff: Stripe.Coupon['percent_off'];
 }
 
 export interface PriceByIdResponse {

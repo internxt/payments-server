@@ -94,6 +94,19 @@ describe('Payments Service tests', () => {
       });
     });
 
+    test('When a subscription is created, then it keeps the classic billing so prorations are calculated as before', async () => {
+      const createSubscriptionSpy = mockSubscriptionCreation({
+        pending_setup_intent: null,
+        latest_invoice: {} as Stripe.Invoice,
+      });
+
+      await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(createSubscriptionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ billing_mode: { type: 'classic' } }),
+      );
+    });
+
     test('When the subscription starts without a payment, then the secret to save the payment method is returned', async () => {
       mockSubscriptionCreation({ pending_setup_intent: { client_secret: 'seti_secret' } as Stripe.SetupIntent });
 
@@ -716,10 +729,39 @@ describe('Payments Service tests', () => {
     });
 
     describe('Get promotion code object by name', () => {
+      test('When the promotion code exists, then the discount and the products of its coupon are taken into account', async () => {
+        const mockedPrice = getPrice();
+        const mockedPromoCode = getPromoCode();
+        const coupon = {
+          ...(mockedPromoCode.promotion.coupon as Stripe.Coupon),
+          applies_to: { products: ['other_product'] },
+        };
+        jest.spyOn(stripe.promotionCodes, 'list').mockImplementation((async (
+          params: Stripe.PromotionCodeListParams,
+        ) => {
+          const isCouponExpanded = params.expand?.includes('data.promotion.coupon.applies_to');
+          return {
+            data: [
+              { ...mockedPromoCode, promotion: { type: 'coupon', coupon: isCouponExpanded ? coupon : coupon.id } },
+            ],
+          };
+        }) as any);
+
+        await expect(
+          paymentService.getPromoCodeByName(mockedPrice.product as string, mockedPromoCode.code),
+        ).rejects.toThrow(BadRequestError);
+        await expect(paymentService.getPromoCodeByName('other_product', mockedPromoCode.code)).resolves.toStrictEqual({
+          promoCodeName: mockedPromoCode.code,
+          codeId: mockedPromoCode.id,
+          amountOff: coupon.amount_off,
+          percentOff: coupon.percent_off,
+        });
+      });
+
       it('When the promotion code is active and the product can be applied, then it returns the correct promo code', async () => {
         const mockedPrice = getPrice();
         const mockedPromoCode = getPromoCode();
-        mockedPromoCode.coupon.applies_to = { products: [mockedPrice.product as string] };
+        (mockedPromoCode.promotion.coupon as Stripe.Coupon).applies_to = { products: [mockedPrice.product as string] };
         jest.spyOn(paymentService, 'getPromoCode').mockResolvedValue(mockedPromoCode);
 
         const promoCodeByName = await paymentService.getPromoCodeByName(
@@ -730,8 +772,8 @@ describe('Payments Service tests', () => {
         expect(promoCodeByName).toStrictEqual({
           promoCodeName: mockedPromoCode.code,
           codeId: mockedPromoCode.id,
-          amountOff: mockedPromoCode.coupon.amount_off,
-          percentOff: mockedPromoCode.coupon.percent_off,
+          amountOff: (mockedPromoCode.promotion.coupon as Stripe.Coupon).amount_off,
+          percentOff: (mockedPromoCode.promotion.coupon as Stripe.Coupon).percent_off,
         });
       });
 
@@ -748,8 +790,8 @@ describe('Payments Service tests', () => {
         expect(promoCodeByName).toStrictEqual({
           promoCodeName: mockedPromoCode.code,
           codeId: mockedPromoCode.id,
-          amountOff: mockedPromoCode.coupon.amount_off,
-          percentOff: mockedPromoCode.coupon.percent_off,
+          amountOff: (mockedPromoCode.promotion.coupon as Stripe.Coupon).amount_off,
+          percentOff: (mockedPromoCode.promotion.coupon as Stripe.Coupon).percent_off,
         });
       });
 
@@ -758,7 +800,7 @@ describe('Payments Service tests', () => {
         const mockedPromoCode = getPromoCode();
         jest.spyOn(paymentService, 'getPromoCode').mockResolvedValue(mockedPromoCode);
 
-        mockedPromoCode.coupon.applies_to = { products: ['other_product'] };
+        (mockedPromoCode.promotion.coupon as Stripe.Coupon).applies_to = { products: ['other_product'] };
 
         await expect(
           paymentService.getPromoCodeByName(mockedPrice.product as string, mockedPromoCode.code),
@@ -858,6 +900,7 @@ describe('Payments Service tests', () => {
       expect(stripe.prices.retrieve).toHaveBeenCalledWith(recurringPriceId);
       expect(subscriptionCreateSpy).toHaveBeenCalledWith({
         customer: customerId,
+        billing_mode: { type: 'classic' },
         items: [
           {
             price: recurringPriceId,
