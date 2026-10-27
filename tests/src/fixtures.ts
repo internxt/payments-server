@@ -135,6 +135,7 @@ export const getConfirmationToken = (params?: Partial<Stripe.ConfirmationToken>)
     created: nowInSeconds,
     expires_at: nowInSeconds + twelveHoursInSeconds,
     livemode: false,
+    metadata: null,
     payment_intent: null,
     payment_method_options: null,
     payment_method_preview: null,
@@ -252,7 +253,7 @@ export const getPrice = (params?: Partial<Stripe.Price>): Stripe.Price => {
     currency: 'eur',
     product: 'prod_NZKdYqrwEYx6iK',
     unit_amount: 1000,
-    unit_amount_decimal: '1000',
+    unit_amount_decimal: Stripe.Decimal.from('1000'),
     currency_options: {
       eur: {
         tax_behavior: 'exclusive',
@@ -389,7 +390,7 @@ export const getCreatedSubscription = (
             active: true,
             aggregate_usage: null,
             amount: 1000,
-            amount_decimal: '1000',
+            amount_decimal: Stripe.Decimal.from('1000'),
             billing_scheme: 'per_unit',
             created: randomDataGenerator.natural({ length: 10 }),
             currency: 'usd',
@@ -636,7 +637,7 @@ export const getInvoiceItems = (params?: DeepPartial<Partial<Stripe.InvoiceItem>
     tax_rates: [],
     test_clock: null,
     unit_amount: 1000,
-    unit_amount_decimal: '1000',
+    unit_amount_decimal: Stripe.Decimal.from('1000'),
     ...(params as any),
   } as Stripe.InvoiceItem;
 };

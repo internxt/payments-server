@@ -42,6 +42,7 @@ import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter
 import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
+  SubscriptionStatus,
 } from '../infrastructure/domain/entities/subscription';
 import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../constants';
 import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../errors/stripeErrorCodes';
@@ -1150,7 +1151,7 @@ export class PaymentService {
     return SubscriptionEntity.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
-      status: subscription.status,
+      status: subscription.status as SubscriptionStatus,
       metadata: subscription.metadata,
       startDate: subscription.start_date,
       priceId: subscription.items.data[0].price.id,

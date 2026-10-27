@@ -1,4 +1,4 @@
-import { Stripe } from 'stripe';
+import Stripe from 'stripe';
 import axios, { AxiosInstance } from 'axios';
 import { TiersService } from '../../../src/services/tiers.service';
 import { PaymentService } from '../../../src/services/payment.service';
