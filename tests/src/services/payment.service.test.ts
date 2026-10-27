@@ -1373,6 +1373,24 @@ describe('Payments Service tests', () => {
       expect(result.type === 'subscription' && result.plan.tax?.enabled).toBe(false);
     });
 
+    test('when the user has an active subscription, then the amount of the next payment is the one of that subscription', async () => {
+      const subscription = makeActiveSubscription();
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
+      jest.spyOn(stripe.invoices, 'createPreview').mockImplementation((async (params: any) => {
+        if (!params?.subscription) {
+          throw new Stripe.errors.StripeInvalidRequestError({
+            type: 'invalid_request_error',
+            message: 'You must provide at least one of: `subscription`, `schedule`, `subscription_details.items`.',
+          });
+        }
+        return { total: params.subscription === subscription.id ? 1210 : 0, total_excluding_tax: 1000 };
+      }) as any);
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.amountAfterCoupon).toBe(1210);
+    });
+
     test('when the user has a business subscription, then it returns the subscription with business type', async () => {
       const subscription = makeActiveSubscription({}, { product: { metadata: { type: 'business' } } });
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);

@@ -863,7 +863,10 @@ export class PaymentService {
       }
     }
 
-    const upcomingInvoice = await this.provider.invoices.createPreview({ customer: customerId });
+    const upcomingInvoice = await this.provider.invoices.createPreview({
+      customer: customerId,
+      subscription: subscription.id,
+    });
 
     const storageLimit =
       Number(
