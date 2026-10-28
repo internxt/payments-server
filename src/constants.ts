@@ -34,6 +34,6 @@ export const EU_COUNTRIES = [
   'ES',
   'SE',
 ];
-export const STRIPE_API_VERSION = '2025-08-27.basil';
+export const STRIPE_API_VERSION = '2026-02-25.clover';
 export const CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES = 15;
 export const PAYMENTS_TOKEN_EXPIRATION = '6h';

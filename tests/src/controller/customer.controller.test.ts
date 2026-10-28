@@ -29,14 +29,14 @@ describe('Customer controller', () => {
       const mockedCoupon2 = getCoupon({ code: 'COuPoN' });
       const mockedPromoCode = getPromoCode({
         code: 'PROMO_CODE',
-        coupon: {
-          id: mockedCoupon.code,
+        promotion: {
+          coupon: { id: mockedCoupon.code },
         },
       });
       const mockedPromoCode2 = getPromoCode({
         code: 'PROMO_CODE_2',
-        coupon: {
-          id: mockedCoupon2.code,
+        promotion: {
+          coupon: { id: mockedCoupon2.code },
         },
       });
       const mockedCoupons = [mockedCoupon.id, mockedCoupon2.id];
@@ -72,14 +72,14 @@ describe('Customer controller', () => {
       const mockedCoupon2 = getCoupon({ code: 'COuPoN' });
       const mockedPromoCode = getPromoCode({
         code: 'PROMO_CODE',
-        coupon: {
-          id: mockedCoupon.code,
+        promotion: {
+          coupon: { id: mockedCoupon.code },
         },
       });
       const mockedPromoCode2 = getPromoCode({
         code: 'PROMO_CODE_2',
-        coupon: {
-          id: mockedCoupon2.code,
+        promotion: {
+          coupon: { id: mockedCoupon2.code },
         },
       });
       const usedCoupons = [mockedPromoCode.code, mockedPromoCode2.code];
