@@ -4,6 +4,7 @@ import { PaymentService } from '../../services/payment.service';
 import { AxiosError, isAxiosError } from 'axios';
 import Logger from '../../Logger';
 import { Customer } from '../../infrastructure/domain/entities/customer';
+import { getInvoiceProductId } from '../../utils/invoice';
 
 export class ObjectStorageWebhookHandler {
   constructor(
@@ -40,19 +41,18 @@ export class ObjectStorageWebhookHandler {
       return;
     }
 
-    const [item] = invoice.lines.data;
     const { customer_email } = invoice;
-    const { price } = item;
+    const productId = getInvoiceProductId(invoice);
 
-    if (!price || !price.product) {
+    if (!productId) {
       Logger.info(`The price or the product for the invoice with ID ${invoice.id} are null.`);
       return;
     }
 
-    const product = await this.paymentService.getProduct(price.product as string);
+    const product = await this.paymentService.getProduct(productId);
 
     if (!this.isObjectStorageProduct(product)) {
-      Logger.info(`Invoice ${invoice.id} for product ${price.product as string} is not an object-storage product`);
+      Logger.info(`Invoice ${invoice.id} for product ${productId} is not an object-storage product`);
       return;
     }
 

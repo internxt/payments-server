@@ -6,10 +6,10 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { PaymentService } from '../services/payment.service';
 import { TiersService } from '../services/tiers.service';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
+import { NotFoundError } from '../errors/Errors';
 
 interface HandleDisputeResultProps {
   dispute: Stripe.Dispute;
-  stripe: Stripe;
   paymentService: PaymentService;
   usersService: UsersService;
   storageService: StorageService;
@@ -20,7 +20,6 @@ interface HandleDisputeResultProps {
 
 export async function handleDisputeResult({
   dispute,
-  stripe,
   paymentService,
   usersService,
   storageService,
@@ -34,11 +33,8 @@ export async function handleDisputeResult({
 
   const chargeId = dispute.charge as string;
   try {
-    const charge = await stripe.charges.retrieve(chargeId);
+    const charge = await paymentService.retrieveCustomerChargeByChargeId(chargeId);
     const customerId = typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id as string);
-    const invoiceId = typeof charge.invoice === 'string' ? charge.invoice : (charge.invoice?.id as string);
-
-    const { subscription: subscriptionId } = await stripe.invoices.retrieve(invoiceId as string);
     const { lifetime } = await usersService.findUserByCustomerID(customerId);
 
     if (lifetime) {
@@ -52,6 +48,12 @@ export async function handleDisputeResult({
         preCreatedUserService,
       );
     } else {
+      const invoiceId = await paymentService.getInvoiceIdFromCharge(charge);
+      if (!invoiceId) throw new NotFoundError(`Disputed charge ${chargeId} does not belong to an invoice`);
+
+      const invoice = await paymentService.getInvoice(invoiceId);
+      const subscription = invoice.parent?.subscription_details?.subscription;
+      const subscriptionId = typeof subscription === 'string' ? subscription : subscription?.id;
       await paymentService.cancelSubscription(subscriptionId as string);
     }
   } catch (error) {

@@ -11,7 +11,7 @@ import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
-import { EU_COUNTRIES } from '../../constants';
+import { EU_COUNTRIES, STRIPE_API_VERSION } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
 
 export class StripePaymentsAdapter implements PaymentsAdapter {
@@ -21,7 +21,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   get provider(): Stripe {
     if (!this._provider) {
       this._provider = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
-        apiVersion: '2025-02-24.acacia',
+        apiVersion: STRIPE_API_VERSION,
       });
     }
     return this._provider;
@@ -182,7 +182,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       customer: subscription.customer as string,
       status: subscription.status,
       priceId: subscription.items.data[0].price.id,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       metadata: subscription.metadata,
       startDate: subscription.start_date,
       trialEnd: subscription.trial_end ?? undefined,
@@ -203,7 +203,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
       id: subscription.id,
       customer: subscription.customer as string,
       status: subscription.status,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       priceId: subscription.items.data[0].price.id,
       startDate: subscription.start_date,
       metadata: subscription.metadata,
@@ -221,7 +221,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     const invoice = await this.provider.invoices.create(params);
 
     return Invoice.toDomain({
-      id: invoice.id,
+      id: invoice.id as string,
       clientSecretId: invoice.confirmation_secret?.client_secret,
       status: invoice.status as InvoiceStatus,
     });
@@ -232,7 +232,11 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     customerId: string,
     params: Partial<Stripe.InvoiceItemCreateParams>,
   ): Promise<InvoiceItems> {
-    const invoice = await this.provider.invoiceItems.create({ invoice: invoiceId, customer: customerId, ...params });
+    const invoice = await this.provider.invoiceItems.create({
+      invoice: invoiceId,
+      customer: customerId,
+      ...params,
+    });
 
     return InvoiceItems.toDomain({
       id: invoice.id,
@@ -245,7 +249,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     });
 
     return Invoice.toDomain({
-      id: finalizedInvoice.id,
+      id: finalizedInvoice.id as string,
       clientSecretId: finalizedInvoice.confirmation_secret?.client_secret,
       status: finalizedInvoice.status as InvoiceStatus,
     });

@@ -778,7 +778,7 @@ describe('Checkout controller', () => {
         method: 'POST',
         body: {
           customerId: mockedUser.customerId,
-          priceId: mockedInvoice.lines.data[0].price?.id,
+          priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price,
           token: userToken,
           currency: 'eur',
           captchaToken: mockedCaptchaToken,
@@ -934,7 +934,7 @@ describe('Checkout controller', () => {
         method: 'POST',
         body: {
           customerId: mockedUser.customerId,
-          priceId: mockedInvoice.lines.data[0].price?.id,
+          priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price,
           token: userToken,
         },
         headers: {

@@ -242,7 +242,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -289,7 +288,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'month',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -319,7 +317,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -362,7 +359,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -388,7 +384,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -412,7 +407,6 @@ describe('Stripe Adapter', () => {
         recurring: {
           interval: 'year',
           interval_count: 1,
-          aggregate_usage: null,
           meter: null,
           usage_type: 'licensed',
           trial_period_days: null,
@@ -467,7 +461,7 @@ describe('Stripe Adapter', () => {
           customer: stripeSubscription.customer as string,
           status: stripeSubscription.status,
           priceId: stripeSubscription.items.data[0].price.id,
-          currentPeriodEnd: stripeSubscription.current_period_end,
+          currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           metadata: stripeSubscription.metadata,
           startDate: stripeSubscription.start_date,
         }),
@@ -503,7 +497,7 @@ describe('Stripe Adapter', () => {
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
           status: stripeSubscription.status,
-          currentPeriodEnd: stripeSubscription.current_period_end,
+          currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           priceId: stripeSubscription.items.data[0].price.id,
           startDate: stripeSubscription.start_date,
           metadata: stripeSubscription.metadata,
@@ -528,7 +522,7 @@ describe('Stripe Adapter', () => {
 
   describe('Creating an invoice', () => {
     test('When creating an invoice, then the invoice is created and the entity is mapped and returned', async () => {
-      const mockedInvoice = getInvoice();
+      const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
       jest.spyOn(stripePaymentsAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
 
@@ -538,8 +532,8 @@ describe('Stripe Adapter', () => {
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
-          id: mockedInvoice.id,
-          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          id: mockedInvoice.id as string,
+          clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
       );
@@ -548,16 +542,16 @@ describe('Stripe Adapter', () => {
 
   describe('Finalizing an invoice', () => {
     test('When finalizing an invoice, then the invoice is finalized and the entity is mapped and returned', async () => {
-      const mockedInvoice = getInvoice();
+      const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
       jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
 
-      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id);
+      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id as string);
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
-          id: mockedInvoice.id,
-          clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
+          id: mockedInvoice.id as string,
+          clientSecretId: 'pi_secret',
           status: mockedInvoice.status as InvoiceStatus,
         }),
       );

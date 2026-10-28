@@ -4,10 +4,8 @@ import {
   getCharge,
   getCoupon,
   getCreatedSubscription,
-  getCreateSubscriptionResponse,
   getCustomer,
   getInvoice,
-  getInvoices,
   getPaymentIntent,
   getPaymentIntentResponse,
   getPaymentMethod,
@@ -22,7 +20,6 @@ import {
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
-import { getStripeNewVersion } from '../../../src/services/stripe';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import {
   getCustomerEntity,
@@ -35,10 +32,9 @@ import {
   ClientSecretNotFoundError,
   PaymentMethodNotFoundError,
   SubscriptionNotEligibleForEarlyChargeError,
+  NotFoundSubscriptionError,
 } from '../../../src/errors/PaymentErrors';
 import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../../../src/errors/stripeErrorCodes';
-
-const stripeNewVersion = getStripeNewVersion();
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe } = createTestServices();
@@ -69,30 +65,41 @@ describe('Payments Service tests', () => {
   });
 
   describe('Creating a subscription', () => {
-    it('When trying to create a subscription with the correct params, then it is successfully created', async () => {
-      const mockedSubscriptionResponse = getCreateSubscriptionResponse();
-      const mockedCreateSubscription = getCreatedSubscription();
+    const mockSubscriptionCreation = (createdSubscription: Partial<Stripe.Subscription>) => {
+      jest
+        .spyOn(stripe.prices, 'retrieve')
+        .mockResolvedValue(getPrice({ product: getProduct({ params: { metadata: {} } }) }) as any);
+      jest.spyOn(stripe.subscriptions, 'list').mockResolvedValue({ data: [] } as any);
+      return jest
+        .spyOn(stripe.subscriptions, 'create')
+        .mockResolvedValue({ id: 'sub_new', ...createdSubscription } as any);
+    };
 
-      const subscriptionCreatedSpy = jest
-        .spyOn(paymentService, 'createSubscription')
-        .mockImplementation(() => Promise.resolve(mockedSubscriptionResponse));
-
-      const subscription = await paymentService.createSubscription({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
+    test('When the subscription needs a payment, then the secret and the id of that payment are returned', async () => {
+      mockSubscriptionCreation({
+        pending_setup_intent: null,
+        latest_invoice: {
+          confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' },
+          payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_new' } }] },
+        } as Stripe.Invoice,
       });
 
-      expect(subscriptionCreatedSpy).toHaveBeenCalledWith({
-        customerId: mockedCreateSubscription.customer as string,
-        priceId: mockedCreateSubscription.items.data[0].price.id,
-        promoCodeId: (
-          (mockedCreateSubscription.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode
-        ).code,
+      const subscription = await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(subscription).toStrictEqual({
+        type: 'payment',
+        clientSecret: 'pi_secret',
+        subscriptionId: 'sub_new',
+        paymentIntentId: 'pi_new',
       });
-      expect(subscription).toEqual(mockedSubscriptionResponse);
+    });
+
+    test('When the subscription starts without a payment, then the secret to save the payment method is returned', async () => {
+      mockSubscriptionCreation({ pending_setup_intent: { client_secret: 'seti_secret' } as Stripe.SetupIntent });
+
+      const subscription = await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(subscription).toStrictEqual({ type: 'setup', clientSecret: 'seti_secret', subscriptionId: 'sub_new' });
     });
 
     it('When trying to create a business subscription, then an error is thrown', async () => {
@@ -134,8 +141,8 @@ describe('Payments Service tests', () => {
 
       const paymentIntentPayload = {
         customerId: mockedInvoice.customer as string,
-        priceId: mockedInvoice.lines.data[0].price?.id as string,
-        currency: mockedInvoice.lines.data[0].price?.currency as string,
+        priceId: mockedInvoice.lines.data[0].pricing?.price_details?.price as string,
+        currency: mockedInvoice.currency,
         promoCodeId: ((mockedInvoice.discounts[0] as Stripe.Discount)?.promotion_code as Stripe.PromotionCode).code,
       };
 
@@ -181,18 +188,18 @@ describe('Payments Service tests', () => {
         },
       });
       jest
-        .spyOn(stripeNewVersion.invoices, 'create')
+        .spyOn(stripe.invoices, 'create')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .spyOn(stripe.invoiceItems, 'create')
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .spyOn(stripe.invoices, 'retrieve')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .spyOn(stripe.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValueOnce({
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
         client_secret: mockedPaymentIntent.clientSecret as string,
       });
@@ -235,18 +242,18 @@ describe('Payments Service tests', () => {
       });
 
       jest
-        .spyOn(stripeNewVersion.invoices, 'create')
+        .spyOn(stripe.invoices, 'create')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .spyOn(stripe.invoiceItems, 'create')
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .spyOn(stripe.invoices, 'retrieve')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .spyOn(stripe.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValueOnce({
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
       });
 
@@ -289,19 +296,19 @@ describe('Payments Service tests', () => {
       });
 
       jest
-        .spyOn(stripeNewVersion.invoices, 'create')
+        .spyOn(stripe.invoices, 'create')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       const invoiceItemsCreateSpy = jest
-        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .spyOn(stripe.invoiceItems, 'create')
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(getPriceEntity({ id: 'mockedPriceId' }));
       jest
-        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .spyOn(stripe.invoices, 'retrieve')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .spyOn(stripe.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValueOnce({
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
         client_secret: mockedPaymentIntent.clientSecret as string,
       });
@@ -353,21 +360,21 @@ describe('Payments Service tests', () => {
       });
 
       jest
-        .spyOn(stripeNewVersion.invoices, 'create')
+        .spyOn(stripe.invoices, 'create')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoiceItems, 'create')
+        .spyOn(stripe.invoiceItems, 'create')
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'retrieve')
+        .spyOn(stripe.invoices, 'retrieve')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       const updateSpy = jest
-        .spyOn(stripeNewVersion.invoices, 'update')
+        .spyOn(stripe.invoices, 'update')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
       jest
-        .spyOn(stripeNewVersion.invoices, 'finalizeInvoice')
+        .spyOn(stripe.invoices, 'finalizeInvoice')
         .mockResolvedValueOnce(mockedFinalizedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
-      jest.spyOn(stripeNewVersion.paymentIntents, 'retrieve').mockResolvedValueOnce({
+      jest.spyOn(stripe.paymentIntents, 'retrieve').mockResolvedValueOnce({
         ...(mockedPaymentIntent as unknown as Stripe.Response<Stripe.PaymentIntent>),
         client_secret: mockedPaymentIntent.clientSecret as string,
       });
@@ -493,53 +500,64 @@ describe('Payments Service tests', () => {
     const { id: subscriptionId } = getCreatedSubscription();
     const mockPagination = { limit: 10, startingAfter: 'inv_123' };
 
-    beforeEach(() => {
-      jest.clearAllMocks();
+    const mockStripeInvoices = (invoices: Stripe.Invoice[]) =>
+      jest.spyOn(stripe.invoices, 'list').mockResolvedValue({ data: invoices } as any);
+
+    const mockStripePrices = (prices: Stripe.Price[]) =>
+      jest
+        .spyOn(stripe.prices, 'retrieve')
+        .mockImplementation(async (priceId: string) => prices.find((price) => price.id === priceId) as any);
+
+    const planPrice = (type: string) => getPrice({ metadata: { maxSpaceBytes: '1099511627776', type } });
+
+    const invoiceFor = (price: Stripe.Price) =>
+      getInvoice({
+        invoice_pdf: 'https://pay.stripe.com/invoice/pdf',
+        lines: { data: [{ pricing: { price_details: { price: price.id, product: price.product as string } } }] },
+      });
+
+    const toDriveInvoice = (invoice: Stripe.Invoice, price: Stripe.Price) => ({
+      id: invoice.id,
+      created: invoice.created,
+      pdf: invoice.invoice_pdf,
+      bytesInPlan: price.metadata.maxSpaceBytes,
+      product: price.product,
+      total: invoice.total,
+      currency: invoice.currency,
     });
 
-    it('When userType is Individual, then returns filtered invoices with individual type', async () => {
-      const mockedInvoices = getInvoice(undefined, UserType.Individual);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoices]);
+    test('When an individual user requests their invoices, then their paid plan invoices are returned with the plan storage and product', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const individualInvoice = invoiceFor(individualPrice);
+      const listInvoices = mockStripeInvoices([individualInvoice, invoiceFor(businessPrice)]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([
-        {
-          id: mockedInvoices.id,
-          created: mockedInvoices.created,
-          pdf: mockedInvoices.invoice_pdf,
-          bytesInPlan: mockedInvoices.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: mockedInvoices.lines.data[0].price?.product,
-          total: mockedInvoices.total,
-          currency: mockedInvoices.currency,
-        },
-      ]);
+      expect(listInvoices).toHaveBeenCalledWith(expect.objectContaining({ customer: customerId, status: 'paid' }));
+      expect(result).toStrictEqual([toDriveInvoice(individualInvoice, individualPrice)]);
     });
 
-    it('When userType is Business, then returns filtered invoices with business type', async () => {
-      const mockedInvoices = getInvoice(undefined, UserType.Business);
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([mockedInvoices]);
+    test('When a business user requests their invoices, then only the business plan invoices are returned', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const businessInvoice = invoiceFor(businessPrice);
+      mockStripeInvoices([invoiceFor(individualPrice), businessInvoice]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Business);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([
-        {
-          id: mockedInvoices.id,
-          created: mockedInvoices.created,
-          pdf: mockedInvoices.invoice_pdf,
-          bytesInPlan: mockedInvoices.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: mockedInvoices.lines.data[0].price?.product,
-          total: mockedInvoices.total,
-          currency: mockedInvoices.currency,
-        },
-      ]);
+      expect(result).toStrictEqual([toDriveInvoice(businessInvoice, businessPrice)]);
     });
 
-    it('When a subscriptionId is provided, then filters invoices by subscriptionId', async () => {
-      const mockedInvoices = getInvoices();
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue(mockedInvoices);
+    test('When the invoices of a subscription are requested, then all the invoices of that subscription are returned', async () => {
+      const individualPrice = planPrice(UserType.Individual);
+      const businessPrice = planPrice(UserType.Business);
+      const individualInvoice = invoiceFor(individualPrice);
+      const businessInvoice = invoiceFor(businessPrice);
+      const listInvoices = mockStripeInvoices([individualInvoice, businessInvoice]);
+      mockStripePrices([individualPrice, businessPrice]);
 
       const result = await paymentService.getDriveInvoices(
         customerId,
@@ -548,36 +566,34 @@ describe('Payments Service tests', () => {
         subscriptionId,
       );
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(
-        customerId,
-        mockPagination,
-        subscriptionId,
-        'paid',
-      );
-      expect(result).toEqual(
-        mockedInvoices.map((invoice) => ({
-          id: invoice.id,
-          created: invoice.created,
-          pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0].price?.metadata.maxSpaceBytes,
-          product: invoice.lines.data[0].price?.product,
-          total: invoice.total,
-          currency: invoice.currency,
-        })),
-      );
+      expect(listInvoices).toHaveBeenCalledWith(expect.objectContaining({ subscription: subscriptionId }));
+      expect(result).toStrictEqual([
+        toDriveInvoice(individualInvoice, individualPrice),
+        toDriveInvoice(businessInvoice, businessPrice),
+      ]);
     });
 
-    it('When no invoices match the filters, then returns an empty array', async () => {
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([]);
+    test('When several invoices are for the same plan, then the plan price is fetched only once', async () => {
+      const price = planPrice(UserType.Individual);
+      mockStripeInvoices([invoiceFor(price), invoiceFor(price), invoiceFor(price)]);
+      const retrievePrice = mockStripePrices([price]);
 
       const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
 
-      expect(paymentService.getInvoicesFromUser).toHaveBeenCalledWith(customerId, mockPagination, undefined, 'paid');
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(3);
+      expect(retrievePrice).toHaveBeenCalledTimes(1);
     });
 
-    it('When getInvoicesFromUser throws an error, then it propagates the error', async () => {
-      jest.spyOn(paymentService, 'getInvoicesFromUser').mockRejectedValue(new Error('Service error'));
+    test('When the user has no paid invoices, then an empty list is returned', async () => {
+      mockStripeInvoices([]);
+
+      const result = await paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual);
+
+      expect(result).toStrictEqual([]);
+    });
+
+    test('When the invoices cannot be fetched, then the error is propagated', async () => {
+      jest.spyOn(stripe.invoices, 'list').mockRejectedValue(new Error('Service error'));
 
       await expect(paymentService.getDriveInvoices(customerId, mockPagination, UserType.Individual)).rejects.toThrow(
         'Service error',
@@ -807,18 +823,6 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Retrieve an invoice given its ID', () => {
-    it('When an invoice is requested, then the correct invoice object is returned', async () => {
-      const mockedInvoice = getInvoice();
-
-      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue(mockedInvoice as Stripe.Response<Stripe.Invoice>);
-
-      const invoice = await paymentService.getInvoice(mockedInvoice.id);
-
-      expect(invoice).toStrictEqual(mockedInvoice);
-    });
-  });
-
   describe('Subscribe', () => {
     const customerId = 'cus_test_123';
     const recurringPriceId = 'price_recurring_123';
@@ -905,7 +909,7 @@ describe('Payments Service tests', () => {
       });
       expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
         customer: customerId,
-        price: oneTimePriceId,
+        pricing: { price: oneTimePriceId },
         quantity: 0,
         description: 'One-time charge',
         invoice: mockedInvoice.id,
@@ -959,7 +963,7 @@ describe('Payments Service tests', () => {
       });
       expect(invoiceItemCreateSpy).toHaveBeenCalledWith({
         customer: customerId,
-        price: oneTimePriceId,
+        pricing: { price: oneTimePriceId },
         quantity: 0,
         description: expect.stringContaining(licenseCode.provider),
         invoice: mockedInvoice.id,
@@ -1142,6 +1146,131 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Active subscriptions', () => {
+    const mockStripeSubscriptions = (subscriptions: Stripe.Subscription[]) =>
+      jest.spyOn(stripe.subscriptions, 'list').mockResolvedValue({ data: subscriptions } as any);
+
+    const withProductType = (subscription: Stripe.Subscription, type?: string) =>
+      ({
+        ...subscription,
+        plan: {
+          ...subscription.items.data[0].plan,
+          product: getProduct({ params: { metadata: type ? { type } : {} } }),
+        },
+      }) as unknown as Stripe.Subscription;
+
+    test('When the customer has subscriptions in several states, then only the active, trialing and past due ones are returned', async () => {
+      const active = getCreatedSubscription({ status: 'active' });
+      const trialing = getCreatedSubscription({ status: 'trialing' });
+      const pastDue = getCreatedSubscription({ status: 'past_due' });
+      const canceled = getCreatedSubscription({ status: 'canceled' });
+      mockStripeSubscriptions([active, trialing, pastDue, canceled]);
+
+      const subscriptions = await paymentService.getActiveSubscriptions('cus_test');
+
+      expect(subscriptions.map((subscription) => subscription.id)).toStrictEqual([active.id, trialing.id, pastDue.id]);
+    });
+
+    const mockBusinessProducts = (businessSubscriptions: Stripe.Subscription[]) =>
+      jest.spyOn(paymentService['productsRepository'], 'findByType').mockResolvedValue(
+        businessSubscriptions.map((subscription) => ({
+          paymentGatewayId: subscription.items.data[0].price.product,
+        })) as any,
+      );
+
+    test('When the customer has an individual and a business subscription, then each type gets its own subscription', async () => {
+      const individual = withProductType(getCreatedSubscription({ status: 'active' }));
+      const business = withProductType(getCreatedSubscription({ status: 'active' }), UserType.Business);
+      mockStripeSubscriptions([business, individual]);
+      mockBusinessProducts([business]);
+
+      const individualEntity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Individual);
+      const businessEntity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Business);
+
+      expect(individualEntity.id).toBe(individual.id);
+      expect(businessEntity.id).toBe(business.id);
+    });
+
+    test('When the customer has an active subscription, then its period ends when the billing period of its item ends', async () => {
+      const subscription = withProductType(getCreatedSubscription({ status: 'active' }));
+      mockStripeSubscriptions([subscription]);
+
+      const entity = await paymentService.getActiveSubscriptionEntity('cus_test', UserType.Individual);
+
+      expect(entity.currentPeriodEnd).toBe(subscription.items.data[0].current_period_end);
+    });
+
+    test('When the customer has no active subscription of the requested type, then an error indicating so is thrown', async () => {
+      mockStripeSubscriptions([withProductType(getCreatedSubscription({ status: 'active' }))]);
+      mockBusinessProducts([]);
+
+      await expect(paymentService.getActiveSubscriptionEntity('cus_test', UserType.Business)).rejects.toThrow(
+        NotFoundSubscriptionError,
+      );
+    });
+  });
+
+  describe('Changing the subscription plan', () => {
+    const mockPlanChange = (latestInvoicePaymentIntent?: Partial<Stripe.PaymentIntent>) => {
+      const subscription = getCreatedSubscription();
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription as any]);
+      jest
+        .spyOn(stripe.prices, 'retrieve')
+        .mockResolvedValue(getPrice({ product: getProduct({ params: { metadata: {} } }) }) as any);
+      jest.spyOn(stripe.invoices, 'retrieve').mockResolvedValue({
+        payments: {
+          data: latestInvoicePaymentIntent
+            ? [{ payment: { type: 'payment_intent', payment_intent: latestInvoicePaymentIntent } }]
+            : [],
+        },
+      } as any);
+      return jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as any);
+    };
+
+    test('When the plan is changed with a coupon, then the coupon is applied to the subscription', async () => {
+      const updateSpy = mockPlanChange();
+
+      await paymentService.updateSubscriptionPrice({
+        customerId: 'cus_test',
+        priceId: 'price_new',
+        couponCode: 'coupon_1',
+      });
+
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ discounts: [{ coupon: 'coupon_1' }], billing_cycle_anchor: 'now' }),
+      );
+    });
+
+    test('When the plan is changed without a coupon, then the current discounts of the subscription are kept', async () => {
+      const updateSpy = mockPlanChange();
+
+      await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(updateSpy.mock.calls[0][1]).not.toHaveProperty('discounts');
+    });
+
+    test('When the payment of the new plan needs 3D Secure, then the secret to confirm it is returned', async () => {
+      mockPlanChange({
+        status: 'requires_action',
+        next_action: { type: 'use_stripe_sdk' } as Stripe.PaymentIntent.NextAction,
+        client_secret: 'pi_secret',
+      });
+
+      const result = await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(result).toStrictEqual({ is3DSecureRequired: true, clientSecret: 'pi_secret' });
+    });
+
+    test('When the payment of the new plan succeeds without extra steps, then 3D Secure is not requested', async () => {
+      mockPlanChange({ status: 'succeeded', next_action: null, client_secret: 'pi_secret' });
+
+      const result = await paymentService.updateSubscriptionPrice({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(result).toStrictEqual({ is3DSecureRequired: false, clientSecret: '' });
+    });
+  });
+
   describe('Getting the user subscription', () => {
     const makeActiveSubscription = (priceMetadata: Record<string, string> = {}, overrides = {}) => {
       const base = getCreatedSubscription();
@@ -1159,14 +1288,15 @@ describe('Payments Service tests', () => {
           intervalCount: 1,
           nickname: 'monthly',
         },
-        items: { ...base.items, data: [{ ...base.items.data[0], price }] },
-        current_period_end: 1800000000,
+        items: { ...base.items, data: [{ ...base.items.data[0], price, current_period_end: 1800000000 }] },
         ...overrides,
       } as any;
     };
 
-    const mockUpcomingInvoice = () => {
-      jest.spyOn(stripe.invoices, 'retrieveUpcoming').mockResolvedValue({ total: 999 } as any);
+    const mockUpcomingInvoice = (
+      totals: { total: number; total_excluding_tax: number | null } = { total: 999, total_excluding_tax: 999 },
+    ) => {
+      jest.spyOn(stripe.invoices, 'createPreview').mockResolvedValue(totals as any);
     };
 
     test('when the user has no active subscription, then it returns a free plan', async () => {
@@ -1214,6 +1344,51 @@ describe('Payments Service tests', () => {
       }
 
       jest.useRealTimers();
+    });
+
+    test('when the user has an active subscription, then the next payment is due when the current billing period ends', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice();
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.nextPayment).toBe(1800000000);
+    });
+
+    test('when the next invoice includes taxes, then the subscription shows taxes as enabled', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice({ total: 1210, total_excluding_tax: 1000 });
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.plan.tax?.enabled).toBe(true);
+    });
+
+    test('when the next invoice has no taxes, then the subscription shows taxes as disabled', async () => {
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([makeActiveSubscription()]);
+      mockUpcomingInvoice({ total: 1000, total_excluding_tax: 1000 });
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.plan.tax?.enabled).toBe(false);
+    });
+
+    test('when the user has an active subscription, then the amount of the next payment is the one of that subscription', async () => {
+      const subscription = makeActiveSubscription();
+      jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
+      jest.spyOn(stripe.invoices, 'createPreview').mockImplementation((async (params: any) => {
+        if (!params?.subscription) {
+          throw new Stripe.errors.StripeInvalidRequestError({
+            type: 'invalid_request_error',
+            message: 'You must provide at least one of: `subscription`, `schedule`, `subscription_details.items`.',
+          });
+        }
+        return { total: params.subscription === subscription.id ? 1210 : 0, total_excluding_tax: 1000 };
+      }) as any);
+
+      const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
+
+      expect(result.type === 'subscription' && result.amountAfterCoupon).toBe(1210);
     });
 
     test('when the user has a business subscription, then it returns the subscription with business type', async () => {
@@ -1297,6 +1472,26 @@ describe('Payments Service tests', () => {
           metadata: { price_id: subscription.priceId },
         }),
       );
+    });
+
+    test('When the remaining amount is charged, then the secret to pay the final invoice in Stripe is returned', async () => {
+      const subscription = getSubscriptionEntity({ paymentMethod: 'pm_test_default' });
+      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripePaymentsAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
+      jest
+        .spyOn(stripePaymentsAdapter.provider.invoices, 'create')
+        .mockResolvedValue({ id: 'in_early', status: 'draft' } as any);
+      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
+      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue({
+        id: 'in_early',
+        status: 'open',
+        confirmation_secret: { client_secret: 'pi_early_secret', type: 'payment_intent' },
+      } as any);
+
+      const result = await paymentService.createEarlyCancellationCharge(subscription);
+
+      expect(result).toStrictEqual({ clientSecret: 'pi_early_secret' });
     });
   });
 });

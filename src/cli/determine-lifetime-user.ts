@@ -25,6 +25,7 @@ import { MongoDBTiersRepository } from '../core/users/MongoDBTiersRepository';
 import { MongoDBUsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
 import { StorageService } from '../services/storage.service';
 import { MailService } from '../services/mail.service';
+import { STRIPE_API_VERSION } from '../constants';
 
 const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
@@ -36,7 +37,7 @@ async function main() {
     const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
     const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
     const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);

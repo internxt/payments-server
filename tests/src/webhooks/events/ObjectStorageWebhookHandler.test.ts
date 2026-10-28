@@ -64,8 +64,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],
@@ -95,13 +95,13 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],
@@ -137,8 +137,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: undefined,
+              pricing: {
+                price_details: { product: undefined },
               },
             },
           ],
@@ -173,8 +173,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],
@@ -191,7 +191,7 @@ describe('Object Storage Webhook Handler', () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        `Invoice ${mockedInvoice.id} for product ${mockedInvoice.lines.data[0].price?.product} is not an object-storage product`,
+        `Invoice ${mockedInvoice.id} for product ${mockedInvoice.lines.data[0].pricing?.price_details?.product} is not an object-storage product`,
       );
 
       expect(objectStorageServiceSpy).not.toHaveBeenCalled();
@@ -211,8 +211,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],
@@ -240,8 +240,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],
@@ -281,8 +281,8 @@ describe('Object Storage Webhook Handler', () => {
         lines: {
           data: [
             {
-              price: {
-                product: mockedProduct.id,
+              pricing: {
+                price_details: { product: mockedProduct.id },
               },
             },
           ],

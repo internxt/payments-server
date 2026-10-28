@@ -8,7 +8,7 @@ import { ObjectStorageService } from '../../../src/services/objectStorage.servic
 import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { PaymentMethod } from '../../../src/infrastructure/domain/entities/paymentMethod';
 
@@ -64,8 +64,12 @@ describe('Webhook events', () => {
       );
     });
 
-    test('When the event invoice.payment_failed is triggered, then the correct function is called', async () => {
+    test('When the event invoice.payment_failed is triggered, then the invoice is handled as returned by the current Stripe version', async () => {
       const mockedInvoice = getInvoice();
+      const currentInvoice = getInvoice({ id: mockedInvoice.id });
+      const retrieveInvoice = jest
+        .spyOn(stripePaymentsAdapter.provider.invoices, 'retrieve')
+        .mockResolvedValue(currentInvoice as any);
       const event = {
         id: 'evt_2',
         type: 'invoice.payment_failed',
@@ -90,8 +94,9 @@ describe('Webhook events', () => {
 
       expect(response.statusCode).toBe(204);
       expect(handleInvoicePaymentFailed).toHaveBeenCalled();
+      expect(retrieveInvoice).toHaveBeenCalledWith(mockedInvoice.id, { expand: ['discounts'] });
       expect(handleInvoicePaymentFailed).toHaveBeenCalledWith(
-        event.data.object,
+        currentInvoice,
         expect.any(ObjectStorageService),
         expect.any(PaymentService),
         expect.any(UsersService),
@@ -142,10 +147,12 @@ describe('Webhook events', () => {
     });
 
     describe('Invoice Payment completed', () => {
-      test('When the event invoice.paid is triggered, then the correct function is called', async () => {
+      test('When the event invoice.paid is triggered, then the invoice is handled as returned by the current Stripe version', async () => {
         const mockedInvoice = getInvoice({
           status: 'paid',
         });
+        const currentInvoice = getInvoice({ id: mockedInvoice.id, customer: mockedInvoice.customer, status: 'paid' });
+        jest.spyOn(stripePaymentsAdapter.provider.invoices, 'retrieve').mockResolvedValue(currentInvoice as any);
         const mockedCustomer = getCustomer();
         const event = {
           id: 'evt_2',
@@ -177,7 +184,7 @@ describe('Webhook events', () => {
         expect(response.statusCode).toBe(204);
         expect(getCustomerSpy).toHaveBeenCalledWith(mockedInvoice.customer);
         expect(invoiceCompletedHandlerRunSpy).toHaveBeenCalledWith({
-          invoice: mockedInvoice,
+          invoice: currentInvoice,
           customer: Customer.toDomain(mockedCustomer),
           status: 'paid',
         });

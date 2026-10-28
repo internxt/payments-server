@@ -24,6 +24,7 @@ import { ProductsRepository } from '../core/users/ProductsRepository';
 import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
 import { DynamicConfigKey, DynamicConfigRepository } from '../core/infra/DynamicConfigRepository';
 import { MongoDBDynamicConfigRepository } from '../core/infra/MongoDBDynamicConfigRepository';
+import { STRIPE_API_VERSION } from '../constants';
 
 const [, , filePath, provider] = process.argv;
 
@@ -63,7 +64,7 @@ async function main() {
     const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
     const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
 
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
     const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
     const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
     const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);

@@ -39,10 +39,10 @@ import { HealthService } from './services/health.service';
 import { DynamicConfigKey, DynamicConfigRepository } from './core/infra/DynamicConfigRepository';
 import { MongoDBDynamicConfigRepository } from './core/infra/MongoDBDynamicConfigRepository';
 import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
-import { initStripeNewVersion } from './services/stripe';
 import { PreCreatedUserService } from './services/preCreatedUser.service';
 import { createHttpClient } from './infrastructure/http/httpClient';
 import { ConfirmationTokenService } from './services/confirmationToken.service';
+import { STRIPE_API_VERSION } from './constants';
 
 const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
   const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
@@ -62,9 +62,8 @@ const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> =>
   const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
 
   const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: '2025-02-24.acacia' });
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
   stripePaymentsAdapter.initProvider(stripe);
-  initStripeNewVersion(stripeSecretKey);
 
   await stripePaymentsAdapter.syncTaxRegistrations();
 

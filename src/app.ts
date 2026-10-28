@@ -8,7 +8,6 @@ import { businessController } from './controller/business.controller';
 import { productsController } from './controller/products.controller';
 import { checkoutController } from './controller/checkout.controller';
 import { customerController } from './controller/customer.controller';
-import controllerMigration from './controller-migration';
 import CacheService from './services/cache.service';
 import { PaymentService } from './services/payment.service';
 import { StorageService } from './services/storage.service';
@@ -98,7 +97,6 @@ export async function buildApp({
       prefix: '/gateway',
     },
   );
-  fastify.register(controllerMigration(paymentService, usersService, config));
   fastify.register(healthController(healthService));
 
   fastify.register(

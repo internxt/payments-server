@@ -95,7 +95,7 @@ export const getPaymentMethodEntity = (params?: Partial<{ id: string; address: A
 export const getInvoiceEntity = (params?: Partial<Invoice>): Invoice => {
   const mockedInvoice = getInvoice();
   return Invoice.toDomain({
-    id: mockedInvoice.id,
+    id: mockedInvoice.id as string,
     clientSecretId: mockedInvoice.confirmation_secret?.client_secret,
     status: mockedInvoice.status as InvoiceStatus,
     ...params,

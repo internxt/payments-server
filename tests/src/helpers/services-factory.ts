@@ -27,6 +27,7 @@ import { UserFeaturesOverridesService } from '../../../src/services/userFeatures
 import { KlaviyoTrackingService } from '../../../src/services/klaviyo.service';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
+import { STRIPE_API_VERSION } from '../../../src/constants';
 
 export interface TestServices {
   stripe: Stripe;
@@ -79,7 +80,7 @@ const createRepositories = (): TestRepositories => ({
 export const createTestServices = (overrides: TestServiceOverrides = {}): TestServices & TestRepositories => {
   const repositories = createRepositories();
 
-  const stripe = overrides.stripe ?? new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' });
+  const stripe = overrides.stripe ?? new Stripe(config.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
   const paymentService = new PaymentService(stripe, repositories.productsRepository);
   const storageService = new StorageService(config, axios);
   const usersService = new UsersService(

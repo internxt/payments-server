@@ -20,7 +20,7 @@ import {
 import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
 import Logger from '../Logger';
-import { getStripeNewVersion } from './stripe';
+import { getInvoicePriceId, getInvoiceProductId } from '../utils/invoice';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
   CustomerId,
@@ -127,7 +127,7 @@ export class PaymentService {
     customerId: string;
     priceId: string;
     currency?: string;
-    promoCodeId?: Stripe.SubscriptionCreateParams['promotion_code'];
+    promoCodeId?: string;
     companyName?: string;
     companyVatId?: string;
     trialEnd?: number;
@@ -186,7 +186,7 @@ export class PaymentService {
         ) as Stripe.SubscriptionCreateParams.PaymentSettings.PaymentMethodType[],
         save_default_payment_method: 'on_subscription',
       },
-      expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
+      expand: ['latest_invoice.confirmation_secret', 'latest_invoice.payments', 'pending_setup_intent'],
       trial_end: trialEnd ? trialEnd : undefined,
       ...additionalOptions,
     });
@@ -198,11 +198,14 @@ export class PaymentService {
         subscriptionId: subscription.id,
       };
     } else {
+      const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
+      const paymentIntent = latestInvoice.payments?.data[0]?.payment.payment_intent;
+
       return {
         type: 'payment',
-        clientSecret: (subscription.latest_invoice as any).payment_intent.client_secret,
+        clientSecret: latestInvoice.confirmation_secret?.client_secret as string,
         subscriptionId: subscription.id,
-        paymentIntentId: (subscription.latest_invoice as any).payment_intent.id,
+        paymentIntentId: typeof paymentIntent === 'string' ? paymentIntent : paymentIntent?.id,
       };
     }
   }
@@ -238,9 +241,12 @@ export class PaymentService {
   }): Promise<PaymentIntent> {
     let couponId: string | undefined = undefined;
     const normalizedCurrencyForStripe = normalizeForStripe(currency);
-    const paymentMethodTypes = getPaymentMethodTypes(normalizedCurrencyForStripe, 'lifetime');
+    const paymentMethodTypes = getPaymentMethodTypes(
+      normalizedCurrencyForStripe,
+      'lifetime',
+    ) as Stripe.InvoiceCreateParams.PaymentSettings.PaymentMethodType[];
 
-    const invoice = await getStripeNewVersion().invoices.create({
+    const invoice = await this.provider.invoices.create({
       customer: customerId,
       currency: normalizedCurrencyForStripe,
       payment_settings: {
@@ -254,7 +260,7 @@ export class PaymentService {
     }
 
     const invoiceId = invoice.id;
-    const invoiceItem = await getStripeNewVersion().invoiceItems.create({
+    const invoiceItem = await this.provider.invoiceItems.create({
       customer: customerId,
       invoice: invoiceId,
       pricing: {
@@ -272,22 +278,22 @@ export class PaymentService {
       throw new BadRequestError('Invoice item does not have a price.');
     }
 
-    const invoiceToFinalize = await getStripeNewVersion().invoices.retrieve(invoiceId);
+    const invoiceToFinalize = await this.provider.invoices.retrieve(invoiceId);
     const allowedPaymentMethodTypes = getPaymentMethodTypes(
       normalizedCurrencyForStripe,
       'lifetime',
       invoiceToFinalize.total / 100,
-    );
+    ) as Stripe.InvoiceUpdateParams.PaymentSettings.PaymentMethodType[];
 
     if (allowedPaymentMethodTypes.join() !== paymentMethodTypes.join()) {
-      await getStripeNewVersion().invoices.update(invoiceId, {
+      await this.provider.invoices.update(invoiceId, {
         payment_settings: {
           payment_method_types: allowedPaymentMethodTypes,
         },
       });
     }
 
-    const finalizedInvoice = await getStripeNewVersion().invoices.finalizeInvoice(invoiceId, {
+    const finalizedInvoice = await this.provider.invoices.finalizeInvoice(invoiceId, {
       expand: ['payments', 'confirmation_secret'],
     });
 
@@ -346,13 +352,13 @@ export class PaymentService {
 
       await this.provider.invoiceItems.create({
         customer: customerId,
-        price: priceId,
+        pricing: { price: priceId },
         quantity: 0,
         description: licenseCode?.provider ? `Affiliate sale via ${licenseCode.provider}` : 'One-time charge',
         invoice: invoice.id,
       });
 
-      await this.provider.invoices.pay(invoice.id, {
+      await this.provider.invoices.pay(invoice.id as string, {
         paid_out_of_band: true,
       });
     }
@@ -498,7 +504,7 @@ export class PaymentService {
       expand: ['data.default_payment_method', 'data.default_source', 'data.plan.product'],
     });
 
-    const transformedData: ExtendedSubscription[] = res.data.map((subscription) => {
+    const transformedData: ExtendedSubscription[] = res.data.map((subscription: Stripe.Subscription) => {
       const untypedSubscription = subscription as any;
       if ('plan' in untypedSubscription) {
         return {
@@ -631,46 +637,43 @@ export class PaymentService {
     }: {
       customerId: CustomerId;
       priceId: PriceId;
-      couponCode: string;
+      couponCode?: string;
     },
     userType: UserType = UserType.Individual,
   ) {
     let is3DSecureRequired = false;
     let clientSecret = '';
 
+    const additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {
+      billing_cycle_anchor: 'now',
+      ...(couponCode && { discounts: [{ coupon: couponCode }] }),
+    };
+
     const updatedSubscription =
       userType === UserType.Individual
         ? await this.updateIndividualSub({
             customerId: customerId,
             priceId: priceId,
-            additionalOptions: {
-              coupon: couponCode,
-              billing_cycle_anchor: 'now',
-            },
+            additionalOptions,
           })
         : await this.updateBusinessSub({
             customerId: customerId,
             priceId: priceId,
-            additionalOptions: {
-              coupon: couponCode,
-              billing_cycle_anchor: 'now',
-            },
+            additionalOptions,
           });
 
-    const getLatestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string);
+    const latestInvoice = await this.provider.invoices.retrieve(updatedSubscription.latest_invoice as string, {
+      expand: ['payments.data.payment.payment_intent'],
+    });
+    const paymentIntent = latestInvoice.payments?.data[0]?.payment.payment_intent as Stripe.PaymentIntent | undefined;
 
-    if (getLatestInvoice.payment_intent) {
-      const getPaymentIntent: Stripe.PaymentIntent = await this.provider.paymentIntents.retrieve(
-        getLatestInvoice.payment_intent as string,
-      );
-      if (
-        getPaymentIntent.status === 'requires_action' &&
-        getPaymentIntent.next_action?.type === 'use_stripe_sdk' &&
-        getPaymentIntent.client_secret
-      ) {
-        is3DSecureRequired = true;
-        clientSecret = getPaymentIntent.client_secret;
-      }
+    if (
+      paymentIntent?.status === 'requires_action' &&
+      paymentIntent.next_action?.type === 'use_stripe_sdk' &&
+      paymentIntent.client_secret
+    ) {
+      is3DSecureRequired = true;
+      clientSecret = paymentIntent.client_secret;
     }
 
     return {
@@ -708,32 +711,6 @@ export class PaymentService {
     return res.data;
   }
 
-  async getPlanIdFromLastPayment(
-    customerId: CustomerId,
-    pagination: { limit?: number; startingAfter?: string },
-  ): Promise<string | null> {
-    const res = await this.provider.paymentIntents.list({
-      customer: customerId,
-      limit: pagination.limit,
-      starting_after: pagination.startingAfter,
-    });
-
-    const lastPaymentIntent = res.data
-      .filter((pi) => pi.status === 'succeeded')
-      .sort((a, b) => b.created - a.created)
-      .at(0);
-
-    if (!lastPaymentIntent) {
-      return null;
-    }
-
-    const checkout = await this.provider.checkout.sessions.list({ payment_intent: lastPaymentIntent.id });
-    const checkoutLines = await this.provider.checkout.sessions.listLineItems(checkout.data[0].id);
-    const productId = checkoutLines.data[0].price?.product;
-
-    return productId as string;
-  }
-
   async getInvoicesFromUser(
     customerId: CustomerId,
     pagination: { limit?: number; startingAfter?: string },
@@ -746,15 +723,23 @@ export class PaymentService {
       starting_after: pagination.startingAfter,
       subscription: subscriptionId,
       ...(status && { status }),
+      expand: ['data.payments'],
     });
 
     return res.data;
   }
 
-  private invoiceType(invoice: Stripe.Invoice, userType: UserType) {
-    return userType === UserType.Business
-      ? invoice.lines?.data?.[0]?.price?.metadata?.type === 'business'
-      : invoice.lines?.data?.[0]?.price?.metadata?.type !== 'business';
+  async getPricesByIds(priceIds: Stripe.Price['id'][]): Promise<Map<Stripe.Price['id'], Stripe.Price>> {
+    const uniquePriceIds = [...new Set(priceIds)];
+    const prices: Stripe.Price[] = await Promise.all(
+      uniquePriceIds.map((priceId) => this.provider.prices.retrieve(priceId)),
+    );
+
+    return new Map(prices.map((price) => [price.id, price]));
+  }
+
+  private invoiceType(priceMetadata: Stripe.Metadata | undefined, userType: UserType) {
+    return userType === UserType.Business ? priceMetadata?.type === 'business' : priceMetadata?.type !== 'business';
   }
 
   async getDriveInvoices(
@@ -766,26 +751,33 @@ export class PaymentService {
     const { limit, startingAfter } = pagination;
 
     const invoices = await this.getInvoicesFromUser(customerId, { limit, startingAfter }, subscriptionId, 'paid');
+    const pricesById = await this.getPricesByIds(
+      invoices.map(getInvoicePriceId).filter((priceId): priceId is string => !!priceId),
+    );
+    const getPriceMetadata = (invoice: Stripe.Invoice) => {
+      const priceId = getInvoicePriceId(invoice);
+      return priceId ? pricesById.get(priceId)?.metadata : undefined;
+    };
 
     const invoicesMapped = invoices
       .filter((invoice) =>
         invoice.created &&
         invoice.invoice_pdf &&
-        invoice.lines?.data?.[0]?.price?.metadata?.maxSpaceBytes &&
-        invoice.lines?.data?.[0]?.price?.metadata?.type !== 'object-storage' &&
+        getPriceMetadata(invoice)?.maxSpaceBytes &&
+        getPriceMetadata(invoice)?.type !== 'object-storage' &&
         subscriptionId
           ? true
-          : this.invoiceType(invoice, userType),
+          : this.invoiceType(getPriceMetadata(invoice), userType),
       )
       .map((invoice) => {
         return {
           id: invoice.id,
           created: invoice.created,
           pdf: invoice.invoice_pdf,
-          bytesInPlan: invoice.lines.data[0]?.price?.metadata?.maxSpaceBytes,
+          bytesInPlan: getPriceMetadata(invoice)?.maxSpaceBytes,
           total: invoice.total,
           currency: invoice.currency,
-          product: invoice.lines.data[0]?.price?.product,
+          product: getInvoiceProductId(invoice),
         };
       });
 
@@ -871,7 +863,10 @@ export class PaymentService {
       }
     }
 
-    const upcomingInvoice = await this.provider.invoices.retrieveUpcoming({ customer: customerId });
+    const upcomingInvoice = await this.provider.invoices.createPreview({
+      customer: customerId,
+      subscription: subscription.id,
+    });
 
     const storageLimit =
       Number(
@@ -884,7 +879,8 @@ export class PaymentService {
     const hasAnnualCommitment = this.hasAnnualCommitment(item.price);
     const subscriptionEntity = this.mapToSubscriptionEntity(subscription);
     const commitment = hasAnnualCommitment ? this.getAnnualCommitmentCancellationInfo(subscriptionEntity) : null;
-    const enabledTaxes = upcomingInvoice.tax ? upcomingInvoice.tax > 0 : false;
+    const enabledTaxes =
+      upcomingInvoice.total_excluding_tax !== null && upcomingInvoice.total > upcomingInvoice.total_excluding_tax;
 
     let earlyCancellationFee: number | undefined;
     if (hasAnnualCommitment) {
@@ -948,7 +944,7 @@ export class PaymentService {
       amount: price.unit_amount!,
       currency: price.currency,
       interval: itemInterval,
-      nextPayment: subscription.current_period_end,
+      nextPayment: subscription.items.data[0].current_period_end,
       amountAfterCoupon: upcomingInvoice.total,
       priceId: price.id,
       productId: price?.product as string,
@@ -1097,12 +1093,25 @@ export class PaymentService {
 
   async getInvoiceLineItems(invoiceId: string) {
     return this.provider.invoices.listLineItems(invoiceId, {
-      expand: ['data.price.product', 'data.discounts'],
+      expand: ['data.pricing.price_details.price', 'data.discounts'],
     });
   }
 
-  getInvoice(invoiceId: Stripe.Invoice['id']) {
-    return this.provider.invoices.retrieve(invoiceId);
+  async getInvoice(invoiceId: string): Promise<Stripe.Invoice> {
+    return this.provider.invoices.retrieve(invoiceId, { expand: ['discounts'] });
+  }
+
+  async getInvoiceIdFromCharge(charge: Stripe.Charge): Promise<Stripe.Invoice['id'] | undefined> {
+    const paymentIntentId =
+      typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+    if (!paymentIntentId) return undefined;
+
+    const { data: invoicePayments } = await this.provider.invoicePayments.list({
+      payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+    });
+    const invoice = invoicePayments[0]?.invoice;
+
+    return typeof invoice === 'string' ? invoice : invoice?.id;
   }
 
   getProduct(productId: Stripe.Product['id']) {
@@ -1140,7 +1149,7 @@ export class PaymentService {
       metadata: subscription.metadata,
       startDate: subscription.start_date,
       priceId: subscription.items.data[0].price.id,
-      currentPeriodEnd: subscription.current_period_end,
+      currentPeriodEnd: subscription.items.data[0].current_period_end,
       paymentMethod:
         typeof subscription.default_payment_method === 'string'
           ? subscription.default_payment_method
@@ -1262,6 +1271,10 @@ export class PaymentService {
 
   async retrieveCustomerChargeByChargeId(chargeId: Stripe.Charge['id']): Promise<Stripe.Charge> {
     return this.provider.charges.retrieve(chargeId);
+  }
+
+  async getPaymentIntent(paymentIntentId: Stripe.PaymentIntent['id']): Promise<Stripe.PaymentIntent> {
+    return this.provider.paymentIntents.retrieve(paymentIntentId);
   }
 
   getVatIdFromCountry(country: string): Stripe.TaxIdCreateParams.Type[] {
