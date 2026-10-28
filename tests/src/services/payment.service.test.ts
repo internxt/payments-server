@@ -1281,7 +1281,7 @@ describe('Payments Service tests', () => {
 
       expect(updateSpy).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ discounts: [{ coupon: 'coupon_1' }], billing_cycle_anchor: 'now' }),
+        expect.objectContaining({ discounts: [{ coupon: 'coupon_1' }], billing_cycle_anchor: { type: 'now' } }),
       );
     });
 

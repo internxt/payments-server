@@ -447,7 +447,7 @@ describe('Payment controller e2e tests', () => {
           description: 'Card verification charge',
           capture_method: 'manual',
           setup_future_usage: 'off_session',
-          payment_method_types: ['card', 'paypal'],
+          allowed_payment_method_types: ['card', 'paypal'],
           payment_method: paymentMethod,
         });
       });
@@ -494,7 +494,7 @@ describe('Payment controller e2e tests', () => {
           description: 'Card verification charge',
           capture_method: 'manual',
           setup_future_usage: 'off_session',
-          payment_method_types: ['card', 'paypal'],
+          allowed_payment_method_types: ['card', 'paypal'],
           payment_method: paymentMethod,
         });
       });

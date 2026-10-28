@@ -649,7 +649,7 @@ export class PaymentService {
     let clientSecret = '';
 
     const additionalOptions: Partial<Stripe.SubscriptionUpdateParams> = {
-      billing_cycle_anchor: 'now',
+      billing_cycle_anchor: { type: 'now' },
       ...(couponCode && { discounts: [{ coupon: couponCode }] }),
     };
 
