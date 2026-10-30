@@ -14,7 +14,6 @@ import {
   getProduct,
   getPromoCode,
   getPromotionCodeResponse,
-  getTaxes,
   getUser,
 } from '../fixtures';
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
@@ -34,7 +33,6 @@ import {
   SubscriptionNotEligibleForEarlyChargeError,
   NotFoundSubscriptionError,
 } from '../../../src/errors/PaymentErrors';
-import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../../../src/errors/stripeErrorCodes';
 
 describe('Payments Service tests', () => {
   const { paymentService, stripe } = createTestServices();
@@ -601,66 +599,77 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Get tax for a price', () => {
-    test('When the params are correct, then a tax object is returned for the requested price', async () => {
-      const mockedPrice = getPrice();
-      const mockedTaxes = getTaxes();
-      jest
-        .spyOn(stripe.tax.calculations, 'create')
-        .mockResolvedValue(mockedTaxes as Stripe.Response<Stripe.Tax.Calculation>);
+  describe('Tax shown for a price', () => {
+    const amount = 10000;
 
-      const taxes = await paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
+    test('When an anonymous consumer is located in an EU country, then the tax uses that country VAT rate', async () => {
+      const tax = await paymentService.calculatePriceTax(amount, undefined, '75001', 'FR');
 
-      expect(taxes).toStrictEqual(mockedTaxes);
+      expect(tax).toStrictEqual({ taxAmount: 2000, amountTotal: 12000 });
     });
 
-    test('When the location is not enough to determine the tax jurisdiction, then no tax is returned so the price still loads', async () => {
-      const mockedPrice = getPrice();
-      const insufficientLocationError = new Stripe.errors.StripeInvalidRequestError({
-        message: "The IP address provided is insufficient to determine the customer's tax location.",
-        type: 'invalid_request_error',
-        code: STRIPE_TAX_LOCATION_INVALID_CODE,
-      });
-      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(insufficientLocationError);
+    test('When the VAT rate has decimals, then the tax is rounded to the nearest cent', async () => {
+      const tax = await paymentService.calculatePriceTax(999, undefined, '00100', 'FI');
 
-      const taxes = await paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip');
-
-      expect(taxes).toBeUndefined();
+      expect(tax).toStrictEqual({ taxAmount: 255, amountTotal: 1254 });
     });
 
-    test('When the stored customer address is not enough to determine the tax jurisdiction, then no tax is returned so the price still loads', async () => {
-      const mockedPrice = getPrice();
-      const customerId = 'cus_customer_with_incomplete_address';
-      const insufficientLocationError = new Stripe.errors.StripeInvalidRequestError({
-        message: "The customer's address is missing or invalid for tax purposes.",
-        type: 'invalid_request_error',
-        code: STRIPE_TAX_LOCATION_INVALID_CODE,
-      });
-      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(insufficientLocationError);
+    test('When a logged in consumer has an address in an EU country, then the tax uses the country of that address', async () => {
+      const customer = getCustomer({ address: { ...getCustomer().address!, country: 'DE' }, tax_exempt: 'none' });
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
 
-      const taxes = await paymentService.calculateTax(
-        mockedPrice.id,
-        mockedPrice.unit_amount as number,
-        undefined,
-        'eur',
-        customerId,
-      );
+      const tax = await paymentService.calculatePriceTax(amount, customer.id, '75001', 'FR');
 
-      expect(taxes).toBeUndefined();
+      expect(tax).toStrictEqual({ taxAmount: 1900, amountTotal: 11900 });
     });
 
-    test('When Stripe fails for an unrelated reason, then the error is propagated', async () => {
-      const mockedPrice = getPrice();
-      const unexpectedError = new Stripe.errors.StripeInvalidRequestError({
-        message: 'No such price.',
-        type: 'invalid_request_error',
-        code: 'resource_missing',
+    test('When the customer is a business with a tax ID, then no tax is returned', async () => {
+      const customer = getCustomer({
+        tax_exempt: 'none',
+        tax_ids: { object: 'list', data: [{ id: 'txi_1' } as Stripe.TaxId], has_more: false, url: '' },
       });
-      jest.spyOn(stripe.tax.calculations, 'create').mockRejectedValue(unexpectedError);
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
 
-      await expect(
-        paymentService.calculateTax(mockedPrice.id, mockedPrice.unit_amount as number, 'user_ip'),
-      ).rejects.toThrow(unexpectedError);
+      const tax = await paymentService.calculatePriceTax(amount, customer.id);
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the customer is tax exempt, then no tax is returned', async () => {
+      const customer = getCustomer({ tax_exempt: 'reverse' });
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
+
+      const tax = await paymentService.calculatePriceTax(amount, customer.id);
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the consumer is in a Spanish territory outside the EU VAT area, then no tax is returned', async () => {
+      const tax = await paymentService.calculatePriceTax(amount, undefined, '38001', 'ES');
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the consumer is in a country outside the EU, then no tax is returned', async () => {
+      const tax = await paymentService.calculatePriceTax(amount, undefined, 'SW1A', 'GB');
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the consumer location is unknown, then no tax is returned', async () => {
+      const tax = await paymentService.calculatePriceTax(amount);
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the price tax is requested, then Stripe Tax is never called', async () => {
+      const stripeTaxCalculation = jest.spyOn(stripe.tax.calculations, 'create');
+
+      await paymentService.calculatePriceTax(amount, undefined, 'SW1A', 'GB');
+      await paymentService.calculatePriceTax(amount, undefined, '38001', 'ES');
+      await paymentService.calculatePriceTax(amount, undefined, '75001', 'FR');
+
+      expect(stripeTaxCalculation).not.toHaveBeenCalled();
     });
   });
 

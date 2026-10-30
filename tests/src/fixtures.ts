@@ -18,7 +18,6 @@ import {
   PRODUCT_BASE,
   PRICE_BASE,
   PROMOTION_CODE_BASE,
-  TAX_CALCULATION_BASE,
   SUBSCRIPTION_BASE,
   PAYMENT_INTENT_BASE,
   INVOICE_BASE,
@@ -186,13 +185,6 @@ export const getPrices = () => {
       exists: 'price_1RQYKvFAOdcgaBMQk7jdUope',
       doesNotExist: 'price_1PLMVCFAOdcgaBMQxIQgdXsds',
     },
-  };
-};
-
-export const getTaxes = (params?: Partial<Stripe.Tax.Calculation>): Stripe.Tax.Calculation => {
-  return {
-    ...TAX_CALCULATION_BASE,
-    ...params,
   };
 };
 
@@ -689,11 +681,3 @@ export const getPaymentMethod = (params?: Partial<Stripe.PaymentMethod>): Stripe
 };
 
 export const voidPromise = () => Promise.resolve();
-
-export const mockCalculateTaxFor = (amount: number, taxRate = 0.21) => {
-  const tax = Math.floor(amount * taxRate);
-  return {
-    tax_amount_exclusive: tax,
-    amount_total: amount + tax,
-  };
-};

@@ -443,19 +443,11 @@ export function checkoutController({
           Logger.info(
             `[GET PRICE BY ID] Calculating taxes for user with customer ID: ${user?.customerId} and uuid: ${userUuid} with country: ${country}`,
           );
-          taxForPrice = await paymentsService.calculateTax(
-            priceId,
-            amount,
-            userAddress,
-            currency,
-            user?.customerId,
-            postalCode,
-            country,
-          );
+          taxForPrice = await paymentsService.calculatePriceTax(amount, user?.customerId, postalCode, country);
         }
 
-        const taxAmount = taxForPrice?.tax_amount_exclusive ?? 0;
-        const amountTotal = taxForPrice?.amount_total ?? amount;
+        const taxAmount = taxForPrice?.taxAmount ?? 0;
+        const amountTotal = taxForPrice?.amountTotal ?? amount;
 
         return res.status(200).send({
           price: price.toJSON(),
