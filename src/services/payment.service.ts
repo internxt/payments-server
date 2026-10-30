@@ -19,7 +19,6 @@ import {
 } from '../errors/PaymentErrors';
 import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
-import Logger from '../Logger';
 import { getInvoicePriceId, getInvoiceProductId } from '../utils/invoice';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
@@ -43,8 +42,13 @@ import {
   Subscription as SubscriptionEntity,
 } from '../infrastructure/domain/entities/subscription';
 import { SUBSCRIPTION_EARLY_CANCELLATION_KEY } from '../constants';
-import { STRIPE_TAX_LOCATION_INVALID_CODE } from '../errors/stripeErrorCodes';
 import { Price } from '../infrastructure/domain/entities/price';
+import { calculateConsumerVatFromStandardRate, PriceTax } from '../core/taxes/VatRates';
+
+interface TaxLocation {
+  country: string;
+  postalCode?: string | null;
+}
 
 export class PaymentService {
   constructor(
@@ -953,60 +957,32 @@ export class PaymentService {
     };
   }
 
-  /**
-   * Returns the tax for a given price
-   * @param priceId - The Id of the price that we want to calculate the tax for
-   * @param amount - The amount of the price
-   * @param ipAddress - The IP address of the user
-   * @param currency - The currency of the price
-   * @returns - The tax calculation object
-   */
-  async calculateTax(
-    priceId: string,
+  async calculatePriceTax(
     amount: number,
-    ipAddress?: string,
-    currency = 'eur',
     customerId?: string,
     postalCode?: string,
     country?: string,
-  ): Promise<Stripe.Tax.Calculation | undefined> {
-    const customerDetails: Stripe.Tax.CalculationCreateParams.CustomerDetails = {};
+  ): Promise<PriceTax | undefined> {
+    const location = await this.getConsumerTaxLocation(customerId, postalCode, country);
 
-    if (postalCode && country) {
-      customerDetails.address = {
-        postal_code: postalCode,
-        country: country,
-      };
-      customerDetails.address_source = 'billing';
-    } else if (ipAddress) {
-      customerDetails.ip_address = ipAddress;
+    return location && calculateConsumerVatFromStandardRate(amount, location.country, location.postalCode);
+  }
+
+  private async getConsumerTaxLocation(
+    customerId?: string,
+    postalCode?: string,
+    country?: string,
+  ): Promise<TaxLocation | undefined> {
+    if (!customerId) {
+      return country ? { country, postalCode } : undefined;
     }
 
-    try {
-      return await this.provider.tax.calculations.create({
-        customer: customerId,
-        customer_details: customerId ? undefined : customerDetails,
-        line_items: [
-          {
-            amount,
-            reference: priceId,
-            tax_behavior: 'exclusive',
-            quantity: 1,
-          },
-        ],
-        currency,
-      });
-    } catch (error) {
-      const isInsufficientLocationError =
-        error instanceof Stripe.errors.StripeError && error.code === STRIPE_TAX_LOCATION_INVALID_CODE;
+    const customer = await this.provider.customers.retrieve(customerId, { expand: ['tax_ids'] });
+    const isTaxableConsumer = !customer.deleted && customer.tax_exempt === 'none' && !customer.tax_ids?.data.length;
 
-      if (isInsufficientLocationError) {
-        Logger.error('Tax calculation skipped: location is insufficient to determine the tax jurisdiction');
-        return undefined;
-      }
+    if (!isTaxableConsumer || !customer.address?.country) return undefined;
 
-      throw error;
-    }
+    return { country: customer.address.country, postalCode: customer.address.postal_code };
   }
 
   /**
