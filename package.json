@@ -58,7 +58,7 @@
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.0",
     "mongodb": "^6.10.0",
-    "stripe": "=22.6.2",
+    "stripe": "=23.0.1",
     "uuid": "^14.0.1"
   },
   "lint-staged": {

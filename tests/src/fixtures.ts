@@ -379,6 +379,7 @@ export const getCreatedSubscription = (
           object: 'subscription_item',
           billing_thresholds: null,
           created: randomDataGenerator.natural({ length: 10 }),
+          current_trial: null,
           current_period_end: randomDataGenerator.natural({ length: 10 }),
           current_period_start: randomDataGenerator.natural({ length: 10 }),
           metadata: {},

@@ -1,8 +1,8 @@
 // AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // Run: npm run generate:stripe-fixtures
-// Generated: 2026-10-27T11:13:02.838Z
-// Stripe SDK: v22.6.2
-// OpenAPI Version: v2442
+// Generated: 2026-10-27T11:40:58.712Z
+// Stripe SDK: v23.0.1
+// OpenAPI Version: v2526
 
 import Stripe from 'stripe';
 
@@ -69,6 +69,7 @@ export const INVOICE_BASE = {
   account_tax_ids: null,
   amount_due: 1000,
   amount_paid: 0,
+  amount_paid_off_stripe: 0,
   amount_remaining: 1000,
   amount_shipping: 0,
   application: null,
@@ -393,6 +394,11 @@ export const SUBSCRIPTION_BASE = {
         billing_thresholds: {
           usage_gte: null,
         },
+        current_trial: {
+          end_date: 1725067410,
+          start_date: 1573629589,
+          trial_offer: 'trial_offer',
+        },
       },
     ],
     has_more: false,
@@ -481,6 +487,7 @@ export const SUBSCRIPTION_BASE = {
   trial_settings: {
     end_behavior: {
       missing_payment_method: 'create_invoice',
+      billing_cycle_anchor: null,
     },
   },
   trial_start: 1234567890,
@@ -574,6 +581,10 @@ export const PRODUCT_BASE = {
   updated: 1234567890,
   url: null,
   type: 'good',
+  tax_details: {
+    performance_location: null,
+    tax_code: null,
+  },
 } as unknown as Stripe.Product;
 
 export const PAYMENT_INTENT_BASE = {
@@ -640,6 +651,7 @@ export const PAYMENT_INTENT_BASE = {
     enabled: true,
   },
   allowed_payment_method_types: null,
+  payment_record: null,
 } as unknown as Stripe.PaymentIntent;
 
 export const PAYMENT_METHOD_BASE = {
@@ -811,6 +823,7 @@ export const CHARGE_BASE = {
       regulated_status: null,
       network_transaction_id: null,
       transaction_link_id: null,
+      electronic_commerce_indicator: null,
     },
     type: 'card',
   },
