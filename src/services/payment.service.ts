@@ -21,6 +21,7 @@ import { normalizeForStripe } from '../utils/currency';
 import { getPaymentMethodTypes } from '../utils/paymentMethods';
 import Logger from '../Logger';
 import { getInvoicePriceId, getInvoiceProductId } from '../utils/invoice';
+import { getPromotionCodeCoupon, getPromotionCodeCouponId } from '../utils/coupon';
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
   CustomerId,
@@ -83,7 +84,7 @@ export class PaymentService {
       throw new PromoCodeIsNotValidError(`Promo code ${promoCode.code} is not valid`);
     }
 
-    return promoCode.coupon.id;
+    return getPromotionCodeCouponId(promoCode);
   }
 
   private async checkIfUserAlreadyHasASubscription(customerId: CustomerId, product: Stripe.Product) {
@@ -162,6 +163,7 @@ export class PaymentService {
     const subscription = await this.provider.subscriptions.create({
       customer: customerId,
       currency: currencyValue,
+      billing_mode: { type: 'classic' },
       items: [
         {
           price: priceId,
@@ -333,6 +335,7 @@ export class PaymentService {
     if (isRecurring) {
       await this.provider.subscriptions.create({
         customer: customerId,
+        billing_mode: { type: 'classic' },
         items: [
           {
             price: priceId,
@@ -358,7 +361,7 @@ export class PaymentService {
         invoice: invoice.id,
       });
 
-      await this.provider.invoices.pay(invoice.id as string, {
+      await this.provider.invoices.pay(invoice.id, {
         paid_out_of_band: true,
       });
     }
@@ -1025,7 +1028,7 @@ export class PaymentService {
       active: true,
       code: promoCodeName,
       coupon: couponId,
-      expand: ['data.coupon.applies_to'],
+      expand: ['data.promotion.coupon.applies_to'],
     });
 
     if (!promotionCodes || promotionCodes.length === 0) {
@@ -1048,8 +1051,9 @@ export class PaymentService {
    */
   async getPromoCodeByName(product: string, promoCodeName: Stripe.PromotionCode['code']): Promise<PromotionCode> {
     const promoCode = await this.getPromoCode({ promoCodeName });
+    const coupon = getPromotionCodeCoupon(promoCode);
 
-    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+    const promoCodeIsAppliedTo = coupon.applies_to?.products;
 
     const isProductAllowed = promoCodeIsAppliedTo?.find((productId) => productId === product);
 
@@ -1060,8 +1064,8 @@ export class PaymentService {
     return {
       promoCodeName,
       codeId: promoCode.id,
-      amountOff: promoCode.coupon.amount_off,
-      percentOff: promoCode.coupon.percent_off,
+      amountOff: coupon.amount_off,
+      percentOff: coupon.percent_off,
     };
   }
 
@@ -1071,10 +1075,11 @@ export class PaymentService {
     }
 
     const promoCode = await this.getPromoCode({ promoCodeName });
+    const coupon = getPromotionCodeCoupon(promoCode);
 
     const product = await this.provider.prices.retrieve(priceId);
 
-    const promoCodeIsAppliedTo = promoCode.coupon.applies_to?.products;
+    const promoCodeIsAppliedTo = coupon.applies_to?.products;
 
     const isProductAllowed =
       promoCodeIsAppliedTo && promoCodeIsAppliedTo.find((productId) => productId === (product.product as string));
@@ -1086,8 +1091,8 @@ export class PaymentService {
     return {
       promoCodeName,
       codeId: promoCode.id,
-      amountOff: promoCode.coupon.amount_off,
-      percentOff: promoCode.coupon.percent_off,
+      amountOff: coupon.amount_off,
+      percentOff: coupon.percent_off,
     };
   }
 

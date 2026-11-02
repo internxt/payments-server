@@ -1,8 +1,8 @@
 // AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // Run: npm run generate:stripe-fixtures
-// Generated: 2026-10-26T15:34:13.279Z
-// Stripe SDK: v18.5.0
-// OpenAPI Version: v1932
+// Generated: 2026-10-27T10:46:14.571Z
+// Stripe SDK: v20.4.1
+// OpenAPI Version: v2186
 
 import Stripe from 'stripe';
 
@@ -23,23 +23,6 @@ export const CUSTOMER_BASE = {
   description: null,
   discount: {
     checkout_session: null,
-    coupon: {
-      amount_off: null,
-      created: 1028554472,
-      currency: null,
-      duration: 'forever',
-      duration_in_months: null,
-      id: 'obj_123',
-      livemode: true,
-      max_redemptions: null,
-      metadata: null,
-      name: null,
-      object: 'coupon',
-      percent_off: null,
-      redeem_by: null,
-      times_redeemed: 990066668,
-      valid: true,
-    },
     customer: null,
     end: null,
     id: 'obj_123',
@@ -50,6 +33,11 @@ export const CUSTOMER_BASE = {
     start: 109757538,
     subscription: null,
     subscription_item: null,
+    source: {
+      coupon: null,
+      type: 'coupon',
+    },
+    customer_account: null,
   },
   email: null,
   id: 'cus_QXg1o8vcGmoR32',
@@ -191,6 +179,7 @@ export const INVOICE_BASE = {
           type: 'price_details',
           unit_amount_decimal: null,
         },
+        subtotal: 2060319484,
       },
     ],
     has_more: false,
@@ -219,6 +208,7 @@ export const INVOICE_BASE = {
       konbini: {},
       sepa_debit: {},
       us_bank_account: {},
+      payto: {},
     },
     payment_method_types: null,
   },
@@ -273,6 +263,7 @@ export const INVOICE_BASE = {
     },
     type: 'quote_details',
   },
+  customer_account: null,
 } as unknown as Stripe.Invoice;
 
 export const SUBSCRIPTION_BASE = {
@@ -424,6 +415,7 @@ export const SUBSCRIPTION_BASE = {
       konbini: {},
       sepa_debit: {},
       us_bank_account: {},
+      payto: {},
     },
     payment_method_types: null,
     save_default_payment_method: null,
@@ -465,7 +457,9 @@ export const SUBSCRIPTION_BASE = {
   },
   billing_mode: {
     type: 'classic',
+    flexible: {},
   },
+  customer_account: null,
 } as unknown as Stripe.Subscription;
 
 export const PRICE_BASE = {
@@ -589,6 +583,7 @@ export const PAYMENT_INTENT_BASE = {
   transfer_group: null,
   source: null,
   excluded_payment_method_types: null,
+  customer_account: null,
 } as unknown as Stripe.PaymentIntent;
 
 export const PAYMENT_METHOD_BASE = {
@@ -617,7 +612,7 @@ export const PAYMENT_METHOD_BASE = {
     country: 'US',
     display_brand: 'visa',
     exp_month: 8,
-    exp_year: 2025,
+    exp_year: 2030,
     fingerprint: 'AOB934RVNwzk6xtn',
     funding: 'credit',
     generated_from: {
@@ -650,6 +645,7 @@ export const PAYMENT_METHOD_BASE = {
   },
   object: 'payment_method',
   type: 'card',
+  customer_account: null,
 } as unknown as Stripe.PaymentMethod;
 
 export const CHARGE_BASE = {
@@ -713,7 +709,7 @@ export const CHARGE_BASE = {
       },
       country: 'US',
       exp_month: 8,
-      exp_year: 2025,
+      exp_year: 2030,
       extended_authorization: {
         status: 'disabled',
       },
@@ -849,23 +845,6 @@ export const COUPON_BASE = {
 export const PROMOTION_CODE_BASE = {
   active: false,
   code: 'FALL20',
-  coupon: {
-    amount_off: null,
-    created: 1721954050,
-    currency: 'usd',
-    duration: 'forever',
-    duration_in_months: 3,
-    id: 'Z4OV52SU',
-    livemode: false,
-    max_redemptions: null,
-    metadata: {},
-    name: '25.5% off',
-    object: 'coupon',
-    percent_off: 25.5,
-    redeem_by: null,
-    times_redeemed: 0,
-    valid: true,
-  },
   created: 1234567890,
   customer: null,
   expires_at: 1234567890,
@@ -880,6 +859,11 @@ export const PROMOTION_CODE_BASE = {
     minimum_amount_currency: null,
   },
   times_redeemed: 0,
+  promotion: {
+    coupon: null,
+    type: 'coupon',
+  },
+  customer_account: null,
 } as unknown as Stripe.PromotionCode;
 
 export const DISPUTE_BASE = {

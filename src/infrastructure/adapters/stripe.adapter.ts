@@ -221,7 +221,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     const invoice = await this.provider.invoices.create(params);
 
     return Invoice.toDomain({
-      id: invoice.id as string,
+      id: invoice.id,
       clientSecretId: invoice.confirmation_secret?.client_secret,
       status: invoice.status as InvoiceStatus,
     });
@@ -249,7 +249,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     });
 
     return Invoice.toDomain({
-      id: finalizedInvoice.id as string,
+      id: finalizedInvoice.id,
       clientSecretId: finalizedInvoice.confirmation_secret?.client_secret,
       status: finalizedInvoice.status as InvoiceStatus,
     });

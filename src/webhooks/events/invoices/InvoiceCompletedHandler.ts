@@ -20,6 +20,7 @@ import { AxiosError } from 'axios';
 import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
 import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
 import { PreCreatedUser } from '../../../infrastructure/domain/entities/preCreatedUser';
+import { getDiscountCouponId } from '../../../utils/coupon';
 
 interface InvoiceCompletedHandlerAttributes {
   determineLifetimeConditions: DetermineLifetimeConditions;
@@ -97,7 +98,7 @@ export class InvoiceCompletedHandler {
       return;
     }
 
-    const items = await this.paymentService.getInvoiceLineItems(invoiceId as string);
+    const items = await this.paymentService.getInvoiceLineItems(invoiceId);
     const priceDetails = items.data?.[0]?.pricing?.price_details;
 
     if (!priceDetails) {
@@ -106,7 +107,7 @@ export class InvoiceCompletedHandler {
 
     const product = await this.paymentService.getProduct(priceDetails.product);
     const { maxSpaceBytes, planType, productId, productType } = this.getPriceData(
-      priceDetails.price as unknown as Stripe.Price,
+      priceDetails.price as Stripe.Price,
       product,
     );
 
@@ -505,16 +506,11 @@ export class InvoiceCompletedHandler {
     try {
       const userData = await this.usersService.findUserByUuid(userUuid);
 
-      const invoiceDiscount = invoice.discounts?.[0] as Stripe.Discount | undefined;
-      const areDiscounts = isLifetimePlan ? invoiceLineItem.discounts.length > 0 : !!invoiceDiscount?.coupon;
-      if (areDiscounts) {
-        const coupon = isLifetimePlan
-          ? (invoiceLineItem.discounts[0] as Stripe.Discount).coupon
-          : invoiceDiscount?.coupon;
+      const discount = isLifetimePlan ? invoiceLineItem.discounts[0] : invoice.discounts?.[0];
+      const couponId = getDiscountCouponId(discount);
 
-        if (coupon) {
-          await this.usersService.storeCouponUsedByUser(userData, coupon.id);
-        }
+      if (couponId) {
+        await this.usersService.storeCouponUsedByUser(userData, couponId);
       }
     } catch (err) {
       const error = err as Error;

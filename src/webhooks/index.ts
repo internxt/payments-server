@@ -68,10 +68,7 @@ export function webhookHandler({
 
       switch (event.type) {
         case 'invoice.payment_failed': {
-          const invoiceId = event.data.object.id;
-          if (!invoiceId) break;
-
-          const invoice = await paymentService.getInvoice(invoiceId);
+          const invoice = await paymentService.getInvoice(event.data.object.id);
           await handleInvoicePaymentFailed(invoice, objectStorageService, paymentService, usersService);
           break;
         }
@@ -125,10 +122,7 @@ export function webhookHandler({
         }
 
         case 'invoice.paid': {
-          const invoiceId = event.data.object.id;
-          if (!invoiceId) break;
-
-          const invoice = await paymentService.getInvoice(invoiceId);
+          const invoice = await paymentService.getInvoice(event.data.object.id);
           const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
 
           const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);

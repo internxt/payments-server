@@ -202,10 +202,13 @@ export const getPromoCode = (params?: DeepPartial<Stripe.PromotionCode>): Stripe
     id: `promo_${randomDataGenerator.string({ length: 22 })}`,
     active: true,
     code: randomDataGenerator.string({ length: 10 }),
-    coupon: {
-      ...COUPON_BASE,
-      id: randomDataGenerator.string({ length: 10 }),
-      currency: null,
+    promotion: {
+      type: 'coupon',
+      coupon: {
+        ...COUPON_BASE,
+        id: randomDataGenerator.string({ length: 10 }),
+        currency: null,
+      },
     },
     expires_at: null,
     ...(params as any),
@@ -340,8 +343,9 @@ export const getCreatedSubscription = (
       {
         id: 'jMT0WJUD',
         checkout_session: '',
-        coupon: 'jMT0WJUD' as any,
+        source: { type: 'coupon', coupon: 'jMT0WJUD' },
         customer: customer,
+        customer_account: null,
         invoice,
         invoice_item: invoice,
         end: 0,
@@ -354,10 +358,13 @@ export const getCreatedSubscription = (
           id: `promo_${randomDataGenerator.string({ length: 22 })}`,
           active: true,
           code: 'PROMO_CODE',
-          coupon: {
-            ...COUPON_BASE,
-            id: 'jMT0WJUD',
-            currency: null,
+          promotion: {
+            type: 'coupon',
+            coupon: {
+              ...COUPON_BASE,
+              id: 'jMT0WJUD',
+              currency: null,
+            },
           },
           expires_at: null,
         },

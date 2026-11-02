@@ -21,6 +21,7 @@ import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { getPromotionCodeCoupon } from '../utils/coupon';
 
 const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
@@ -550,12 +551,13 @@ export function paymentsController(
 
         try {
           const promoCode = await paymentService.getPromoCode({ promoCodeName: promotionCode });
+          const coupon = getPromotionCodeCoupon(promoCode);
 
           const promoCodeObj = {
             promoCodeName: promotionCode,
             codeId: promoCode.id,
-            amountOff: promoCode.coupon.amount_off,
-            percentOff: promoCode.coupon.percent_off,
+            amountOff: coupon.amount_off,
+            percentOff: coupon.percent_off,
           };
 
           return rep.status(200).send(promoCodeObj);
