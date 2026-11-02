@@ -16,7 +16,7 @@ import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/pa
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
-import { Subscription } from '../../../../src/infrastructure/domain/entities/subscription';
+import { Subscription, SubscriptionStatus } from '../../../../src/infrastructure/domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../../../../src/infrastructure/domain/entities/invoice';
 import { InvoiceItems } from '../../../../src/infrastructure/domain/entities/invoiceItems';
 import { EU_COUNTRIES } from '../../../../src/constants';
@@ -248,7 +248,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+          eur: {
+            unit_amount: 999,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('999'),
+          },
         },
       });
 
@@ -294,7 +299,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_business' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 2000, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '2000' },
+          eur: {
+            unit_amount: 2000,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('2000'),
+          },
         },
       });
 
@@ -323,7 +333,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+          eur: {
+            unit_amount: 999,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('999'),
+          },
         },
       });
 
@@ -365,7 +380,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_business' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 5000, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '5000' },
+          eur: {
+            unit_amount: 5000,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('5000'),
+          },
         },
       });
 
@@ -390,7 +410,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+          eur: {
+            unit_amount: 999,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('999'),
+          },
         },
       });
 
@@ -413,7 +438,12 @@ describe('Stripe Adapter', () => {
         },
         product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+          eur: {
+            unit_amount: 999,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('999'),
+          },
         },
       });
 
@@ -431,7 +461,12 @@ describe('Stripe Adapter', () => {
         type: 'one_time',
         product: { ...PRODUCT_BASE, id: 'prod_test' } as Stripe.Product,
         currency_options: {
-          eur: { unit_amount: 999, tax_behavior: 'exclusive', custom_unit_amount: null, unit_amount_decimal: '999' },
+          eur: {
+            unit_amount: 999,
+            tax_behavior: 'exclusive',
+            custom_unit_amount: null,
+            unit_amount_decimal: Stripe.Decimal.from('999'),
+          },
         },
       });
 
@@ -459,7 +494,7 @@ describe('Stripe Adapter', () => {
         Subscription.toDomain({
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
-          status: stripeSubscription.status,
+          status: stripeSubscription.status as SubscriptionStatus,
           priceId: stripeSubscription.items.data[0].price.id,
           currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           metadata: stripeSubscription.metadata,
@@ -496,7 +531,7 @@ describe('Stripe Adapter', () => {
         Subscription.toDomain({
           id: stripeSubscription.id,
           customer: stripeSubscription.customer as string,
-          status: stripeSubscription.status,
+          status: stripeSubscription.status as SubscriptionStatus,
           currentPeriodEnd: stripeSubscription.items.data[0].current_period_end,
           priceId: stripeSubscription.items.data[0].price.id,
           startDate: stripeSubscription.start_date,

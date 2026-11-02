@@ -8,7 +8,7 @@ import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
-import { Subscription } from '../domain/entities/subscription';
+import { Subscription, SubscriptionStatus } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
 import { EU_COUNTRIES, STRIPE_API_VERSION } from '../../constants';
@@ -180,7 +180,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
-      status: subscription.status,
+      status: subscription.status as SubscriptionStatus,
       priceId: subscription.items.data[0].price.id,
       currentPeriodEnd: subscription.items.data[0].current_period_end,
       metadata: subscription.metadata,
@@ -202,7 +202,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
     return Subscription.toDomain({
       id: subscription.id,
       customer: subscription.customer as string,
-      status: subscription.status,
+      status: subscription.status as SubscriptionStatus,
       currentPeriodEnd: subscription.items.data[0].current_period_end,
       priceId: subscription.items.data[0].price.id,
       startDate: subscription.start_date,

@@ -1,8 +1,8 @@
 // AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // Run: npm run generate:stripe-fixtures
-// Generated: 2026-10-27T10:46:14.571Z
-// Stripe SDK: v20.4.1
-// OpenAPI Version: v2186
+// Generated: 2026-10-27T11:13:02.838Z
+// Stripe SDK: v22.6.2
+// OpenAPI Version: v2442
 
 import Stripe from 'stripe';
 
@@ -180,6 +180,7 @@ export const INVOICE_BASE = {
           unit_amount_decimal: null,
         },
         subtotal: 2060319484,
+        quantity_decimal: null,
       },
     ],
     has_more: false,
@@ -209,6 +210,11 @@ export const INVOICE_BASE = {
       sepa_debit: {},
       us_bank_account: {},
       payto: {},
+      pix: {
+        amount_includes_iof: null,
+      },
+      upi: {},
+      billie: {},
     },
     payment_method_types: null,
   },
@@ -290,6 +296,7 @@ export const SUBSCRIPTION_BASE = {
     comment: null,
     feedback: null,
     reason: null,
+    feedback_option: null,
   },
   collection_method: 'charge_automatically',
   created: 1234567890,
@@ -308,6 +315,9 @@ export const SUBSCRIPTION_BASE = {
     issuer: {
       type: 'self',
     },
+    custom_fields: null,
+    description: null,
+    footer: null,
   },
   items: {
     data: [
@@ -416,6 +426,9 @@ export const SUBSCRIPTION_BASE = {
       sepa_debit: {},
       us_bank_account: {},
       payto: {},
+      pix: {},
+      upi: {},
+      billie: {},
     },
     payment_method_types: null,
     save_default_payment_method: null,
@@ -427,10 +440,31 @@ export const SUBSCRIPTION_BASE = {
   pending_setup_intent: null,
   pending_update: {
     billing_cycle_anchor: null,
+    discount: {
+      checkout_session: null,
+      customer: null,
+      end: null,
+      id: 'obj_123',
+      invoice: null,
+      invoice_item: null,
+      object: 'discount',
+      promotion_code: null,
+      start: 109757538,
+      subscription: null,
+      subscription_item: null,
+      source: {
+        coupon: null,
+        type: 'coupon',
+      },
+      customer_account: null,
+    },
+    discounts: [],
     expires_at: 833811170,
     subscription_items: null,
     trial_end: null,
     trial_from_plan: null,
+    metadata: null,
+    cancel_at_period_end: null,
   },
   schedule: null,
   start_date: 1234567890,
@@ -460,6 +494,24 @@ export const SUBSCRIPTION_BASE = {
     flexible: {},
   },
   customer_account: null,
+  managed_payments: {
+    enabled: true,
+  },
+  billing_schedules: [
+    {
+      applies_to: null,
+      bill_until: {
+        computed_timestamp: 2082605468,
+        duration: {
+          interval: 'month',
+          interval_count: null,
+        },
+        timestamp: null,
+        type: 'duration',
+      },
+      key: 'key',
+    },
+  ],
 } as unknown as Stripe.Subscription;
 
 export const PRICE_BASE = {
@@ -584,6 +636,10 @@ export const PAYMENT_INTENT_BASE = {
   source: null,
   excluded_payment_method_types: null,
   customer_account: null,
+  managed_payments: {
+    enabled: true,
+  },
+  allowed_payment_method_types: null,
 } as unknown as Stripe.PaymentIntent;
 
 export const PAYMENT_METHOD_BASE = {
@@ -754,6 +810,7 @@ export const CHARGE_BASE = {
       authorization_code: null,
       regulated_status: null,
       network_transaction_id: null,
+      transaction_link_id: null,
     },
     type: 'card',
   },
@@ -920,6 +977,7 @@ export const DISPUTE_BASE = {
       brand: 'visa',
       case_type: 'inquiry',
       network_reason_code: '10.4',
+      network: 'visa',
     },
     type: 'card',
   },

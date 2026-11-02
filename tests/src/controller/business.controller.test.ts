@@ -60,7 +60,7 @@ describe('Testing business endpoints', () => {
       const responseBody = response.json();
 
       expect(response.statusCode).toBe(200);
-      expect(responseBody).toStrictEqual(mockedSubscription);
+      expect(responseBody).toStrictEqual(JSON.parse(JSON.stringify(mockedSubscription)));
       expect(updateWorkspaceSpy).toHaveBeenCalledWith({
         ownerId: mockedUser.uuid,
         tierId: mockedTier.featuresPerService[Service.Drive].foreignTierId,

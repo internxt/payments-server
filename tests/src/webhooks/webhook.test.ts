@@ -60,7 +60,7 @@ describe('Webhook events', () => {
         event.data.object,
         expect.any(PaymentService),
         expect.any(ObjectStorageService),
-        expect.any(Stripe),
+        stripePaymentsAdapter.provider,
       );
     });
 
