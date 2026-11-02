@@ -5,11 +5,9 @@ import {
   getCustomer,
   getInvoice,
   getPrice,
-  getTaxes,
   getUser,
   getValidAuthToken,
   getValidUserToken,
-  mockCalculateTaxFor,
 } from '../fixtures';
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
@@ -1125,24 +1123,24 @@ describe('Checkout controller', () => {
   });
 
   describe('Get Price by its ID', () => {
+    const spanishLocation = { country: 'ES', postalCode: '28001' };
+    const spanishVatFor = (amount: number) => {
+      const tax = Math.round(amount * 0.21);
+      return { tax_amount_exclusive: tax, amount_total: amount + tax };
+    };
+
     test('When the user wants to get a price by its ID, then the price is returned with its taxes', async () => {
       const mockedPrice = getPriceEntity({
         bytes: 123456789,
         interval: 'year',
       });
-      const taxes = mockCalculateTaxFor(mockedPrice.amount);
+      const taxes = spanishVatFor(mockedPrice.amount);
 
       jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-      jest
-        .spyOn(PaymentService.prototype, 'calculateTax')
-        .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
       const response = await app.inject({
-        path: `/checkout/price-by-id?priceId=${mockedPrice.id}&userAddress=123.12.12.12`,
-        query: {
-          priceId: mockedPrice.id,
-          userAddress: '123.12.12.12',
-        },
+        path: '/checkout/price-by-id',
+        query: { priceId: mockedPrice.id, ...spanishLocation },
         method: 'GET',
       });
 
@@ -1160,6 +1158,25 @@ describe('Checkout controller', () => {
       });
     });
 
+    test('When a visitor located in an EU country checks a price, then the price includes that country VAT', async () => {
+      const mockedPrice = getPriceEntity({ bytes: 123456789, interval: 'year', amount: 10000, decimalAmount: 100 });
+      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+
+      const response = await app.inject({
+        path: '/checkout/price-by-id',
+        query: { priceId: mockedPrice.id, postalCode: '10115', country: 'DE' },
+        method: 'GET',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().taxes).toStrictEqual({
+        tax: 1900,
+        decimalTax: 19,
+        amountWithTax: 11900,
+        decimalAmountWithTax: 119,
+      });
+    });
+
     describe('Handling promo codes', () => {
       test('When the user provides a promo code with amount off, then the price is returned with the discount applied', async () => {
         const mockedPrice = getPriceEntity({
@@ -1173,20 +1190,17 @@ describe('Checkout controller', () => {
           codeId: 'promo_code_id',
         };
         const discountedAmount = mockedPrice.amount - promoCode.amountOff;
-        const taxes = mockCalculateTaxFor(discountedAmount);
+        const taxes = spanishVatFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-        jest
-          .spyOn(PaymentService.prototype, 'calculateTax')
-          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
           path: '/checkout/price-by-id',
           query: {
             priceId: mockedPrice.id,
             promoCodeName: promoCode.promoCodeName,
-            userAddress: '123.12.12.12',
+            ...spanishLocation,
           },
           method: 'GET',
         });
@@ -1218,20 +1232,17 @@ describe('Checkout controller', () => {
         };
         const discount = Math.floor(mockedPrice.amount * (promoCode.percentOff / 100));
         const discountedAmount = mockedPrice.amount - discount;
-        const taxes = mockCalculateTaxFor(discountedAmount);
+        const taxes = spanishVatFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-        jest
-          .spyOn(PaymentService.prototype, 'calculateTax')
-          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
           path: '/checkout/price-by-id',
           query: {
             priceId: mockedPrice.id,
             promoCodeName: promoCode.promoCodeName,
-            userAddress: '123.12.12.12',
+            ...spanishLocation,
           },
           method: 'GET',
         });
@@ -1265,20 +1276,17 @@ describe('Checkout controller', () => {
         };
 
         const discountedAmount = 0;
-        const taxes = mockCalculateTaxFor(discountedAmount);
+        const taxes = spanishVatFor(discountedAmount);
 
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
-        jest
-          .spyOn(PaymentService.prototype, 'calculateTax')
-          .mockResolvedValueOnce(taxes as unknown as Stripe.Tax.Calculation);
 
         const response = await app.inject({
           path: '/checkout/price-by-id',
           query: {
             priceId: mockedPrice.id,
             promoCodeName: promoCode.promoCodeName,
-            userAddress: '123.12.12.12',
+            ...spanishLocation,
           },
           method: 'GET',
         });
@@ -1315,10 +1323,7 @@ describe('Checkout controller', () => {
           bytes: 123456789,
           interval: 'year',
         });
-        const mockedTaxes = getTaxes();
-
         jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
-        jest.spyOn(PaymentService.prototype, 'calculateTax').mockResolvedValue(mockedTaxes);
 
         const response = await app.inject({
           path: '/checkout/price-by-id',
