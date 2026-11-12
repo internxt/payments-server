@@ -59,21 +59,21 @@ export class PaymentService {
   ) {}
 
   async getVatIdAndAttachTaxIdToCustomer(customerId: CustomerId, country?: string, companyVatId?: string) {
-    try {
-      if (country && companyVatId) {
-        const taxIds = this.getVatIdFromCountry(country);
+    if (!country || !companyVatId) return;
 
-        if (taxIds.length > 0) {
-          await this.attachTaxIdToCustomer(customerId, companyVatId, taxIds[0]);
-        }
-      }
-    } catch (err) {
-      const errCode = (err as any)?.raw?.code;
-      if (errCode === 'tax_id_invalid') {
-        throw new InvalidTaxIdError();
-      }
+    const taxIdTypes = this.getVatIdFromCountry(country);
 
-      throw err;
+    for (const [index, taxIdType] of taxIdTypes.entries()) {
+      try {
+        await this.attachTaxIdToCustomer(customerId, companyVatId, taxIdType);
+        return;
+      } catch (err) {
+        const isInvalidTaxId = (err as any)?.raw?.code === 'tax_id_invalid';
+        if (!isInvalidTaxId) throw err;
+
+        const isLastTaxIdType = index === taxIdTypes.length - 1;
+        if (isLastTaxIdType) throw new InvalidTaxIdError();
+      }
     }
   }
 

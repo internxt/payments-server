@@ -32,6 +32,7 @@ import {
   PaymentMethodNotFoundError,
   SubscriptionNotEligibleForEarlyChargeError,
   NotFoundSubscriptionError,
+  InvalidTaxIdError,
 } from '../../../src/errors/PaymentErrors';
 
 describe('Payments Service tests', () => {
@@ -134,6 +135,49 @@ describe('Payments Service tests', () => {
           ).code,
         }),
       ).rejects.toThrow(BadRequestError);
+    });
+  });
+
+  describe('Attaching a tax id to a customer', () => {
+    const customerId = 'cus_123';
+    const invalidTaxIdError = Object.assign(new Error('invalid'), { raw: { code: 'tax_id_invalid' } });
+
+    it('When the first tax id type is rejected as invalid, then it retries with the next type of the country', async () => {
+      const attachSpy = jest
+        .spyOn(paymentService, 'attachTaxIdToCustomer')
+        .mockRejectedValueOnce(invalidTaxIdError)
+        .mockResolvedValueOnce(undefined);
+
+      await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '18174206C');
+
+      expect(attachSpy).toHaveBeenNthCalledWith(1, customerId, '18174206C', 'eu_vat');
+      expect(attachSpy).toHaveBeenNthCalledWith(2, customerId, '18174206C', 'es_cif');
+    });
+
+    it('When every tax id type of the country is rejected as invalid, then an invalid tax id error is thrown', async () => {
+      jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockRejectedValue(invalidTaxIdError);
+
+      await expect(paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '123')).rejects.toThrow(
+        InvalidTaxIdError,
+      );
+    });
+
+    it('When the first tax id type is accepted, then no other type is tried', async () => {
+      const attachSpy = jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockResolvedValue(undefined);
+
+      await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', 'ESB12345678');
+
+      expect(attachSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('When attaching fails for a reason other than an invalid tax id, then the error is propagated without retrying', async () => {
+      const stripeError = new Error('rate limited');
+      const attachSpy = jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockRejectedValue(stripeError);
+
+      await expect(paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '18174206C')).rejects.toBe(
+        stripeError,
+      );
+      expect(attachSpy).toHaveBeenCalledTimes(1);
     });
   });
 
