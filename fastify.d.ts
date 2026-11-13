@@ -4,6 +4,5 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     skipAuth?: boolean;
     allowAnonymous?: boolean;
-    validateCaptcha?: boolean;
   }
 }
