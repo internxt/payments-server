@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import jwt from 'jsonwebtoken';
 
 import { PaymentService } from '../services/payment.service';
 import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError } from '../errors/PaymentErrors';
-import { ForbiddenError, UnauthorizedError } from '../errors/Errors';
+import { UnauthorizedError } from '../errors/Errors';
 import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
+import { verifyUserTokenHook } from '../utils/verifyUserToken';
 import { getInvoiceProductId } from '../utils/invoice';
 
 export function objectStorageController(paymentService: PaymentService) {
@@ -113,22 +113,10 @@ export function objectStorageController(paymentService: PaymentService) {
         config: {
           skipAuth: true,
         },
+        preHandler: verifyUserTokenHook,
       },
       async (req, res) => {
-        const { customerId, priceId, currency, token, promoCodeId } = req.body;
-
-        try {
-          const payload = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          const tokenCustomerId = payload.customerId;
-
-          if (customerId !== tokenCustomerId) {
-            throw new ForbiddenError();
-          }
-        } catch {
-          throw new ForbiddenError();
-        }
+        const { customerId, priceId, currency, promoCodeId } = req.body;
 
         try {
           const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);

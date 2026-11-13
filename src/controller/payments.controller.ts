@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import jwt from 'jsonwebtoken';
 import { type AppConfig } from '../config';
 import { UsersService } from '../services/users.service';
 import {
@@ -14,8 +13,8 @@ import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
 import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
 import { assertUser } from '../utils/assertUser';
+import { verifyUserTokenHook } from '../utils/verifyUserToken';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
-import { ForbiddenError } from '../errors/Errors';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { PaymentService } from '../services/payment.service';
@@ -92,23 +91,10 @@ export function paymentsController(
         config: {
           skipAuth: true,
         },
+        preHandler: verifyUserTokenHook,
       },
       async (req, res) => {
-        let tokenCustomerId: string;
-        const { customerId, currency = 'eur', priceId, token, paymentMethod } = req.body;
-
-        try {
-          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          tokenCustomerId = customerId;
-        } catch {
-          throw new ForbiddenError();
-        }
-
-        if (customerId !== tokenCustomerId) {
-          throw new ForbiddenError();
-        }
+        const { customerId, currency = 'eur', priceId, paymentMethod } = req.body;
 
         res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
 
