@@ -33,6 +33,28 @@ describe('Cache Service', () => {
     });
   });
 
+  describe('Closing the connection', () => {
+    test('When the connection is closed, then Redis is asked to quit', async () => {
+      const newCacheService = new CacheService(config);
+      const redis = (newCacheService as any).redis;
+      const quit = jest.spyOn(redis, 'quit');
+
+      await newCacheService.close();
+
+      expect(quit).toHaveBeenCalled();
+    });
+
+    test('When Redis cannot quit, then the connection is dropped without reconnecting and no error is thrown', async () => {
+      const newCacheService = new CacheService(config);
+      const redis = (newCacheService as any).redis;
+      jest.spyOn(redis, 'quit').mockRejectedValue(new Error("Stream isn't writeable"));
+      const disconnect = jest.spyOn(redis, 'disconnect');
+
+      await expect(newCacheService.close()).resolves.toBeUndefined();
+      expect(disconnect).toHaveBeenCalledWith(false);
+    });
+  });
+
   describe('Retry Strategy', () => {
     test('When reconnection attempts are less than 10, then it returns increasing delays', () => {
       const newCacheService = new CacheService(config);

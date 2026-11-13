@@ -1,30 +1,10 @@
-import axios from 'axios';
 import { MongoClient } from 'mongodb';
 import XLSX from 'xlsx';
 import Stripe from 'stripe';
 
 import envVariablesConfig from '../config';
-import { LicenseCodesService } from '../services/licenseCodes.service';
-import { PaymentService } from '../services/payment.service';
-import { UsersService } from '../services/users.service';
-import { UsersRepository } from '../core/users/UsersRepository';
-import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
-import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
-import { MongoDBLicenseCodesRepository } from '../core/users/MongoDBLicenseCodesRepository';
+import { buildDependencies } from '../dependencies';
 import { LicenseCode } from '../core/users/LicenseCode';
-import {
-  DisplayBillingRepository,
-  MongoDBDisplayBillingRepository,
-} from '../core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from '../core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
-import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
-import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
-import { ProductsRepository } from '../core/users/ProductsRepository';
-import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
-import { DynamicConfigKey, DynamicConfigRepository } from '../core/infra/DynamicConfigRepository';
-import { MongoDBDynamicConfigRepository } from '../core/infra/MongoDBDynamicConfigRepository';
-import { STRIPE_API_VERSION } from '../constants';
 
 const [, , filePath, provider] = process.argv;
 
@@ -58,42 +38,17 @@ function loadFromExcel(): LicenseCode[] {
 
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
+  const { licenseCodesService, closeConnections } = await buildDependencies({
+    config: envVariablesConfig,
+    mongoClient,
+  });
+
   try {
-    const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
-
-    const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
-    const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
-
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
-    const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-    const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
-    const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
-    const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
-    const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
-    const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
-
-    const paymentService = new PaymentService(stripe, productsRepository);
-    const usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      envVariablesConfig,
-      axios,
-    );
-
-    const licenseCodesService = new LicenseCodesService({
-      paymentService,
-      usersService,
-      licenseCodesRepository,
-    });
-
     for (const licenseCode of loadFromExcel()) {
       await licenseCodesService.insertLicenseCode(licenseCode);
     }
   } finally {
-    await mongoClient.close();
+    await closeConnections();
   }
 }
 

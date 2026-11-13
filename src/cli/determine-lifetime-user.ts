@@ -1,81 +1,24 @@
-import axios from 'axios';
 import { MongoClient } from 'mongodb';
-import Stripe from 'stripe';
 
 import envVariablesConfig from '../config';
-import { PaymentService } from '../services/payment.service';
-import { UsersService } from '../services/users.service';
-import { UsersRepository } from '../core/users/UsersRepository';
-import { MongoDBUsersRepository } from '../core/users/MongoDBUsersRepository';
-import {
-  DisplayBillingRepository,
-  MongoDBDisplayBillingRepository,
-} from '../core/users/MongoDBDisplayBillingRepository';
-import { DynamicConfigKey, DynamicConfigRepository } from '../core/infra/DynamicConfigRepository';
-import { MongoDBDynamicConfigRepository } from '../core/infra/MongoDBDynamicConfigRepository';
-import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { CouponsRepository } from '../core/coupons/CouponsRepository';
-import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
-import { MongoDBCouponsRepository } from '../core/coupons/MongoDBCouponsRepository';
-import { MongoDBUsersCouponsRepository } from '../core/coupons/MongoDBUsersCouponsRepository';
-import { ProductsRepository } from '../core/users/ProductsRepository';
-import { MongoDBProductsRepository } from '../core/users/MongoDBProductsRepository';
-import { TiersService } from '../services/tiers.service';
-import { MongoDBTiersRepository } from '../core/users/MongoDBTiersRepository';
-import { MongoDBUsersTiersRepository } from '../core/users/MongoDBUsersTiersRepository';
-import { StorageService } from '../services/storage.service';
-import { MailService } from '../services/mail.service';
-import { STRIPE_API_VERSION } from '../constants';
+import { buildDependencies } from '../dependencies';
 
 const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
 async function main() {
   const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
+  const { usersService, determineLifetimeConditions, closeConnections } = await buildDependencies({
+    config: envVariablesConfig,
+    mongoClient,
+  });
+
   try {
-    const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
-
-    const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
-    const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
-
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
-    const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-    const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
-    const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
-    const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
-    const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
-
-    const paymentService = new PaymentService(stripe, productsRepository);
-    const usersService = new UsersService(
-      usersRepository,
-      paymentService,
-      displayBillingRepository,
-      couponsRepository,
-      usersCouponsRepository,
-      envVariablesConfig,
-      axios,
-    );
-
-    const tiersRepository = new MongoDBTiersRepository(mongoClient);
-    const usersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
-    const storageService = new StorageService(envVariablesConfig, axios);
-    const mailService = new MailService(envVariablesConfig, axios);
-
-    const tiersService = new TiersService(
-      usersService,
-      tiersRepository,
-      usersTiersRepository,
-      storageService,
-      mailService,
-    );
-
-    const determineLifetimeUserCondition = new DetermineLifetimeConditions(paymentService, tiersService);
     const user = await usersService.findUserByCustomerID(customerId);
-
-    const userLifetime = await determineLifetimeUserCondition.determine(user, lastPurchasedTierProductId);
+    const userLifetime = await determineLifetimeConditions.determine(user, lastPurchasedTierProductId);
 
     console.log(JSON.stringify(userLifetime));
   } finally {
-    await mongoClient.close();
+    await closeConnections();
   }
 }
 
