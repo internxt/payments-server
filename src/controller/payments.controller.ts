@@ -13,7 +13,7 @@ import { User, UserSubscription, UserType } from '../core/users/User';
 import CacheService from '../services/cache.service';
 import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
 import { assertUser } from '../utils/assertUser';
-import { verifyUserTokenHook } from '../utils/verifyUserToken';
+import { verifyUserTokenHook } from '../plugins/route-guards';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';

@@ -1,4 +1,3 @@
-import { FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import config from '../config';
 import { ForbiddenError } from '../errors/Errors';
@@ -20,15 +19,4 @@ export function verifyUserToken(token: string, customerId: string): void {
   if (tokenCustomerId !== customerId) {
     throw new ForbiddenError();
   }
-}
-
-/**
- * Fastify `preHandler` for routes whose body carries the payments `token` and the `customerId` it must belong to.
- *
- * @throws {ForbiddenError} When the token is invalid, has expired or belongs to another customer.
- */
-export async function verifyUserTokenHook(
-  req: FastifyRequest<{ Body: { token: string; customerId: string } }>,
-): Promise<void> {
-  verifyUserToken(req.body.token, req.body.customerId);
 }

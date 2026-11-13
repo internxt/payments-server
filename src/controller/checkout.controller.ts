@@ -1,17 +1,16 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { PaymentIntent } from '../types/payment';
-import { BadRequestError, ForbiddenError } from '../errors/Errors';
+import { BadRequestError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyRecaptcha } from '../utils/verifyRecaptcha';
-import { verifyUserTokenHook } from '../utils/verifyUserToken';
 import { setupAuth } from '../plugins/auth';
+import { verifyCaptchaHook, verifyUserTokenHook } from '../plugins/route-guards';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
@@ -23,14 +22,6 @@ interface CheckoutControllerPayload {
   paymentsService: PaymentService;
   preCreatedUserService: PreCreatedUserService;
   confirmationTokenService: ConfirmationTokenService;
-}
-
-async function verifyCaptchaHook(req: FastifyRequest<{ Body: { captchaToken: string } }>): Promise<void> {
-  const isCaptchaValid = await verifyRecaptcha(req.body.captchaToken);
-
-  if (!isCaptchaValid) {
-    throw new ForbiddenError('Token verification failed');
-  }
 }
 
 export function checkoutController({

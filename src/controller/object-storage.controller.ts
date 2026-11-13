@@ -8,7 +8,7 @@ import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyUserTokenHook } from '../utils/verifyUserToken';
+import { verifyUserTokenHook } from '../plugins/route-guards';
 import { getInvoiceProductId } from '../utils/invoice';
 
 export function objectStorageController(paymentService: PaymentService) {
