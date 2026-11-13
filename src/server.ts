@@ -1,123 +1,17 @@
-import axios from 'axios';
 import { MongoClient } from 'mongodb';
-import Stripe from 'stripe';
 import { FastifyInstance } from 'fastify';
 
-import { StorageService } from './services/storage.service';
-import { UsersService } from './services/users.service';
-import { PaymentService } from './services/payment.service';
 import envVariablesConfig from './config';
-import { UsersRepository } from './core/users/UsersRepository';
-import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
-import CacheService from './services/cache.service';
 import { buildApp } from './app';
-import { LicenseCodesService } from './services/licenseCodes.service';
-import { LicenseCodesRepository } from './core/users/LicenseCodeRepository';
-import { MongoDBLicenseCodesRepository } from './core/users/MongoDBLicenseCodesRepository';
-import {
-  DisplayBillingRepository,
-  MongoDBDisplayBillingRepository,
-} from './core/users/MongoDBDisplayBillingRepository';
-import { CouponsRepository } from './core/coupons/CouponsRepository';
-import { MongoDBCouponsRepository } from './core/coupons/MongoDBCouponsRepository';
-import { UsersCouponsRepository } from './core/coupons/UsersCouponsRepository';
-import { MongoDBUsersCouponsRepository } from './core/coupons/MongoDBUsersCouponsRepository';
-import { ProductsRepository } from './core/users/ProductsRepository';
-import { MongoDBProductsRepository } from './core/users/MongoDBProductsRepository';
-import { ObjectStorageService } from './services/objectStorage.service';
-import { MailService } from './services/mail.service';
-import { TiersService } from './services/tiers.service';
-import { MongoDBTiersRepository, TiersRepository } from './core/users/MongoDBTiersRepository';
-import { MongoDBUsersTiersRepository, UsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
-import { ProductsService } from './services/products.service';
-import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
-import {
-  MongoDBUserFeatureOverridesRepository,
-  UserFeatureOverridesRepository,
-} from './core/users/MongoDBUserFeatureOverridesRepository';
-import { HealthService } from './services/health.service';
-import { DynamicConfigKey, DynamicConfigRepository } from './core/infra/DynamicConfigRepository';
-import { MongoDBDynamicConfigRepository } from './core/infra/MongoDBDynamicConfigRepository';
-import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
-import { PreCreatedUserService } from './services/preCreatedUser.service';
-import { createHttpClient } from './infrastructure/http/httpClient';
-import { ConfirmationTokenService } from './services/confirmationToken.service';
-import { STRIPE_API_VERSION } from './constants';
+import { buildDependencies } from './dependencies';
 
-const start = async (mongoTestClient?: MongoClient): Promise<FastifyInstance> => {
-  const mongoClient = mongoTestClient ?? (await new MongoClient(envVariablesConfig.MONGO_URI).connect());
-  const usersRepository: UsersRepository = new MongoDBUsersRepository(mongoClient);
-  const licenseCodesRepository: LicenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
-  const displayBillingRepository: DisplayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
-  const couponsRepository: CouponsRepository = new MongoDBCouponsRepository(mongoClient);
-  const usersCouponsRepository: UsersCouponsRepository = new MongoDBUsersCouponsRepository(mongoClient);
-  const productsRepository: ProductsRepository = new MongoDBProductsRepository(mongoClient);
-  const tiersRepository: TiersRepository = new MongoDBTiersRepository(mongoClient);
-  const usersTiersRepository: UsersTiersRepository = new MongoDBUsersTiersRepository(mongoClient);
-  const userFeatureOverridesRepository: UserFeatureOverridesRepository = new MongoDBUserFeatureOverridesRepository(
-    mongoClient,
-  );
-  const dynamicConfigRepository: DynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
-
-  const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
-
-  const stripeSecretKey = stripeKeyOverride ?? envVariablesConfig.STRIPE_SECRET_KEY;
-  const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
-  stripePaymentsAdapter.initProvider(stripe);
-
-  await stripePaymentsAdapter.syncTaxRegistrations();
-
-  const paymentService = new PaymentService(stripe, productsRepository);
-  const storageService = new StorageService(envVariablesConfig, axios);
-  const usersService = new UsersService(
-    usersRepository,
-    paymentService,
-    displayBillingRepository,
-    couponsRepository,
-    usersCouponsRepository,
-    envVariablesConfig,
-    axios,
-  );
-  const cacheService = new CacheService(envVariablesConfig);
-  const mailService = new MailService(envVariablesConfig, axios);
-  const tiersService = new TiersService(
-    usersService,
-    tiersRepository,
-    usersTiersRepository,
-    storageService,
-    mailService,
-  );
-  const licenseCodesService = new LicenseCodesService({
-    paymentService,
-    usersService,
-    licenseCodesRepository,
-  });
-  const objectStorageService = new ObjectStorageService(paymentService, envVariablesConfig, axios);
-  const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
-  const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
-  const healthService = new HealthService(mongoClient, cacheService);
-  const preCreatedUserService = new PreCreatedUserService(createHttpClient(), envVariablesConfig);
-  const confirmationTokenService = new ConfirmationTokenService(cacheService);
-
-  const fastify = await buildApp({
-    paymentService,
-    storageService,
-    usersService,
-    cacheService,
-    tiersService,
-    licenseCodesService,
-    objectStorageService,
-    productsService,
-    userFeaturesOverridesService,
-    stripe,
-    config: envVariablesConfig,
-    healthService,
-    preCreatedUserService,
-    confirmationTokenService,
-  });
+const start = async (): Promise<FastifyInstance> => {
+  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
+  const dependencies = await buildDependencies({ config: envVariablesConfig, mongoClient });
+  const fastify = await buildApp(dependencies);
 
   fastify.addHook('onClose', async () => {
-    await cacheService['redis'].quit();
+    await dependencies.closeConnections();
   });
 
   try {
