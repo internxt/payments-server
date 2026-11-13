@@ -32,3 +32,25 @@
 
 - If you go to `localhost:8082` you'll see a GUI to inspect the mongodb instance
 - Install prettier & eslint vscode extensions for a better dev experience.
+
+## Versioning and releases
+
+Versions are managed by [release-please](https://github.com/googleapis/release-please). You don't bump `package.json` by hand.
+
+- Every merge to `master` with at least one `feat`, `fix`, `refactor`, `perf` or `revert` commit opens or updates a single **release PR**. That PR bumps the version in `package.json` and adds the changes to `CHANGELOG.md`. Merges with only hidden types (see the table below) don't touch it.
+- Several merged PRs accumulate in that same release PR. The version only changes when you merge it.
+- Merging the release PR creates the `vX.Y.Z` tag and the GitHub Release. Like any push to `master`, it also runs the usual tests and a regular deploy of the same code; it only updates the version and changelog.
+- The release PR is approved and merged like any other PR. CI checks don't run on the PR itself, because it's created with `GITHUB_TOKEN`.
+
+The next version is calculated from the [Conventional Commits](https://www.conventionalcommits.org/) merged since the last release, taking the biggest bump found:
+
+| Commit type                                                    | Bump       |
+| -------------------------------------------------------------- | ---------- |
+| `feat!:`, `fix!:`, `refactor!:` or a `BREAKING CHANGE:` footer | major      |
+| `feat`                                                         | minor      |
+| `fix`, `refactor`, `perf`, `revert`                            | patch      |
+| `chore`, `ci`, `build`, `docs`, `test`, `style`                | no release |
+
+To force a specific version, add a `Release-As: X.Y.Z` footer to a commit.
+
+Configuration: `release-please-config.json`, `.release-please-manifest.json` and `.github/workflows/release-please.yml`.
