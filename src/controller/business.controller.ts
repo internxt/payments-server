@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { AppConfig } from '../config';
 import {
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
@@ -7,20 +6,18 @@ import {
   UpdateWorkspaceError,
   UserNotFoundError,
 } from '../errors/PaymentErrors';
-import { UsersService } from '../services/users.service';
 import { assertUser } from '../utils/assertUser';
 import Stripe from 'stripe';
-import { TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
 import { setupAuth } from '../plugins/auth';
-import { PaymentService } from '../services/payment.service';
+import { type Dependencies } from '../dependencies';
 
-export function businessController(
-  paymentService: PaymentService,
-  usersService: UsersService,
-  tiersService: TiersService,
-  config: AppConfig,
-) {
+export function businessController({
+  paymentService,
+  usersService,
+  tiersService,
+  config,
+}: Pick<Dependencies, 'paymentService' | 'usersService' | 'tiersService' | 'config'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 

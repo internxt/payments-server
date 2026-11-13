@@ -1,12 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { AppConfig } from '../config';
-import { ProductsService } from '../services/products.service';
 import Logger from '../Logger';
 import { Tier } from '../core/users/Tier';
-import CacheService from '../services/cache.service';
 import { setupAuth } from '../plugins/auth';
+import { type Dependencies } from '../dependencies';
 
-export function productsController(productsService: ProductsService, cacheService: CacheService, config: AppConfig) {
+export function productsController({
+  productsService,
+  cacheService,
+  config,
+}: Pick<Dependencies, 'productsService' | 'cacheService' | 'config'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, {
       secret: config.JWT_SECRET,

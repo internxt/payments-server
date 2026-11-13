@@ -189,6 +189,37 @@ describe('Webhook events', () => {
           status: 'paid',
         });
       });
+
+      test('When several invoice.paid events are received, then they are all handled by the same handler', async () => {
+        const mockedInvoice = getInvoice({ status: 'paid' });
+        jest.spyOn(stripePaymentsAdapter.provider.invoices, 'retrieve').mockResolvedValue(mockedInvoice as any);
+        jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
+        const invoiceCompletedHandlerRunSpy = jest.spyOn(InvoiceCompletedHandler.prototype, 'run').mockResolvedValue();
+        invoiceCompletedHandlerRunSpy.mockClear();
+
+        for (const eventId of ['evt_paid_1', 'evt_paid_2']) {
+          const payloadToString = JSON.stringify({
+            id: eventId,
+            type: 'invoice.paid',
+            data: { object: mockedInvoice },
+          });
+          const header = Stripe.webhooks.generateTestHeaderString({ payload: payloadToString, secret });
+
+          const response = await app.inject({
+            method: 'POST',
+            path: 'webhook',
+            body: Buffer.from(payloadToString),
+            headers: { 'stripe-signature': header, 'content-type': 'application/json' },
+          });
+
+          expect(response.statusCode).toBe(204);
+        }
+
+        const [firstHandler, secondHandler] = invoiceCompletedHandlerRunSpy.mock.contexts;
+        expect(invoiceCompletedHandlerRunSpy).toHaveBeenCalledTimes(2);
+        expect(firstHandler).toBeInstanceOf(InvoiceCompletedHandler);
+        expect(secondHandler).toBe(firstHandler);
+      });
     });
   });
 });

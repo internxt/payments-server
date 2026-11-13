@@ -1,7 +1,5 @@
 import Stripe from 'stripe';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { type AppConfig } from '../config';
-import { UsersService } from '../services/users.service';
 import {
   IncompatibleSubscriptionTypesError,
   InvalidSeatNumberError,
@@ -10,28 +8,30 @@ import {
   PromoCodeIsNotValidError,
 } from '../errors/PaymentErrors';
 import { User, UserSubscription, UserType } from '../core/users/User';
-import CacheService from '../services/cache.service';
-import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
+import { LicenseCodeAlreadyAppliedError } from '../services/licenseCodes.service';
 import { assertUser } from '../utils/assertUser';
 import { verifyUserTokenHook } from '../plugins/route-guards';
-import { TierNotFoundError, TiersService } from '../services/tiers.service';
+import { TierNotFoundError } from '../services/tiers.service';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
-import { PaymentService } from '../services/payment.service';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { getPromotionCodeCoupon } from '../utils/coupon';
+import { type Dependencies } from '../dependencies';
 
 const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
-export function paymentsController(
-  paymentService: PaymentService,
-  usersService: UsersService,
-  config: AppConfig,
-  cacheService: CacheService,
-  licenseCodesService: LicenseCodesService,
-  tiersService: TiersService,
-) {
+export function paymentsController({
+  paymentService,
+  usersService,
+  config,
+  cacheService,
+  licenseCodesService,
+  tiersService,
+}: Pick<
+  Dependencies,
+  'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService'
+>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 

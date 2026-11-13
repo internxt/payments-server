@@ -1,8 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 
-import { UsersService } from '../services/users.service';
-import { PaymentService } from '../services/payment.service';
 import { PaymentIntent } from '../types/payment';
 import { BadRequestError } from '../errors/Errors';
 import config from '../config';
@@ -13,23 +11,15 @@ import { setupAuth } from '../plugins/auth';
 import { verifyCaptchaHook, verifyUserTokenHook } from '../plugins/route-guards';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
-import { PreCreatedUserService } from '../services/preCreatedUser.service';
 import { UserNotFoundError } from '../errors/PaymentErrors';
-import { ConfirmationTokenService } from '../services/confirmationToken.service';
-
-interface CheckoutControllerPayload {
-  usersService: UsersService;
-  paymentsService: PaymentService;
-  preCreatedUserService: PreCreatedUserService;
-  confirmationTokenService: ConfirmationTokenService;
-}
+import { type Dependencies } from '../dependencies';
 
 export function checkoutController({
   usersService,
-  paymentsService,
+  paymentService,
   preCreatedUserService,
   confirmationTokenService,
-}: CheckoutControllerPayload) {
+}: Pick<Dependencies, 'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
@@ -142,7 +132,7 @@ export function checkoutController({
         }
 
         if (country && companyVatId) {
-          await paymentsService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
+          await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
         return res.send({ customerId, token: signUserToken({ customerId }) });
@@ -208,7 +198,7 @@ export function checkoutController({
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
 
-        const subscriptionAttempt = await paymentsService.createSubscription({
+        const subscriptionAttempt = await paymentService.createSubscription({
           customerId,
           priceId,
           currency,
@@ -308,7 +298,7 @@ export function checkoutController({
 
         const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
 
-        const result = await paymentsService.createInvoice({
+        const result = await paymentService.createInvoice({
           customerId,
           priceId,
           currency: currency.trim(),
@@ -384,7 +374,7 @@ export function checkoutController({
         let amount = price.amount;
 
         if (promoCodeName) {
-          const couponCode = await paymentsService.getPromoCodeByName(price.productId, promoCodeName);
+          const couponCode = await paymentService.getPromoCodeByName(price.productId, promoCodeName);
           if (couponCode.amountOff) {
             amount = Math.max(0, price.amount - couponCode.amountOff);
           } else if (couponCode.percentOff) {
@@ -398,7 +388,7 @@ export function checkoutController({
           Logger.info(
             `[GET PRICE BY ID] Calculating taxes for user with customer ID: ${user?.customerId} and uuid: ${userUuid} with country: ${country}`,
           );
-          taxForPrice = await paymentsService.calculatePriceTax(amount, user?.customerId, postalCode, country);
+          taxForPrice = await paymentService.calculatePriceTax(amount, user?.customerId, postalCode, country);
         }
 
         const taxAmount = taxForPrice?.taxAmount ?? 0;

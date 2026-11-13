@@ -1,37 +1,15 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
-import { type AppConfig } from '../config';
-import { StorageService } from '../services/storage.service';
-import { UsersService } from '../services/users.service';
 import handleSubscriptionCanceled from './handleSubscriptionCanceled';
 import handleSubscriptionUpdated from './handleSubscriptionUpdated';
-import { PaymentService } from '../services/payment.service';
-import CacheService from '../services/cache.service';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
-import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
-import { TiersService } from '../services/tiers.service';
 import handleFundsCaptured from './handleFundsCaptured';
-import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';
-import { ObjectStorageWebhookHandler } from './events/ObjectStorageWebhookHandler';
-import { InvoiceCompletedHandler } from './events/invoices/InvoiceCompletedHandler';
 import Logger from '../Logger';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { PreCreatedUserService } from '../services/preCreatedUser.service';
-
-interface WebhookHandlerPayload {
-  stripe: Stripe;
-  storageService: StorageService;
-  usersService: UsersService;
-  paymentService: PaymentService;
-  config: AppConfig;
-  cacheService: CacheService;
-  objectStorageService: ObjectStorageService;
-  tiersService: TiersService;
-  preCreatedUserService: PreCreatedUserService;
-}
+import { type Dependencies } from '../dependencies';
 
 export function webhookHandler({
   stripe,
@@ -43,7 +21,20 @@ export function webhookHandler({
   objectStorageService,
   tiersService,
   preCreatedUserService,
-}: WebhookHandlerPayload) {
+  invoiceCompletedHandler,
+}: Pick<
+  Dependencies,
+  | 'stripe'
+  | 'storageService'
+  | 'usersService'
+  | 'paymentService'
+  | 'config'
+  | 'cacheService'
+  | 'objectStorageService'
+  | 'tiersService'
+  | 'preCreatedUserService'
+  | 'invoiceCompletedHandler'
+>) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
       done(null, body);
@@ -125,20 +116,7 @@ export function webhookHandler({
           const invoice = await paymentService.getInvoice(event.data.object.id);
           const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
 
-          const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
-          const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
-          const handler = new InvoiceCompletedHandler({
-            determineLifetimeConditions,
-            objectStorageWebhookHandler,
-            paymentService,
-            storageService,
-            tiersService,
-            usersService,
-            cacheService,
-            preCreatedUserService,
-          });
-
-          await handler.run({
+          await invoiceCompletedHandler.run({
             invoice,
             customer,
             status: invoice.status as string,
