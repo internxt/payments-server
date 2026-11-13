@@ -25,7 +25,6 @@ const getTiersRepository = (): TiersRepository => {
 
 const getUsersTiersRepository = (): UsersTiersRepository => {
   return {
-    deleteAllUserTiers: jest.fn(),
     deleteTierFromUser: jest.fn(),
     findTierIdByUserId: jest.fn(),
     insertTierToUser: jest.fn(),

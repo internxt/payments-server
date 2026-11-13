@@ -124,8 +124,6 @@ export class PaymentService {
     priceId,
     currency,
     promoCodeId,
-    companyName,
-    companyVatId,
     trialEnd,
     metadata,
     additionalOptions,
@@ -134,8 +132,6 @@ export class PaymentService {
     priceId: string;
     currency?: string;
     promoCodeId?: string;
-    companyName?: string;
-    companyVatId?: string;
     trialEnd?: number;
     metadata?: Stripe.Metadata;
     additionalOptions?: Partial<Stripe.SubscriptionCreateParams>;
@@ -179,11 +175,7 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
-      metadata: {
-        companyName: companyName ?? null,
-        companyVatId: companyVatId ?? null,
-        ...metadata,
-      },
+      metadata: { ...metadata },
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: getPaymentMethodTypes(

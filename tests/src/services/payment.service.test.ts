@@ -106,6 +106,32 @@ describe('Payments Service tests', () => {
       );
     });
 
+    test('When a subscription is created with tracking metadata, then only that metadata is sent to Stripe', async () => {
+      const createSubscriptionSpy = mockSubscriptionCreation({
+        pending_setup_intent: null,
+        latest_invoice: {} as Stripe.Invoice,
+      });
+
+      await paymentService.createSubscription({
+        customerId: 'cus_test',
+        priceId: 'price_new',
+        metadata: { gclid: 'gclid_123' },
+      });
+
+      expect(createSubscriptionSpy).toHaveBeenCalledWith(expect.objectContaining({ metadata: { gclid: 'gclid_123' } }));
+    });
+
+    test('When a subscription is created without metadata, then no metadata is sent to Stripe', async () => {
+      const createSubscriptionSpy = mockSubscriptionCreation({
+        pending_setup_intent: null,
+        latest_invoice: {} as Stripe.Invoice,
+      });
+
+      await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
+
+      expect(createSubscriptionSpy).toHaveBeenCalledWith(expect.objectContaining({ metadata: {} }));
+    });
+
     test('When the subscription starts without a payment, then the secret to save the payment method is returned', async () => {
       mockSubscriptionCreation({ pending_setup_intent: { client_secret: 'seti_secret' } as Stripe.SetupIntent });
 
