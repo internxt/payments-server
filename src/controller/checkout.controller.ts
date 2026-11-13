@@ -1,17 +1,16 @@
 import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
-import jwt from 'jsonwebtoken';
 
 import { UsersService } from '../services/users.service';
 import { PaymentService } from '../services/payment.service';
 import { PaymentIntent } from '../types/payment';
-import { BadRequestError, ForbiddenError } from '../errors/Errors';
+import { BadRequestError } from '../errors/Errors';
 import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { setupAuth } from '../plugins/auth';
+import { verifyCaptchaHook, verifyUserTokenHook } from '../plugins/route-guards';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
@@ -74,20 +73,14 @@ export function checkoutController({
             timeWindow: '1 hour',
           },
         },
+        preHandler: verifyCaptchaHook,
       },
       async (req, res): Promise<{ customerId: string; token: string }> => {
         let customerId: Stripe.Customer['id'];
         let userUuid: string;
 
-        const { email, confirmationTokenId, customerName, country, postalCode, companyVatId, captchaToken, metadata } =
-          req.body;
+        const { email, confirmationTokenId, customerName, country, postalCode, companyVatId, metadata } = req.body;
         const userToken = req.user?.payload;
-
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
 
         if (!userToken) {
           if (!email) {
@@ -204,29 +197,10 @@ export function checkoutController({
             timeWindow: '1 hour',
           },
         },
+        preHandler: [verifyCaptchaHook, verifyUserTokenHook],
       },
       async (req, res) => {
-        const { customerId, priceId, currency, promoCodeId, captchaToken, token, gclid } = req.body;
-        let tokenCustomerId;
-
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
-
-        try {
-          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          tokenCustomerId = customerId;
-        } catch {
-          throw new ForbiddenError();
-        }
-
-        if (customerId !== tokenCustomerId) {
-          throw new ForbiddenError();
-        }
+        const { customerId, priceId, currency, promoCodeId, gclid } = req.body;
 
         const price = await stripePaymentsAdapter.getPriceById(priceId);
 
@@ -298,36 +272,17 @@ export function checkoutController({
             timeWindow: '1 hour',
           },
         },
+        preHandler: [verifyCaptchaHook, verifyUserTokenHook],
       },
       async (req, res): Promise<PaymentIntent> => {
-        let tokenCustomerId: string;
         const userUuid = req.user?.payload?.uuid;
-        const { customerId, priceId, token, currency, captchaToken, promoCodeId, gclid } = req.body;
-
-        const verifiedCaptcha = await verifyRecaptcha(captchaToken);
-
-        if (!verifiedCaptcha) {
-          throw new ForbiddenError('Token verification failed');
-        }
+        const { customerId, priceId, currency, promoCodeId, gclid } = req.body;
 
         if (!isValidCurrency(currency)) {
           const allowedCurrencies = getAllowedCurrencies().join(', ');
           throw new BadRequestError(
             'Invalid currency. The currency must be one of the following: ' + allowedCurrencies,
           );
-        }
-
-        try {
-          const { customerId } = jwt.verify(token, config.JWT_SECRET) as {
-            customerId: string;
-          };
-          tokenCustomerId = customerId;
-        } catch {
-          throw new ForbiddenError();
-        }
-
-        if (customerId !== tokenCustomerId) {
-          throw new ForbiddenError();
         }
 
         const customer = await stripePaymentsAdapter.getCustomer(customerId);
