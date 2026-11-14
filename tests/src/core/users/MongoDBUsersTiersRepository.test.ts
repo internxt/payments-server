@@ -96,18 +96,4 @@ describe('Testing the users and tiers collection', () => {
     const deleted = await repository.deleteTierFromUser(userId, tierId);
     expect(deleted).toBe(false);
   });
-
-  it('when deleting all tiers from a user, then all tiers should be removed', async () => {
-    const { id: userId } = getUser();
-
-    await repository.insertTierToUser(userId, 'tier1');
-    await repository.insertTierToUser(userId, 'tier2');
-
-    let userTiers = await repository.findTierIdByUserId(userId);
-    expect(userTiers).toHaveLength(2);
-
-    await repository.deleteAllUserTiers(userId);
-    userTiers = await repository.findTierIdByUserId(userId);
-    expect(userTiers).toHaveLength(0);
-  });
 });

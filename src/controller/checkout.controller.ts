@@ -164,7 +164,6 @@ export function checkoutController({
         captchaToken: string;
         currency?: string;
         promoCodeId?: string;
-        quantity?: number;
         gclid?: string;
       };
     }>(

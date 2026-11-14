@@ -1,4 +1,3 @@
-import { DisplayPrice } from '../core/users/DisplayPrice';
 import { UserType } from '../core/users/User';
 
 export enum RenewalPeriod {
@@ -53,8 +52,3 @@ export interface SubscriptionCreated {
   subscriptionId?: string;
   paymentIntentId?: string;
 }
-
-export type RequestedPlanData = DisplayPrice & {
-  decimalAmount: number;
-  type?: UserType;
-};
