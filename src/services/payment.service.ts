@@ -175,7 +175,7 @@ export class PaymentService {
           coupon: couponId,
         },
       ],
-      metadata: { ...metadata },
+      metadata,
       payment_behavior: 'default_incomplete',
       payment_settings: {
         payment_method_types: getPaymentMethodTypes(

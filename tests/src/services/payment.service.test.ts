@@ -129,7 +129,8 @@ describe('Payments Service tests', () => {
 
       await paymentService.createSubscription({ customerId: 'cus_test', priceId: 'price_new' });
 
-      expect(createSubscriptionSpy).toHaveBeenCalledWith(expect.objectContaining({ metadata: {} }));
+      const [subscriptionParams] = createSubscriptionSpy.mock.calls[0];
+      expect(subscriptionParams?.metadata).toBeUndefined();
     });
 
     test('When the subscription starts without a payment, then the secret to save the payment method is returned', async () => {
