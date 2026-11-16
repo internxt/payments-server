@@ -11,7 +11,7 @@ import handleLifetimeRefunded from './handleLifetimeRefunded';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
-import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import handleSetupIntentSucceeded from './handleSetupIntentSucceeded';
 import { TiersService } from '../services/tiers.service';
 import handleFundsCaptured from './handleFundsCaptured';
 import { DetermineLifetimeConditions } from '../core/users/DetermineLifetimeConditions';

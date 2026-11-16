@@ -7,7 +7,6 @@ export type CustomerEmail = Customer['email'];
 export type Price = Stripe.Price;
 export type Plan = Stripe.Plan;
 export type PriceId = Price['id'];
-export type PlanId = Plan['id'];
 
 export type Subscription = Stripe.Subscription;
 export type SubscriptionId = Subscription['id'];
