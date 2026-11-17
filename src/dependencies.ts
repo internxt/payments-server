@@ -55,17 +55,8 @@ export interface Dependencies {
   closeConnections: () => Promise<void>;
 }
 
-/**
- * Builds every repository, client and service of the app once. It is the only place that wires them together
- * (used by the server, the CLI scripts and the tests).
- */
-export async function buildDependencies({
-  config,
-  mongoClient,
-}: {
-  config: AppConfig;
-  mongoClient: MongoClient;
-}): Promise<Dependencies> {
+export async function buildDependencies(config: AppConfig): Promise<Dependencies> {
+  const mongoClient = await new MongoClient(config.MONGO_URI).connect();
   const usersRepository = new MongoDBUsersRepository(mongoClient);
   const licenseCodesRepository = new MongoDBLicenseCodesRepository(mongoClient);
   const displayBillingRepository = new MongoDBDisplayBillingRepository(mongoClient);
@@ -130,11 +121,8 @@ export async function buildDependencies({
   });
 
   const closeConnections = async () => {
-    try {
-      await cacheService.close();
-    } finally {
-      await mongoClient.close();
-    }
+    await cacheService.close();
+    await mongoClient.close();
   };
 
   return {

@@ -1,4 +1,3 @@
-import { MongoClient } from 'mongodb';
 import XLSX from 'xlsx';
 import Stripe from 'stripe';
 
@@ -37,11 +36,7 @@ function loadFromExcel(): LicenseCode[] {
 }
 
 async function main() {
-  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
-  const { licenseCodesService, closeConnections } = await buildDependencies({
-    config: envVariablesConfig,
-    mongoClient,
-  });
+  const { licenseCodesService, closeConnections } = await buildDependencies(envVariablesConfig);
 
   try {
     for (const licenseCode of loadFromExcel()) {

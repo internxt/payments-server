@@ -63,10 +63,6 @@ export default class CacheService {
     return this.redis.ping();
   }
 
-  /**
-   * Closes the Redis connection. If Redis cannot quit gracefully (e.g. it is down), the connection is dropped without
-   * reconnecting so the process can exit.
-   */
   async close(): Promise<void> {
     try {
       await this.redis.quit();

@@ -64,6 +64,44 @@ describe('Webhook events', () => {
       );
     });
 
+    test('When the event setup_intent.succeeded is triggered for an individual user, then the subscription payment method is updated', async () => {
+      const updatePaymentMethod = jest
+        .spyOn(PaymentService.prototype, 'updateSubscriptionPaymentMethod')
+        .mockResolvedValue(undefined as any);
+      const event = {
+        id: 'evt_setup_intent',
+        type: 'setup_intent.succeeded',
+        data: {
+          object: {
+            id: 'seti_1',
+            object: 'setup_intent',
+            customer: 'cus_setup',
+            payment_method: 'pm_setup',
+            metadata: { userType: 'individual' },
+          },
+        },
+      };
+      const payloadToString = JSON.stringify(event);
+
+      const header = Stripe.webhooks.generateTestHeaderString({
+        payload: payloadToString,
+        secret,
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        path: 'webhook',
+        body: Buffer.from(payloadToString),
+        headers: {
+          'stripe-signature': header,
+          'content-type': 'application/json',
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(updatePaymentMethod).toHaveBeenCalledWith('cus_setup', 'pm_setup', 'individual');
+    });
+
     test('When the event invoice.payment_failed is triggered, then the invoice is handled as returned by the current Stripe version', async () => {
       const mockedInvoice = getInvoice();
       const currentInvoice = getInvoice({ id: mockedInvoice.id });

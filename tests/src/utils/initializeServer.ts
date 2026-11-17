@@ -7,25 +7,29 @@ import { buildApp } from '../../../src/app';
 import { buildDependencies, Dependencies } from '../../../src/dependencies';
 
 let mongoServer: MongoMemoryServer;
-let mongoClient: MongoClient;
 let dependencies: Dependencies;
 let app: FastifyInstance;
 
-/**
- * Builds the app with the real dependencies over an in-memory Mongo, without opening a port: tests call it through
- * `app.inject`.
- */
+const seedDatabase = async (uri: string) => {
+  const mongoClient = await new MongoClient(uri).connect();
+  try {
+    await preloadData(mongoClient);
+  } finally {
+    await mongoClient.close();
+  }
+};
+
 export const initializeServerAndDatabase = async () => {
   process.env.NODE_ENV = 'test';
   mongoServer = await MongoMemoryServer.create({
     instance: { dbName: 'payments' },
   });
   const uri = mongoServer.getUri();
-  mongoClient = await new MongoClient(uri).connect();
-  dependencies = await buildDependencies({ config, mongoClient });
+  process.env.MONGO_URI = uri;
+  dependencies = await buildDependencies(config);
   app = await buildApp(dependencies);
   await app.ready();
-  await preloadData(mongoClient);
+  await seedDatabase(uri);
 
   return app;
 };
