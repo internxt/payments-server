@@ -5,7 +5,7 @@ import handleSubscriptionUpdated from './handleSubscriptionUpdated';
 import handleLifetimeRefunded from './handleLifetimeRefunded';
 import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
-import handleSetupIntentSucceeded from './handleSetupIntentSucceded';
+import handleSetupIntentSucceeded from './handleSetupIntentSucceeded';
 import handleFundsCaptured from './handleFundsCaptured';
 import Logger from '../Logger';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
