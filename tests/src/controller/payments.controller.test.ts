@@ -380,6 +380,25 @@ describe('Payment controller e2e tests', () => {
         expect(response.statusCode).toBe(403);
       });
 
+      it('When the user token belongs to another customer, then the subscription is rejected', async () => {
+        const mockedUser = getUser();
+        const createSubscriptionSpy = jest.spyOn(PaymentService.prototype, 'createSubscription');
+        createSubscriptionSpy.mockClear();
+
+        const response = await app.inject({
+          method: 'POST',
+          path: '/object-storage/subscription',
+          body: {
+            customerId: mockedUser.customerId,
+            priceId: 'price_id',
+            token: getValidUserToken({ customerId: 'cus_another_customer' }),
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(createSubscriptionSpy).not.toHaveBeenCalled();
+      });
+
       it('When the user token is not provided, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const subResponse = getCreateSubscriptionResponse();

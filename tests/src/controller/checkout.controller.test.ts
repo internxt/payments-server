@@ -1041,6 +1041,30 @@ describe('Checkout controller', () => {
         expect(response.statusCode).toBe(400);
       });
 
+      test('When both the user token and the currency are invalid, then the token is rejected first', async () => {
+        const mockedUser = getUser();
+        const authToken = getValidAuthToken(mockedUser.uuid);
+
+        jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
+
+        const response = await app.inject({
+          path: '/checkout/payment-intent',
+          method: 'POST',
+          body: {
+            priceId: 'price_id',
+            customerId: mockedUser.customerId,
+            token: 'malformed.token.payload',
+            currency: 'not-a-currency',
+            captchaToken: 'captcha_token',
+          },
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        expect(response.statusCode).toBe(403);
+      });
+
       test('When the provided token is invalid or cannot be verified, then an error indicating so is thrown', async () => {
         const mockedUser = getUser();
         const authToken = getValidAuthToken(mockedUser.uuid);
