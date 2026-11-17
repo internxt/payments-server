@@ -2,11 +2,22 @@ import { FastifyInstance } from 'fastify';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { preloadData } from './preloadMongoDBData';
-import start from '../../../src/server';
+import config from '../../../src/config';
+import { buildApp } from '../../../src/app';
+import { buildDependencies, Dependencies } from '../../../src/dependencies';
 
 let mongoServer: MongoMemoryServer;
-let mongoClient: MongoClient;
+let dependencies: Dependencies;
 let app: FastifyInstance;
+
+const seedDatabase = async (uri: string) => {
+  const mongoClient = await new MongoClient(uri).connect();
+  try {
+    await preloadData(mongoClient);
+  } finally {
+    await mongoClient.close();
+  }
+};
 
 export const initializeServerAndDatabase = async () => {
   process.env.NODE_ENV = 'test';
@@ -14,9 +25,11 @@ export const initializeServerAndDatabase = async () => {
     instance: { dbName: 'payments' },
   });
   const uri = mongoServer.getUri();
-  mongoClient = await new MongoClient(uri).connect();
-  app = await start(mongoClient);
-  await preloadData(mongoClient);
+  process.env.MONGO_URI = uri;
+  dependencies = await buildDependencies(config);
+  app = await buildApp(dependencies);
+  await app.ready();
+  await seedDatabase(uri);
 
   return app;
 };
@@ -27,8 +40,8 @@ export const closeServerAndDatabase = async () => {
       await app.close();
     }
 
-    if (mongoClient) {
-      await mongoClient.close();
+    if (dependencies) {
+      await dependencies.closeConnections();
     }
 
     if (mongoServer) {

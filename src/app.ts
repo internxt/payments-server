@@ -1,47 +1,17 @@
-import Stripe from 'stripe';
 import fastifyCors from '@fastify/cors';
 import Fastify, { FastifyInstance } from 'fastify';
-import { AppConfig } from './config';
 import { paymentsController } from './controller/payments.controller';
 import { objectStorageController } from './controller/object-storage.controller';
 import { businessController } from './controller/business.controller';
 import { productsController } from './controller/products.controller';
 import { checkoutController } from './controller/checkout.controller';
 import { customerController } from './controller/customer.controller';
-import CacheService from './services/cache.service';
-import { PaymentService } from './services/payment.service';
-import { StorageService } from './services/storage.service';
-import { UsersService } from './services/users.service';
 import { webhookHandler } from './webhooks';
-import { LicenseCodesService } from './services/licenseCodes.service';
-import { ObjectStorageService } from './services/objectStorage.service';
-import { TiersService } from './services/tiers.service';
-import { ProductsService } from './services/products.service';
 import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
-import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
 import { gatewayController } from './controller/gateway.controller';
-import { HealthService } from './services/health.service';
 import healthController from './controller/health.controller';
-import { PreCreatedUserService } from './services/preCreatedUser.service';
-import { ConfirmationTokenService } from './services/confirmationToken.service';
-
-interface AppDependencies {
-  paymentService: PaymentService;
-  storageService: StorageService;
-  usersService: UsersService;
-  cacheService: CacheService;
-  tiersService: TiersService;
-  licenseCodesService: LicenseCodesService;
-  objectStorageService: ObjectStorageService;
-  productsService: ProductsService;
-  userFeaturesOverridesService: UserFeaturesOverridesService;
-  stripe: Stripe;
-  config: AppConfig;
-  healthService: HealthService;
-  preCreatedUserService: PreCreatedUserService;
-  confirmationTokenService: ConfirmationTokenService;
-}
+import { type Dependencies } from './dependencies';
 
 export async function buildApp({
   paymentService,
@@ -58,7 +28,7 @@ export async function buildApp({
   healthService,
   preCreatedUserService,
   confirmationTokenService,
-}: AppDependencies): Promise<FastifyInstance> {
+}: Dependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
   });

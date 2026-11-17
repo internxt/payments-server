@@ -63,6 +63,15 @@ export default class CacheService {
     return this.redis.ping();
   }
 
+  async close(): Promise<void> {
+    try {
+      await this.redis.quit();
+    } catch (error) {
+      Logger.warn(`[CACHE SERVICE]: Could not quit Redis gracefully, disconnecting: ${(error as Error).message}`);
+      this.redis.disconnect(false);
+    }
+  }
+
   async getSubscription(
     customerId: string,
     userType: UserType = UserType.Individual,
