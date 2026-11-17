@@ -1,4 +1,3 @@
-import { MongoClient } from 'mongodb';
 import { FastifyInstance } from 'fastify';
 
 import envVariablesConfig from './config';
@@ -6,8 +5,7 @@ import { buildApp } from './app';
 import { buildDependencies } from './dependencies';
 
 const start = async (): Promise<FastifyInstance> => {
-  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
-  const dependencies = await buildDependencies({ config: envVariablesConfig, mongoClient });
+  const dependencies = await buildDependencies(envVariablesConfig);
   const fastify = await buildApp(dependencies);
 
   fastify.addHook('onClose', async () => {

@@ -1,16 +1,10 @@
-import { MongoClient } from 'mongodb';
-
 import envVariablesConfig from '../config';
 import { buildDependencies } from '../dependencies';
 
 const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
 async function main() {
-  const mongoClient = await new MongoClient(envVariablesConfig.MONGO_URI).connect();
-  const { usersService, determineLifetimeConditions, closeConnections } = await buildDependencies({
-    config: envVariablesConfig,
-    mongoClient,
-  });
+  const { usersService, determineLifetimeConditions, closeConnections } = await buildDependencies(envVariablesConfig);
 
   try {
     const user = await usersService.findUserByCustomerID(customerId);
