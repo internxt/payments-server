@@ -1,8 +1,10 @@
 import jwt from 'jsonwebtoken';
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { ForbiddenError } from '../../../src/errors/Errors';
 import { verifyUserToken } from '../../../src/utils/verifyUserToken';
 import { getExpiredUserToken, getValidUserToken } from '../fixtures';
+
+const config = loadConfig();
 
 describe('Verifying the payments token of a customer', () => {
   test('When the token was issued for that customer, then it is accepted', () => {

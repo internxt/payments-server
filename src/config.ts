@@ -48,24 +48,19 @@ export type AppConfig = EnvVariables & {
   isTest: boolean;
 };
 
-function assertMandatoryVariables(): void {
-  const variablesToCheck = process.env.NODE_ENV === 'test' ? TEST_REQUIRED_VARIABLES : BASE_REQUIRED_VARIABLES;
-  const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
-
-  if (undefinedMandatoryVariables.length) {
-    throw new Error(`Some mandatory variables are undefined: ${undefinedMandatoryVariables.join(' - ')}.`);
-  }
-}
-
 /**
  * Reads the environment, checks that the mandatory variables are set and returns the app config.
  *
  * @throws {Error} When a mandatory variable is undefined.
  */
 export function loadConfig(): AppConfig {
-  assertMandatoryVariables();
-
   const { NODE_ENV } = process.env;
+  const variablesToCheck = NODE_ENV === 'test' ? TEST_REQUIRED_VARIABLES : BASE_REQUIRED_VARIABLES;
+  const undefinedMandatoryVariables = variablesToCheck.filter((key) => !process.env[key]);
+
+  if (undefinedMandatoryVariables.length) {
+    throw new Error(`Some mandatory variables are undefined: ${undefinedMandatoryVariables.join(' - ')}.`);
+  }
 
   return {
     ...(process.env as EnvVariables),
@@ -75,10 +70,6 @@ export function loadConfig(): AppConfig {
   };
 }
 
-assertMandatoryVariables();
-
-export const isProduction = process.env.NODE_ENV === 'production';
+// Only for the Logger singleton, which gets the config injected in the logger block.
 export const isDevelopment = process.env.NODE_ENV === 'development';
 export const isTest = process.env.NODE_ENV === 'test';
-
-export default process.env as EnvVariables;

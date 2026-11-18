@@ -738,7 +738,7 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
-        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken, expect.anything());
       });
     });
   });
@@ -1141,7 +1141,7 @@ describe('Checkout controller', () => {
         });
 
         expect(response.statusCode).toBe(403);
-        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken);
+        expect(verifyRecaptchaSpy).toHaveBeenCalledWith(mockedCaptchaToken, expect.anything());
       });
     });
   });

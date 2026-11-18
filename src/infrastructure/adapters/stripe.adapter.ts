@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { InvalidConfirmationTokenError, UserNotFoundError } from '../../errors/PaymentErrors';
 import { PaymentsAdapter } from '../domain/ports/payments.adapter';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
-import envVariablesConfig from '../../config';
+import { loadConfig } from '../../config';
 import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
@@ -20,7 +20,7 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
 
   get provider(): Stripe {
     if (!this._provider) {
-      this._provider = new Stripe(envVariablesConfig.STRIPE_SECRET_KEY, {
+      this._provider = new Stripe(loadConfig().STRIPE_SECRET_KEY, {
         apiVersion: STRIPE_API_VERSION,
       });
     }

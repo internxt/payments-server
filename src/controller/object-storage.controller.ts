@@ -6,11 +6,14 @@ import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyUserTokenHook } from '../plugins/route-guards';
 import { getInvoiceProductId } from '../utils/invoice';
 import { type Dependencies } from '../dependencies';
 
-export function objectStorageController({ paymentService, config }: Pick<Dependencies, 'paymentService' | 'config'>) {
+export function objectStorageController({
+  paymentService,
+  config,
+  routeGuards: { verifyUserTokenHook },
+}: Pick<Dependencies, 'paymentService' | 'config' | 'routeGuards'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 

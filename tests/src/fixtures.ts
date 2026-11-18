@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { FastifyBaseLogger } from 'fastify';
 import { Chance } from 'chance';
-import config from '../../src/config';
+import { loadConfig } from '../../src/config';
 import { PAYMENTS_TOKEN_EXPIRATION } from '../../src/constants';
 import { User, UserSubscription, UserType } from '../../src/core/users/User';
 import { PaymentIntent, PromotionCode } from '../../src/types/payment';
@@ -27,6 +27,8 @@ import {
   COUPON_BASE,
 } from './fixtures/stripe-base.generated';
 import { HealthStatus } from '../../src/services/health.service';
+
+const config = loadConfig();
 
 const randomDataGenerator = new Chance();
 

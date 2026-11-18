@@ -1,4 +1,4 @@
-import config from '../../src/config';
+import { loadConfig } from '../../src/config';
 import {
   getUser,
   getValidAuthToken,
@@ -19,6 +19,8 @@ import {
   getUniqueCodes,
 } from './fixtures';
 import jwt from 'jsonwebtoken';
+
+const config = loadConfig();
 
 describe('Test fixtures', () => {
   describe("User's fixture", () => {

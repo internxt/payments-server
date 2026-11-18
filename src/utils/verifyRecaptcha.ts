@@ -1,9 +1,7 @@
 import axios from 'axios';
 import { encode } from 'querystring';
-import config, { isProduction } from '../config';
+import { type AppConfig } from '../config';
 import Logger from '../Logger';
-
-const GOOGLE_RECAPTCHA_V3_ENDPOINT = config.RECAPTCHA_V3_ENDPOINT;
 
 const MAX_RECAPTCHA_ATTEMPTS = 3;
 const RECAPTCHA_RETRY_BASE_DELAY_MS = 300;
@@ -25,13 +23,18 @@ const isTransientNetworkError = (err: unknown): boolean => {
   return !!code && TRANSIENT_NETWORK_ERRORS.includes(code);
 };
 
-async function requestRecaptcha(captcha: string): Promise<boolean> {
+type RecaptchaConfig = Pick<
+  AppConfig,
+  'RECAPTCHA_V3_ENDPOINT' | 'RECAPTCHA_V3' | 'RECAPTCHA_V3_SCORE_THRESHOLD' | 'isProduction'
+>;
+
+async function requestRecaptcha(captcha: string, config: RecaptchaConfig): Promise<boolean> {
   const body = {
     secret: config.RECAPTCHA_V3,
     response: captcha,
   };
 
-  const res = await axios.post(GOOGLE_RECAPTCHA_V3_ENDPOINT, encode(body), {
+  const res = await axios.post(config.RECAPTCHA_V3_ENDPOINT, encode(body), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
@@ -51,14 +54,14 @@ async function requestRecaptcha(captcha: string): Promise<boolean> {
   return res.data.success;
 }
 
-export async function verifyRecaptcha(captcha: string) {
-  if (!isProduction) {
+export async function verifyRecaptcha(captcha: string, config: RecaptchaConfig) {
+  if (!config.isProduction) {
     return true;
   }
 
   for (let attempt = 0; attempt < MAX_RECAPTCHA_ATTEMPTS; attempt++) {
     try {
-      return await requestRecaptcha(captcha);
+      return await requestRecaptcha(captcha, config);
     } catch (err) {
       const isLastAttempt = attempt === MAX_RECAPTCHA_ATTEMPTS - 1;
 
