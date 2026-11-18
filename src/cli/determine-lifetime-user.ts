@@ -1,10 +1,10 @@
-import envVariablesConfig from '../config';
+import { loadConfig } from '../config';
 import { buildDependencies } from '../dependencies';
 
 const [, , customerId, lastPurchasedTierProductId] = process.argv;
 
 async function main() {
-  const { usersService, determineLifetimeConditions, closeConnections } = await buildDependencies(envVariablesConfig);
+  const { usersService, determineLifetimeConditions, closeConnections } = await buildDependencies(loadConfig());
 
   try {
     const user = await usersService.findUserByCustomerID(customerId);

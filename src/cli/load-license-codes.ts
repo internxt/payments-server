@@ -1,7 +1,7 @@
 import XLSX from 'xlsx';
 import Stripe from 'stripe';
 
-import envVariablesConfig from '../config';
+import { loadConfig } from '../config';
 import { buildDependencies } from '../dependencies';
 import { LicenseCode } from '../core/users/LicenseCode';
 
@@ -36,7 +36,7 @@ function loadFromExcel(): LicenseCode[] {
 }
 
 async function main() {
-  const { licenseCodesService, closeConnections } = await buildDependencies(envVariablesConfig);
+  const { licenseCodesService, closeConnections } = await buildDependencies(loadConfig());
 
   try {
     for (const licenseCode of loadFromExcel()) {

@@ -20,8 +20,8 @@ jest.mock('../../../src/webhooks/handleInvoicePaymentFailed');
 const secret = 'whsec_lorim_ipsum_etc_etc';
 
 beforeAll(async () => {
+  process.env.STRIPE_WEBHOOK_KEY = secret;
   app = await initializeServerAndDatabase();
-  process.env.STRIPE_WEBHOOK_KEY = 'whsec_lorim_ipsum_etc_etc';
 });
 
 afterAll(async () => {

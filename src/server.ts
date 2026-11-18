@@ -1,11 +1,12 @@
 import { FastifyInstance } from 'fastify';
 
-import envVariablesConfig from './config';
+import { loadConfig } from './config';
 import { buildApp } from './app';
 import { buildDependencies } from './dependencies';
 
 const start = async (): Promise<FastifyInstance> => {
-  const dependencies = await buildDependencies(envVariablesConfig);
+  const config = loadConfig();
+  const dependencies = await buildDependencies(config);
   const fastify = await buildApp(dependencies);
 
   fastify.addHook('onClose', async () => {
@@ -13,7 +14,7 @@ const start = async (): Promise<FastifyInstance> => {
   });
 
   try {
-    const PORT = Number(envVariablesConfig.SERVER_PORT);
+    const PORT = Number(config.SERVER_PORT);
 
     if (!PORT) {
       throw new Error('ENV VARIABLE SERVER_PORT IS NOT DEFINED');

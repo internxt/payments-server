@@ -2,7 +2,6 @@ import axios from 'axios';
 import { KlaviyoTrackingService, KlaviyoEvent } from '../../../src/services/klaviyo.service';
 import Logger from '../../../src/Logger';
 import config from '../../../src/config';
-import { createTestServices } from '../helpers/services-factory';
 
 jest.mock('axios');
 jest.mock('../../../src/config', () => ({
@@ -31,21 +30,19 @@ describe('KlaviyoTrackingService', () => {
 
     (config as any).KLAVIYO_API_KEY = mockApiKey;
     (config as any).KLAVIYO_BASE_URL = mockBaseUrl;
-    service = createTestServices({ stripe: {} as any, httpClient: {} as any }).klaviyoTrackingService;
+    service = new KlaviyoTrackingService();
   });
 
   describe('Initialization', () => {
     test('When instantiated without an API Key in config, then it logs a warning', () => {
       const loggerWarnSpy = jest.spyOn(Logger, 'warn').mockImplementation();
       (config as any).KLAVIYO_API_KEY = undefined;
-      createTestServices({ stripe: {} as any, httpClient: {} as any });
+      new KlaviyoTrackingService();
       expect(loggerWarnSpy).toHaveBeenCalled();
     });
 
     test('When instantiated with valid config, then it initializes correctly', () => {
-      expect(
-        () => createTestServices({ stripe: {} as any, httpClient: {} as any }).klaviyoTrackingService,
-      ).not.toThrow();
+      expect(() => new KlaviyoTrackingService()).not.toThrow();
     });
   });
 
