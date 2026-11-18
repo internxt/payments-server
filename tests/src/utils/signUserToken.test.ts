@@ -1,6 +1,8 @@
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { signUserToken } from '../../../src/utils/signUserToken';
 import jwt from 'jsonwebtoken';
+
+const config = loadConfig();
 
 describe('Signing user token', () => {
   test('When customer Id is provided, then the token is signed with the customer Id', () => {

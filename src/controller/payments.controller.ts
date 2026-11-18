@@ -10,7 +10,6 @@ import {
 import { User, UserSubscription, UserType } from '../core/users/User';
 import { LicenseCodeAlreadyAppliedError } from '../services/licenseCodes.service';
 import { assertUser } from '../utils/assertUser';
-import { verifyUserTokenHook } from '../plugins/route-guards';
 import { TierNotFoundError } from '../services/tiers.service';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
@@ -28,9 +27,10 @@ export function paymentsController({
   cacheService,
   licenseCodesService,
   tiersService,
+  routeGuards: { verifyUserTokenHook },
 }: Pick<
   Dependencies,
-  'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService'
+  'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService' | 'routeGuards'
 >) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });

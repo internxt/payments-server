@@ -1,24 +1,26 @@
 import axios from 'axios';
 import { verifyRecaptcha } from '../../../src/utils/verifyRecaptcha';
-import config from '../../../src/config';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-jest.mock('../../../src/config', () => ({
-  __esModule: true,
-  default: {
-    RECAPTCHA_V3_ENDPOINT: 'https://www.google.com/recaptcha/api/siteverify',
-    RECAPTCHA_V3: 'test-secret-key',
-    RECAPTCHA_V3_SCORE_THRESHOLD: 0.5,
-  },
+const recaptchaConfig = {
+  RECAPTCHA_V3_ENDPOINT: 'https://www.google.com/recaptcha/api/siteverify',
+  RECAPTCHA_V3: 'test-secret-key',
+  RECAPTCHA_V3_SCORE_THRESHOLD: '0.5',
   isProduction: true,
-}));
+};
 
 describe('Validate Captcha token', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (config as any).isProduction = true;
+  });
+
+  test('When the app is not running in production, then the captcha is accepted without asking Google', async () => {
+    const result = await verifyRecaptcha('any-token', { ...recaptchaConfig, isProduction: false });
+
+    expect(result).toBe(true);
+    expect(mockedAxios.post).not.toHaveBeenCalled();
   });
 
   test('When the token is valid, then it should return true', async () => {
@@ -31,11 +33,11 @@ describe('Validate Captcha token', () => {
 
     mockedAxios.post.mockResolvedValue(mockResponse);
 
-    const result = await verifyRecaptcha('valid-token');
+    const result = await verifyRecaptcha('valid-token', recaptchaConfig);
 
     expect(result).toBe(true);
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      config.RECAPTCHA_V3_ENDPOINT,
+      recaptchaConfig.RECAPTCHA_V3_ENDPOINT,
       'secret=test-secret-key&response=valid-token',
       {
         headers: {
@@ -55,7 +57,7 @@ describe('Validate Captcha token', () => {
 
     mockedAxios.post.mockResolvedValue(mockResponse);
 
-    await expect(verifyRecaptcha('invalid-token')).rejects.toThrow('invalid-input-response');
+    await expect(verifyRecaptcha('invalid-token', recaptchaConfig)).rejects.toThrow('invalid-input-response');
   });
 
   test('When score is below threshold, then it should throw error', async () => {
@@ -68,7 +70,7 @@ describe('Validate Captcha token', () => {
 
     mockedAxios.post.mockResolvedValue(mockResponse);
 
-    await expect(verifyRecaptcha('low-score-token')).rejects.toThrow('Score 0.3 under 0.5');
+    await expect(verifyRecaptcha('low-score-token', recaptchaConfig)).rejects.toThrow('Score 0.3 under 0.5');
   });
 
   test('When score equals threshold, then it should return true', async () => {
@@ -81,14 +83,12 @@ describe('Validate Captcha token', () => {
 
     mockedAxios.post.mockResolvedValue(mockResponse);
 
-    const result = await verifyRecaptcha('threshold-token');
+    const result = await verifyRecaptcha('threshold-token', recaptchaConfig);
 
     expect(result).toBe(true);
   });
 
   test('When custom threshold is set, then it should use custom value', async () => {
-    (config as any).RECAPTCHA_V3_SCORE_THRESHOLD = 0.7;
-
     const mockResponse = {
       data: {
         success: true,
@@ -98,14 +98,16 @@ describe('Validate Captcha token', () => {
 
     mockedAxios.post.mockResolvedValue(mockResponse);
 
-    await expect(verifyRecaptcha('below-custom-threshold')).rejects.toThrow('Score 0.6 under 0.7');
+    await expect(
+      verifyRecaptcha('below-custom-threshold', { ...recaptchaConfig, RECAPTCHA_V3_SCORE_THRESHOLD: '0.7' }),
+    ).rejects.toThrow('Score 0.6 under 0.7');
   });
 
   test('When axios request fails, then it should throw network error', async () => {
     const networkError = new Error('Network Error');
     mockedAxios.post.mockRejectedValue(networkError);
 
-    await expect(verifyRecaptcha('network-fail-token')).rejects.toThrow('Network Error');
+    await expect(verifyRecaptcha('network-fail-token', recaptchaConfig)).rejects.toThrow('Network Error');
   });
 
   describe('Exponential backoff on transient network errors', () => {
@@ -125,7 +127,7 @@ describe('Validate Captcha token', () => {
         .mockRejectedValueOnce(eaiAgainError())
         .mockResolvedValueOnce({ data: { success: true, score: 0.9 } });
 
-      const resultPromise = verifyRecaptcha('valid-token');
+      const resultPromise = verifyRecaptcha('valid-token', recaptchaConfig);
       await jest.runAllTimersAsync();
       const result = await resultPromise;
 
@@ -136,7 +138,7 @@ describe('Validate Captcha token', () => {
     test('When the network error persists across all attempts, then it retries up to the max and throws', async () => {
       mockedAxios.post.mockRejectedValue(eaiAgainError());
 
-      const resultPromise = verifyRecaptcha('valid-token');
+      const resultPromise = verifyRecaptcha('valid-token', recaptchaConfig);
       const expectation = expect(resultPromise).rejects.toThrow('EAI_AGAIN');
       await jest.runAllTimersAsync();
       await expectation;
@@ -148,7 +150,7 @@ describe('Validate Captcha token', () => {
       const otherError = Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' });
       mockedAxios.post.mockRejectedValue(otherError);
 
-      const resultPromise = verifyRecaptcha('valid-token');
+      const resultPromise = verifyRecaptcha('valid-token', recaptchaConfig);
       const expectation = expect(resultPromise).rejects.toThrow('connection refused');
       await jest.runAllTimersAsync();
       await expectation;
@@ -161,7 +163,7 @@ describe('Validate Captcha token', () => {
       const errorCode = 'invalid-input-response';
       mockedAxios.post.mockResolvedValue({ data: { success: false, 'error-codes': [errorCode] } });
 
-      const resultPromise = verifyRecaptcha('invalid-token');
+      const resultPromise = verifyRecaptcha('invalid-token', recaptchaConfig);
       const expectation = expect(resultPromise).rejects.toThrow(errorCode);
       await jest.runAllTimersAsync();
       await expectation;

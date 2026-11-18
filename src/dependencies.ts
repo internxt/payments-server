@@ -18,6 +18,7 @@ import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 import { MongoDBUsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
 import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
 import { createHttpClient } from './infrastructure/http/httpClient';
+import { createRouteGuards, type RouteGuards } from './plugins/route-guards';
 import CacheService from './services/cache.service';
 import { ConfirmationTokenService } from './services/confirmationToken.service';
 import { HealthService } from './services/health.service';
@@ -53,6 +54,7 @@ export interface Dependencies {
   determineLifetimeConditions: DetermineLifetimeConditions;
   invoiceCompletedHandler: InvoiceCompletedHandler;
   klaviyoTrackingService: KlaviyoTrackingService;
+  routeGuards: RouteGuards;
   /** Closes the connections the app keeps open (Redis and Mongo). */
   closeConnections: () => Promise<void>;
 }
@@ -146,6 +148,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
     determineLifetimeConditions,
     invoiceCompletedHandler,
     klaviyoTrackingService,
+    routeGuards: createRouteGuards(config),
     closeConnections,
   };
 }
