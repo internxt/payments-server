@@ -8,6 +8,7 @@ import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter
 import { signUserToken } from '../utils/signUserToken';
 import { getInvoiceProductId } from '../utils/invoice';
 import { type Dependencies } from '../dependencies';
+import Logger from '../Logger';
 
 export function objectStorageController({
   paymentService,
@@ -144,7 +145,7 @@ export function objectStorageController({
             });
           }
 
-          req.log.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
+          Logger.error(`[ERROR CREATING SUBSCRIPTION]: ${error.stack ?? error.message}`);
 
           return res.status(500).send({
             message: 'Internal Server Error',
@@ -192,7 +193,7 @@ export function objectStorageController({
             return rep.status(404).send({ message: err.message });
           }
 
-          req.log.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          Logger.error(`[ERROR WHILE FETCHING PLAN BY ID]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },

@@ -7,7 +7,7 @@ import handleInvoicePaymentFailed from './handleInvoicePaymentFailed';
 import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceeded';
 import handleFundsCaptured from './handleFundsCaptured';
-import Logger from '../Logger';
+import Logger, { addLogContext } from '../Logger';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { type Dependencies } from '../dependencies';
 
@@ -57,6 +57,7 @@ export function webhookHandler({
         }
       }
 
+      addLogContext({ stripeEventId: event.id, stripeEventType: event.type });
       Logger.info(`Stripe event received: ${event.type}, id: ${event.id}`);
 
       switch (event.type) {

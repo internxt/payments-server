@@ -17,6 +17,7 @@ import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { getPromotionCodeCoupon } from '../utils/coupon';
 import { type Dependencies } from '../dependencies';
+import Logger from '../Logger';
 
 const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
@@ -96,7 +97,7 @@ export function paymentsController({
       async (req, res) => {
         const { customerId, currency = 'eur', priceId, paymentMethod } = req.body;
 
-        res.log.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
+        Logger.info(`Payment method for customer ${customerId} is going to be charged in order to verify it`);
 
         const paymentIntentVerification = await paymentService.paymentIntent(
           customerId,
@@ -371,12 +372,12 @@ export function paymentsController({
         try {
           subscriptionInCache = await cacheService.getSubscription(user.customerId, userType);
         } catch (err) {
-          req.log.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
-          req.log.error(err);
+          Logger.error(`Error while trying to retrieve ${user.customerId} subscription from cache`);
+          Logger.error(err);
         }
 
         if (subscriptionInCache) {
-          req.log.info(`Cache hit for ${user.customerId} subscription`);
+          Logger.info(`Cache hit for ${user.customerId} subscription`);
           return subscriptionInCache;
         }
 
@@ -398,8 +399,8 @@ export function paymentsController({
         }
 
         cacheService.setSubscription(user.customerId, userType, response).catch((err) => {
-          req.log.error(`Error while trying to set subscription cache for ${user.customerId}`);
-          req.log.error(err);
+          Logger.error(`Error while trying to set subscription cache for ${user.customerId}`);
+          Logger.error(err);
         });
 
         return response;
@@ -505,7 +506,7 @@ export function paymentsController({
             return rep.status(400).send(err.message);
           }
 
-          req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          Logger.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },
@@ -557,7 +558,7 @@ export function paymentsController({
             return rep.status(400).send(err.message);
           }
 
-          req.log.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
+          Logger.error(`[ERROR WHILE FETCHING PROMO CODE BY NAME]: ${err.message}. STACK ${err.stack ?? 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },
@@ -591,7 +592,7 @@ export function paymentsController({
             return res.status(404).send({ message: err.message });
           }
 
-          req.log.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          Logger.error(`[LICENSE/CHECK/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
           return res.status(500).send({ message: 'Internal Server Error' });
         }
       },
@@ -645,7 +646,7 @@ export function paymentsController({
             return rep.status(403).send({ message: err.message });
           }
 
-          req.log.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+          Logger.error(`[LICENSE/REDEEM/ERROR]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
           return rep.status(500).send({ message: 'Internal Server Error' });
         }
       },
@@ -659,7 +660,7 @@ export function paymentsController({
       } catch (error) {
         const err = error as Error;
 
-        req.log.error(`[DISPLAY-BILLING]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
+        Logger.error(`[DISPLAY-BILLING]: ${err.message}. STACK ${err.stack || 'NO STACK'}`);
 
         return rep.status(500).send({ message: 'Internal Server Error' });
       }

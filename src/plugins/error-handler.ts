@@ -1,6 +1,8 @@
 import { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { HttpError } from '../errors/HttpError';
 import { isAxiosError } from 'axios';
+import Stripe from 'stripe';
+import Logger from '../Logger';
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
@@ -18,7 +20,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       errorMessage = error.response?.data?.message || errorMessage;
     }
 
-    request.log.error(
+    Logger.error(
       {
         method: request.method,
         url: request.url,
@@ -26,8 +28,8 @@ export function registerErrorHandler(app: FastifyInstance) {
         errorMessage,
         stack: error.stack,
         query: request.query,
-        body: request.body,
         params: request.params,
+        ...(error instanceof Stripe.errors.StripeError && { stripeRequestId: error.requestId }),
       },
       'Unhandled error',
     );

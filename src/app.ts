@@ -1,4 +1,5 @@
 import fastifyCors from '@fastify/cors';
+import { randomUUID } from 'node:crypto';
 import Fastify, { FastifyInstance } from 'fastify';
 import { paymentsController } from './controller/payments.controller';
 import { objectStorageController } from './controller/object-storage.controller';
@@ -9,14 +10,17 @@ import { customerController } from './controller/customer.controller';
 import { gatewayController } from './controller/gateway.controller';
 import healthController from './controller/health.controller';
 import { webhookHandler } from './webhooks';
-import Logger from './Logger';
+import Logger, { runWithLogContext } from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
 import { type Dependencies } from './dependencies';
 
 export async function buildApp(deps: Dependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
-    loggerInstance: Logger.getPinoLogger(),
+    loggerInstance: Logger,
+    genReqId: () => randomUUID(),
   });
+
+  fastify.addHook('onRequest', (request, _reply, done) => runWithLogContext({ reqId: request.id }, done));
 
   registerErrorHandler(fastify);
 
