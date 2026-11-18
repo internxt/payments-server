@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 
-import { PaymentService } from '../services/payment.service';
 import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError } from '../errors/PaymentErrors';
 import { UnauthorizedError } from '../errors/Errors';
 import config from '../config';
@@ -10,8 +9,9 @@ import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter
 import { signUserToken } from '../utils/signUserToken';
 import { verifyUserTokenHook } from '../plugins/route-guards';
 import { getInvoiceProductId } from '../utils/invoice';
+import { type Dependencies } from '../dependencies';
 
-export function objectStorageController(paymentService: PaymentService) {
+export function objectStorageController({ paymentService }: Pick<Dependencies, 'paymentService'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 

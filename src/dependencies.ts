@@ -31,6 +31,8 @@ import { StorageService } from './services/storage.service';
 import { TiersService } from './services/tiers.service';
 import { UserFeaturesOverridesService } from './services/userFeaturesOverride.service';
 import { UsersService } from './services/users.service';
+import { ObjectStorageWebhookHandler } from './webhooks/events/ObjectStorageWebhookHandler';
+import { InvoiceCompletedHandler } from './webhooks/events/invoices/InvoiceCompletedHandler';
 
 export interface Dependencies {
   config: AppConfig;
@@ -48,6 +50,8 @@ export interface Dependencies {
   preCreatedUserService: PreCreatedUserService;
   confirmationTokenService: ConfirmationTokenService;
   determineLifetimeConditions: DetermineLifetimeConditions;
+  invoiceCompletedHandler: InvoiceCompletedHandler;
+  /** Closes the connections the app keeps open (Redis and Mongo). */
   closeConnections: () => Promise<void>;
 }
 
@@ -104,6 +108,17 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
   const confirmationTokenService = new ConfirmationTokenService(cacheService);
 
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+  const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
+  const invoiceCompletedHandler = new InvoiceCompletedHandler({
+    determineLifetimeConditions,
+    objectStorageWebhookHandler,
+    paymentService,
+    storageService,
+    tiersService,
+    usersService,
+    cacheService,
+    preCreatedUserService,
+  });
 
   const closeConnections = async () => {
     await cacheService.close();
@@ -126,6 +141,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
     preCreatedUserService,
     confirmationTokenService,
     determineLifetimeConditions,
+    invoiceCompletedHandler,
     closeConnections,
   };
 }

@@ -6,82 +6,29 @@ import { businessController } from './controller/business.controller';
 import { productsController } from './controller/products.controller';
 import { checkoutController } from './controller/checkout.controller';
 import { customerController } from './controller/customer.controller';
+import { gatewayController } from './controller/gateway.controller';
+import healthController from './controller/health.controller';
 import { webhookHandler } from './webhooks';
 import Logger from './Logger';
 import { registerErrorHandler } from './plugins/error-handler';
-import { gatewayController } from './controller/gateway.controller';
-import healthController from './controller/health.controller';
 import { type Dependencies } from './dependencies';
 
-export async function buildApp({
-  paymentService,
-  storageService,
-  usersService,
-  cacheService,
-  tiersService,
-  licenseCodesService,
-  objectStorageService,
-  productsService,
-  userFeaturesOverridesService,
-  stripe,
-  config,
-  healthService,
-  preCreatedUserService,
-  confirmationTokenService,
-}: Dependencies): Promise<FastifyInstance> {
+export async function buildApp(deps: Dependencies): Promise<FastifyInstance> {
   const fastify = Fastify({
     loggerInstance: Logger.getPinoLogger(),
   });
 
   registerErrorHandler(fastify);
 
-  fastify.register(
-    paymentsController(paymentService, usersService, config, cacheService, licenseCodesService, tiersService),
-  );
-  fastify.register(objectStorageController(paymentService), { prefix: '/object-storage' });
-  fastify.register(businessController(paymentService, usersService, tiersService, config), { prefix: '/business' });
-  fastify.register(productsController(productsService, cacheService, config), {
-    prefix: '/products',
-  });
-  fastify.register(
-    checkoutController({
-      usersService,
-      paymentsService: paymentService,
-      preCreatedUserService,
-      confirmationTokenService,
-    }),
-    {
-      prefix: '/checkout',
-    },
-  );
-  fastify.register(customerController(usersService, paymentService, cacheService), { prefix: '/customer' });
-  fastify.register(
-    gatewayController({
-      usersService,
-      userFeaturesOverridesService,
-      cacheService,
-      licenseCodeService: licenseCodesService,
-      config,
-    }),
-    {
-      prefix: '/gateway',
-    },
-  );
-  fastify.register(healthController(healthService));
-
-  fastify.register(
-    webhookHandler({
-      stripe,
-      storageService,
-      usersService,
-      paymentService,
-      config,
-      cacheService,
-      objectStorageService,
-      tiersService,
-      preCreatedUserService,
-    }),
-  );
+  fastify.register(paymentsController(deps));
+  fastify.register(objectStorageController(deps), { prefix: '/object-storage' });
+  fastify.register(businessController(deps), { prefix: '/business' });
+  fastify.register(productsController(deps), { prefix: '/products' });
+  fastify.register(checkoutController(deps), { prefix: '/checkout' });
+  fastify.register(customerController(deps), { prefix: '/customer' });
+  fastify.register(gatewayController(deps), { prefix: '/gateway' });
+  fastify.register(healthController(deps));
+  fastify.register(webhookHandler(deps));
 
   fastify.register(fastifyCors, {
     allowedHeaders: [

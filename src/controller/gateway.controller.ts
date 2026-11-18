@@ -1,30 +1,22 @@
 import { FastifyInstance } from 'fastify';
-import { AppConfig } from '../config';
-import { UsersService } from '../services/users.service';
 import { NotFoundError } from '../errors/Errors';
 import Logger from '../Logger';
-import CacheService from '../services/cache.service';
 import { Service } from '../core/users/Tier';
 import { User } from '../core/users/User';
-import { UserFeaturesOverridesService } from '../services/userFeaturesOverride.service';
 import { setupAuth } from '../plugins/auth';
-import { LicenseCodeAlreadyAppliedError, LicenseCodesService } from '../services/licenseCodes.service';
-
-interface GatewayControllerPayload {
-  cacheService: CacheService;
-  usersService: UsersService;
-  licenseCodeService: LicenseCodesService;
-  userFeaturesOverridesService: UserFeaturesOverridesService;
-  config: AppConfig;
-}
+import { LicenseCodeAlreadyAppliedError } from '../services/licenseCodes.service';
+import { type Dependencies } from '../dependencies';
 
 export function gatewayController({
   cacheService,
   usersService,
-  licenseCodeService,
+  licenseCodesService,
   userFeaturesOverridesService,
   config,
-}: GatewayControllerPayload) {
+}: Pick<
+  Dependencies,
+  'cacheService' | 'usersService' | 'licenseCodesService' | 'userFeaturesOverridesService' | 'config'
+>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, {
       jwtOptions: {
@@ -90,7 +82,7 @@ export function gatewayController({
       async (request, response) => {
         const { code } = request.body;
 
-        await licenseCodeService.reactivateLicenseCode(code);
+        await licenseCodesService.reactivateLicenseCode(code);
 
         return response.status(200).send();
       },
@@ -115,7 +107,7 @@ export function gatewayController({
       async (req, res) => {
         const { code, provider } = req.query;
 
-        const available = await licenseCodeService.isLicenseCodeAvailable(code, provider).catch((error) => {
+        const available = await licenseCodesService.isLicenseCodeAvailable(code, provider).catch((error) => {
           if (error instanceof LicenseCodeAlreadyAppliedError) {
             return false;
           }

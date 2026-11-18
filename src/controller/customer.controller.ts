@@ -1,18 +1,16 @@
 import { FastifyInstance } from 'fastify';
 
-import { UsersService } from '../services/users.service';
 import config from '../config';
-import CacheService from '../services/cache.service';
-import { PaymentService } from '../services/payment.service';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
+import { type Dependencies } from '../dependencies';
 
-export function customerController(
-  usersService: UsersService,
-  paymentService: PaymentService,
-  cacheService: CacheService,
-) {
+export function customerController({
+  usersService,
+  paymentService,
+  cacheService,
+}: Pick<Dependencies, 'usersService' | 'paymentService' | 'cacheService'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET });
 
