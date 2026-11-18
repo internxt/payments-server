@@ -32,7 +32,7 @@ export class MailService {
   }
 
   private requestConfig(): AxiosRequestConfig {
-    const jwt = signGatewayToken('5m', this.config.MAIL_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.MAIL_GATEWAY_SECRET, this.config.isProduction);
 
     return {
       headers: {

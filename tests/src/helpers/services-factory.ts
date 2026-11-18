@@ -127,7 +127,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     repositories.userFeatureOverridesRepository,
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
-  const klaviyoTrackingService = new KlaviyoTrackingService();
+  const klaviyoTrackingService = new KlaviyoTrackingService(config);
 
   return {
     stripe,

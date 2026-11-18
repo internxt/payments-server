@@ -33,7 +33,7 @@ export function paymentsController({
   'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService'
 >) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     const getUserSubscription = async (customerId: string, userType: UserType) => {
       /**

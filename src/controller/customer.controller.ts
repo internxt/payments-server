@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 
-import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
@@ -10,9 +9,10 @@ export function customerController({
   usersService,
   paymentService,
   cacheService,
-}: Pick<Dependencies, 'usersService' | 'paymentService' | 'cacheService'>) {
+  config,
+}: Pick<Dependencies, 'usersService' | 'paymentService' | 'cacheService' | 'config'>) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     fastify.get(
       '/redeemed-promotion-codes',

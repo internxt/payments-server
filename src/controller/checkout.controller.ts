@@ -3,7 +3,6 @@ import Stripe from 'stripe';
 
 import { PaymentIntent } from '../types/payment';
 import { BadRequestError } from '../errors/Errors';
-import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
@@ -19,9 +18,13 @@ export function checkoutController({
   paymentService,
   preCreatedUserService,
   confirmationTokenService,
-}: Pick<Dependencies, 'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService'>) {
+  config,
+}: Pick<
+  Dependencies,
+  'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService' | 'config'
+>) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     fastify.post<{
       Body: {
@@ -135,7 +138,7 @@ export function checkoutController({
           await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
-        return res.send({ customerId, token: signUserToken({ customerId }) });
+        return res.send({ customerId, token: signUserToken({ customerId }, config.JWT_SECRET) });
       },
     );
 
@@ -286,6 +289,7 @@ export function checkoutController({
             userUuid,
             customer.email,
             price.bytes.toString(),
+            config,
           );
 
           if (!isStorageUpgradeAllowed) {

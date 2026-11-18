@@ -17,6 +17,7 @@ const {
   objectStorageService,
   tiersService,
   preCreatedUserService,
+  klaviyoTrackingService,
 } = createTestServices();
 
 beforeEach(() => {
@@ -36,6 +37,9 @@ describe('Process when a subscription is cancelled', () => {
       .spyOn(stripePaymentsAdapter, 'getCustomer')
       .mockResolvedValue(Customer.toDomain(mockedCustomer));
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
+    const trackCancellationSpy = jest
+      .spyOn(klaviyoTrackingService, 'trackSubscriptionCancelled')
+      .mockResolvedValue(undefined);
     await handleSubscriptionCanceled(
       storageService,
       usersService,
@@ -45,6 +49,7 @@ describe('Process when a subscription is cancelled', () => {
       objectStorageService,
       tiersService,
       preCreatedUserService,
+      klaviyoTrackingService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -58,6 +63,7 @@ describe('Process when a subscription is cancelled', () => {
       tiersService,
       preCreatedUserService,
     });
+    expect(trackCancellationSpy).toHaveBeenCalledWith(mockedCustomer.email);
   });
 
   it('When the cancellation of a subscription that does not have a Tier is requested, then should cancel it using the old way', async () => {
@@ -93,6 +99,7 @@ describe('Process when a subscription is cancelled', () => {
       objectStorageService,
       tiersService,
       preCreatedUserService,
+      klaviyoTrackingService,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -128,6 +135,7 @@ describe('Process when a subscription is cancelled', () => {
         objectStorageService,
         tiersService,
         preCreatedUserService,
+        klaviyoTrackingService,
       ),
     ).rejects.toThrow(randomError);
   });

@@ -1,9 +1,12 @@
+import { loadConfig } from '../../src/config';
 import { HUNDRED_TB } from '../../src/constants';
 import { getUserStorage } from '../../src/services/storage.service';
 import { fetchUserStorage } from '../../src/utils/fetchUserStorage';
 import { getUser } from './fixtures';
 
 jest.mock('../../src/services/storage.service');
+
+const config = loadConfig();
 
 describe('Check if user can increase storage', () => {
   it('When the user has available space, then they should be able to increase storage', async () => {
@@ -15,7 +18,7 @@ describe('Check if user can increase storage', () => {
       expandableBytes: 102,
     });
 
-    const userStorage = await fetchUserStorage(mockedUser.uuid, mockedUser.email, newStorageBytes);
+    const userStorage = await fetchUserStorage(mockedUser.uuid, mockedUser.email, newStorageBytes, config);
 
     expect(userStorage).toStrictEqual({
       canExpand: true,
@@ -31,7 +34,7 @@ describe('Check if user can increase storage', () => {
       expandableBytes: 102,
     });
 
-    const userStorage = await fetchUserStorage(mockedUser.uuid, mockedUser.email, newStorageBytes);
+    const userStorage = await fetchUserStorage(mockedUser.uuid, mockedUser.email, newStorageBytes, config);
 
     expect(userStorage).toStrictEqual({
       canExpand: false,

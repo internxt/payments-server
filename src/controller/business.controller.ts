@@ -19,7 +19,7 @@ export function businessController({
   config,
 }: Pick<Dependencies, 'paymentService' | 'usersService' | 'tiersService' | 'config'>) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     fastify.patch<{ Body: { workspaceId: string; subscriptionId: string; workspaceUpdatedSeats: number } }>(
       '/subscription',
