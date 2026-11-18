@@ -1,4 +1,4 @@
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { InvalidConfirmationTokenError } from '../../../src/errors/PaymentErrors';
 import { ConfirmationToken } from '../../../src/infrastructure/domain/entities/confirmationToken';
 import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
@@ -6,6 +6,8 @@ import CacheService from '../../../src/services/cache.service';
 import { ConfirmationTokenService } from '../../../src/services/confirmationToken.service';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { getConfirmationToken } from '../fixtures';
+
+const config = loadConfig();
 
 jest.mock('ioredis', () => require('ioredis-mock'));
 

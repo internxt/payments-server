@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { preloadData } from './preloadMongoDBData';
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { buildApp } from '../../../src/app';
 import { buildDependencies, Dependencies } from '../../../src/dependencies';
 
@@ -26,7 +26,7 @@ export const initializeServerAndDatabase = async () => {
   });
   const uri = mongoServer.getUri();
   process.env.MONGO_URI = uri;
-  dependencies = await buildDependencies(config);
+  dependencies = await buildDependencies(loadConfig());
   app = await buildApp(dependencies);
   await app.ready();
   await seedDatabase(uri);

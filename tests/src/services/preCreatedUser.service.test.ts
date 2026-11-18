@@ -1,4 +1,4 @@
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 import { PreCreatedUser } from '../../../src/infrastructure/domain/entities/preCreatedUser';
 import { PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
@@ -10,6 +10,8 @@ import {
   PreCreatedUserNotFoundError,
   PreCreatedUserPendingSetupError,
 } from '../../../src/errors/PreCreatedUsersErrors';
+
+const config = loadConfig();
 
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('mocked-jwt-token'),

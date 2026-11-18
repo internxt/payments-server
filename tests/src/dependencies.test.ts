@@ -1,9 +1,11 @@
 import { MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import config from '../../src/config';
+import { loadConfig } from '../../src/config';
 import { buildDependencies } from '../../src/dependencies';
 import { StripePaymentsAdapter } from '../../src/infrastructure/adapters/stripe.adapter';
 import CacheService from '../../src/services/cache.service';
+
+const config = loadConfig();
 
 describe('Building the app dependencies', () => {
   let mongoServer: MongoMemoryServer;

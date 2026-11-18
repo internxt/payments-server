@@ -1,8 +1,10 @@
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { UserType } from '../../../src/core/users/User';
 import Logger from '../../../src/Logger';
 import CacheService from '../../../src/services/cache.service';
 import { getSubscription, getUser, newTier } from '../fixtures';
+
+const config = loadConfig();
 
 let cacheService: CacheService;
 

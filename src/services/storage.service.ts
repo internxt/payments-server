@@ -50,7 +50,7 @@ export async function getUserStorage(
   userUuid: User['uuid'],
   email: string,
   newStorage: string,
-  config: AppConfig,
+  config: Pick<AppConfig, 'DRIVE_NEW_GATEWAY_SECRET' | 'DRIVE_NEW_GATEWAY_URL'>,
 ): Promise<{
   canExpand: boolean;
   currentMaxSpaceBytes: number;
