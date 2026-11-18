@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import config from '../config';
 import { ForbiddenError } from '../errors/Errors';
 
 /**
@@ -7,11 +6,11 @@ import { ForbiddenError } from '../errors/Errors';
  *
  * @throws {ForbiddenError} When the token is invalid, has expired or belongs to another customer.
  */
-export function verifyUserToken(token: string, customerId: string): void {
+export function verifyUserToken(token: string, customerId: string, secret: string): void {
   let tokenCustomerId: string | undefined;
 
   try {
-    ({ customerId: tokenCustomerId } = jwt.verify(token, config.JWT_SECRET) as { customerId?: string });
+    ({ customerId: tokenCustomerId } = jwt.verify(token, secret) as { customerId?: string });
   } catch {
     throw new ForbiddenError();
   }

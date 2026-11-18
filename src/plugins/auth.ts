@@ -2,7 +2,6 @@ import fastifyJwt from '@fastify/jwt';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { FastifyInstance } from 'fastify';
 import { UnauthorizedError } from '../errors/Errors';
-import { isTest } from '../config';
 import { Algorithm } from 'jsonwebtoken';
 import Logger from '../Logger';
 
@@ -17,6 +16,7 @@ interface WithAuthOptions {
     algorithms?: Algorithm[];
   };
   rateLimit?: RateLimitOptions;
+  isTest: boolean;
 }
 
 const DEFAULT_RATE_LIMIT: RateLimitOptions = {
@@ -35,7 +35,7 @@ export async function setupAuth(fastify: FastifyInstance, options: WithAuthOptio
 
   fastify.register(fastifyJwt, jwtConfig);
 
-  if (!isTest) {
+  if (!options.isTest) {
     fastify.register(fastifyRateLimit, options.rateLimit ?? DEFAULT_RATE_LIMIT);
   }
 

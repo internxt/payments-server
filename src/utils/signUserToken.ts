@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
-import config from '../config';
 import { PAYMENTS_TOKEN_EXPIRATION } from '../constants';
 
-export function signUserToken(payload: { customerId: string }): string {
-  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: PAYMENTS_TOKEN_EXPIRATION });
+export function signUserToken(payload: { customerId: string }, secret: string): string {
+  return jwt.sign(payload, secret, { expiresIn: PAYMENTS_TOKEN_EXPIRATION });
 }

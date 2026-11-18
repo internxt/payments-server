@@ -17,7 +17,7 @@ export class PreCreatedUserService {
   ) {}
 
   async getOrCreate(email: string): Promise<PreCreatedUser> {
-    const token = signGatewayToken('5m', this.gatewaySecret);
+    const token = signGatewayToken('5m', this.gatewaySecret, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 
@@ -38,7 +38,7 @@ export class PreCreatedUserService {
    * @throws {PreCreatedUserNotFoundError} When the gateway has no pre-created user for that email.
    */
   async get(email: string): Promise<PreCreatedUser> {
-    const token = signGatewayToken('5m', this.gatewaySecret);
+    const token = signGatewayToken('5m', this.gatewaySecret, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token, {
       params: {
@@ -70,7 +70,7 @@ export class PreCreatedUserService {
     maxSpaceBytes?: string;
     tierId?: string;
   }): Promise<void> {
-    const token = signGatewayToken('5m', this.gatewaySecret);
+    const token = signGatewayToken('5m', this.gatewaySecret, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 
@@ -87,7 +87,7 @@ export class PreCreatedUserService {
   }
 
   async sendSetupEmail(uuid: string, planName?: string): Promise<void> {
-    const token = signGatewayToken('5m', this.gatewaySecret);
+    const token = signGatewayToken('5m', this.gatewaySecret, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = this.basicRequestConfig(token);
 

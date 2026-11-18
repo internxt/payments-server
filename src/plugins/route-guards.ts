@@ -1,4 +1,5 @@
 import { FastifyRequest } from 'fastify';
+import config from '../config';
 import { ForbiddenError } from '../errors/Errors';
 import { verifyRecaptcha } from '../utils/verifyRecaptcha';
 import { verifyUserToken } from '../utils/verifyUserToken';
@@ -24,5 +25,5 @@ export async function verifyCaptchaHook(req: FastifyRequest<{ Body: { captchaTok
 export async function verifyUserTokenHook(
   req: FastifyRequest<{ Body: { token: string; customerId: string } }>,
 ): Promise<void> {
-  verifyUserToken(req.body.token, req.body.customerId);
+  verifyUserToken(req.body.token, req.body.customerId, config.JWT_SECRET);
 }

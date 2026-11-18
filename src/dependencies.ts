@@ -21,6 +21,7 @@ import { createHttpClient } from './infrastructure/http/httpClient';
 import CacheService from './services/cache.service';
 import { ConfirmationTokenService } from './services/confirmationToken.service';
 import { HealthService } from './services/health.service';
+import { KlaviyoTrackingService } from './services/klaviyo.service';
 import { LicenseCodesService } from './services/licenseCodes.service';
 import { MailService } from './services/mail.service';
 import { ObjectStorageService } from './services/objectStorage.service';
@@ -51,6 +52,7 @@ export interface Dependencies {
   confirmationTokenService: ConfirmationTokenService;
   determineLifetimeConditions: DetermineLifetimeConditions;
   invoiceCompletedHandler: InvoiceCompletedHandler;
+  klaviyoTrackingService: KlaviyoTrackingService;
   /** Closes the connections the app keeps open (Redis and Mongo). */
   closeConnections: () => Promise<void>;
 }
@@ -106,6 +108,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
   const healthService = new HealthService(mongoClient, cacheService);
   const preCreatedUserService = new PreCreatedUserService(createHttpClient(), config);
   const confirmationTokenService = new ConfirmationTokenService(cacheService);
+  const klaviyoTrackingService = new KlaviyoTrackingService(config);
 
   const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
@@ -142,6 +145,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
     confirmationTokenService,
     determineLifetimeConditions,
     invoiceCompletedHandler,
+    klaviyoTrackingService,
     closeConnections,
   };
 }

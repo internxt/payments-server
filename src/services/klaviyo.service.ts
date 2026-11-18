@@ -1,6 +1,6 @@
 import axios from 'axios';
 import Logger from '../Logger';
-import config from '../config';
+import { type AppConfig } from '../config';
 
 export enum KlaviyoEvent {
   SubscriptionCancelled = 'Subscription Cancelled',
@@ -15,7 +15,7 @@ export class KlaviyoTrackingService {
   private readonly apiKey?: string;
   private readonly baseUrl?: string;
 
-  constructor() {
+  constructor(config: Pick<AppConfig, 'KLAVIYO_API_KEY' | 'KLAVIYO_BASE_URL'>) {
     if (!config.KLAVIYO_API_KEY) {
       Logger.warn('Klaviyo API key is not set');
       return;
@@ -72,5 +72,3 @@ export class KlaviyoTrackingService {
     });
   }
 }
-
-export const klaviyoService = new KlaviyoTrackingService();

@@ -17,7 +17,7 @@ export class ObjectStorageService {
   }
 
   async reactivateAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET, this.config.isProduction);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ export class ObjectStorageService {
   }
 
   async suspendAccount(payload: { customerId: string }): Promise<void> {
-    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET, this.config.isProduction);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -41,7 +41,7 @@ export class ObjectStorageService {
   }
 
   private async createUser(email: string, customerId: string): Promise<void> {
-    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET);
+    const jwt = signGatewayToken('5m', this.config.OBJECT_STORAGE_GATEWAY_SECRET, this.config.isProduction);
     const params: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
