@@ -24,7 +24,6 @@ import { getPromotionCodeCoupon, getPromotionCodeCouponId } from '../utils/coupo
 import { LicenseCode } from '../core/users/LicenseCode';
 import {
   CustomerId,
-  CustomerEmail,
   ExtendedSubscription,
   PriceId,
   Subscription,
@@ -33,11 +32,11 @@ import {
   SetupIntent,
   PaymentMethod,
   CustomerSource,
-  Customer as StripeCustomer,
 } from '../types/stripe';
 import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { Customer } from '../infrastructure/domain/entities/customer';
 import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
@@ -69,8 +68,7 @@ export class PaymentService {
         await this.attachTaxIdToCustomer(customerId, companyVatId, taxIdType);
         return;
       } catch (err) {
-        const isInvalidTaxId = (err as any)?.raw?.code === 'tax_id_invalid';
-        if (!isInvalidTaxId) throw err;
+        if (!(err instanceof InvalidTaxIdError)) throw err;
 
         const isLastTaxIdType = index === taxIdTypes.length - 1;
         if (isLastTaxIdType) throw new InvalidTaxIdError();
@@ -706,10 +704,8 @@ export class PaymentService {
     });
   }
 
-  async getCustomersByEmail(customerEmail: CustomerEmail): Promise<StripeCustomer[]> {
-    const res = await this.provider.customers.list({ email: customerEmail as string });
-
-    return res.data;
+  async getCustomersByEmail(customerEmail: Customer['email']): Promise<Customer[]> {
+    return this.stripeAdapter.listCustomersByEmail(customerEmail);
   }
 
   async getInvoicesFromUser(
@@ -974,12 +970,12 @@ export class PaymentService {
       return country ? { country, postalCode } : undefined;
     }
 
-    const customer = await this.provider.customers.retrieve(customerId, { expand: ['tax_ids'] });
-    const isTaxableConsumer = !customer.deleted && customer.tax_exempt === 'none' && !customer.tax_ids?.data.length;
+    const taxDetails = await this.stripeAdapter.getCustomerTaxDetails(customerId);
+    const isTaxableConsumer = !!taxDetails && !taxDetails.isTaxExempt && taxDetails.taxIds.length === 0;
 
-    if (!isTaxableConsumer || !customer.address?.country) return undefined;
+    if (!isTaxableConsumer || !taxDetails.address?.country) return undefined;
 
-    return { country: customer.address.country, postalCode: customer.address.postal_code };
+    return { country: taxDetails.address.country, postalCode: taxDetails.address.postalCode };
   }
 
   /**
@@ -1094,19 +1090,15 @@ export class PaymentService {
   }
 
   async getCustomerIdByEmail(email: string) {
-    const { data: customer } = await this.provider.customers.search({
-      query: `email:'${email}'`,
-    });
-    const userExists = !!customer.length;
+    const customerIds = await this.stripeAdapter.searchCustomerIdsByEmail(email);
+    const userExists = !!customerIds.length;
 
     if (!userExists) {
       throw new CustomerNotFoundError(email);
     }
 
-    const customerId = customer[0].id;
-
     return {
-      id: customerId,
+      id: customerIds[0],
     };
   }
 
@@ -1335,19 +1327,11 @@ export class PaymentService {
   }
 
   async attachTaxIdToCustomer(customerId: CustomerId, value: string, type: Stripe.TaxIdCreateParams.Type) {
-    const customerTaxIds = await this.provider.customers.listTaxIds(customerId, {});
-    const hasTaxIds = customerTaxIds.data.length > 0;
+    const customerTaxIds = await this.stripeAdapter.listTaxIds(customerId);
 
-    if (hasTaxIds) {
-      const isTaxIdAlreadyAttached = customerTaxIds.data.find((taxId) => taxId.value === value);
+    if (customerTaxIds.includes(value)) return;
 
-      if (isTaxIdAlreadyAttached) return;
-    }
-
-    await this.provider.customers.createTaxId(customerId, {
-      type,
-      value,
-    });
+    await this.stripeAdapter.createTaxId(customerId, { type, value });
   }
 
   private hasAnnualCommitment(price: Stripe.Price): boolean {

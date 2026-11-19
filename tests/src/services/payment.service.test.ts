@@ -32,6 +32,7 @@ import {
   SubscriptionNotEligibleForEarlyChargeError,
   NotFoundSubscriptionError,
   InvalidTaxIdError,
+  CustomerNotFoundError,
 } from '../../../src/errors/PaymentErrors';
 
 describe('Payments Service tests', () => {
@@ -166,44 +167,62 @@ describe('Payments Service tests', () => {
 
   describe('Attaching a tax id to a customer', () => {
     const customerId = 'cus_123';
-    const invalidTaxIdError = Object.assign(new Error('invalid'), { raw: { code: 'tax_id_invalid' } });
+    const invalidTaxIdError = () =>
+      new Stripe.errors.StripeInvalidRequestError({
+        type: 'invalid_request_error',
+        code: 'tax_id_invalid',
+        message: 'Invalid value for eu_vat.',
+      });
 
-    it('When the first tax id type is rejected as invalid, then it retries with the next type of the country', async () => {
-      const attachSpy = jest
-        .spyOn(paymentService, 'attachTaxIdToCustomer')
-        .mockRejectedValueOnce(invalidTaxIdError)
-        .mockResolvedValueOnce(undefined);
+    beforeEach(() => {
+      jest.spyOn(stripe.customers, 'listTaxIds').mockResolvedValue({ data: [] } as any);
+    });
+
+    test('When the first tax id type of the country is rejected as invalid, then the next type is attached', async () => {
+      const createSpy = jest
+        .spyOn(stripe.customers, 'createTaxId')
+        .mockRejectedValueOnce(invalidTaxIdError())
+        .mockResolvedValueOnce({} as any);
 
       await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '18174206C');
 
-      expect(attachSpy).toHaveBeenNthCalledWith(1, customerId, '18174206C', 'eu_vat');
-      expect(attachSpy).toHaveBeenNthCalledWith(2, customerId, '18174206C', 'es_cif');
+      expect(createSpy).toHaveBeenNthCalledWith(1, customerId, { type: 'eu_vat', value: '18174206C' });
+      expect(createSpy).toHaveBeenNthCalledWith(2, customerId, { type: 'es_cif', value: '18174206C' });
     });
 
-    it('When every tax id type of the country is rejected as invalid, then an invalid tax id error is thrown', async () => {
-      jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockRejectedValue(invalidTaxIdError);
+    test('When every tax id type of the country is rejected as invalid, then an invalid tax id error is thrown', async () => {
+      jest.spyOn(stripe.customers, 'createTaxId').mockRejectedValue(invalidTaxIdError());
 
       await expect(paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '123')).rejects.toThrow(
         InvalidTaxIdError,
       );
     });
 
-    it('When the first tax id type is accepted, then no other type is tried', async () => {
-      const attachSpy = jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockResolvedValue(undefined);
+    test('When the first tax id type is accepted, then no other type is tried', async () => {
+      const createSpy = jest.spyOn(stripe.customers, 'createTaxId').mockResolvedValue({} as any);
 
       await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', 'ESB12345678');
 
-      expect(attachSpy).toHaveBeenCalledTimes(1);
+      expect(createSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('When attaching fails for a reason other than an invalid tax id, then the error is propagated without retrying', async () => {
-      const stripeError = new Error('rate limited');
-      const attachSpy = jest.spyOn(paymentService, 'attachTaxIdToCustomer').mockRejectedValue(stripeError);
+    test('When the customer already has that tax id, then it is not added again', async () => {
+      jest.spyOn(stripe.customers, 'listTaxIds').mockResolvedValue({ data: [{ value: 'ESB12345678' }] } as any);
+      const createSpy = jest.spyOn(stripe.customers, 'createTaxId');
+
+      await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', 'ESB12345678');
+
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    test('When Stripe fails for a reason other than an invalid tax id, then the error is propagated without retrying', async () => {
+      const rateLimitError = new Stripe.errors.StripeRateLimitError({ type: 'rate_limit_error', message: 'Too many' });
+      const createSpy = jest.spyOn(stripe.customers, 'createTaxId').mockRejectedValue(rateLimitError);
 
       await expect(paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, 'ES', '18174206C')).rejects.toBe(
-        stripeError,
+        rateLimitError,
       );
-      expect(attachSpy).toHaveBeenCalledTimes(1);
+      expect(createSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -472,6 +491,44 @@ describe('Payments Service tests', () => {
     });
   });
 
+  describe('Finding customers by email', () => {
+    test('When looking for every customer of an email, then Stripe is asked for that exact email', async () => {
+      const customer = getCustomer({ id: 'cus_exact', email: 'example@internxt.com' });
+      const listSpy = jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: [customer] } as any);
+
+      const customers = await paymentService.getCustomersByEmail('example@internxt.com');
+
+      expect(listSpy).toHaveBeenCalledWith({ email: 'example@internxt.com' });
+      expect(customers.map(({ id }) => id)).toStrictEqual(['cus_exact']);
+    });
+
+    test('When looking for the customer id of an email that Stripe search finds, then the first match is returned', async () => {
+      jest.spyOn(stripe.customers, 'search').mockResolvedValue({
+        data: [getCustomer({ id: 'cus_first' }), getCustomer({ id: 'cus_second' })],
+      } as any);
+
+      const customer = await paymentService.getCustomerIdByEmail('example@internxt.com');
+
+      expect(customer).toStrictEqual({ id: 'cus_first' });
+    });
+
+    test('When Stripe search still returns a customer whose email was just removed, then its id is returned', async () => {
+      jest
+        .spyOn(stripe.customers, 'search')
+        .mockResolvedValue({ data: [getCustomer({ id: 'cus_email_removed', email: null })] } as any);
+
+      const customer = await paymentService.getCustomerIdByEmail('example@internxt.com');
+
+      expect(customer).toStrictEqual({ id: 'cus_email_removed' });
+    });
+
+    test('When looking for the customer id of an email that Stripe search does not find, then a customer not found error is thrown', async () => {
+      jest.spyOn(stripe.customers, 'search').mockResolvedValue({ data: [] } as any);
+
+      await expect(paymentService.getCustomerIdByEmail('nobody@internxt.com')).rejects.toThrow(CustomerNotFoundError);
+    });
+  });
+
   describe('Get User default payment method', () => {
     const mockProvider = {
       paymentMethods: {
@@ -716,6 +773,27 @@ describe('Payments Service tests', () => {
       const tax = await paymentService.calculatePriceTax(amount, customer.id);
 
       expect(tax).toBeUndefined();
+    });
+
+    test('When the customer was deleted, then no tax is returned', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue({ id: 'cus_deleted', deleted: true } as any);
+
+      const tax = await paymentService.calculatePriceTax(amount, 'cus_deleted', '75001', 'FR');
+
+      expect(tax).toBeUndefined();
+    });
+
+    test('When the customer has no email in Stripe, then the tax still uses the country of its address', async () => {
+      const customer = getCustomer({
+        email: null,
+        address: { ...getCustomer().address!, country: 'DE' },
+        tax_exempt: 'none',
+      });
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(customer as Stripe.Response<Stripe.Customer>);
+
+      const tax = await paymentService.calculatePriceTax(amount, customer.id);
+
+      expect(tax).toStrictEqual({ taxAmount: 1900, amountTotal: 11900 });
     });
 
     test('When the customer is tax exempt, then no tax is returned', async () => {
