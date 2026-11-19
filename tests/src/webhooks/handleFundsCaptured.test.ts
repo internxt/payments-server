@@ -4,8 +4,8 @@ import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
 import { ConflictError, InternalServerError } from '../../../src/errors/Errors';
 import { UserSubscription, UserType } from '../../../src/core/users/User';
 import { createTestServices } from '../helpers/services-factory';
-import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import Logger from '../../../src/Logger';
+import { getCustomerEntity } from '../entity.fixtures';
 
 const stripeMock = {
   paymentIntents: {
@@ -70,7 +70,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       const cancelPaymentIntentSpy = jest.spyOn(stripe.paymentIntents, 'cancel');
       const getUserSubscriptionSpy = jest
         .spyOn(paymentService, 'getUserSubscription')
@@ -112,7 +118,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       jest.spyOn(stripe.paymentIntents, 'cancel').mockRejectedValue(unexpectedError);
       const getUserSubscriptionSpy = jest
         .spyOn(paymentService, 'getUserSubscription')
@@ -143,7 +155,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       const cancelPaymentIntentSpy = jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -177,7 +195,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       const cancelPaymentIntentSpy = jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -210,7 +234,13 @@ describe('Handling captured funds from a payment method', () => {
     const mockCustomer = getCustomer();
     const mockSubscription = getCreateSubscriptionResponse();
 
-    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+      getCustomerEntity({
+        id: mockCustomer.id,
+        name: mockCustomer.name as string,
+        email: mockCustomer.email as string,
+      }),
+    );
     const cancelPaymentIntentSpy = jest
       .spyOn(stripe.paymentIntents, 'cancel')
       .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -252,7 +282,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
@@ -284,7 +320,13 @@ describe('Handling captured funds from a payment method', () => {
       const mockCustomer = getCustomer();
       const mockSubscription = getCreateSubscriptionResponse();
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockCustomer));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockCustomer.id,
+          name: mockCustomer.name as string,
+          email: mockCustomer.email as string,
+        }),
+      );
       jest
         .spyOn(stripe.paymentIntents, 'cancel')
         .mockResolvedValue(mockPaymentIntent as Stripe.Response<Stripe.PaymentIntent>);
