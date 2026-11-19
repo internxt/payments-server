@@ -134,6 +134,38 @@ export class StripeAdapter {
     return PaymentMethod.toDomain(paymentMethods);
   }
 
+  async attachPaymentMethod(
+    paymentMethodId: PaymentMethod['id'],
+    customerId: Customer['id'],
+  ): Promise<{ id: PaymentMethod['id']; customerId: Customer['id'] | null }> {
+    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, { customer: customerId });
+
+    return { id, customerId: typeof customer === 'string' ? customer : (customer?.id ?? null) };
+  }
+
+  /** Returned as Stripe sends it: it is the response body of the default payment method endpoint. */
+  async listPaymentMethods(customerId: Customer['id']): Promise<Stripe.PaymentMethod[]> {
+    const paymentMethods = await this.provider.paymentMethods.list({ customer: customerId });
+
+    return paymentMethods.data;
+  }
+
+  /** Returned as Stripe sends it: it is the response body of the default payment method endpoint. */
+  async getCustomerDefaultPaymentMethod(
+    customerId: Customer['id'],
+  ): Promise<Stripe.PaymentMethod | Stripe.CustomerSource | null> {
+    const customer = await this.provider.customers.retrieve(customerId, {
+      expand: ['default_source', 'invoice_settings.default_payment_method'],
+    });
+
+    if (customer.deleted) return null;
+
+    return (
+      (customer.invoice_settings.default_payment_method as Stripe.PaymentMethod) ??
+      (customer.default_source as Stripe.CustomerSource)
+    );
+  }
+
   async getPrices(currency: string = 'eur'): Promise<Price[]> {
     const prices = await this.provider.prices.search({
       query: 'metadata["show"]:"1" active:"true" currency:"eur"',

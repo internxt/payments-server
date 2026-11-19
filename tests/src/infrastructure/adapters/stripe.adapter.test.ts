@@ -321,7 +321,7 @@ describe('Stripe Adapter', () => {
     });
   });
 
-  describe('Get Payment methods', () => {
+  describe('Payment methods', () => {
     test('When retrieving a payment method, then the payment method is returned', async () => {
       const mockedPaymentMethod = getPaymentMethod();
 
@@ -332,6 +332,63 @@ describe('Stripe Adapter', () => {
       const paymentMethod = await stripeAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
 
       expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
+    });
+
+    test('When attaching a payment method to a customer, then the attached payment method and its customer are returned', async () => {
+      const attachSpy = jest
+        .spyOn(stripe.paymentMethods, 'attach')
+        .mockResolvedValue(
+          getPaymentMethod({ id: 'pm_card', customer: 'cus_internxt' }) as Stripe.Response<Stripe.PaymentMethod>,
+        );
+
+      const attached = await stripeAdapter.attachPaymentMethod('pm_card', 'cus_internxt');
+
+      expect(attachSpy).toHaveBeenCalledWith('pm_card', { customer: 'cus_internxt' });
+      expect(attached).toStrictEqual({ id: 'pm_card', customerId: 'cus_internxt' });
+    });
+
+    test('When listing the payment methods of a customer, then they are returned as Stripe sends them', async () => {
+      const card = getPaymentMethod({ id: 'pm_card' });
+      jest.spyOn(stripe.paymentMethods, 'list').mockResolvedValue({ data: [card] } as any);
+
+      const paymentMethods = await stripeAdapter.listPaymentMethods('cus_internxt');
+
+      expect(paymentMethods).toStrictEqual([card]);
+    });
+
+    test('When the customer has a default payment method, then it is returned as Stripe sends it', async () => {
+      const card = getPaymentMethod({ id: 'pm_card' });
+      const retrieveSpy = jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
+        getCustomer({
+          invoice_settings: { default_payment_method: card } as Stripe.Customer.InvoiceSettings,
+        }) as Stripe.Response<Stripe.Customer>,
+      );
+
+      const defaultPaymentMethod = await stripeAdapter.getCustomerDefaultPaymentMethod('cus_internxt');
+
+      expect(retrieveSpy).toHaveBeenCalledWith('cus_internxt', {
+        expand: ['default_source', 'invoice_settings.default_payment_method'],
+      });
+      expect(defaultPaymentMethod).toStrictEqual(card);
+    });
+
+    test('When the customer only has a legacy default source, then that source is returned', async () => {
+      const legacyCard = { id: 'card_legacy', object: 'card' } as Stripe.Card;
+      jest
+        .spyOn(stripe.customers, 'retrieve')
+        .mockResolvedValue(getCustomer({ default_source: legacyCard }) as Stripe.Response<Stripe.Customer>);
+
+      const defaultPaymentMethod = await stripeAdapter.getCustomerDefaultPaymentMethod('cus_internxt');
+
+      expect(defaultPaymentMethod).toStrictEqual(legacyCard);
+    });
+
+    test('When the customer was deleted, then there is no default payment method', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue({ id: 'cus_internxt', deleted: true } as any);
+
+      const defaultPaymentMethod = await stripeAdapter.getCustomerDefaultPaymentMethod('cus_internxt');
+
+      expect(defaultPaymentMethod).toBeNull();
     });
   });
 
