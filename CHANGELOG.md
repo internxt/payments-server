@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.2](https://github.com/internxt/payments-server/compare/v1.0.1...v1.0.2) (2026-11-19)
+
+
+### Code Refactoring
+
+* add loadConfig with environment flags ([a021365](https://github.com/internxt/payments-server/commit/a021365d3f13f7b5b5a9aee6cd50c3d0f712adce))
+* pass config values by parameter ([d888c05](https://github.com/internxt/payments-server/commit/d888c05eea1089d7f088a41178e502a5ae66276e))
+* remove config default export ([9621c89](https://github.com/internxt/payments-server/commit/9621c89ccaaa17924e78abc0c0114cc30dfc7c68))
+* remove config default export ([fb860ae](https://github.com/internxt/payments-server/commit/fb860ae14a03bbb45174201ea56d08e342777e9b))
+
 ## [1.0.1](https://github.com/internxt/payments-server/compare/v1.0.0...v1.0.1) (2026-11-18)
 
 
