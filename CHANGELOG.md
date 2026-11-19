@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.3](https://github.com/internxt/payments-server/compare/v1.0.2...v1.0.3) (2026-11-19)
+
+
+### Code Refactoring
+
+* inject Stripe adapter ([7b51a50](https://github.com/internxt/payments-server/commit/7b51a50b4e6fdafe167fcaf15a59b2b61f3e80fa))
+* inject Stripe adapter ([9075e06](https://github.com/internxt/payments-server/commit/9075e06345331ba42f3d981d7e7453745dfbbe14))
+* rename Stripe adapter ([31eb6f5](https://github.com/internxt/payments-server/commit/31eb6f5477d248fb322e8fdc9e419105061746c6))
+
 ## [1.0.2](https://github.com/internxt/payments-server/compare/v1.0.1...v1.0.2) (2026-11-19)
 
 
