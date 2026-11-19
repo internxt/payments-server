@@ -18,7 +18,7 @@ import { ProductsRepository } from '../../../src/core/users/ProductsRepository';
 import { LicenseCodesRepository } from '../../../src/core/users/LicenseCodeRepository';
 import { UsersCouponsRepository } from '../../../src/core/coupons/UsersCouponsRepository';
 import testFactory from '../utils/factory';
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { DetermineLifetimeConditions } from '../../../src/core/users/DetermineLifetimeConditions';
 import { ObjectStorageWebhookHandler } from '../../../src/webhooks/events/ObjectStorageWebhookHandler';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
@@ -28,6 +28,8 @@ import { KlaviyoTrackingService } from '../../../src/services/klaviyo.service';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
 import { STRIPE_API_VERSION } from '../../../src/constants';
+
+const config = loadConfig();
 
 export interface TestServices {
   stripe: Stripe;
@@ -125,7 +127,7 @@ export const createTestServices = (overrides: TestServiceOverrides = {}): TestSe
     repositories.userFeatureOverridesRepository,
   );
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
-  const klaviyoTrackingService = new KlaviyoTrackingService();
+  const klaviyoTrackingService = new KlaviyoTrackingService(config);
 
   return {
     stripe,

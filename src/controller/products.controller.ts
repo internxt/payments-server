@@ -12,6 +12,7 @@ export function productsController({
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, {
       secret: config.JWT_SECRET,
+      isTest: config.isTest,
       rateLimit: {
         timeWindow: '1 minute',
         max: 20,

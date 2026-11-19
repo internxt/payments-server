@@ -8,13 +8,13 @@ import { CouponsRepository } from '../core/coupons/CouponsRepository';
 import { UsersCouponsRepository } from '../core/coupons/UsersCouponsRepository';
 import { sign } from 'jsonwebtoken';
 import { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { isProduction, type AppConfig } from '../config';
+import { type AppConfig } from '../config';
 import { Service, VpnFeatures } from '../core/users/Tier';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../errors/UsersErrors';
 import dayjs from 'dayjs';
 
-function signToken(duration: string, secret: string) {
+function signToken(duration: string, secret: string, isProduction: boolean) {
   return sign({}, Buffer.from(secret, 'base64').toString('utf8'), {
     algorithm: 'RS256',
     expiresIn: duration,
@@ -171,7 +171,7 @@ export class UsersService {
     maxSpaceBytes: number,
     seats: number,
   ): Promise<boolean> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
     const requestConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -202,7 +202,7 @@ export class UsersService {
     maxSpaceBytes: number;
     seats: number;
   }): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
     const requestConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -223,7 +223,7 @@ export class UsersService {
   }
 
   async destroyWorkspace(ownerId: string): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
     const requestConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ export class UsersService {
   }
 
   async findUserByEmail(email: string): Promise<{ data: { uuid: string; email: string } }> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
     const requestConfig: AxiosRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
@@ -253,7 +253,7 @@ export class UsersService {
   }
 
   async enableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -273,7 +273,7 @@ export class UsersService {
   }
 
   async disableVPNTier(userUuid: User['uuid'], featureId: VpnFeatures['featureId']): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -286,7 +286,7 @@ export class UsersService {
   }
 
   async notifyFailedPayment(userUuid: string): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = {
       headers: {
@@ -311,7 +311,7 @@ export class UsersService {
     feature: OverrideServiceAvailable;
     enabled: boolean;
   }): Promise<void> {
-    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET);
+    const jwt = signToken('5m', this.config.DRIVE_NEW_GATEWAY_SECRET, this.config.isProduction);
 
     const requestConfig: AxiosRequestConfig = {
       headers: {

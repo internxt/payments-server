@@ -25,6 +25,7 @@ export function gatewayController({
       secret: {
         public: Buffer.from(config.PAYMENTS_GATEWAY_PUBLIC_SECRET, 'base64').toString('utf-8'),
       },
+      isTest: config.isTest,
     });
 
     fastify.post<{ Body: { feature: Service; userUuid: string } }>(

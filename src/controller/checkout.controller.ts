@@ -3,12 +3,10 @@ import Stripe from 'stripe';
 
 import { PaymentIntent } from '../types/payment';
 import { BadRequestError } from '../errors/Errors';
-import config from '../config';
 import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { setupAuth } from '../plugins/auth';
-import { verifyCaptchaHook, verifyUserTokenHook } from '../plugins/route-guards';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { UserNotFoundError } from '../errors/PaymentErrors';
@@ -19,9 +17,14 @@ export function checkoutController({
   paymentService,
   preCreatedUserService,
   confirmationTokenService,
-}: Pick<Dependencies, 'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService'>) {
+  config,
+  routeGuards: { verifyCaptchaHook, verifyUserTokenHook },
+}: Pick<
+  Dependencies,
+  'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService' | 'config' | 'routeGuards'
+>) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     fastify.post<{
       Body: {
@@ -135,7 +138,7 @@ export function checkoutController({
           await paymentService.getVatIdAndAttachTaxIdToCustomer(customerId, country, companyVatId);
         }
 
-        return res.send({ customerId, token: signUserToken({ customerId }) });
+        return res.send({ customerId, token: signUserToken({ customerId }, config.JWT_SECRET) });
       },
     );
 
@@ -286,6 +289,7 @@ export function checkoutController({
             userUuid,
             customer.email,
             price.bytes.toString(),
+            config,
           );
 
           if (!isStorageUpgradeAllowed) {

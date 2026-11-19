@@ -22,6 +22,7 @@ export function webhookHandler({
   tiersService,
   preCreatedUserService,
   invoiceCompletedHandler,
+  klaviyoTrackingService,
 }: Pick<
   Dependencies,
   | 'stripe'
@@ -34,6 +35,7 @@ export function webhookHandler({
   | 'tiersService'
   | 'preCreatedUserService'
   | 'invoiceCompletedHandler'
+  | 'klaviyoTrackingService'
 >) {
   return async function (fastify: FastifyInstance) {
     fastify.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (req, body, done) {
@@ -78,6 +80,7 @@ export function webhookHandler({
             objectStorageService,
             tiersService,
             preCreatedUserService,
+            klaviyoTrackingService,
           );
           break;
 

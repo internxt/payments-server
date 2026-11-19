@@ -10,7 +10,7 @@ import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
-import { klaviyoService } from '../services/klaviyo.service';
+import { type KlaviyoTrackingService } from '../services/klaviyo.service';
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';
 
@@ -54,6 +54,7 @@ export default async function handleSubscriptionCanceled(
   objectStorageService: ObjectStorageService,
   tiersService: TiersService,
   preCreatedUserService: PreCreatedUserService,
+  klaviyoTrackingService: KlaviyoTrackingService,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;
@@ -120,7 +121,7 @@ export default async function handleSubscriptionCanceled(
   }
 
   try {
-    await klaviyoService.trackSubscriptionCancelled(customer.email);
+    await klaviyoTrackingService.trackSubscriptionCancelled(customer.email);
   } catch (error) {
     Logger.error(`[KLAVIYO] Failed to track cancellation for ${customerId}: ${(error as Error).message}`);
   }

@@ -1,9 +1,11 @@
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { getUser, newTier, voidPromise } from '../fixtures';
 import { getUserStorage, StorageService } from '../../../src/services/storage.service';
 import { Service } from '../../../src/core/users/Tier';
+
+const config = loadConfig();
 
 jest.mock('axios');
 

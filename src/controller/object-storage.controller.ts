@@ -2,18 +2,20 @@ import { FastifyInstance } from 'fastify';
 
 import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError } from '../errors/PaymentErrors';
 import { UnauthorizedError } from '../errors/Errors';
-import config from '../config';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
-import { verifyUserTokenHook } from '../plugins/route-guards';
 import { getInvoiceProductId } from '../utils/invoice';
 import { type Dependencies } from '../dependencies';
 
-export function objectStorageController({ paymentService }: Pick<Dependencies, 'paymentService'>) {
+export function objectStorageController({
+  paymentService,
+  config,
+  routeGuards: { verifyUserTokenHook },
+}: Pick<Dependencies, 'paymentService' | 'config' | 'routeGuards'>) {
   return async function (fastify: FastifyInstance) {
-    await setupAuth(fastify, { secret: config.JWT_SECRET });
+    await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 
     fastify.get<{
       Querystring: { email: string; customerName: string; country: string; postalCode: string; companyVatId?: string };
@@ -72,7 +74,7 @@ export function objectStorageController({ paymentService }: Pick<Dependencies, '
           customerId = id;
         }
 
-        return res.send({ customerId, token: signUserToken({ customerId }) });
+        return res.send({ customerId, token: signUserToken({ customerId }, config.JWT_SECRET) });
       },
     );
 

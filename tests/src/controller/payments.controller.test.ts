@@ -16,7 +16,7 @@ import {
 import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
 import { PaymentService } from '../../../src/services/payment.service';
 import { CustomerNotFoundError } from '../../../src/errors/PaymentErrors';
-import config from '../../../src/config';
+import { loadConfig } from '../../../src/config';
 import { assertUser } from '../../../src/utils/assertUser';
 import { TierNotFoundError, TiersService } from '../../../src/services/tiers.service';
 import CacheService from '../../../src/services/cache.service';
@@ -26,6 +26,8 @@ import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stri
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 import { getPriceEntity, getSubscriptionEntity } from '../entity.fixtures';
+
+const config = loadConfig();
 
 jest.mock('../../../src/utils/assertUser');
 jest.mock('../../../src/services/storage.service', () => {
