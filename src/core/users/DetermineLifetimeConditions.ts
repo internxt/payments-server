@@ -8,6 +8,7 @@ import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
 import { StripeAdapter } from '../../infrastructure/adapters/stripe.adapter';
 import { getInvoicePriceId, getInvoiceProductId } from '../../utils/invoice';
+import { Customer } from '../../infrastructure/domain/entities/customer';
 
 export class DetermineLifetimeConditions {
   constructor(
@@ -127,7 +128,7 @@ export class DetermineLifetimeConditions {
   }
 
   private async getPaidInvoices(
-    customer: Stripe.Customer,
+    customer: Customer,
     invoices: Stripe.Invoice[],
     pricesById: Map<Stripe.Price['id'], Stripe.Price>,
   ): Promise<Stripe.Invoice[]> {

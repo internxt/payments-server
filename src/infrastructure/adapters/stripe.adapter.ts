@@ -1,8 +1,10 @@
 import Stripe from 'stripe';
 
-import { InvalidConfirmationTokenError, UserNotFoundError } from '../../errors/PaymentErrors';
+import { InvalidConfirmationTokenError, InvalidTaxIdError, UserNotFoundError } from '../../errors/PaymentErrors';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
 import { PaymentMethod } from '../domain/entities/paymentMethod';
+import { Address } from '../domain/types';
+import { CustomerTaxDetails } from '../../types/customer';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
@@ -73,17 +75,45 @@ export class StripeAdapter {
     return Customer.toDomain(stripeCustomer);
   }
 
-  async searchCustomer(email: Customer['email']): Promise<Customer[]> {
-    const customers = await this.provider.customers.search({
-      query: `email:'${email}'`,
-      expand: ['total_count'],
-    });
-
-    if (customers?.total_count === 0) {
-      throw new UserNotFoundError();
-    }
+  async listCustomersByEmail(email: Customer['email']): Promise<Customer[]> {
+    const customers = await this.provider.customers.list({ email });
 
     return customers.data.map((customer) => Customer.toDomain(customer));
+  }
+
+  async searchCustomerIdsByEmail(email: Customer['email']): Promise<Customer['id'][]> {
+    const customers = await this.provider.customers.search({ query: `email:'${email}'` });
+
+    return customers.data.map((customer) => customer.id);
+  }
+
+  async getCustomerTaxDetails(customerId: Customer['id']): Promise<CustomerTaxDetails | null> {
+    const customer = await this.provider.customers.retrieve(customerId, { expand: ['tax_ids'] });
+
+    if (customer.deleted) return null;
+
+    return {
+      isTaxExempt: customer.tax_exempt !== 'none',
+      taxIds: customer.tax_ids?.data.map((taxId) => taxId.value) ?? [],
+      address: this.toAddress(customer.address),
+    };
+  }
+
+  async listTaxIds(customerId: Customer['id']): Promise<string[]> {
+    const taxIds = await this.provider.customers.listTaxIds(customerId, {});
+
+    return taxIds.data.map((taxId) => taxId.value);
+  }
+
+  async createTaxId(customerId: Customer['id'], taxId: Stripe.TaxIdCreateParams): Promise<void> {
+    try {
+      await this.provider.customers.createTaxId(customerId, taxId);
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError && error.code === 'tax_id_invalid') {
+        throw new InvalidTaxIdError();
+      }
+      throw error;
+    }
   }
 
   async getConfirmationToken(confirmationTokenId: ConfirmationToken['id']): Promise<ConfirmationToken> {
@@ -239,6 +269,17 @@ export class StripeAdapter {
       clientSecretId: finalizedInvoice.confirmation_secret?.client_secret,
       status: finalizedInvoice.status as InvoiceStatus,
     });
+  }
+
+  private toAddress(address: Stripe.Address | null | undefined): Address {
+    return {
+      line1: address?.line1,
+      line2: address?.line2,
+      city: address?.city,
+      state: address?.state,
+      country: address?.country,
+      postalCode: address?.postal_code,
+    };
   }
 
   private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {

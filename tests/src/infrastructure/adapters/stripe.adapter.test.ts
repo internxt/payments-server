@@ -10,7 +10,11 @@ import {
 import { StripeAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
-import { InvalidConfirmationTokenError, UserNotFoundError } from '../../../../src/errors/PaymentErrors';
+import {
+  InvalidConfirmationTokenError,
+  InvalidTaxIdError,
+  UserNotFoundError,
+} from '../../../../src/errors/PaymentErrors';
 import { ConfirmationToken } from '../../../../src/infrastructure/domain/entities/confirmationToken';
 import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/paymentMethod';
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
@@ -147,29 +151,130 @@ describe('Stripe Adapter', () => {
     });
   });
 
-  describe('Search customer', () => {
-    test('When searching a customer, then the customer is returned', async () => {
-      const mockedCustomer = getCustomer();
+  describe('Find customers by email', () => {
+    test('When listing customers by email, then Stripe is asked for that exact email', async () => {
+      const mockedCustomer = getCustomer({ email: 'example@internxt.com' });
+      const listSpy = jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: [mockedCustomer] } as any);
 
-      jest.spyOn(stripe.customers, 'search').mockResolvedValue({
-        data: [mockedCustomer],
-      } as any);
+      const customers = await stripeAdapter.listCustomersByEmail('example@internxt.com');
 
-      const customer = await stripeAdapter.searchCustomer(mockedCustomer.email as string);
-
-      expect(customer).toStrictEqual([Customer.toDomain(mockedCustomer)]);
+      expect(listSpy).toHaveBeenCalledWith({ email: 'example@internxt.com' });
+      expect(customers).toStrictEqual([Customer.toDomain(mockedCustomer)]);
     });
 
-    test('When searching a customer and there is no match, then an error indicating so is thrown', async () => {
-      const mockedError = new UserNotFoundError();
-      const mockedCustomer = getCustomer();
+    test('When searching customers by email, then Stripe search is used and the ids of the matches are returned', async () => {
+      const searchSpy = jest
+        .spyOn(stripe.customers, 'search')
+        .mockResolvedValue({ data: [getCustomer({ id: 'cus_first' }), getCustomer({ id: 'cus_second' })] } as any);
 
-      jest.spyOn(stripe.customers, 'search').mockResolvedValue({
-        data: [],
-        total_count: 0,
-      } as any);
+      const customerIds = await stripeAdapter.searchCustomerIdsByEmail('example@internxt.com');
 
-      await expect(stripeAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
+      expect(searchSpy).toHaveBeenCalledWith({ query: "email:'example@internxt.com'" });
+      expect(customerIds).toStrictEqual(['cus_first', 'cus_second']);
+    });
+
+    test('When no customer has that email, then an empty list is returned', async () => {
+      jest.spyOn(stripe.customers, 'search').mockResolvedValue({ data: [] } as any);
+
+      const customerIds = await stripeAdapter.searchCustomerIdsByEmail('nobody@internxt.com');
+
+      expect(customerIds).toStrictEqual([]);
+    });
+  });
+
+  describe('Customer tax details', () => {
+    test('When the customer exists, then whether it is tax exempt, its tax ids and its address are returned', async () => {
+      const retrieveSpy = jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
+        getCustomer({
+          tax_exempt: 'reverse',
+          tax_ids: { data: [{ value: 'ESB12345678' }] } as Stripe.ApiList<Stripe.TaxId>,
+          address: {
+            line1: 'Avenida el Port',
+            line2: 'Angels',
+            city: 'Valencia',
+            state: 'Valencia',
+            country: 'ES',
+            postal_code: '46023',
+          },
+        }) as Stripe.Response<Stripe.Customer>,
+      );
+
+      const taxDetails = await stripeAdapter.getCustomerTaxDetails('cus_internxt');
+
+      expect(retrieveSpy).toHaveBeenCalledWith('cus_internxt', { expand: ['tax_ids'] });
+      expect(taxDetails).toStrictEqual({
+        isTaxExempt: true,
+        taxIds: ['ESB12345678'],
+        address: {
+          line1: 'Avenida el Port',
+          line2: 'Angels',
+          city: 'Valencia',
+          state: 'Valencia',
+          country: 'ES',
+          postalCode: '46023',
+        },
+      });
+    });
+
+    test('When the customer has no email, then its tax details are still returned', async () => {
+      jest
+        .spyOn(stripe.customers, 'retrieve')
+        .mockResolvedValue(getCustomer({ email: null }) as Stripe.Response<Stripe.Customer>);
+
+      const taxDetails = await stripeAdapter.getCustomerTaxDetails('cus_internxt');
+
+      expect(taxDetails?.address?.country).toBe('ES');
+    });
+
+    test('When the customer was deleted, then there are no tax details', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue({ id: 'cus_internxt', deleted: true } as any);
+
+      const taxDetails = await stripeAdapter.getCustomerTaxDetails('cus_internxt');
+
+      expect(taxDetails).toBeNull();
+    });
+  });
+
+  describe('Customer tax ids', () => {
+    test('When listing the tax ids of a customer, then their values are returned', async () => {
+      jest
+        .spyOn(stripe.customers, 'listTaxIds')
+        .mockResolvedValue({ data: [{ value: 'ESB12345678' }, { value: 'EU123' }] } as any);
+
+      const taxIds = await stripeAdapter.listTaxIds('cus_internxt');
+
+      expect(taxIds).toStrictEqual(['ESB12345678', 'EU123']);
+    });
+
+    test('When adding a tax id, then Stripe stores it with its type', async () => {
+      const createSpy = jest.spyOn(stripe.customers, 'createTaxId').mockResolvedValue({} as any);
+
+      await stripeAdapter.createTaxId('cus_internxt', { type: 'es_cif', value: 'ESB12345678' });
+
+      expect(createSpy).toHaveBeenCalledWith('cus_internxt', { type: 'es_cif', value: 'ESB12345678' });
+    });
+
+    test('When Stripe rejects the tax id as invalid, then an invalid tax id error is thrown', async () => {
+      jest.spyOn(stripe.customers, 'createTaxId').mockRejectedValue(
+        new Stripe.errors.StripeInvalidRequestError({
+          type: 'invalid_request_error',
+          code: 'tax_id_invalid',
+          message: 'Invalid value for es_cif.',
+        }),
+      );
+
+      await expect(stripeAdapter.createTaxId('cus_internxt', { type: 'es_cif', value: '123' })).rejects.toThrow(
+        InvalidTaxIdError,
+      );
+    });
+
+    test('When Stripe fails for another reason, then the error is not hidden', async () => {
+      const rateLimitError = new Stripe.errors.StripeRateLimitError({ type: 'rate_limit_error', message: 'Too many' });
+      jest.spyOn(stripe.customers, 'createTaxId').mockRejectedValue(rateLimitError);
+
+      await expect(stripeAdapter.createTaxId('cus_internxt', { type: 'es_cif', value: '123' })).rejects.toBe(
+        rateLimitError,
+      );
     });
   });
 
