@@ -16,7 +16,7 @@ import { MongoDBTiersRepository } from './core/users/MongoDBTiersRepository';
 import { MongoDBUserFeatureOverridesRepository } from './core/users/MongoDBUserFeatureOverridesRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 import { MongoDBUsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
-import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from './infrastructure/adapters/stripe.adapter';
 import { createHttpClient } from './infrastructure/http/httpClient';
 import { createRouteGuards, type RouteGuards } from './plugins/route-guards';
 import CacheService from './services/cache.service';
@@ -76,8 +76,8 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
   try {
     const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
     stripe = new Stripe(stripeKeyOverride ?? config.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
-    stripePaymentsAdapter.initProvider(stripe);
-    await stripePaymentsAdapter.syncTaxRegistrations();
+    stripeAdapter.initProvider(stripe);
+    await stripeAdapter.syncTaxRegistrations();
   } catch (error) {
     await mongoClient.close();
     throw error;

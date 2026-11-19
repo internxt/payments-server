@@ -1,5 +1,5 @@
 import { InvalidConfirmationTokenError } from '../errors/PaymentErrors';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { ConfirmationToken } from '../infrastructure/domain/entities/confirmationToken';
 import CacheService from './cache.service';
 
@@ -10,7 +10,7 @@ export class ConfirmationTokenService {
    * @throws {InvalidConfirmationTokenError} When the token is unknown, expired, too old or was already used.
    */
   async validateAndClaim(confirmationTokenId: ConfirmationToken['id']): Promise<void> {
-    const confirmationToken = await stripePaymentsAdapter.getConfirmationToken(confirmationTokenId);
+    const confirmationToken = await stripeAdapter.getConfirmationToken(confirmationTokenId);
 
     if (!confirmationToken.canStartPaymentAttempt()) {
       throw new InvalidConfirmationTokenError();

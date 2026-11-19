@@ -19,7 +19,7 @@ import {
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
-import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import {
   getCustomerEntity,
   getInvoiceEntity,
@@ -383,7 +383,7 @@ describe('Payments Service tests', () => {
       const invoiceItemsCreateSpy = jest
         .spyOn(stripe.invoiceItems, 'create')
         .mockResolvedValueOnce(mockedInvoice.lines.data[0] as unknown as Stripe.Response<Stripe.InvoiceItem>);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValueOnce(getPriceEntity({ id: 'mockedPriceId' }));
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValueOnce(getPriceEntity({ id: 'mockedPriceId' }));
       jest
         .spyOn(stripe.invoices, 'retrieve')
         .mockResolvedValueOnce(mockedInvoice as unknown as Stripe.Response<Stripe.Invoice>);
@@ -1196,8 +1196,8 @@ describe('Payments Service tests', () => {
       const subscription = getSubscriptionEntity({ startDate: dayjs('2025-10-01T00:00:00Z').unix() });
       const price = getPriceEntity({ commitmentPlan: true });
 
-      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
+      jest.spyOn(stripeAdapter, 'getSubscription').mockResolvedValue(subscription);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(price);
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(subscription as unknown as any);
       const cancelSpy = jest.spyOn(stripe.subscriptions, 'cancel').mockResolvedValue(undefined as any);
 
@@ -1217,9 +1217,9 @@ describe('Payments Service tests', () => {
       const subscription = getSubscriptionEntity({ startDate: dayjs('2026-04-28T00:00:00Z').unix() });
       const price = getPriceEntity({ commitmentPlan: true });
 
-      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
+      jest.spyOn(stripeAdapter, 'getSubscription').mockResolvedValue(subscription);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(price);
+      const deleteSpy = jest.spyOn(stripeAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
@@ -1234,9 +1234,9 @@ describe('Payments Service tests', () => {
       const subscription = getSubscriptionEntity();
       const price = getPriceEntity({ commitmentPlan: false });
 
-      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(price);
-      const deleteSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
+      jest.spyOn(stripeAdapter, 'getSubscription').mockResolvedValue(subscription);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(price);
+      const deleteSpy = jest.spyOn(stripeAdapter, 'cancelSubscription').mockResolvedValue();
       const updateSpy = jest.spyOn(stripe.subscriptions, 'update').mockResolvedValue(undefined as any);
 
       await paymentService.cancelSubscription(subscription.id);
@@ -1250,8 +1250,8 @@ describe('Payments Service tests', () => {
     test('when the subscription has a scheduled cancellation, then it clears the cancel_at so it keeps renewing', async () => {
       const subscription = getSubscriptionEntity({ cancelAt: dayjs().add(1, 'month').unix() });
 
-      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
-      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(subscription);
+      jest.spyOn(stripeAdapter, 'getSubscription').mockResolvedValue(subscription);
+      const updateSpy = jest.spyOn(stripeAdapter, 'updateSubscription').mockResolvedValue(subscription);
 
       await paymentService.reactivateSubscription(subscription.id);
 
@@ -1261,8 +1261,8 @@ describe('Payments Service tests', () => {
     test('when the subscription has no scheduled cancellation, then an error is thrown and no update is made', async () => {
       const subscription = getSubscriptionEntity({ cancelAt: undefined });
 
-      jest.spyOn(stripePaymentsAdapter, 'getSubscription').mockResolvedValue(subscription);
-      const updateSpy = jest.spyOn(stripePaymentsAdapter, 'updateSubscription').mockResolvedValue(subscription);
+      jest.spyOn(stripeAdapter, 'getSubscription').mockResolvedValue(subscription);
+      const updateSpy = jest.spyOn(stripeAdapter, 'updateSubscription').mockResolvedValue(subscription);
 
       await expect(paymentService.reactivateSubscription(subscription.id)).rejects.toThrow(BadRequestError);
       expect(updateSpy).not.toHaveBeenCalled();
@@ -1453,7 +1453,7 @@ describe('Payments Service tests', () => {
         { start_date: dayjs('2025-10-01T00:00:00Z').unix() },
       );
       jest.spyOn(paymentService, 'getActiveSubscriptions').mockResolvedValue([subscription]);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(getPriceEntity());
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(getPriceEntity());
       mockUpcomingInvoice();
 
       const result = await paymentService.getUserSubscription('cus_test', UserType.Individual);
@@ -1534,8 +1534,8 @@ describe('Payments Service tests', () => {
     const priceEntity = getPriceEntity();
     test('When the user subscription ends this month(last month of commitment), then an error indicating so is thrown', async () => {
       const subscription = getSubscriptionEntity({ startDate: dayjs().subtract(11, 'month').unix() });
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
       await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         SubscriptionNotEligibleForEarlyChargeError,
@@ -1544,8 +1544,8 @@ describe('Payments Service tests', () => {
 
     test('When the user does not have a default payment method, then an error indicating so is thrown', async () => {
       const subscription = getSubscriptionEntity({ paymentMethod: undefined });
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
 
       await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         PaymentMethodNotFoundError,
@@ -1557,11 +1557,11 @@ describe('Payments Service tests', () => {
       const invoiceEntity = getInvoiceEntity({
         clientSecretId: undefined,
       });
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
-      jest.spyOn(stripePaymentsAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
-      jest.spyOn(stripePaymentsAdapter, 'addInvoiceItems').mockResolvedValue(invoiceEntity);
-      jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripeAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripeAdapter, 'addInvoiceItems').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripeAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
 
       await expect(paymentService.createEarlyCancellationCharge(subscription)).rejects.toThrow(
         ClientSecretNotFoundError,
@@ -1575,13 +1575,11 @@ describe('Payments Service tests', () => {
       });
       const invoiceItemsEntity = getInvoiceItemsEntity();
       const expectedClientSecret = 'pi_test_secret';
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
-      jest.spyOn(stripePaymentsAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
-      const addInvoiceItemsSpy = jest
-        .spyOn(stripePaymentsAdapter, 'addInvoiceItems')
-        .mockResolvedValue(invoiceItemsEntity);
-      jest.spyOn(stripePaymentsAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripeAdapter, 'createInvoice').mockResolvedValue(invoiceEntity);
+      const addInvoiceItemsSpy = jest.spyOn(stripeAdapter, 'addInvoiceItems').mockResolvedValue(invoiceItemsEntity);
+      jest.spyOn(stripeAdapter, 'finalizeInvoice').mockResolvedValue(invoiceEntity);
 
       const result = await paymentService.createEarlyCancellationCharge(subscription);
 
@@ -1599,14 +1597,14 @@ describe('Payments Service tests', () => {
 
     test('When the remaining amount is charged, then the secret to pay the final invoice in Stripe is returned', async () => {
       const subscription = getSubscriptionEntity({ paymentMethod: 'pm_test_default' });
-      jest.spyOn(stripePaymentsAdapter, 'getCustomer').mockResolvedValue(customerEntity);
-      jest.spyOn(stripePaymentsAdapter, 'getPriceById').mockResolvedValue(priceEntity);
-      jest.spyOn(stripePaymentsAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
+      jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
+      jest.spyOn(stripeAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
       jest
-        .spyOn(stripePaymentsAdapter.provider.invoices, 'create')
+        .spyOn(stripeAdapter.provider.invoices, 'create')
         .mockResolvedValue({ id: 'in_early', status: 'draft' } as any);
-      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
-      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
+      jest.spyOn(stripeAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue({
         id: 'in_early',
         status: 'open',
         confirmation_secret: { client_secret: 'pi_early_secret', type: 'payment_intent' },

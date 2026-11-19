@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { PaymentService } from '../services/payment.service';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { UsersService } from '../services/users.service';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 
 function isProduct(product: Stripe.Product | Stripe.DeletedProduct): product is Stripe.Product {
@@ -49,7 +49,7 @@ export default async function handleInvoicePaymentFailed(
     throw new Error('No customer found for this payment');
   }
 
-  const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
+  const customer = await stripeAdapter.getCustomer(invoice.customer as string);
 
   const relevantLineItem = await findObjectStorageLineItem(invoice, paymentService);
 

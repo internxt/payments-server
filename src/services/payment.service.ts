@@ -37,7 +37,7 @@ import {
 } from '../types/stripe';
 import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
@@ -394,8 +394,8 @@ export class PaymentService {
   }
 
   async cancelSubscription(subscriptionId: SubscriptionId): Promise<void> {
-    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
-    const price = await stripePaymentsAdapter.getPriceById(subscription.priceId);
+    const subscription = await stripeAdapter.getSubscription(subscriptionId);
+    const price = await stripeAdapter.getPriceById(subscription.priceId);
     const hasAnnualCommitment = price.isCommitmentPlan();
     const { isElegibleForCancellation, cancelAt } = this.getAnnualCommitmentCancellationInfo(subscription);
 
@@ -406,20 +406,20 @@ export class PaymentService {
       return;
     }
 
-    await stripePaymentsAdapter.cancelSubscription(subscriptionId);
+    await stripeAdapter.cancelSubscription(subscriptionId);
   }
 
   /**
    * Reverts a scheduled cancellation (cancel_at) so the subscription keeps renewing.
    */
   async reactivateSubscription(subscriptionId: SubscriptionId): Promise<void> {
-    const subscription = await stripePaymentsAdapter.getSubscription(subscriptionId);
+    const subscription = await stripeAdapter.getSubscription(subscriptionId);
 
     if (!subscription.hasScheduledCancellation) {
       throw new BadRequestError('The subscription has no scheduled cancellation to revert');
     }
 
-    await stripePaymentsAdapter.updateSubscription(subscriptionId, {
+    await stripeAdapter.updateSubscription(subscriptionId, {
       cancel_at: '',
     });
   }
@@ -435,8 +435,8 @@ export class PaymentService {
   async createEarlyCancellationCharge(subscriptionEntity: SubscriptionEntity): Promise<{
     clientSecret?: string;
   }> {
-    const customer = await stripePaymentsAdapter.getCustomer(subscriptionEntity.customer);
-    const price = await stripePaymentsAdapter.getPriceById(subscriptionEntity.priceId);
+    const customer = await stripeAdapter.getCustomer(subscriptionEntity.customer);
+    const price = await stripeAdapter.getPriceById(subscriptionEntity.priceId);
 
     const { remainingMonths } = this.getAnnualCommitmentCancellationInfo(subscriptionEntity);
     if (remainingMonths === 1)
@@ -450,9 +450,9 @@ export class PaymentService {
       throw new PaymentMethodNotFoundError('The customer has no payment method to charge the remaining amount');
     }
 
-    const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(subscriptionEntity.customer);
+    const shouldCalculateTaxes = await stripeAdapter.shouldCalculateTaxForCustomer(subscriptionEntity.customer);
 
-    const invoice = await stripePaymentsAdapter.createInvoice({
+    const invoice = await stripeAdapter.createInvoice({
       customer: subscriptionEntity.customer,
       auto_advance: false,
       metadata: {
@@ -466,7 +466,7 @@ export class PaymentService {
       },
     });
 
-    await stripePaymentsAdapter.addInvoiceItems(invoice.id, subscriptionEntity.customer, {
+    await stripeAdapter.addInvoiceItems(invoice.id, subscriptionEntity.customer, {
       description: 'Remaining subscription amount',
       amount: Math.round(amountToCharge),
       metadata: {
@@ -474,7 +474,7 @@ export class PaymentService {
       },
     });
 
-    const finalizedInvoice = await stripePaymentsAdapter.finalizeInvoice(invoice.id);
+    const finalizedInvoice = await stripeAdapter.finalizeInvoice(invoice.id);
 
     const clientSecretId = finalizedInvoice.clientSecretId;
 
@@ -492,7 +492,7 @@ export class PaymentService {
     if (!isElegibleForCancellation) throw new BadRequestError('The trial cannot be applied.');
 
     const trialEnd = dayjs.unix(subscription.currentPeriodEnd).add(1, 'month').unix();
-    await stripePaymentsAdapter.updateSubscription(subscription.id, {
+    await stripeAdapter.updateSubscription(subscription.id, {
       trial_end: trialEnd,
       proration_behavior: 'none',
     });
@@ -884,7 +884,7 @@ export class PaymentService {
 
     let earlyCancellationFee: number | undefined;
     if (hasAnnualCommitment) {
-      const priceEntity = await stripePaymentsAdapter.getPriceById(subscriptionEntity.priceId);
+      const priceEntity = await stripeAdapter.getPriceById(subscriptionEntity.priceId);
       earlyCancellationFee =
         this.calculateRemainingSubscriptionAmount(priceEntity, commitment?.remainingMonths || 0) * 0.01;
     }

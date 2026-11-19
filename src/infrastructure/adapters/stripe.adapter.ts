@@ -14,7 +14,7 @@ import { InvoiceItems } from '../domain/entities/invoiceItems';
 import { EU_COUNTRIES, STRIPE_API_VERSION } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
 
-export class StripePaymentsAdapter implements PaymentsAdapter {
+export class StripeAdapter implements PaymentsAdapter {
   private _provider?: Stripe;
   public taxRegistrations = new Set<string>();
 
@@ -300,4 +300,4 @@ export class StripePaymentsAdapter implements PaymentsAdapter {
   }
 }
 
-export const stripePaymentsAdapter = new StripePaymentsAdapter();
+export const stripeAdapter = new StripeAdapter();

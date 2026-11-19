@@ -4,7 +4,7 @@ import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError
 import { UnauthorizedError } from '../errors/Errors';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
 import { getInvoiceProductId } from '../utils/invoice';
 import { type Dependencies } from '../dependencies';
@@ -58,7 +58,7 @@ export function objectStorageController({
         if (userExists) {
           customerId = userExists.id;
         } else {
-          const { id } = await stripePaymentsAdapter.createCustomer({
+          const { id } = await stripeAdapter.createCustomer({
             name: customerName,
             email,
             address: {
@@ -121,7 +121,7 @@ export function objectStorageController({
         const { customerId, priceId, currency, promoCodeId } = req.body;
 
         try {
-          const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+          const shouldCalculateTaxes = await stripeAdapter.shouldCalculateTaxForCustomer(customerId);
 
           const createdSubscription = await paymentService.createSubscription({
             customerId,
@@ -176,7 +176,7 @@ export function objectStorageController({
         const { planId, currency } = req.query;
 
         try {
-          const price = await stripePaymentsAdapter.getPriceById(planId, currency);
+          const price = await stripeAdapter.getPriceById(planId, currency);
 
           return rep.status(200).send({
             id: price.id,

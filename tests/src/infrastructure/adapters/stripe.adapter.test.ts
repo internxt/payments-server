@@ -7,7 +7,7 @@ import {
   getPaymentMethod,
   getPrice,
 } from '../../fixtures';
-import { stripePaymentsAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 import { InvalidConfirmationTokenError, UserNotFoundError } from '../../../../src/errors/PaymentErrors';
@@ -27,12 +27,12 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'create')
+        .spyOn(stripeAdapter.provider.customers, 'create')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
       const metadata = { referralCode: 'ABC123' };
 
-      const createdCustomer = await stripePaymentsAdapter.createCustomer({
+      const createdCustomer = await stripeAdapter.createCustomer({
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
         address: {
@@ -55,10 +55,10 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'update')
+        .spyOn(stripeAdapter.provider.customers, 'update')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const updatedCustomer = await stripePaymentsAdapter.updateCustomer(mockedCustomer.id, {
+      const updatedCustomer = await stripeAdapter.updateCustomer(mockedCustomer.id, {
         email: mockedCustomer.email as string,
         name: mockedCustomer.name as string,
         address: {
@@ -98,10 +98,10 @@ describe('Stripe Adapter', () => {
       });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'update')
+        .spyOn(stripeAdapter.provider.customers, 'update')
         .mockResolvedValue(updatedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const result = await stripePaymentsAdapter.updateCustomer(initialCustomer.id, {
+      const result = await stripeAdapter.updateCustomer(initialCustomer.id, {
         name: 'Updated Name',
       });
 
@@ -130,10 +130,10 @@ describe('Stripe Adapter', () => {
       const mockedCustomer = getCustomer();
 
       jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .spyOn(stripeAdapter.provider.customers, 'retrieve')
         .mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
 
-      const customer = await stripePaymentsAdapter.getCustomer(mockedCustomer.id);
+      const customer = await stripeAdapter.getCustomer(mockedCustomer.id);
 
       expect(customer).toStrictEqual(Customer.toDomain(mockedCustomer));
     });
@@ -144,9 +144,9 @@ describe('Stripe Adapter', () => {
       };
       const mockedError = new UserNotFoundError();
 
-      jest.spyOn(stripePaymentsAdapter.provider.customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
+      jest.spyOn(stripeAdapter.provider.customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
 
-      await expect(stripePaymentsAdapter.getCustomer('')).rejects.toThrow(mockedError);
+      await expect(stripeAdapter.getCustomer('')).rejects.toThrow(mockedError);
     });
   });
 
@@ -154,11 +154,11 @@ describe('Stripe Adapter', () => {
     test('When searching a customer, then the customer is returned', async () => {
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.provider.customers, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.customers, 'search').mockResolvedValue({
         data: [mockedCustomer],
       } as any);
 
-      const customer = await stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string);
+      const customer = await stripeAdapter.searchCustomer(mockedCustomer.email as string);
 
       expect(customer).toStrictEqual([Customer.toDomain(mockedCustomer)]);
     });
@@ -167,12 +167,12 @@ describe('Stripe Adapter', () => {
       const mockedError = new UserNotFoundError();
       const mockedCustomer = getCustomer();
 
-      jest.spyOn(stripePaymentsAdapter.provider.customers, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.customers, 'search').mockResolvedValue({
         data: [],
         total_count: 0,
       } as any);
 
-      await expect(stripePaymentsAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
+      await expect(stripeAdapter.searchCustomer(mockedCustomer.email as string)).rejects.toThrow(mockedError);
     });
   });
 
@@ -184,10 +184,10 @@ describe('Stripe Adapter', () => {
         payment_intent: 'pi_123',
       });
       jest
-        .spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve')
+        .spyOn(stripeAdapter.provider.confirmationTokens, 'retrieve')
         .mockResolvedValue(stripeConfirmationToken as Stripe.Response<Stripe.ConfirmationToken>);
 
-      const confirmationToken = await stripePaymentsAdapter.getConfirmationToken(stripeConfirmationToken.id);
+      const confirmationToken = await stripeAdapter.getConfirmationToken(stripeConfirmationToken.id);
 
       expect(confirmationToken).toStrictEqual(
         new ConfirmationToken({
@@ -200,7 +200,7 @@ describe('Stripe Adapter', () => {
     });
 
     test('When Stripe does not know the token, then an error indicating it is invalid is thrown', async () => {
-      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
+      jest.spyOn(stripeAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
         new Stripe.errors.StripeInvalidRequestError({
           type: 'invalid_request_error',
           code: 'resource_missing',
@@ -208,16 +208,14 @@ describe('Stripe Adapter', () => {
         }),
       );
 
-      await expect(stripePaymentsAdapter.getConfirmationToken('ctoken_unknown')).rejects.toThrow(
-        InvalidConfirmationTokenError,
-      );
+      await expect(stripeAdapter.getConfirmationToken('ctoken_unknown')).rejects.toThrow(InvalidConfirmationTokenError);
     });
 
     test('When Stripe fails for another reason, then the error is not hidden', async () => {
       const stripeOutage = new Stripe.errors.StripeAPIError({ type: 'api_error', message: 'Stripe is down' });
-      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(stripeOutage);
+      jest.spyOn(stripeAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(stripeOutage);
 
-      await expect(stripePaymentsAdapter.getConfirmationToken('ctoken_123')).rejects.toBe(stripeOutage);
+      await expect(stripeAdapter.getConfirmationToken('ctoken_123')).rejects.toBe(stripeOutage);
     });
   });
 
@@ -226,10 +224,10 @@ describe('Stripe Adapter', () => {
       const mockedPaymentMethod = getPaymentMethod();
 
       jest
-        .spyOn(stripePaymentsAdapter.provider.paymentMethods, 'retrieve')
+        .spyOn(stripeAdapter.provider.paymentMethods, 'retrieve')
         .mockResolvedValue(mockedPaymentMethod as Stripe.Response<Stripe.PaymentMethod>);
 
-      const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
+      const paymentMethod = await stripeAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
 
       expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
     });
@@ -257,11 +255,11 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.prices, 'search').mockResolvedValue({
         data: [stripePrice],
       } as any);
 
-      const prices = await stripePaymentsAdapter.getPrices('eur');
+      const prices = await stripeAdapter.getPrices('eur');
 
       expect(prices).toHaveLength(1);
       expect(prices[0]).toStrictEqual(
@@ -308,11 +306,11 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'search').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.prices, 'search').mockResolvedValue({
         data: [stripePrice],
       } as any);
 
-      const prices = await stripePaymentsAdapter.getPrices('eur');
+      const prices = await stripeAdapter.getPrices('eur');
 
       expect(prices[0].type).toBe(UserType.Business);
       expect(prices[0].minimumSeats).toBe(1);
@@ -342,9 +340,9 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+      jest.spyOn(stripeAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
 
-      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+      const price = await stripeAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price).toStrictEqual(
         Price.toDomain({
@@ -389,9 +387,9 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+      jest.spyOn(stripeAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
 
-      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+      const price = await stripeAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.type).toBe(UserType.Business);
       expect(price.minimumSeats).toBe(1);
@@ -419,9 +417,9 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+      jest.spyOn(stripeAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
 
-      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+      const price = await stripeAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.isCommitmentPlan).toBeTruthy();
     });
@@ -447,9 +445,9 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+      jest.spyOn(stripeAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
 
-      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+      const price = await stripeAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.isBusinessPlan).toBeTruthy();
     });
@@ -470,9 +468,9 @@ describe('Stripe Adapter', () => {
         },
       });
 
-      jest.spyOn(stripePaymentsAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
+      jest.spyOn(stripeAdapter.provider.prices, 'retrieve').mockResolvedValue(stripePrice as any);
 
-      const price = await stripePaymentsAdapter.getPriceById(stripePrice.id, 'eur');
+      const price = await stripeAdapter.getPriceById(stripePrice.id, 'eur');
 
       expect(price.interval).toBe('lifetime');
     });
@@ -483,11 +481,11 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const updateSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'update')
+        .spyOn(stripeAdapter.provider.subscriptions, 'update')
         .mockResolvedValue(stripeSubscription as any);
 
       const params = { cancel_at: 1800000000 };
-      const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, params);
+      const subscription = await stripeAdapter.updateSubscription(stripeSubscription.id, params);
 
       expect(updateSpy).toHaveBeenCalledWith(stripeSubscription.id, params);
       expect(subscription).toStrictEqual(
@@ -507,9 +505,9 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'update').mockResolvedValue(stripeSubscription as any);
+      jest.spyOn(stripeAdapter.provider.subscriptions, 'update').mockResolvedValue(stripeSubscription as any);
 
-      const subscription = await stripePaymentsAdapter.updateSubscription(stripeSubscription.id, {});
+      const subscription = await stripeAdapter.updateSubscription(stripeSubscription.id, {});
 
       expect(subscription.isTrialing).toBeTruthy();
       expect(subscription.trialEnd).toBe(trialEnd);
@@ -521,10 +519,10 @@ describe('Stripe Adapter', () => {
       const stripeSubscription = getCreatedSubscription({ status: 'active', trial_end: null });
 
       const retrieveSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve')
+        .spyOn(stripeAdapter.provider.subscriptions, 'retrieve')
         .mockResolvedValue(stripeSubscription as any);
 
-      const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
+      const subscription = await stripeAdapter.getSubscription(stripeSubscription.id);
 
       expect(retrieveSpy).toHaveBeenCalledWith(stripeSubscription.id, { expand: ['plan.product'] });
       expect(subscription).toStrictEqual(
@@ -546,9 +544,9 @@ describe('Stripe Adapter', () => {
       const trialEnd = 1800000000;
       const stripeSubscription = getCreatedSubscription({ status: 'trialing', trial_end: trialEnd });
 
-      jest.spyOn(stripePaymentsAdapter.provider.subscriptions, 'retrieve').mockResolvedValue(stripeSubscription as any);
+      jest.spyOn(stripeAdapter.provider.subscriptions, 'retrieve').mockResolvedValue(stripeSubscription as any);
 
-      const subscription = await stripePaymentsAdapter.getSubscription(stripeSubscription.id);
+      const subscription = await stripeAdapter.getSubscription(stripeSubscription.id);
 
       expect(subscription.isTrialing).toBeTruthy();
       expect(subscription.trialEnd).toBe(trialEnd);
@@ -559,9 +557,9 @@ describe('Stripe Adapter', () => {
     test('When creating an invoice, then the invoice is created and the entity is mapped and returned', async () => {
       const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
+      jest.spyOn(stripeAdapter.provider.invoices, 'create').mockResolvedValue(mockedInvoice as any);
 
-      const invoice = await stripePaymentsAdapter.createInvoice({
+      const invoice = await stripeAdapter.createInvoice({
         customer: mockedInvoice.customer as string,
       });
 
@@ -579,9 +577,9 @@ describe('Stripe Adapter', () => {
     test('When finalizing an invoice, then the invoice is finalized and the entity is mapped and returned', async () => {
       const mockedInvoice = getInvoice({ confirmation_secret: { client_secret: 'pi_secret', type: 'payment_intent' } });
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
+      jest.spyOn(stripeAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue(mockedInvoice as any);
 
-      const invoice = await stripePaymentsAdapter.finalizeInvoice(mockedInvoice.id as string);
+      const invoice = await stripeAdapter.finalizeInvoice(mockedInvoice.id as string);
 
       expect(invoice).toStrictEqual(
         Invoice.toDomain({
@@ -597,12 +595,12 @@ describe('Stripe Adapter', () => {
     test('When adding invoice items, then the invoice items are added and the entity is mapped and returned', async () => {
       const mockedInvoiceItems = getInvoiceItems();
 
-      jest.spyOn(stripePaymentsAdapter.provider.invoiceItems, 'create').mockResolvedValue({
+      jest.spyOn(stripeAdapter.provider.invoiceItems, 'create').mockResolvedValue({
         ...mockedInvoiceItems,
         lastResponse: {} as any,
       });
 
-      const invoice = await stripePaymentsAdapter.addInvoiceItems(
+      const invoice = await stripeAdapter.addInvoiceItems(
         mockedInvoiceItems.id,
         mockedInvoiceItems.customer as string,
         {},
@@ -626,90 +624,90 @@ describe('Stripe Adapter', () => {
     });
 
     afterEach(() => {
-      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+      stripeAdapter.taxRegistrations = new Set<string>();
     });
 
     test('When a standard registration is synced, then only its country is stored', async () => {
       jest
-        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .spyOn(stripeAdapter.provider.tax.registrations, 'list')
         .mockReturnValue(asAsyncIterable([{ country: 'ES', country_options: { es: { type: 'standard' } } }]) as any);
 
-      await stripePaymentsAdapter.syncTaxRegistrations();
+      await stripeAdapter.syncTaxRegistrations();
 
-      expect(stripePaymentsAdapter.taxRegistrations.has('ES')).toBe(true);
-      expect(stripePaymentsAdapter.taxRegistrations.has('FR')).toBe(false);
+      expect(stripeAdapter.taxRegistrations.has('ES')).toBe(true);
+      expect(stripeAdapter.taxRegistrations.has('FR')).toBe(false);
     });
 
     test('When an OSS union registration is synced, then the whole EU is stored', async () => {
       jest
-        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .spyOn(stripeAdapter.provider.tax.registrations, 'list')
         .mockReturnValue(asAsyncIterable([{ country: 'ES', country_options: { es: { type: 'oss_union' } } }]) as any);
 
-      await stripePaymentsAdapter.syncTaxRegistrations();
+      await stripeAdapter.syncTaxRegistrations();
 
       EU_COUNTRIES.forEach((country) => {
-        expect(stripePaymentsAdapter.taxRegistrations.has(country)).toBe(true);
+        expect(stripeAdapter.taxRegistrations.has(country)).toBe(true);
       });
     });
 
     test('When registrations have no country, then they are ignored', async () => {
       jest
-        .spyOn(stripePaymentsAdapter.provider.tax.registrations, 'list')
+        .spyOn(stripeAdapter.provider.tax.registrations, 'list')
         .mockReturnValue(asAsyncIterable([{ country: undefined, country_options: {} }]) as any);
 
-      await stripePaymentsAdapter.syncTaxRegistrations();
+      await stripeAdapter.syncTaxRegistrations();
 
-      expect(stripePaymentsAdapter.taxRegistrations.size).toBe(0);
+      expect(stripeAdapter.taxRegistrations.size).toBe(0);
     });
   });
 
   describe('Should calculate taxes', () => {
     afterEach(() => {
-      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+      stripeAdapter.taxRegistrations = new Set<string>();
     });
 
     test('When the country is registered, then it returns true (case-insensitive)', () => {
-      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      stripeAdapter.taxRegistrations = new Set(['ES']);
 
-      expect(stripePaymentsAdapter.shouldCalculateTax('ES')).toBe(true);
-      expect(stripePaymentsAdapter.shouldCalculateTax('es')).toBe(true);
+      expect(stripeAdapter.shouldCalculateTax('ES')).toBe(true);
+      expect(stripeAdapter.shouldCalculateTax('es')).toBe(true);
     });
 
     test('When the country is not registered, then it returns false', () => {
-      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      stripeAdapter.taxRegistrations = new Set(['ES']);
 
-      expect(stripePaymentsAdapter.shouldCalculateTax('CN')).toBe(false);
+      expect(stripeAdapter.shouldCalculateTax('CN')).toBe(false);
     });
 
     test('When the country is missing, then it returns false', () => {
-      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      stripeAdapter.taxRegistrations = new Set(['ES']);
 
-      expect(stripePaymentsAdapter.shouldCalculateTax(undefined)).toBe(false);
-      expect(stripePaymentsAdapter.shouldCalculateTax(null)).toBe(false);
+      expect(stripeAdapter.shouldCalculateTax(undefined)).toBe(false);
+      expect(stripeAdapter.shouldCalculateTax(null)).toBe(false);
     });
   });
 
   describe('Should calculate taxes for customer', () => {
     afterEach(() => {
-      stripePaymentsAdapter.taxRegistrations = new Set<string>();
+      stripeAdapter.taxRegistrations = new Set<string>();
     });
 
     test("When the customer's country is registered, then it returns true", async () => {
-      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      stripeAdapter.taxRegistrations = new Set(['ES']);
       jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .spyOn(stripeAdapter.provider.customers, 'retrieve')
         .mockResolvedValue(getCustomer({ address: { country: 'ES' } as any }) as Stripe.Response<Stripe.Customer>);
 
-      await expect(stripePaymentsAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(true);
+      await expect(stripeAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(true);
     });
 
     test("When the customer's country is not registered, then it returns false", async () => {
-      stripePaymentsAdapter.taxRegistrations = new Set(['ES']);
+      stripeAdapter.taxRegistrations = new Set(['ES']);
       jest
-        .spyOn(stripePaymentsAdapter.provider.customers, 'retrieve')
+        .spyOn(stripeAdapter.provider.customers, 'retrieve')
         .mockResolvedValue(getCustomer({ address: { country: 'CN' } as any }) as Stripe.Response<Stripe.Customer>);
 
-      await expect(stripePaymentsAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(false);
+      await expect(stripeAdapter.shouldCalculateTaxForCustomer('cus_test')).resolves.toBe(false);
     });
   });
 });

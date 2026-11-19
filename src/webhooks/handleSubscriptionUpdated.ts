@@ -4,7 +4,7 @@ import { PaymentService } from '../services/payment.service';
 import { UsersService } from '../services/users.service';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import Logger from '../Logger';
 
@@ -53,7 +53,7 @@ export default async function handleSubscriptionUpdated(
       );
 
       await handleObjectStorageScheduledForCancelation(
-        await stripePaymentsAdapter.getCustomer(customerId),
+        await stripeAdapter.getCustomer(customerId),
         subscription,
         objectStorageService,
       );

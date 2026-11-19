@@ -6,7 +6,7 @@ import { User, UserType } from '../../../core/users/User';
 import { NotFoundError } from '../../../errors/Errors';
 import { UserNotFoundError } from '../../../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
-import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../infrastructure/domain/entities/customer';
 import Logger from '../../../Logger';
 import CacheService from '../../../services/cache.service';
@@ -94,7 +94,7 @@ export class InvoiceCompletedHandler {
     // If the invoice is for early cancellation, cancel the subscription
     if (isChargeRemainingSubscriptionAmount && subscriptionId) {
       Logger.info(`Invoice ${invoiceId} is for early cancellation, cancelling subscription...`);
-      await stripePaymentsAdapter.cancelSubscription(subscriptionId);
+      await stripeAdapter.cancelSubscription(subscriptionId);
       return;
     }
 

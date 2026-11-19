@@ -6,7 +6,7 @@ import { ConflictError } from '../errors/Errors';
 import { UserType } from '../core/users/User';
 import axios from 'axios';
 import { VERIFICATION_CHARGE } from '../constants';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 
 export default async function handleFundsCaptured(
@@ -31,7 +31,7 @@ export default async function handleFundsCaptured(
     `Received successful payment intent ${paymentIntent.id} from customer ${paymentIntent.customer as string}`,
   );
 
-  const customer = await stripePaymentsAdapter.getCustomer(paymentIntent.customer as string);
+  const customer = await stripeAdapter.getCustomer(paymentIntent.customer as string);
 
   Logger.info(`Object Storage for user ${customer.email} (customer ${customer.id}) is being initialized...`);
 
@@ -53,7 +53,7 @@ export default async function handleFundsCaptured(
   try {
     const { type } = await paymentsService.getUserSubscription(customer.id, UserType.ObjectStorage);
     const isSubscriptionActivated = type === 'subscription';
-    const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customer.id);
+    const shouldCalculateTaxes = await stripeAdapter.shouldCalculateTaxForCustomer(customer.id);
 
     if (!isSubscriptionActivated) {
       await paymentsService.createSubscription({

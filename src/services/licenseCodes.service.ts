@@ -3,7 +3,7 @@ import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { User } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 
@@ -73,9 +73,9 @@ export class LicenseCodesService {
     let customer: Customer;
 
     if (maybeExistingUser) {
-      customer = await stripePaymentsAdapter.getCustomer(maybeExistingUser.customerId);
+      customer = await stripeAdapter.getCustomer(maybeExistingUser.customerId);
     } else {
-      customer = await stripePaymentsAdapter.createCustomer({
+      customer = await stripeAdapter.createCustomer({
         name: user.name || 'Internxt User',
         email: user.email,
       });

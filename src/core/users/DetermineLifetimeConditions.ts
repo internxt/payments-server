@@ -6,7 +6,7 @@ import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
-import { stripePaymentsAdapter } from '../../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../infrastructure/adapters/stripe.adapter';
 import { getInvoicePriceId, getInvoiceProductId } from '../../utils/invoice';
 
 export class DetermineLifetimeConditions {
@@ -74,7 +74,7 @@ export class DetermineLifetimeConditions {
     maxSpaceBytes: number;
     tier: Tier;
   }> {
-    const customer = await stripePaymentsAdapter.getCustomer(user.customerId);
+    const customer = await stripeAdapter.getCustomer(user.customerId);
 
     const { email } = customer;
     const customersRelatedToUser = await this.paymentsService.getCustomersByEmail(email);

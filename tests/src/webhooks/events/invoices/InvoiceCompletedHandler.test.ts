@@ -7,7 +7,7 @@ import { NotFoundError } from '../../../../../src/errors/Errors';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
 import { PreCreatedUserNotFoundError } from '../../../../../src/errors/PreCreatedUsersErrors';
-import { stripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 import { PreCreatedUserStatus } from '../../../../../src/infrastructure/domain/entities/preCreatedUser';
 import Logger from '../../../../../src/Logger';
@@ -290,7 +290,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: mockedInvoice.status as string,
       };
 
-      const cancelSubscriptionSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
+      const cancelSubscriptionSpy = jest.spyOn(stripeAdapter, 'cancelSubscription').mockResolvedValue();
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 

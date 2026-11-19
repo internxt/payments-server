@@ -8,7 +8,7 @@ import { handleDisputeResult } from './handleDisputeResult';
 import handleSetupIntentSucceeded from './handleSetupIntentSucceeded';
 import handleFundsCaptured from './handleFundsCaptured';
 import Logger from '../Logger';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { type Dependencies } from '../dependencies';
 
 export function webhookHandler({
@@ -97,11 +97,11 @@ export function webhookHandler({
         case 'payment_intent.succeeded': {
           const eventData = event.data.object;
 
-          const paymentMethod = await stripePaymentsAdapter.retrievePaymentMethod(eventData.payment_method as string);
+          const paymentMethod = await stripeAdapter.retrievePaymentMethod(eventData.payment_method as string);
           const userAddressBillingDetails = paymentMethod.getAddress();
 
           if (userAddressBillingDetails) {
-            await stripePaymentsAdapter.updateCustomer(eventData.customer as string, {
+            await stripeAdapter.updateCustomer(eventData.customer as string, {
               address: {
                 city: userAddressBillingDetails.city,
                 line1: userAddressBillingDetails.line1,
@@ -117,7 +117,7 @@ export function webhookHandler({
 
         case 'invoice.paid': {
           const invoice = await paymentService.getInvoice(event.data.object.id);
-          const customer = await stripePaymentsAdapter.getCustomer(invoice.customer as string);
+          const customer = await stripeAdapter.getCustomer(invoice.customer as string);
 
           await invoiceCompletedHandler.run({
             invoice,
