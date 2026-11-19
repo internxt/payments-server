@@ -1,9 +1,7 @@
 import Stripe from 'stripe';
 
 import { InvalidConfirmationTokenError, UserNotFoundError } from '../../errors/PaymentErrors';
-import { PaymentsAdapter } from '../domain/ports/payments.adapter';
 import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
-import { loadConfig } from '../../config';
 import { PaymentMethod } from '../domain/entities/paymentMethod';
 
 import { UserType } from '../../core/users/User';
@@ -11,25 +9,13 @@ import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription, SubscriptionStatus } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
-import { EU_COUNTRIES, STRIPE_API_VERSION } from '../../constants';
+import { EU_COUNTRIES } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
 
-export class StripeAdapter implements PaymentsAdapter {
-  private _provider?: Stripe;
+export class StripeAdapter {
   public taxRegistrations = new Set<string>();
 
-  get provider(): Stripe {
-    if (!this._provider) {
-      this._provider = new Stripe(loadConfig().STRIPE_SECRET_KEY, {
-        apiVersion: STRIPE_API_VERSION,
-      });
-    }
-    return this._provider;
-  }
-
-  initProvider(provider: Stripe) {
-    this._provider = provider;
-  }
+  constructor(private readonly provider: Stripe) {}
 
   async syncTaxRegistrations(): Promise<void> {
     const registrations = new Set<string>();
@@ -299,5 +285,3 @@ export class StripeAdapter implements PaymentsAdapter {
     };
   }
 }
-
-export const stripeAdapter = new StripeAdapter();

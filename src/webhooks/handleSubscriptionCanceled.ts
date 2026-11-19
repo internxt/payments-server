@@ -8,7 +8,7 @@ import { ObjectStorageService } from '../services/objectStorage.service';
 import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import { type KlaviyoTrackingService } from '../services/klaviyo.service';
 import Logger from '../Logger';
@@ -55,6 +55,7 @@ export default async function handleSubscriptionCanceled(
   tiersService: TiersService,
   preCreatedUserService: PreCreatedUserService,
   klaviyoTrackingService: KlaviyoTrackingService,
+  stripeAdapter: StripeAdapter,
 ): Promise<void> {
   const customerId = subscription.customer as string;
   const productId = subscription.items.data[0].price.product as string;

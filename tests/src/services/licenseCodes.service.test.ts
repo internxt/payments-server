@@ -2,12 +2,12 @@ import { LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCod
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
-import { stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { InvalidLicenseCodeError } from '../../../src/errors/LicenseCodeErrors';
 
 describe('Tests for License Codes service', () => {
-  const { licenseCodesRepository, licenseCodesService, usersService, paymentService } = createTestServices();
+  const { licenseCodesRepository, licenseCodesService, usersService, paymentService, stripeAdapter } =
+    createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();

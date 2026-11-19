@@ -7,7 +7,6 @@ import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { setupAuth } from '../plugins/auth';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { type Dependencies } from '../dependencies';
@@ -15,13 +14,20 @@ import { type Dependencies } from '../dependencies';
 export function checkoutController({
   usersService,
   paymentService,
+  stripeAdapter,
   preCreatedUserService,
   confirmationTokenService,
   config,
   routeGuards: { verifyCaptchaHook, verifyUserTokenHook },
 }: Pick<
   Dependencies,
-  'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService' | 'config' | 'routeGuards'
+  | 'usersService'
+  | 'paymentService'
+  | 'stripeAdapter'
+  | 'preCreatedUserService'
+  | 'confirmationTokenService'
+  | 'config'
+  | 'routeGuards'
 >) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });

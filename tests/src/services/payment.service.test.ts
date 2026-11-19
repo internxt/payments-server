@@ -19,7 +19,6 @@ import {
 import { BadRequestError, NotFoundError } from '../../../src/errors/Errors';
 import { createTestServices } from '../helpers/services-factory';
 import Stripe from 'stripe';
-import { stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import {
   getCustomerEntity,
   getInvoiceEntity,
@@ -36,7 +35,7 @@ import {
 } from '../../../src/errors/PaymentErrors';
 
 describe('Payments Service tests', () => {
-  const { paymentService, stripe } = createTestServices();
+  const { paymentService, stripe, stripeAdapter } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1600,11 +1599,9 @@ describe('Payments Service tests', () => {
       jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(customerEntity);
       jest.spyOn(stripeAdapter, 'getPriceById').mockResolvedValue(priceEntity);
       jest.spyOn(stripeAdapter, 'shouldCalculateTaxForCustomer').mockResolvedValue(false);
-      jest
-        .spyOn(stripeAdapter.provider.invoices, 'create')
-        .mockResolvedValue({ id: 'in_early', status: 'draft' } as any);
-      jest.spyOn(stripeAdapter.provider.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
-      jest.spyOn(stripeAdapter.provider.invoices, 'finalizeInvoice').mockResolvedValue({
+      jest.spyOn(stripe.invoices, 'create').mockResolvedValue({ id: 'in_early', status: 'draft' } as any);
+      jest.spyOn(stripe.invoiceItems, 'create').mockResolvedValue({ id: 'ii_early' } as any);
+      jest.spyOn(stripe.invoices, 'finalizeInvoice').mockResolvedValue({
         id: 'in_early',
         status: 'open',
         confirmation_secret: { client_secret: 'pi_early_secret', type: 'payment_intent' },

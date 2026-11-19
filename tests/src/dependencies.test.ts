@@ -4,6 +4,7 @@ import { loadConfig } from '../../src/config';
 import { buildDependencies } from '../../src/dependencies';
 import { StripeAdapter } from '../../src/infrastructure/adapters/stripe.adapter';
 import CacheService from '../../src/services/cache.service';
+import { getCustomer } from './fixtures';
 
 const config = loadConfig();
 
@@ -31,6 +32,21 @@ describe('Building the app dependencies', () => {
 
     await expect(buildDependencies(appConfig)).rejects.toBe(stripeError);
     expect(closeMongo).toHaveBeenCalled();
+  });
+
+  test('When the adapter calls Stripe, then it uses the same Stripe client as the rest of the app', async () => {
+    jest.spyOn(StripeAdapter.prototype, 'syncTaxRegistrations').mockResolvedValue();
+    const { stripe, stripeAdapter, closeConnections } = await buildDependencies(appConfig);
+    const customer = getCustomer();
+    const retrieveCustomer = jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(customer as any);
+
+    try {
+      await stripeAdapter.getCustomer(customer.id);
+
+      expect(retrieveCustomer).toHaveBeenCalledWith(customer.id);
+    } finally {
+      await closeConnections();
+    }
   });
 
   test('When closing the connections, then Redis and Mongo are closed', async () => {

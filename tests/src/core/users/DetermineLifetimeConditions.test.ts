@@ -4,11 +4,10 @@ import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice } 
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
 import { createTestServices } from '../../helpers/services-factory';
-import { stripeAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 
 describe('Determining Lifetime conditions', () => {
-  const { stripe, paymentService, tiersService, determineLifetimeConditions } = createTestServices();
+  const { stripe, paymentService, tiersService, determineLifetimeConditions, stripeAdapter } = createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();

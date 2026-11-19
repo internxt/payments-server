@@ -4,16 +4,16 @@ import { CustomerNotFoundError, ExistingSubscriptionError, NotFoundPlanByIdError
 import { UnauthorizedError } from '../errors/Errors';
 import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { signUserToken } from '../utils/signUserToken';
 import { getInvoiceProductId } from '../utils/invoice';
 import { type Dependencies } from '../dependencies';
 
 export function objectStorageController({
   paymentService,
+  stripeAdapter,
   config,
   routeGuards: { verifyUserTokenHook },
-}: Pick<Dependencies, 'paymentService' | 'config' | 'routeGuards'>) {
+}: Pick<Dependencies, 'paymentService' | 'stripeAdapter' | 'config' | 'routeGuards'>) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
 

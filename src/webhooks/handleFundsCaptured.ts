@@ -6,7 +6,7 @@ import { ConflictError } from '../errors/Errors';
 import { UserType } from '../core/users/User';
 import axios from 'axios';
 import { VERIFICATION_CHARGE } from '../constants';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 
 export default async function handleFundsCaptured(
@@ -14,6 +14,7 @@ export default async function handleFundsCaptured(
   paymentsService: PaymentService,
   objectStorageService: ObjectStorageService,
   stripe: Stripe,
+  stripeAdapter: StripeAdapter,
 ): Promise<void> {
   const isMissingType = !paymentIntent.metadata.type;
   const isNotObjectStorage = paymentIntent.metadata.type !== 'object-storage';

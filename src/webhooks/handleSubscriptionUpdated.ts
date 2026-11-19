@@ -4,7 +4,7 @@ import { PaymentService } from '../services/payment.service';
 import { UsersService } from '../services/users.service';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import Logger from '../Logger';
 
@@ -32,6 +32,7 @@ export default async function handleSubscriptionUpdated(
   cacheService: CacheService,
   paymentService: PaymentService,
   objectStorageService: ObjectStorageService,
+  stripeAdapter: StripeAdapter,
 ): Promise<void> {
   let uuid = '';
   const customerId = subscription.customer as string;

@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
+import { closeServerAndDatabase, getTestDependencies, initializeServerAndDatabase } from '../utils/initializeServer';
 import Stripe from 'stripe';
 import { getCustomer, getInvoice, getPaymentIntent, getPaymentMethod } from '../fixtures';
 import handleFundsCaptured from '../../../src/webhooks/handleFundsCaptured';
@@ -8,7 +8,7 @@ import { ObjectStorageService } from '../../../src/services/objectStorage.servic
 import { UsersService } from '../../../src/services/users.service';
 import handleInvoicePaymentFailed from '../../../src/webhooks/handleInvoicePaymentFailed';
 import { InvoiceCompletedHandler } from '../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
-import { StripeAdapter, stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { PaymentMethod } from '../../../src/infrastructure/domain/entities/paymentMethod';
 
@@ -60,7 +60,8 @@ describe('Webhook events', () => {
         event.data.object,
         expect.any(PaymentService),
         expect.any(ObjectStorageService),
-        stripeAdapter.provider,
+        getTestDependencies().stripe,
+        getTestDependencies().stripeAdapter,
       );
     });
 
@@ -106,7 +107,7 @@ describe('Webhook events', () => {
       const mockedInvoice = getInvoice();
       const currentInvoice = getInvoice({ id: mockedInvoice.id });
       const retrieveInvoice = jest
-        .spyOn(stripeAdapter.provider.invoices, 'retrieve')
+        .spyOn(getTestDependencies().stripe.invoices, 'retrieve')
         .mockResolvedValue(currentInvoice as any);
       const event = {
         id: 'evt_2',
@@ -138,6 +139,7 @@ describe('Webhook events', () => {
         expect.any(ObjectStorageService),
         expect.any(PaymentService),
         expect.any(UsersService),
+        getTestDependencies().stripeAdapter,
       );
     });
 
@@ -188,7 +190,7 @@ describe('Webhook events', () => {
           status: 'paid',
         });
         const currentInvoice = getInvoice({ id: mockedInvoice.id, customer: mockedInvoice.customer, status: 'paid' });
-        jest.spyOn(stripeAdapter.provider.invoices, 'retrieve').mockResolvedValue(currentInvoice as any);
+        jest.spyOn(getTestDependencies().stripe.invoices, 'retrieve').mockResolvedValue(currentInvoice as any);
         const mockedCustomer = getCustomer();
         const event = {
           id: 'evt_2',
@@ -228,7 +230,7 @@ describe('Webhook events', () => {
 
       test('When several invoice.paid events are received, then they are all handled by the same handler', async () => {
         const mockedInvoice = getInvoice({ status: 'paid' });
-        jest.spyOn(stripeAdapter.provider.invoices, 'retrieve').mockResolvedValue(mockedInvoice as any);
+        jest.spyOn(getTestDependencies().stripe.invoices, 'retrieve').mockResolvedValue(mockedInvoice as any);
         jest.spyOn(StripeAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
         const invoiceCompletedHandlerRunSpy = jest.spyOn(InvoiceCompletedHandler.prototype, 'run').mockResolvedValue();
         invoiceCompletedHandlerRunSpy.mockClear();

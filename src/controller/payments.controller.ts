@@ -14,7 +14,6 @@ import { TierNotFoundError } from '../services/tiers.service';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
-import { stripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { getPromotionCodeCoupon } from '../utils/coupon';
 import { type Dependencies } from '../dependencies';
 
@@ -22,6 +21,7 @@ const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
 export function paymentsController({
   paymentService,
+  stripeAdapter,
   usersService,
   config,
   cacheService,
@@ -30,7 +30,14 @@ export function paymentsController({
   routeGuards: { verifyUserTokenHook },
 }: Pick<
   Dependencies,
-  'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService' | 'routeGuards'
+  | 'paymentService'
+  | 'stripeAdapter'
+  | 'usersService'
+  | 'config'
+  | 'cacheService'
+  | 'licenseCodesService'
+  | 'tiersService'
+  | 'routeGuards'
 >) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });

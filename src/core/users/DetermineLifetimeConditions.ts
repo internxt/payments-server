@@ -6,13 +6,14 @@ import { User, UserType } from './User';
 import { FREE_PLAN_BYTES_SPACE } from '../../constants';
 import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
-import { stripeAdapter } from '../../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../infrastructure/adapters/stripe.adapter';
 import { getInvoicePriceId, getInvoiceProductId } from '../../utils/invoice';
 
 export class DetermineLifetimeConditions {
   constructor(
     private readonly paymentsService: PaymentService,
     private readonly tiersService: TiersService,
+    private readonly stripeAdapter: StripeAdapter,
   ) {}
 
   /**
@@ -74,7 +75,7 @@ export class DetermineLifetimeConditions {
     maxSpaceBytes: number;
     tier: Tier;
   }> {
-    const customer = await stripeAdapter.getCustomer(user.customerId);
+    const customer = await this.stripeAdapter.getCustomer(user.customerId);
 
     const { email } = customer;
     const customersRelatedToUser = await this.paymentsService.getCustomersByEmail(email);

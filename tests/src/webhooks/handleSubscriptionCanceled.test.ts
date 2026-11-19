@@ -4,7 +4,6 @@ import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscription
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-import { stripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
@@ -18,6 +17,7 @@ const {
   tiersService,
   preCreatedUserService,
   klaviyoTrackingService,
+  stripeAdapter,
 } = createTestServices();
 
 beforeEach(() => {
@@ -50,6 +50,7 @@ describe('Process when a subscription is cancelled', () => {
       tiersService,
       preCreatedUserService,
       klaviyoTrackingService,
+      stripeAdapter,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -100,6 +101,7 @@ describe('Process when a subscription is cancelled', () => {
       tiersService,
       preCreatedUserService,
       klaviyoTrackingService,
+      stripeAdapter,
     );
 
     expect(getProductSpy).toHaveBeenCalledWith(mockedSubscription.items.data[0].price.product);
@@ -136,6 +138,7 @@ describe('Process when a subscription is cancelled', () => {
         tiersService,
         preCreatedUserService,
         klaviyoTrackingService,
+        stripeAdapter,
       ),
     ).rejects.toThrow(randomError);
   });
