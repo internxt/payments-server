@@ -1,17 +1,22 @@
 import Stripe from 'stripe';
 
 import { InvalidConfirmationTokenError, InvalidTaxIdError, UserNotFoundError } from '../../errors/PaymentErrors';
-import { Customer, CreateCustomerParams, UpdateCustomerParams } from '../domain/entities/customer';
-import { PaymentMethod } from '../domain/entities/paymentMethod';
-import { Address } from '../domain/types';
-import { CustomerTaxDetails } from '../../types/customer';
+import { BadRequestError } from '../../errors/Errors';
+import {
+  Address,
+  Customer,
+  CustomerTaxDetails,
+  CreateCustomerParams,
+  PaymentMethod,
+  UpdateCustomerParams,
+} from '../../types/customer';
 
 import { UserType } from '../../core/users/User';
 import { Price, PriceInterval } from '../domain/entities/price';
 import { Subscription, SubscriptionStatus } from '../domain/entities/subscription';
 import { Invoice, InvoiceStatus } from '../domain/entities/invoice';
 import { InvoiceItems } from '../domain/entities/invoiceItems';
-import { EU_COUNTRIES } from '../../constants';
+import { DEFAULT_CUSTOMER_NAME, EU_COUNTRIES } from '../../constants';
 import { ConfirmationToken } from '../domain/entities/confirmationToken';
 
 export class StripeAdapter {
@@ -50,19 +55,19 @@ export class StripeAdapter {
   async shouldCalculateTaxForCustomer(customerId: Customer['id']): Promise<boolean> {
     const customer = await this.getCustomer(customerId);
 
-    return this.shouldCalculateTax(customer.getAddress()?.country);
+    return this.shouldCalculateTax(customer.address?.country);
   }
 
   async createCustomer(params: Partial<CreateCustomerParams>): Promise<Customer> {
     const stripeCustomer = await this.provider.customers.create(this.toStripeCustomerParams(params));
 
-    return Customer.toDomain(stripeCustomer);
+    return this.toCustomer(stripeCustomer);
   }
 
   async updateCustomer(customerId: Customer['id'], params: Partial<UpdateCustomerParams>): Promise<Customer> {
     const updatedCustomer = await this.provider.customers.update(customerId, this.toStripeCustomerParams(params));
 
-    return Customer.toDomain(updatedCustomer);
+    return this.toCustomer(updatedCustomer);
   }
 
   async getCustomer(customerId: Customer['id']): Promise<Customer> {
@@ -72,13 +77,13 @@ export class StripeAdapter {
       throw new UserNotFoundError();
     }
 
-    return Customer.toDomain(stripeCustomer);
+    return this.toCustomer(stripeCustomer);
   }
 
   async listCustomersByEmail(email: Customer['email']): Promise<Customer[]> {
     const customers = await this.provider.customers.list({ email });
 
-    return customers.data.map((customer) => Customer.toDomain(customer));
+    return customers.data.map((customer) => this.toCustomer(customer));
   }
 
   async searchCustomerIdsByEmail(email: Customer['email']): Promise<Customer['id'][]> {
@@ -130,8 +135,9 @@ export class StripeAdapter {
   }
 
   async retrievePaymentMethod(paymentMethodId: PaymentMethod['id']): Promise<PaymentMethod> {
-    const paymentMethods = await this.provider.paymentMethods.retrieve(paymentMethodId, {});
-    return PaymentMethod.toDomain(paymentMethods);
+    const paymentMethod = await this.provider.paymentMethods.retrieve(paymentMethodId, {});
+
+    return { id: paymentMethod.id, address: this.toAddress(paymentMethod.billing_details.address) };
   }
 
   async attachPaymentMethod(
@@ -303,6 +309,22 @@ export class StripeAdapter {
     });
   }
 
+  private toCustomer(stripeCustomer: Stripe.Customer): Customer {
+    if (!stripeCustomer.email) {
+      throw new BadRequestError('Customer email is required');
+    }
+
+    return {
+      id: stripeCustomer.id,
+      name: stripeCustomer.name ?? DEFAULT_CUSTOMER_NAME,
+      email: stripeCustomer.email,
+      address: this.toAddress(stripeCustomer.address),
+      phone: stripeCustomer.phone ?? undefined,
+      metadata: stripeCustomer.metadata,
+      defaultPaymentMethod: this.getDefaultPaymentMethodId(stripeCustomer),
+    };
+  }
+
   private toAddress(address: Stripe.Address | null | undefined): Address {
     return {
       line1: address?.line1,
@@ -312,6 +334,20 @@ export class StripeAdapter {
       country: address?.country,
       postalCode: address?.postal_code,
     };
+  }
+
+  private getDefaultPaymentMethodId(stripeCustomer: Stripe.Customer): string | undefined {
+    const defaultPaymentMethod = stripeCustomer.invoice_settings?.default_payment_method;
+    if (defaultPaymentMethod) {
+      return typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod.id;
+    }
+
+    const defaultSource = stripeCustomer.default_source;
+    if (defaultSource) {
+      return typeof defaultSource === 'string' ? defaultSource : defaultSource.id;
+    }
+
+    return undefined;
   }
 
   private toStripeCustomerParams(params: Partial<UpdateCustomerParams>): Stripe.CustomerCreateParams {

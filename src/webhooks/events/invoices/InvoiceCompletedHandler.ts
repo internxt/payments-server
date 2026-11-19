@@ -7,7 +7,7 @@ import { NotFoundError } from '../../../errors/Errors';
 import { UserNotFoundError } from '../../../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
 import { StripeAdapter } from '../../../infrastructure/adapters/stripe.adapter';
-import { Customer } from '../../../infrastructure/domain/entities/customer';
+import { Customer } from '../../../types/customer';
 import Logger from '../../../Logger';
 import CacheService from '../../../services/cache.service';
 import { PaymentService } from '../../../services/payment.service';

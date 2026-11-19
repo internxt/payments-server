@@ -36,7 +36,7 @@ import {
 import { PaymentIntent, PromotionCode } from '../types/payment';
 import { RenewalPeriod, PlanSubscription, SubscriptionCreated } from '../types/subscription';
 import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { Customer } from '../infrastructure/domain/entities/customer';
+import { Customer } from '../types/customer';
 import {
   CommitmentCancellationInfo,
   Subscription as SubscriptionEntity,
@@ -443,7 +443,7 @@ export class PaymentService {
 
     const amountToCharge = this.calculateRemainingSubscriptionAmount(price, remainingMonths);
 
-    const defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.getDefaultPaymentMethod();
+    const defaultPaymentMethod = subscriptionEntity.paymentMethod ?? customer.defaultPaymentMethod;
 
     if (!defaultPaymentMethod) {
       throw new PaymentMethodNotFoundError('The customer has no payment method to charge the remaining amount');
