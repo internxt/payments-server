@@ -5,7 +5,7 @@ import { UsersService } from '../services/users.service';
 import { UserType } from '../core/users/User';
 import { ObjectStorageService } from '../services/objectStorage.service';
 import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { Customer } from '../infrastructure/domain/entities/customer';
+import { Customer } from '../types/customer';
 import Logger from '../Logger';
 
 function isObjectStorageProduct(meta: Stripe.Metadata): boolean {

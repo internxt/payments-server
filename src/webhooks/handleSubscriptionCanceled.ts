@@ -9,7 +9,7 @@ import { handleCancelPlan } from './utils/handleCancelPlan';
 import { TierNotFoundError, TiersService } from '../services/tiers.service';
 import { Service } from '../core/users/Tier';
 import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { Customer } from '../infrastructure/domain/entities/customer';
+import { Customer } from '../types/customer';
 import { type KlaviyoTrackingService } from '../services/klaviyo.service';
 import Logger from '../Logger';
 import { PreCreatedUserService } from '../services/preCreatedUser.service';

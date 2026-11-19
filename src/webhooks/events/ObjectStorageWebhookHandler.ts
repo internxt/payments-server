@@ -3,7 +3,7 @@ import { ObjectStorageService } from '../../services/objectStorage.service';
 import { PaymentService } from '../../services/payment.service';
 import { AxiosError, isAxiosError } from 'axios';
 import Logger from '../../Logger';
-import { Customer } from '../../infrastructure/domain/entities/customer';
+import { Customer } from '../../types/customer';
 import { getInvoiceProductId } from '../../utils/invoice';
 
 export class ObjectStorageWebhookHandler {

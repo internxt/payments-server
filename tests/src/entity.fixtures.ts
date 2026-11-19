@@ -1,9 +1,7 @@
 import { Chance } from 'chance';
-import { Customer } from '../../src/infrastructure/domain/entities/customer';
+import { Address, Customer, PaymentMethod } from '../../src/types/customer';
 import { Price, PriceAttributes } from '../../src/infrastructure/domain/entities/price';
 import { Subscription, SubscriptionAttributes } from '../../src/infrastructure/domain/entities/subscription';
-import { PaymentMethod } from '../../src/infrastructure/domain/entities/paymentMethod';
-import { Address } from '../../src/infrastructure/domain/types';
 import { UserType } from '../../src/core/users/User';
 import dayjs from 'dayjs';
 import { Invoice, InvoiceStatus } from '../../src/infrastructure/domain/entities/invoice';
@@ -43,14 +41,7 @@ export const getCustomerEntity = (params?: Partial<CustomerEntityParams>): Custo
     ...params,
   };
 
-  return new Customer(
-    attributes.id,
-    attributes.name,
-    attributes.email,
-    attributes.address,
-    attributes.phone,
-    attributes.metadata,
-  );
+  return attributes;
 };
 
 export const getPriceEntity = (params?: Partial<PriceAttributes>): Price => {
@@ -86,10 +77,10 @@ export const getSubscriptionEntity = (params?: Partial<SubscriptionAttributes>):
 };
 
 export const getPaymentMethodEntity = (params?: Partial<{ id: string; address: Address }>): PaymentMethod => {
-  return new PaymentMethod(
-    params?.id ?? `pm_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
-    getAddress(params?.address),
-  );
+  return {
+    id: params?.id ?? `pm_${randomGenerator.string({ length: 14, alpha: true, numeric: true })}`,
+    address: getAddress(params?.address),
+  };
 };
 
 export const getInvoiceEntity = (params?: Partial<Invoice>): Invoice => {

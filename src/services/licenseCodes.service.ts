@@ -4,7 +4,7 @@ import { User } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
 import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
-import { Customer } from '../infrastructure/domain/entities/customer';
+import { Customer } from '../types/customer';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 
 type LicenseCodesServiceDeps = {
