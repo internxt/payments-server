@@ -21,9 +21,8 @@ import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
 import { PreCreatedUserStatus } from '../../../src/core/users/PreCreatedUser';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
-import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPreCreatedUser, getPriceEntity } from '../entity.fixtures';
+import { getPreCreatedUser, getPriceEntity, getCustomerEntity } from '../entity.fixtures';
 import { AllowedFiatCurrencies } from '../../../src/utils/currency';
 
 jest.mock('../../../src/utils/fetchUserStorage');
@@ -124,9 +123,13 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
-      const createCustomerSpy = jest
-        .spyOn(StripeAdapter.prototype, 'createCustomer')
-        .mockResolvedValue(Customer.toDomain(mockedCustomer));
+      const createCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
+      );
       const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
       const response = await app.inject({
@@ -282,7 +285,7 @@ describe('Checkout controller', () => {
       jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
       return jest
         .spyOn(StripeAdapter.prototype, 'createCustomer')
-        .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id', email: buyerEmail })));
+        .mockResolvedValue(getCustomerEntity({ id: 'new_customer_id', email: buyerEmail }));
     };
 
     const createCustomerAnonymously = (body: Record<string, unknown>) =>
@@ -324,7 +327,7 @@ describe('Checkout controller', () => {
       jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
       jest
         .spyOn(StripeAdapter.prototype, 'createCustomer')
-        .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id' })));
+        .mockResolvedValue(getCustomerEntity({ id: 'new_customer_id' }));
 
       const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
 
@@ -740,7 +743,7 @@ describe('Checkout controller', () => {
   describe('Create an invoice and returns the payment intent', () => {
     beforeEach(() => {
       jest.clearAllMocks();
-      jest.spyOn(StripeAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
+      jest.spyOn(StripeAdapter.prototype, 'getCustomer').mockResolvedValue(getCustomerEntity());
     });
 
     test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {

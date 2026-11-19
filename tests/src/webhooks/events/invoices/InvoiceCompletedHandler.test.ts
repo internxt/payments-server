@@ -7,14 +7,13 @@ import { NotFoundError } from '../../../../../src/errors/Errors';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
 import { PreCreatedUserNotFoundError } from '../../../../../src/errors/PreCreatedUsersErrors';
-import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
 import { PreCreatedUserStatus } from '../../../../../src/core/users/PreCreatedUser';
 import Logger from '../../../../../src/Logger';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getCustomer, getInvoice, getPrice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
-import { getPreCreatedUser } from '../../../entity.fixtures';
+import { getPreCreatedUser, getCustomerEntity } from '../../../entity.fixtures';
 
 function axiosErrorWithStatus(status: number): AxiosError {
   const error = new AxiosError('Request failed');
@@ -71,7 +70,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'open' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -88,7 +91,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -102,7 +109,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -114,7 +125,10 @@ describe('Testing the handler when an invoice is completed', () => {
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
-      expect(reactivateObjectStorageAccountSpy).toHaveBeenCalledWith(Customer.toDomain(mockedCustomer), mockedInvoice);
+      expect(reactivateObjectStorageAccountSpy).toHaveBeenCalledWith(
+        invoiceCompletedHandlerPayload.customer,
+        mockedInvoice,
+      );
       expect(getTierProductsByProductIdsSpy).not.toHaveBeenCalled();
     });
 
@@ -126,7 +140,11 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -144,7 +162,11 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -184,7 +206,11 @@ describe('Testing the handler when an invoice is completed', () => {
         status: 'paid',
       });
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -218,7 +244,7 @@ describe('Testing the handler when an invoice is completed', () => {
         user: { ...mockedUser, email: mockedCustomer.email as string },
         isLifetimePlan: false,
         productId: mockedInvoice.lines.data[0].pricing?.price_details?.product,
-        customer: Customer.toDomain(mockedCustomer),
+        customer: invoiceCompletedHandlerPayload.customer,
         tier: mockedTier,
       });
       expect(updateOrInsertUserTierSpy).toHaveBeenCalledWith({
@@ -251,7 +277,11 @@ describe('Testing the handler when an invoice is completed', () => {
       const getPreCreatedUserSpy = jest.spyOn(preCreatedUserService, 'get');
 
       await invoiceCompletedHandler.run({
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       });
@@ -285,7 +315,7 @@ describe('Testing the handler when an invoice is completed', () => {
       });
 
       const invoiceCompletedHandlerPayload: InvoiceCompletedHandlerPayload = {
-        customer: Customer.toDomain(getCustomer()),
+        customer: getCustomerEntity(),
         invoice: mockedInvoice,
         status: mockedInvoice.status as string,
       };
@@ -530,7 +560,11 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: Customer.toDomain(mockedCustomer),
+          customer: getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           tier: mockedTier,
@@ -576,7 +610,11 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: Customer.toDomain(mockedCustomer),
+          customer: getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           tier: mockedTier,
@@ -620,7 +658,11 @@ describe('Testing the handler when an invoice is completed', () => {
           ...mockedUser,
           email: mockedCustomer.email as string,
         },
-        customer: Customer.toDomain(mockedCustomer),
+        customer: getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         isLifetimePlan: mockedIsLifetimePlan,
         productId: mockedProductId,
         tier: mockedTier,
@@ -669,7 +711,11 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: Customer.toDomain(mockedCustomer),
+          customer: getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           tier: mockedTier,
@@ -701,7 +747,11 @@ describe('Testing the handler when an invoice is completed', () => {
             ...mockedUser,
             email: mockedCustomer.email as string,
           },
-          customer: Customer.toDomain(mockedCustomer),
+          customer: getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
           isLifetimePlan: mockedIsLifetimePlan,
           productId: mockedProductId,
           tier: mockedTier,

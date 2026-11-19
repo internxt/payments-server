@@ -2,8 +2,8 @@ import { LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCod
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
-import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { InvalidLicenseCodeError } from '../../../src/errors/LicenseCodeErrors';
+import { getCustomerEntity } from '../entity.fixtures';
 
 describe('Tests for License Codes service', () => {
   const { licenseCodesRepository, licenseCodesService, usersService, paymentService, stripeAdapter } =
@@ -53,9 +53,13 @@ describe('Tests for License Codes service', () => {
       const findOneLicenseRepositorySpy = jest
         .spyOn(licenseCodesRepository, 'findOne')
         .mockResolvedValue(mockedLicenseCode);
-      const getCustomerSpy = jest
-        .spyOn(stripeAdapter, 'getCustomer')
-        .mockResolvedValue(Customer.toDomain(mockedCustomer));
+      const getCustomerSpy = jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
+      );
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,
@@ -94,9 +98,13 @@ describe('Tests for License Codes service', () => {
         .spyOn(licenseCodesRepository, 'findOne')
         .mockResolvedValue(mockedLicenseCode);
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
-      const createCustomerSpy = jest
-        .spyOn(stripeAdapter, 'createCustomer')
-        .mockResolvedValue(Customer.toDomain(mockedCustomer));
+      const createCustomerSpy = jest.spyOn(stripeAdapter, 'createCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
+      );
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,
         recurring: false,

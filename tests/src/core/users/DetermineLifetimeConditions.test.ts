@@ -4,7 +4,7 @@ import { getUser, newTier, getCustomer, getInvoice, getSubscription, getPrice } 
 import { Service } from '../../../../src/core/users/Tier';
 import { BadRequestError, InternalServerError } from '../../../../src/errors/Errors';
 import { createTestServices } from '../../helpers/services-factory';
-import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
+import { getCustomerEntity } from '../../entity.fixtures';
 
 describe('Determining Lifetime conditions', () => {
   const { stripe, paymentService, tiersService, determineLifetimeConditions, stripeAdapter } = createTestServices();
@@ -134,7 +134,13 @@ describe('Determining Lifetime conditions', () => {
       const user = getUser({ lifetime: true, customerId: customers[0].id });
       const tier = newTier({ billingType: 'lifetime' });
       jest.spyOn(paymentService, 'getUserSubscription').mockResolvedValue({ type: 'lifetime' } as any);
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customers[0]));
+      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+        getCustomerEntity({
+          id: customers[0].id,
+          name: customers[0].name as string,
+          email: customers[0].email as string,
+        }),
+      );
       jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: customers } as any);
       jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(tier);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockResolvedValue([]);
@@ -319,7 +325,11 @@ describe('Determining Lifetime conditions', () => {
       const customer = getCustomer({ id: user.customerId });
       const tierNotFoundError = new TierNotFoundError(`Tier not found for user ${user.uuid} when stacking lifetime`);
 
-      jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(customer));
+      jest
+        .spyOn(stripeAdapter, 'getCustomer')
+        .mockResolvedValue(
+          getCustomerEntity({ id: customer.id, name: customer.name as string, email: customer.email as string }),
+        );
       jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: [customer] } as any);
       jest.spyOn(paymentService, 'getInvoicesFromUser').mockResolvedValue([]);
       jest.spyOn(tiersService, 'getTiersProductsByUserId').mockRejectedValue(tierNotFoundError);
