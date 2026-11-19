@@ -3,7 +3,7 @@ import { LicenseCodesRepository } from '../core/users/LicenseCodeRepository';
 import { User } from '../core/users/User';
 import { PaymentService } from './payment.service';
 import { UsersService } from './users.service';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../infrastructure/domain/entities/customer';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
 
@@ -11,6 +11,7 @@ type LicenseCodesServiceDeps = {
   paymentService: PaymentService;
   usersService: UsersService;
   licenseCodesRepository: LicenseCodesRepository;
+  stripeAdapter: StripeAdapter;
 };
 
 export class LicenseCodeAlreadyAppliedError extends Error {
@@ -25,11 +26,13 @@ export class LicenseCodesService {
   private readonly paymentService: PaymentService;
   private readonly usersService: UsersService;
   private readonly licenseCodesRepository: LicenseCodesRepository;
+  private readonly stripeAdapter: StripeAdapter;
 
-  constructor({ paymentService, usersService, licenseCodesRepository }: LicenseCodesServiceDeps) {
+  constructor({ paymentService, usersService, licenseCodesRepository, stripeAdapter }: LicenseCodesServiceDeps) {
     this.paymentService = paymentService;
     this.usersService = usersService;
     this.licenseCodesRepository = licenseCodesRepository;
+    this.stripeAdapter = stripeAdapter;
   }
 
   async isLicenseCodeAvailable(code: LicenseCode['code'], provider: LicenseCode['provider']): Promise<boolean> {
@@ -73,9 +76,9 @@ export class LicenseCodesService {
     let customer: Customer;
 
     if (maybeExistingUser) {
-      customer = await stripePaymentsAdapter.getCustomer(maybeExistingUser.customerId);
+      customer = await this.stripeAdapter.getCustomer(maybeExistingUser.customerId);
     } else {
-      customer = await stripePaymentsAdapter.createCustomer({
+      customer = await this.stripeAdapter.createCustomer({
         name: user.name || 'Internxt User',
         email: user.email,
       });

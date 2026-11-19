@@ -2,12 +2,12 @@ import { LicenseCodeAlreadyAppliedError } from '../../../src/services/licenseCod
 import { getCustomer, getLicenseCode, getUser } from '../fixtures';
 import { createTestServices } from '../helpers/services-factory';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
-import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { InvalidLicenseCodeError } from '../../../src/errors/LicenseCodeErrors';
 
 describe('Tests for License Codes service', () => {
-  const { licenseCodesRepository, licenseCodesService, usersService, paymentService } = createTestServices();
+  const { licenseCodesRepository, licenseCodesService, usersService, paymentService, stripeAdapter } =
+    createTestServices();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -54,7 +54,7 @@ describe('Tests for License Codes service', () => {
         .spyOn(licenseCodesRepository, 'findOne')
         .mockResolvedValue(mockedLicenseCode);
       const getCustomerSpy = jest
-        .spyOn(stripePaymentsAdapter, 'getCustomer')
+        .spyOn(stripeAdapter, 'getCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockResolvedValue(mockedUser);
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
@@ -95,7 +95,7 @@ describe('Tests for License Codes service', () => {
         .mockResolvedValue(mockedLicenseCode);
       const findUserByUuidSpy = jest.spyOn(usersService, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
-        .spyOn(stripePaymentsAdapter, 'createCustomer')
+        .spyOn(stripeAdapter, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const subscribeSpy = jest.spyOn(paymentService, 'subscribe').mockResolvedValue({
         maxSpaceBytes: 100,

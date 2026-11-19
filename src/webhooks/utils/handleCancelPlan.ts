@@ -3,7 +3,7 @@ import { UsersService } from '../../services/users.service';
 import { TierNotFoundError, TiersService } from '../../services/tiers.service';
 import Stripe from 'stripe';
 import { PreCreatedUserService } from '../../services/preCreatedUser.service';
-import { PreCreatedUserStatus } from '../../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserStatus } from '../../core/users/PreCreatedUser';
 import { PreCreatedUserNotFoundError } from '../../errors/PreCreatedUsersErrors';
 import Logger from '../../Logger';
 

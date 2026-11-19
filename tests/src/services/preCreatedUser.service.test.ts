@@ -1,7 +1,6 @@
 import { loadConfig } from '../../../src/config';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
-import { PreCreatedUser } from '../../../src/infrastructure/domain/entities/preCreatedUser';
-import { PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserStatus } from '../../../src/core/users/PreCreatedUser';
 import { createHttpClient } from '../../../src/infrastructure/http/httpClient';
 import { HttpResponseError } from '../../../src/infrastructure/http/HttpResponseError';
 import { HttpErrorCode } from '../../../src/errors/httpErrorCodes';
@@ -59,7 +58,7 @@ describe('Pre Created User Service tests', () => {
 
       const result = await preCreatedUserService.getOrCreate('n2oK7@example.com');
 
-      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
+      expect(result).toStrictEqual(gatewayResponse.data);
     });
 
     test('When the email already has a Drive account, then an error indicating so is thrown', async () => {
@@ -100,7 +99,7 @@ describe('Pre Created User Service tests', () => {
 
       const result = await preCreatedUserService.get('n2oK7@example.com');
 
-      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
+      expect(result).toStrictEqual(gatewayResponse.data);
     });
 
     test('When the retrieved user is pending to set up the account, then the resulting user reflects it', async () => {
@@ -110,7 +109,7 @@ describe('Pre Created User Service tests', () => {
 
       const result = await preCreatedUserService.get('n2oK7@example.com');
 
-      expect(result.isPendingStatus).toBe(true);
+      expect(result.status).toBe(PreCreatedUserStatus.PendingSetup);
     });
 
     test('When the gateway reports the user as not found, then a domain error is thrown instead', async () => {
@@ -136,7 +135,7 @@ describe('Pre Created User Service tests', () => {
 
       expect(postSpy).toHaveBeenCalledTimes(1);
       expect(getSpy).not.toHaveBeenCalled();
-      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
+      expect(result).toStrictEqual(gatewayResponse.data);
     });
 
     test('When the user is pending to set up the account, then an error indicating so is thrown', async () => {
@@ -243,7 +242,7 @@ describe('Pre Created User Service tests', () => {
 
       const result = await preCreatedUserService.getEligibleForPayment('n2oK7@example.com');
 
-      expect(result).toStrictEqual(PreCreatedUser.toDomain(gatewayResponse.data));
+      expect(result).toStrictEqual(gatewayResponse.data);
     });
 
     test('When the pre-created user already paid and is pending to set up the account, then a domain error is thrown', async () => {

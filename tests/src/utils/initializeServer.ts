@@ -34,6 +34,9 @@ export const initializeServerAndDatabase = async () => {
   return app;
 };
 
+/** The dependencies the running test server was built with. */
+export const getTestDependencies = (): Dependencies => dependencies;
+
 export const closeServerAndDatabase = async () => {
   try {
     if (app) {

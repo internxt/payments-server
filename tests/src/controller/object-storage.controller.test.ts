@@ -3,7 +3,7 @@ import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/in
 import { getInvoices, getProduct, getUser, getValidAuthToken, getValidUserToken } from '../fixtures';
 import { PaymentService } from '../../../src/services/payment.service';
 import Stripe from 'stripe';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { getPriceEntity } from '../entity.fixtures';
 
 let app: FastifyInstance;
@@ -34,7 +34,7 @@ describe('Object Storage controller', () => {
         decimalAmount: mockedPriceEntity.decimalAmount,
       };
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPriceEntity);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPriceEntity);
       const response = await app.inject({
         method: 'GET',
         path: '/object-storage/price',

@@ -7,15 +7,14 @@ import { NotFoundError } from '../../../../../src/errors/Errors';
 import { UserNotFoundError } from '../../../../../src/errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../../../src/errors/UsersErrors';
 import { PreCreatedUserNotFoundError } from '../../../../../src/errors/PreCreatedUsersErrors';
-import { stripePaymentsAdapter } from '../../../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../../../src/infrastructure/domain/entities/customer';
-import { PreCreatedUserStatus } from '../../../../../src/infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserStatus } from '../../../../../src/core/users/PreCreatedUser';
 import Logger from '../../../../../src/Logger';
 import { TierNotFoundError, UsersTiersError } from '../../../../../src/services/tiers.service';
 import { InvoiceCompletedHandlerPayload } from '../../../../../src/webhooks/events/invoices/InvoiceCompletedHandler';
 import { getCustomer, getInvoice, getPrice, getProduct, getUser, newTier, voidPromise } from '../../../fixtures';
 import { createTestServices } from '../../../helpers/services-factory';
-import { getPreCreatedUserEntity } from '../../../entity.fixtures';
+import { getPreCreatedUser } from '../../../entity.fixtures';
 
 function axiosErrorWithStatus(status: number): AxiosError {
   const error = new AxiosError('Request failed');
@@ -34,12 +33,13 @@ const {
   cacheService,
   storageService,
   preCreatedUserService,
+  stripeAdapter,
 } = createTestServices();
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
-  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUser());
   jest.spyOn(preCreatedUserService, 'sendSetupEmail').mockImplementation(voidPromise);
 });
 
@@ -230,7 +230,7 @@ describe('Testing the handler when an invoice is completed', () => {
   });
 
   describe('Account setup email', () => {
-    const runNewProductPurchase = async (preCreatedUser?: ReturnType<typeof getPreCreatedUserEntity>) => {
+    const runNewProductPurchase = async (preCreatedUser?: ReturnType<typeof getPreCreatedUser>) => {
       const mockedCustomer = getCustomer();
       const mockedInvoice = getInvoice({ customer: mockedCustomer.id, status: 'paid' });
       const mockedTier = newTier();
@@ -260,7 +260,7 @@ describe('Testing the handler when an invoice is completed', () => {
     };
 
     test('When the buyer was found as a pre-created user, then the setup email is requested for it with the plan name', async () => {
-      const preCreatedUser = getPreCreatedUserEntity();
+      const preCreatedUser = getPreCreatedUser();
       const { sendSetupEmailSpy, mockedTier } = await runNewProductPurchase(preCreatedUser);
 
       expect(sendSetupEmailSpy).toHaveBeenCalledWith(preCreatedUser.uuid, mockedTier.label);
@@ -290,7 +290,7 @@ describe('Testing the handler when an invoice is completed', () => {
         status: mockedInvoice.status as string,
       };
 
-      const cancelSubscriptionSpy = jest.spyOn(stripePaymentsAdapter, 'cancelSubscription').mockResolvedValue();
+      const cancelSubscriptionSpy = jest.spyOn(stripeAdapter, 'cancelSubscription').mockResolvedValue();
 
       await invoiceCompletedHandler.run(invoiceCompletedHandlerPayload);
 
@@ -354,7 +354,7 @@ describe('Testing the handler when an invoice is completed', () => {
       const mockedCustomer = getCustomer({
         email: 'test@inxt.com',
       });
-      const mockedPreCreatedUser = getPreCreatedUserEntity();
+      const mockedPreCreatedUser = getPreCreatedUser();
       jest.spyOn(usersService, 'findUserByEmail').mockRejectedValue(axiosErrorWithStatus(404));
       jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(mockedPreCreatedUser);
       const findByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID');

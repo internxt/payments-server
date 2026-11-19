@@ -9,21 +9,21 @@ import {
   getValidAuthToken,
   getValidUserToken,
 } from '../fixtures';
-import { closeServerAndDatabase, initializeServerAndDatabase } from '../utils/initializeServer';
+import { closeServerAndDatabase, getTestDependencies, initializeServerAndDatabase } from '../utils/initializeServer';
 import { UsersService } from '../../../src/services/users.service';
 import { PaymentService } from '../../../src/services/payment.service';
 import { PaymentIntent } from '../../../src/types/payment';
 import { fetchUserStorage } from '../../../src/utils/fetchUserStorage';
 import Stripe from 'stripe';
 import * as verifyRecaptcha from '../../../src/utils/verifyRecaptcha';
-import { StripePaymentsAdapter, stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { UserNotFoundError } from '../../../src/errors/PaymentErrors';
 import { PreCreatedUserService } from '../../../src/services/preCreatedUser.service';
-import { PreCreatedUser, PreCreatedUserStatus } from '../../../src/infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUserStatus } from '../../../src/core/users/PreCreatedUser';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPreCreatedUserEntity, getPriceEntity } from '../entity.fixtures';
+import { getPreCreatedUser, getPriceEntity } from '../entity.fixtures';
 import { AllowedFiatCurrencies } from '../../../src/utils/currency';
 
 jest.mock('../../../src/utils/fetchUserStorage');
@@ -42,8 +42,8 @@ afterAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
-  jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTax').mockReturnValue(true);
-  jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
+  jest.spyOn(StripeAdapter.prototype, 'shouldCalculateTax').mockReturnValue(true);
+  jest.spyOn(StripeAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 });
 
 describe('Checkout controller', () => {
@@ -77,9 +77,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      const updateCustomerSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'updateCustomer')
-        .mockResolvedValue({} as any);
+      const updateCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
 
       const response = await app.inject({
         path: '/checkout/customer',
@@ -127,7 +125,7 @@ describe('Checkout controller', () => {
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       const createCustomerSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .spyOn(StripeAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(mockedCustomer));
       const insertUserSpy = jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
 
@@ -176,7 +174,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
+      jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest
         .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
         .mockResolvedValue();
@@ -216,7 +214,7 @@ describe('Checkout controller', () => {
 
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockResolvedValue(mockedUser);
-      jest.spyOn(StripePaymentsAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
+      jest.spyOn(StripeAdapter.prototype, 'updateCustomer').mockResolvedValue({} as any);
       const attachVatIdSpy = jest.spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer');
 
       const response = await app.inject({
@@ -268,7 +266,7 @@ describe('Checkout controller', () => {
     const stripeKnowsToken = (params?: Parameters<typeof getConfirmationToken>[0]) => {
       const stripeToken = getConfirmationToken(params);
       const retrieveSpy = jest
-        .spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve')
+        .spyOn(getTestDependencies().stripe.confirmationTokens, 'retrieve')
         .mockResolvedValue(stripeToken as Stripe.Response<Stripe.ConfirmationToken>);
       return { stripeToken, retrieveSpy };
     };
@@ -276,16 +274,14 @@ describe('Checkout controller', () => {
     const driveHasNoPreCreatedUser = () => {
       return jest
         .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
-        .mockResolvedValue(
-          new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
-        );
+        .mockResolvedValue({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment });
     };
 
     const buyerHasNoCustomer = () => {
       jest.spyOn(UsersService.prototype, 'findUserByUuid').mockRejectedValue(new UserNotFoundError());
       jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
       return jest
-        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .spyOn(StripeAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id', email: buyerEmail })));
     };
 
@@ -320,16 +316,14 @@ describe('Checkout controller', () => {
       const { stripeToken } = stripeKnowsToken();
       const getOrCreatePreCreatedUserSpy = jest
         .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
-        .mockResolvedValue(
-          new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
-        );
+        .mockResolvedValue({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment });
       const getPreCreatedUserSpy = jest.spyOn(PreCreatedUserService.prototype, 'get');
       const findUserSpy = jest
         .spyOn(UsersService.prototype, 'findUserByUuid')
         .mockRejectedValue(new UserNotFoundError());
       jest.spyOn(UsersService.prototype, 'insertUser').mockResolvedValue();
       jest
-        .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+        .spyOn(StripeAdapter.prototype, 'createCustomer')
         .mockResolvedValue(Customer.toDomain(getCustomer({ id: 'new_customer_id' })));
 
       const response = await createCustomerAnonymously({ email: buyerEmail, confirmationTokenId: stripeToken.id });
@@ -374,7 +368,7 @@ describe('Checkout controller', () => {
     });
 
     test('When Stripe does not know the confirmation token, then the request is rejected and nothing is created', async () => {
-      jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve').mockRejectedValue(
+      jest.spyOn(getTestDependencies().stripe.confirmationTokens, 'retrieve').mockRejectedValue(
         new Stripe.errors.StripeInvalidRequestError({
           type: 'invalid_request_error',
           code: 'resource_missing',
@@ -425,8 +419,8 @@ describe('Checkout controller', () => {
         .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
         .mockImplementation(async (email) =>
           email === pendingEmail
-            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
-            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+            ? { uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup }
+            : { uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment },
         );
       const createCustomerSpy = buyerHasNoCustomer();
 
@@ -447,8 +441,8 @@ describe('Checkout controller', () => {
         .spyOn(PreCreatedUserService.prototype, 'getOrCreate')
         .mockImplementation(async (email) =>
           email === pendingEmail
-            ? new PreCreatedUser({ uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup })
-            : new PreCreatedUser({ uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment }),
+            ? { uuid: 'pending-uuid', status: PreCreatedUserStatus.PendingSetup }
+            : { uuid: preCreatedUserUuid, status: PreCreatedUserStatus.AwaitingPayment },
         );
       const createCustomerSpy = buyerHasNoCustomer();
 
@@ -471,7 +465,7 @@ describe('Checkout controller', () => {
     test('When the user is logged in, then no confirmation token is needed and Stripe is not asked about one', async () => {
       const mockedUser = getUser();
       const userAuthToken = getValidAuthToken(mockedUser.uuid, undefined, { email: buyerEmail });
-      const retrieveSpy = jest.spyOn(stripePaymentsAdapter.provider.confirmationTokens, 'retrieve');
+      const retrieveSpy = jest.spyOn(getTestDependencies().stripe.confirmationTokens, 'retrieve');
       const createCustomerSpy = buyerHasNoCustomer();
 
       const response = await app.inject({
@@ -498,7 +492,7 @@ describe('Checkout controller', () => {
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
       jest
-        .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+        .spyOn(StripeAdapter.prototype, 'getPriceById')
         .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
       jest.spyOn(PaymentService.prototype, 'createSubscription').mockResolvedValue(mockedSubscriptionResponse);
       jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
@@ -530,7 +524,7 @@ describe('Checkout controller', () => {
         const mockedPrice = getPrice();
 
         jest
-          .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+          .spyOn(StripeAdapter.prototype, 'getPriceById')
           .mockResolvedValue(getPriceEntity({ type: UserType.Individual }));
         const createSubscriptionSpy = jest
           .spyOn(PaymentService.prototype, 'createSubscription')
@@ -586,7 +580,7 @@ describe('Checkout controller', () => {
         const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
         jest
-          .spyOn(StripePaymentsAdapter.prototype, 'getPriceById')
+          .spyOn(StripeAdapter.prototype, 'getPriceById')
           .mockResolvedValue(getPriceEntity({ type: UserType.Business }));
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
 
@@ -746,7 +740,7 @@ describe('Checkout controller', () => {
   describe('Create an invoice and returns the payment intent', () => {
     beforeEach(() => {
       jest.clearAllMocks();
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
+      jest.spyOn(StripeAdapter.prototype, 'getCustomer').mockResolvedValue(Customer.toDomain(getCustomer()));
     });
 
     test('When the user wants to pay a one time plan, then an invoice is created and the client secret is returned', async () => {
@@ -764,7 +758,7 @@ describe('Checkout controller', () => {
       } as const;
       const mockedCaptchaToken = 'captcha_token';
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: true,
       });
@@ -796,7 +790,7 @@ describe('Checkout controller', () => {
       const mockedUser = getUser();
       const mockedPrice = getPriceEntity({ interval: 'lifetime' });
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({ canExpand: true });
       const createInvoiceSpy = jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue({
         id: 'payment_intent_id',
@@ -835,12 +829,12 @@ describe('Checkout controller', () => {
           type: 'fiat',
         } as const;
 
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'createInvoice').mockResolvedValue(mockedPaymentIntent);
         jest.spyOn(verifyRecaptcha, 'verifyRecaptcha').mockResolvedValue(true);
         const eligibilitySpy = jest
           .spyOn(PreCreatedUserService.prototype, 'getEligibleForPayment')
-          .mockResolvedValue(getPreCreatedUserEntity());
+          .mockResolvedValue(getPreCreatedUser());
 
         return {
           mockedPaymentIntent,
@@ -892,7 +886,7 @@ describe('Checkout controller', () => {
       });
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
       const response = await app.inject({
         path: '/checkout/payment-intent',
@@ -921,7 +915,7 @@ describe('Checkout controller', () => {
       const authToken = getValidAuthToken(mockedUser.uuid);
       const userToken = getValidUserToken({ customerId: mockedUser.customerId });
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
       (fetchUserStorage as jest.Mock).mockResolvedValue({
         canExpand: false,
       });
@@ -1160,7 +1154,7 @@ describe('Checkout controller', () => {
       });
       const taxes = spanishVatFor(mockedPrice.amount);
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
       const response = await app.inject({
         path: '/checkout/price-by-id',
@@ -1184,7 +1178,7 @@ describe('Checkout controller', () => {
 
     test('When a visitor located in an EU country checks a price, then the price includes that country VAT', async () => {
       const mockedPrice = getPriceEntity({ bytes: 123456789, interval: 'year', amount: 10000, decimalAmount: 100 });
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+      jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
       const response = await app.inject({
         path: '/checkout/price-by-id',
@@ -1216,7 +1210,7 @@ describe('Checkout controller', () => {
         const discountedAmount = mockedPrice.amount - promoCode.amountOff;
         const taxes = spanishVatFor(discountedAmount);
 
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
 
         const response = await app.inject({
@@ -1258,7 +1252,7 @@ describe('Checkout controller', () => {
         const discountedAmount = mockedPrice.amount - discount;
         const taxes = spanishVatFor(discountedAmount);
 
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
 
         const response = await app.inject({
@@ -1302,7 +1296,7 @@ describe('Checkout controller', () => {
         const discountedAmount = 0;
         const taxes = spanishVatFor(discountedAmount);
 
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
         jest.spyOn(PaymentService.prototype, 'getPromoCodeByName').mockResolvedValue(promoCode);
 
         const response = await app.inject({
@@ -1347,7 +1341,7 @@ describe('Checkout controller', () => {
           bytes: 123456789,
           interval: 'year',
         });
-        jest.spyOn(StripePaymentsAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
+        jest.spyOn(StripeAdapter.prototype, 'getPriceById').mockResolvedValue(mockedPrice);
 
         const response = await app.inject({
           path: '/checkout/price-by-id',

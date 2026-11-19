@@ -2,8 +2,8 @@ import { TierNotFoundError } from '../../../../src/services/tiers.service';
 import { getCustomer, getUser, newTier, voidPromise } from '../../fixtures';
 import { handleCancelPlan } from '../../../../src/webhooks/utils/handleCancelPlan';
 import { createTestServices } from '../../helpers/services-factory';
-import { getPreCreatedUserEntity } from '../../entity.fixtures';
-import { PreCreatedUserStatus } from '../../../../src/infrastructure/domain/entities/preCreatedUser';
+import { getPreCreatedUser } from '../../entity.fixtures';
+import { PreCreatedUserStatus } from '../../../../src/core/users/PreCreatedUser';
 import { PreCreatedUserNotFoundError } from '../../../../src/errors/PreCreatedUsersErrors';
 
 const { usersService, tiersService, preCreatedUserService } = createTestServices();
@@ -11,7 +11,7 @@ const { usersService, tiersService, preCreatedUserService } = createTestServices
 beforeEach(() => {
   jest.resetAllMocks();
   jest.clearAllMocks();
-  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUserEntity());
+  jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(getPreCreatedUser());
   jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 });
 
@@ -146,7 +146,7 @@ describe('Handling canceled plans and refunded lifetimes', () => {
       'When the pre-created user is %s, then it is marked as cancelled',
       async (status) => {
         const { params } = setUpCancellation();
-        const mockedPreCreatedUser = getPreCreatedUserEntity({ status });
+        const mockedPreCreatedUser = getPreCreatedUser({ status });
 
         jest.spyOn(preCreatedUserService, 'get').mockResolvedValue(mockedPreCreatedUser);
         const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
@@ -162,14 +162,12 @@ describe('Handling canceled plans and refunded lifetimes', () => {
 
     it('When the cancellation is notified twice, then the pre-created user ends up cancelled the same way both times', async () => {
       const { params } = setUpCancellation();
-      const mockedPreCreatedUser = getPreCreatedUserEntity({ status: PreCreatedUserStatus.PendingSetup });
+      const mockedPreCreatedUser = getPreCreatedUser({ status: PreCreatedUserStatus.PendingSetup });
 
       jest.spyOn(preCreatedUserService, 'get').mockResolvedValueOnce(mockedPreCreatedUser);
       jest
         .spyOn(preCreatedUserService, 'get')
-        .mockResolvedValueOnce(
-          getPreCreatedUserEntity({ ...mockedPreCreatedUser, status: PreCreatedUserStatus.Cancelled }),
-        );
+        .mockResolvedValueOnce(getPreCreatedUser({ ...mockedPreCreatedUser, status: PreCreatedUserStatus.Cancelled }));
       const updateSpy = jest.spyOn(preCreatedUserService, 'update').mockImplementation(voidPromise);
 
       await handleCancelPlan(params);

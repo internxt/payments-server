@@ -22,7 +22,7 @@ import { TierNotFoundError, TiersService } from '../../../src/services/tiers.ser
 import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
-import { StripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
 import { getPriceEntity, getSubscriptionEntity } from '../entity.fixtures';
@@ -200,7 +200,7 @@ describe('Payment controller e2e tests', () => {
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
         const createdCustomerSpy = jest
-          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
+          .spyOn(StripeAdapter.prototype, 'createCustomer')
           .mockResolvedValue(Customer.toDomain(mockedCustomer));
 
         const response = await app.inject({
@@ -257,9 +257,7 @@ describe('Payment controller e2e tests', () => {
         jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
-        jest
-          .spyOn(StripePaymentsAdapter.prototype, 'createCustomer')
-          .mockResolvedValue(Customer.toDomain(mockedCustomer));
+        jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
         const attachVatIdSpy = jest
           .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
           .mockImplementation(voidPromise);
@@ -297,7 +295,7 @@ describe('Payment controller e2e tests', () => {
         const createSubscriptionSpy = jest
           .spyOn(PaymentService.prototype, 'createSubscription')
           .mockResolvedValue(subResponse);
-        jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
+        jest.spyOn(StripeAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 
         const body = {
           customerId: mockedUser.customerId,
@@ -335,7 +333,7 @@ describe('Payment controller e2e tests', () => {
         const createSubscriptionSpy = jest
           .spyOn(PaymentService.prototype, 'createSubscription')
           .mockResolvedValue(subResponse);
-        jest.spyOn(StripePaymentsAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
+        jest.spyOn(StripeAdapter.prototype, 'shouldCalculateTaxForCustomer').mockResolvedValue(true);
 
         const body = {
           customerId: mockedUser.customerId,
@@ -615,9 +613,7 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
-        .mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest.spyOn(StripeAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
@@ -637,9 +633,7 @@ describe('Payment controller e2e tests', () => {
         interval: mockedPriceEntity.interval,
       };
 
-      const getPricesSpy = jest
-        .spyOn(StripePaymentsAdapter.prototype, 'getPrices')
-        .mockResolvedValue([mockedPriceEntity]);
+      const getPricesSpy = jest.spyOn(StripeAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices?currency=usd' });
 
@@ -661,7 +655,7 @@ describe('Payment controller e2e tests', () => {
       const individualPrice = getPriceEntity({ type: UserType.Individual });
       const businessPrice = getPriceEntity({ type: UserType.Business });
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([individualPrice, businessPrice]);
+      jest.spyOn(StripeAdapter.prototype, 'getPrices').mockResolvedValue([individualPrice, businessPrice]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
       const responseBody = response.json();
@@ -674,7 +668,7 @@ describe('Payment controller e2e tests', () => {
     test('When a price has an annual commitment, then the interval is returned as year', async () => {
       const mockedPriceEntity = getPriceEntity({ commitmentPlan: true, interval: 'month' });
 
-      jest.spyOn(StripePaymentsAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
+      jest.spyOn(StripeAdapter.prototype, 'getPrices').mockResolvedValue([mockedPriceEntity]);
 
       const response = await app.inject({ method: 'GET', path: '/prices' });
 
