@@ -11,7 +11,7 @@ const { version } = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'
 const env = process.env.NODE_ENV;
 
 export const loggerOptions: LoggerOptions = {
-  level: env === 'test' ? 'silent' : 'info',
+  level: env === 'test' ? 'silent' : process.env.LOG_LEVEL || 'info',
   base: { service: 'payments', env, version },
   redact: ['headers.authorization', 'token', 'captchaToken', 'confirmationTokenId', 'companyVatId'],
   mixin: (_obj, _level, logger) => {

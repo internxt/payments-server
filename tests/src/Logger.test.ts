@@ -89,4 +89,42 @@ describe('App logger', () => {
   test('When the app runs the tests, then the logger is silent', () => {
     expect(loggerOptions.level).toBe('silent');
   });
+
+  describe('Log level outside the tests', () => {
+    const originalEnv = { ...process.env };
+    const loadLevel = () => {
+      let level: string | undefined;
+      jest.isolateModules(() => {
+        level = require('../../src/Logger').loggerOptions.level;
+      });
+      return level;
+    };
+
+    beforeEach(() => {
+      process.env.NODE_ENV = 'production';
+    });
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    test('When LOG_LEVEL is set, then the logger uses that level', () => {
+      process.env.LOG_LEVEL = 'debug';
+
+      expect(loadLevel()).toBe('debug');
+    });
+
+    test('When LOG_LEVEL is not set, then the logger logs from info upwards', () => {
+      delete process.env.LOG_LEVEL;
+
+      expect(loadLevel()).toBe('info');
+    });
+
+    test('When LOG_LEVEL is set while running the tests, then the logger stays silent', () => {
+      process.env.NODE_ENV = 'test';
+      process.env.LOG_LEVEL = 'debug';
+
+      expect(loadLevel()).toBe('silent');
+    });
+  });
 });
