@@ -14,7 +14,6 @@ import { TierNotFoundError } from '../services/tiers.service';
 import { VERIFICATION_CHARGE } from '../constants';
 import { setupAuth } from '../plugins/auth';
 import { InvalidLicenseCodeError } from '../errors/LicenseCodeErrors';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import { getPromotionCodeCoupon } from '../utils/coupon';
 import { type Dependencies } from '../dependencies';
 import Logger from '../Logger';
@@ -23,6 +22,7 @@ const allowedCurrency = ['eur', 'usd', 'inr', 'brl'];
 
 export function paymentsController({
   paymentService,
+  stripeAdapter,
   usersService,
   config,
   cacheService,
@@ -31,7 +31,14 @@ export function paymentsController({
   routeGuards: { verifyUserTokenHook },
 }: Pick<
   Dependencies,
-  'paymentService' | 'usersService' | 'config' | 'cacheService' | 'licenseCodesService' | 'tiersService' | 'routeGuards'
+  | 'paymentService'
+  | 'stripeAdapter'
+  | 'usersService'
+  | 'config'
+  | 'cacheService'
+  | 'licenseCodesService'
+  | 'tiersService'
+  | 'routeGuards'
 >) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
@@ -207,7 +214,7 @@ export function paymentsController({
       async (req, rep) => {
         const user = await assertUser(req, rep, usersService);
         const { address, phoneNumber } = req.body;
-        await stripePaymentsAdapter.updateCustomer(user.customerId, {
+        await stripeAdapter.updateCustomer(user.customerId, {
           address: {
             line1: address,
           },
@@ -451,7 +458,7 @@ export function paymentsController({
           return rep.status(400).send({ message: errorMessage });
         }
 
-        const prices = await stripePaymentsAdapter.getPrices(currencyValue);
+        const prices = await stripeAdapter.getPrices(currencyValue);
 
         const mappedPrices = prices
           .filter((price) => price.type === UserType.Individual)

@@ -6,7 +6,7 @@ import { User, UserType } from '../../../core/users/User';
 import { NotFoundError } from '../../../errors/Errors';
 import { UserNotFoundError } from '../../../errors/PaymentErrors';
 import { CouponNotBeingTrackedError } from '../../../errors/UsersErrors';
-import { stripePaymentsAdapter } from '../../../infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../infrastructure/adapters/stripe.adapter';
 import { Customer } from '../../../infrastructure/domain/entities/customer';
 import Logger from '../../../Logger';
 import CacheService from '../../../services/cache.service';
@@ -19,7 +19,7 @@ import { ObjectStorageWebhookHandler } from '../ObjectStorageWebhookHandler';
 import { AxiosError } from 'axios';
 import { PreCreatedUserService } from '../../../services/preCreatedUser.service';
 import { PreCreatedUserNotFoundError } from '../../../errors/PreCreatedUsersErrors';
-import { PreCreatedUser } from '../../../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUser } from '../../../core/users/PreCreatedUser';
 import { getDiscountCouponId } from '../../../utils/coupon';
 
 interface InvoiceCompletedHandlerAttributes {
@@ -31,6 +31,7 @@ interface InvoiceCompletedHandlerAttributes {
   usersService: UsersService;
   preCreatedUserService: PreCreatedUserService;
   cacheService: CacheService;
+  stripeAdapter: StripeAdapter;
 }
 
 export interface InvoiceCompletedHandlerPayload {
@@ -48,6 +49,7 @@ export class InvoiceCompletedHandler {
   private readonly usersService: UsersService;
   private readonly cacheService: CacheService;
   private readonly preCreatedUserService: PreCreatedUserService;
+  private readonly stripeAdapter: StripeAdapter;
 
   constructor({
     determineLifetimeConditions,
@@ -58,6 +60,7 @@ export class InvoiceCompletedHandler {
     usersService,
     cacheService,
     preCreatedUserService,
+    stripeAdapter,
   }: InvoiceCompletedHandlerAttributes) {
     this.determineLifetimeConditions = determineLifetimeConditions;
     this.objectStorageWebhookHandler = objectStorageWebhookHandler;
@@ -67,6 +70,7 @@ export class InvoiceCompletedHandler {
     this.usersService = usersService;
     this.cacheService = cacheService;
     this.preCreatedUserService = preCreatedUserService;
+    this.stripeAdapter = stripeAdapter;
   }
 
   /**
@@ -94,7 +98,7 @@ export class InvoiceCompletedHandler {
     // If the invoice is for early cancellation, cancel the subscription
     if (isChargeRemainingSubscriptionAmount && subscriptionId) {
       Logger.info(`Invoice ${invoiceId} is for early cancellation, cancelling subscription...`);
-      await stripePaymentsAdapter.cancelSubscription(subscriptionId);
+      await this.stripeAdapter.cancelSubscription(subscriptionId);
       return;
     }
 

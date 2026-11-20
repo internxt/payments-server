@@ -7,7 +7,6 @@ import { fetchUserStorage } from '../utils/fetchUserStorage';
 import { getAllowedCurrencies, isValidCurrency } from '../utils/currency';
 import { signUserToken } from '../utils/signUserToken';
 import { setupAuth } from '../plugins/auth';
-import { stripePaymentsAdapter } from '../infrastructure/adapters/stripe.adapter';
 import Logger from '../Logger';
 import { UserNotFoundError } from '../errors/PaymentErrors';
 import { type Dependencies } from '../dependencies';
@@ -15,13 +14,20 @@ import { type Dependencies } from '../dependencies';
 export function checkoutController({
   usersService,
   paymentService,
+  stripeAdapter,
   preCreatedUserService,
   confirmationTokenService,
   config,
   routeGuards: { verifyCaptchaHook, verifyUserTokenHook },
 }: Pick<
   Dependencies,
-  'usersService' | 'paymentService' | 'preCreatedUserService' | 'confirmationTokenService' | 'config' | 'routeGuards'
+  | 'usersService'
+  | 'paymentService'
+  | 'stripeAdapter'
+  | 'preCreatedUserService'
+  | 'confirmationTokenService'
+  | 'config'
+  | 'routeGuards'
 >) {
   return async function (fastify: FastifyInstance) {
     await setupAuth(fastify, { secret: config.JWT_SECRET, isTest: config.isTest });
@@ -104,7 +110,7 @@ export function checkoutController({
         });
 
         if (userExists) {
-          await stripePaymentsAdapter.updateCustomer(userExists.customerId, {
+          await stripeAdapter.updateCustomer(userExists.customerId, {
             name: customerName,
             email: customerEmail,
             address: {
@@ -115,7 +121,7 @@ export function checkoutController({
           });
           customerId = userExists.customerId;
         } else {
-          const { id } = await stripePaymentsAdapter.createCustomer({
+          const { id } = await stripeAdapter.createCustomer({
             name: customerName,
             email: customerEmail,
             address: {
@@ -194,11 +200,11 @@ export function checkoutController({
       async (req, res) => {
         const { customerId, priceId, currency, promoCodeId, gclid } = req.body;
 
-        const price = await stripePaymentsAdapter.getPriceById(priceId);
+        const price = await stripeAdapter.getPriceById(priceId);
 
         if (price.isBusinessPlan()) throw new BadRequestError('Business plan is no longer available');
 
-        const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+        const shouldCalculateTaxes = await stripeAdapter.shouldCalculateTaxForCustomer(customerId);
 
         const subscriptionAttempt = await paymentService.createSubscription({
           customerId,
@@ -277,8 +283,8 @@ export function checkoutController({
           );
         }
 
-        const customer = await stripePaymentsAdapter.getCustomer(customerId);
-        const price = await stripePaymentsAdapter.getPriceById(priceId);
+        const customer = await stripeAdapter.getCustomer(customerId);
+        const price = await stripeAdapter.getPriceById(priceId);
 
         if (price.interval !== 'lifetime') {
           throw new BadRequestError('Only lifetime plans are supported');
@@ -299,7 +305,7 @@ export function checkoutController({
           await preCreatedUserService.getEligibleForPayment(customer.email);
         }
 
-        const shouldCalculateTaxes = await stripePaymentsAdapter.shouldCalculateTaxForCustomer(customerId);
+        const shouldCalculateTaxes = await stripeAdapter.shouldCalculateTaxForCustomer(customerId);
 
         const result = await paymentService.createInvoice({
           customerId,
@@ -368,10 +374,10 @@ export function checkoutController({
         const userUuid = req.user?.payload?.uuid;
         const user = await usersService.findUserByUuid(userUuid).catch(() => null);
 
-        const price = await stripePaymentsAdapter.getPriceById(priceId, currency);
+        const price = await stripeAdapter.getPriceById(priceId, currency);
 
         const isUserAddressProvided = !!userAddress || (!!postalCode && !!country) || !!user?.customerId;
-        const isCountryAllowedForTaxes = stripePaymentsAdapter.shouldCalculateTax(country);
+        const isCountryAllowedForTaxes = stripeAdapter.shouldCalculateTax(country);
         const shouldCalculateTaxes = isUserAddressProvided && isCountryAllowedForTaxes;
 
         let amount = price.amount;

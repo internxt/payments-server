@@ -1,7 +1,7 @@
 import { AxiosInstance, AxiosRequestConfig, HttpStatusCode } from 'axios';
 import { signGatewayToken } from '../utils/signGatewayToken';
 import { AppConfig } from '../config';
-import { PreCreatedUser, PreCreatedUserStatus } from '../infrastructure/domain/entities/preCreatedUser';
+import { PreCreatedUser, PreCreatedUserStatus } from '../core/users/PreCreatedUser';
 import {
   DriveAccountAlreadyExistsError,
   PreCreatedUserNotFoundError,
@@ -24,7 +24,7 @@ export class PreCreatedUserService {
     try {
       const preCreatedUser = await this.axios.post(`${this.baseUrl}/pre-create`, { email }, requestConfig);
 
-      return PreCreatedUser.toDomain(preCreatedUser.data);
+      return { uuid: preCreatedUser.data.uuid, status: preCreatedUser.data.status };
     } catch (error) {
       if (error instanceof HttpResponseError && error.status === HttpStatusCode.Conflict) {
         throw new DriveAccountAlreadyExistsError();
@@ -49,7 +49,7 @@ export class PreCreatedUserService {
     try {
       const preCreatedUser = await this.axios.get(`${this.baseUrl}/pre-create`, requestConfig);
 
-      return PreCreatedUser.toDomain(preCreatedUser.data);
+      return { uuid: preCreatedUser.data.uuid, status: preCreatedUser.data.status };
     } catch (error) {
       if (error instanceof HttpResponseError && error.hasCode(HttpErrorCode.UserNotFound)) {
         throw new PreCreatedUserNotFoundError();
@@ -108,7 +108,7 @@ export class PreCreatedUserService {
   async getOrCreateEligibleForPayment(email: string): Promise<PreCreatedUser> {
     const preCreatedUser = await this.getOrCreate(email);
 
-    if (preCreatedUser.isPendingStatus) {
+    if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) {
       throw new PreCreatedUserPendingSetupError();
     }
 
@@ -122,7 +122,7 @@ export class PreCreatedUserService {
   async getEligibleForPayment(email: string): Promise<PreCreatedUser> {
     const preCreatedUser = await this.get(email);
 
-    if (preCreatedUser.isPendingStatus) {
+    if (preCreatedUser.status === PreCreatedUserStatus.PendingSetup) {
       throw new PreCreatedUserPendingSetupError();
     }
 

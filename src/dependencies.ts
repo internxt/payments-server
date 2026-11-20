@@ -16,7 +16,7 @@ import { MongoDBTiersRepository } from './core/users/MongoDBTiersRepository';
 import { MongoDBUserFeatureOverridesRepository } from './core/users/MongoDBUserFeatureOverridesRepository';
 import { MongoDBUsersRepository } from './core/users/MongoDBUsersRepository';
 import { MongoDBUsersTiersRepository } from './core/users/MongoDBUsersTiersRepository';
-import { stripePaymentsAdapter } from './infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from './infrastructure/adapters/stripe.adapter';
 import { createHttpClient } from './infrastructure/http/httpClient';
 import { createRouteGuards, type RouteGuards } from './plugins/route-guards';
 import CacheService from './services/cache.service';
@@ -39,6 +39,7 @@ import { InvoiceCompletedHandler } from './webhooks/events/invoices/InvoiceCompl
 export interface Dependencies {
   config: AppConfig;
   stripe: Stripe;
+  stripeAdapter: StripeAdapter;
   paymentService: PaymentService;
   storageService: StorageService;
   usersService: UsersService;
@@ -73,17 +74,18 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
   const dynamicConfigRepository = new MongoDBDynamicConfigRepository(mongoClient);
 
   let stripe: Stripe;
+  let stripeAdapter: StripeAdapter;
   try {
     const stripeKeyOverride = await dynamicConfigRepository.get(DynamicConfigKey.StripeKey);
     stripe = new Stripe(stripeKeyOverride ?? config.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
-    stripePaymentsAdapter.initProvider(stripe);
-    await stripePaymentsAdapter.syncTaxRegistrations();
+    stripeAdapter = new StripeAdapter(stripe);
+    await stripeAdapter.syncTaxRegistrations();
   } catch (error) {
     await mongoClient.close();
     throw error;
   }
 
-  const paymentService = new PaymentService(stripe, productsRepository);
+  const paymentService = new PaymentService(stripe, productsRepository, stripeAdapter);
   const storageService = new StorageService(config, axios);
   const usersService = new UsersService(
     usersRepository,
@@ -103,16 +105,21 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
     storageService,
     mailService,
   );
-  const licenseCodesService = new LicenseCodesService({ paymentService, usersService, licenseCodesRepository });
+  const licenseCodesService = new LicenseCodesService({
+    paymentService,
+    usersService,
+    licenseCodesRepository,
+    stripeAdapter,
+  });
   const objectStorageService = new ObjectStorageService(paymentService, config, axios);
   const userFeaturesOverridesService = new UserFeaturesOverridesService(usersService, userFeatureOverridesRepository);
   const productsService = new ProductsService(tiersService, usersService, userFeaturesOverridesService);
   const healthService = new HealthService(mongoClient, cacheService);
   const preCreatedUserService = new PreCreatedUserService(createHttpClient(), config);
-  const confirmationTokenService = new ConfirmationTokenService(cacheService);
+  const confirmationTokenService = new ConfirmationTokenService(cacheService, stripeAdapter);
   const klaviyoTrackingService = new KlaviyoTrackingService(config);
 
-  const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService);
+  const determineLifetimeConditions = new DetermineLifetimeConditions(paymentService, tiersService, stripeAdapter);
   const objectStorageWebhookHandler = new ObjectStorageWebhookHandler(objectStorageService, paymentService);
   const invoiceCompletedHandler = new InvoiceCompletedHandler({
     determineLifetimeConditions,
@@ -123,6 +130,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
     usersService,
     cacheService,
     preCreatedUserService,
+    stripeAdapter,
   });
 
   const closeConnections = async () => {
@@ -133,6 +141,7 @@ export async function buildDependencies(config: AppConfig): Promise<Dependencies
   return {
     config,
     stripe,
+    stripeAdapter,
     paymentService,
     storageService,
     usersService,

@@ -1,7 +1,8 @@
+import Stripe from 'stripe';
 import { loadConfig } from '../../../src/config';
 import { InvalidConfirmationTokenError } from '../../../src/errors/PaymentErrors';
 import { ConfirmationToken } from '../../../src/infrastructure/domain/entities/confirmationToken';
-import { stripePaymentsAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
+import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
 import CacheService from '../../../src/services/cache.service';
 import { ConfirmationTokenService } from '../../../src/services/confirmationToken.service';
 import { CONFIRMATION_TOKEN_MAX_AGE_IN_MINUTES } from '../../../src/constants';
@@ -25,8 +26,9 @@ describe('Confirmation token service', () => {
 
   beforeEach(() => {
     jest.restoreAllMocks();
-    getConfirmationTokenFromPayments = jest.spyOn(stripePaymentsAdapter, 'getConfirmationToken');
-    confirmationTokenService = new ConfirmationTokenService(new CacheService(config));
+    const stripeAdapter = new StripeAdapter({} as Stripe);
+    getConfirmationTokenFromPayments = jest.spyOn(stripeAdapter, 'getConfirmationToken');
+    confirmationTokenService = new ConfirmationTokenService(new CacheService(config), stripeAdapter);
   });
 
   test('When the token is valid and unused, then it is accepted', async () => {
