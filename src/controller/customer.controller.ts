@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { setupAuth } from '../plugins/auth';
 import { CancellationTrialAlreadyRedeemedError } from '../errors/UsersErrors';
 import { type Dependencies } from '../dependencies';
+import Logger from '../Logger';
 
 export function customerController({
   usersService,
@@ -35,7 +36,7 @@ export function customerController({
             return res.status(200).send({ usedCoupons: cachedCoupons });
           }
         } catch (error) {
-          req.log.error(`[CUSTOMER/COUPONS]: Failed to fetch cached promo codes for user ${user.customerId}: ${error}`);
+          Logger.error(`[CUSTOMER/COUPONS]: Failed to fetch cached promo codes for user ${user.customerId}: ${error}`);
         }
 
         try {
@@ -51,7 +52,7 @@ export function customerController({
 
           promoCodeResults.forEach((result, index) => {
             if (result.status === 'rejected') {
-              req.log.warn(
+              Logger.warn(
                 `[UUID/${uuid}] Failed to get user promo code for coupon ${storedCoupons[index]}: ${result.reason}`,
               );
             }
@@ -70,7 +71,7 @@ export function customerController({
 
           return res.status(200).send({ usedCoupons });
         } catch (error) {
-          req.log.error(`[CUSTOMER/COUPONS]: Failed to retrieve stored coupons for user ${user.id}: ${error}`);
+          Logger.error(`[CUSTOMER/COUPONS]: Failed to retrieve stored coupons for user ${user.id}: ${error}`);
 
           throw error;
         }
