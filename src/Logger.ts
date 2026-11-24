@@ -13,7 +13,7 @@ const env = process.env.NODE_ENV;
 export const loggerOptions: LoggerOptions = {
   level: env === 'test' ? 'silent' : process.env.LOG_LEVEL || 'info',
   base: { service: 'payments', env, version },
-  redact: ['headers.authorization', 'token', 'captchaToken', 'confirmationTokenId', 'companyVatId'],
+  redact: ['headers.authorization', 'token', 'captchaToken', 'confirmationTokenId'],
   mixin: (_obj, _level, logger) => {
     const { reqId, ...context } = logContext.getStore() ?? {};
     return logger.bindings().reqId ? context : { reqId, ...context };
