@@ -11,6 +11,7 @@ import Stripe from 'stripe';
 import { Service } from '../core/users/Tier';
 import { setupAuth } from '../plugins/auth';
 import { type Dependencies } from '../dependencies';
+import Logger from '../Logger';
 
 export function businessController({
   paymentService,
@@ -98,7 +99,7 @@ export function businessController({
           return res.status(200).send(updatedSub);
         } catch (err) {
           const error = err as Error;
-          req.log.error(`[WORKSPACES/ERROR]: Error trying to update seats: ${error.stack ?? error.message}`);
+          Logger.error(`[WORKSPACES/ERROR]: Error trying to update seats: ${error.stack ?? error.message}`);
           if (
             error instanceof InvalidSeatNumberError ||
             error instanceof IncompatibleSubscriptionTypesError ||

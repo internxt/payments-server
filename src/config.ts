@@ -69,7 +69,3 @@ export function loadConfig(): AppConfig {
     isTest: NODE_ENV === 'test',
   };
 }
-
-// Only for the Logger singleton, which gets the config injected in the logger block.
-export const isDevelopment = process.env.NODE_ENV === 'development';
-export const isTest = process.env.NODE_ENV === 'test';

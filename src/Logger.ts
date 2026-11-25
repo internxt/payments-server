@@ -1,54 +1,35 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { FastifyBaseLogger } from 'fastify';
-import pino from 'pino';
-import { isDevelopment, isTest } from './config';
+import pino, { LoggerOptions } from 'pino';
 
-class Logger {
-  private static instance: Logger;
-  private readonly pinoLogger: FastifyBaseLogger;
+type LogContext = { reqId?: string; stripeEventId?: string; stripeEventType?: string };
 
-  private constructor() {
-    this.pinoLogger = pino({
-      level: process.env.LOG_LEVEL || 'info',
-      ...(isDevelopment && {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname',
-          },
-        },
-        msgPrefix: '[PAYMENTS-SERVER]: ',
-      }),
-      ...(isTest && { level: 'silent' }),
-    });
-  }
+const logContext = new AsyncLocalStorage<LogContext>();
+const { version } = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const env = process.env.NODE_ENV;
 
-  static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
-    }
-    return Logger.instance;
-  }
+export const loggerOptions: LoggerOptions = {
+  level: env === 'test' ? 'silent' : process.env.LOG_LEVEL || 'info',
+  base: { service: 'payments', env, version },
+  redact: ['headers.authorization', 'token', 'captchaToken', 'confirmationTokenId'],
+  mixin: (_obj, _level, logger) => {
+    const { reqId, ...context } = logContext.getStore() ?? {};
+    return logger.bindings().reqId ? context : { reqId, ...context };
+  },
+  ...(env === 'development' && {
+    transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' } },
+  }),
+};
 
-  getPinoLogger(): FastifyBaseLogger {
-    return this.pinoLogger;
-  }
+export const runWithLogContext = <T>(context: LogContext, fn: () => T): T =>
+  logContext.run({ ...logContext.getStore(), ...context }, fn);
 
-  info(message: string, ...args: any[]): void {
-    this.pinoLogger.info(message, ...args);
-  }
+export const addLogContext = (context: LogContext): void => {
+  Object.assign(logContext.getStore() ?? {}, context);
+};
 
-  error(message: string, ...args: any[]): void {
-    this.pinoLogger.error(message, ...args);
-  }
+const Logger: FastifyBaseLogger = pino(loggerOptions);
 
-  debug(message: string, ...args: any[]): void {
-    this.pinoLogger.debug(message, ...args);
-  }
-
-  warn(message: string, ...args: any[]): void {
-    this.pinoLogger.warn(message, ...args);
-  }
-}
-
-export default Logger.getInstance();
+export default Logger;

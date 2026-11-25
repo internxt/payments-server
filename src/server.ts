@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 
 import { loadConfig } from './config';
+import Logger from './Logger';
 import { buildApp } from './app';
 import { buildDependencies } from './dependencies';
 
@@ -26,7 +27,7 @@ const start = async (): Promise<FastifyInstance> => {
     });
     return fastify;
   } catch (err) {
-    fastify.log.error(err);
+    Logger.error({ err }, 'Server could not start');
     process.exit(1);
   }
 };
