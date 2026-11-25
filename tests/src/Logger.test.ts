@@ -81,7 +81,6 @@ describe('App logger', () => {
       token: '[Redacted]',
       captchaToken: '[Redacted]',
       confirmationTokenId: '[Redacted]',
-      companyVatId: '[Redacted]',
       headers: { authorization: '[Redacted]' },
     });
   });
