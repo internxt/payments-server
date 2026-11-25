@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.4](https://github.com/internxt/payments-server/compare/v1.0.3...v1.0.4) (2026-11-25)
+
+
+### Bug Fixes
+
+* honour LOG_LEVEL in logger ([e93031c](https://github.com/internxt/payments-server/commit/e93031c08fb52e1734c8c3c09d7384309c0431cd))
+* remove companyVatId from redact ([6b56b23](https://github.com/internxt/payments-server/commit/6b56b238cd5f58d2ec88049517ab6e40be8b6f91))
+
+
+### Code Refactoring
+
+* add request context to logger ([6e224cd](https://github.com/internxt/payments-server/commit/6e224cd093944290449a04e56541dc10cd941f96))
+
 ## [1.0.3](https://github.com/internxt/payments-server/compare/v1.0.2...v1.0.3) (2026-11-19)
 
 
