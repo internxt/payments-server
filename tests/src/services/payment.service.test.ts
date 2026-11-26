@@ -529,107 +529,124 @@ describe('Payments Service tests', () => {
     });
   });
 
-  describe('Get User default payment method', () => {
-    const mockProvider = {
-      paymentMethods: {
-        list: jest.fn(),
-      },
-      customers: {
-        retrieve: jest.fn(),
-      },
-    };
-    const mockGetActiveSubscriptions = jest.fn();
-
-    const { id: customerId } = getUser();
+  describe('Changing the payment method of a subscription', () => {
+    const individualPlan = { metadata: { type: UserType.Individual } } as unknown as Stripe.Product;
 
     beforeEach(() => {
-      jest.clearAllMocks();
+      jest.spyOn(stripe.subscriptions, 'list').mockResolvedValue({
+        data: [{ id: 'sub_individual', status: 'active', plan: { product: individualPlan } }],
+      } as any);
     });
 
-    it('when user is lifetime individual, then returns the payment method', async () => {
-      const mockedPaymentMethod = getPaymentMethod();
-      const mockPaymentMethods = [{ ...mockedPaymentMethod }];
-      mockProvider.paymentMethods.list.mockResolvedValue({ data: mockPaymentMethods });
+    test('When the payment method is attached to the customer, then it becomes the default of the active subscription', async () => {
+      jest
+        .spyOn(stripe.paymentMethods, 'attach')
+        .mockResolvedValue(
+          getPaymentMethod({ id: 'pm_new_card', customer: 'cus_internxt' }) as Stripe.Response<Stripe.PaymentMethod>,
+        );
+      const updateSpy = jest
+        .spyOn(stripe.subscriptions, 'update')
+        .mockResolvedValue({ id: 'sub_individual' } as Stripe.Response<Stripe.Subscription>);
 
-      const result = await paymentService.getDefaultPaymentMethod.call(
-        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
-        customerId,
-        true,
-        UserType.Individual,
-      );
+      await paymentService.updateSubscriptionPaymentMethod('cus_internxt', 'pm_new_card', UserType.Individual);
 
-      expect(mockProvider.paymentMethods.list).toHaveBeenCalledWith({ customer: customerId });
-      expect(result).toEqual(mockPaymentMethods[0]);
+      expect(updateSpy).toHaveBeenCalledWith('sub_individual', { default_payment_method: 'pm_new_card' });
     });
 
-    it('when no payment methods exist for lifetime individual user, then returns null', async () => {
-      mockProvider.paymentMethods.list.mockResolvedValue({ data: [] });
+    test('When Stripe attaches the payment method without a customer, then the subscription is not changed', async () => {
+      jest
+        .spyOn(stripe.paymentMethods, 'attach')
+        .mockResolvedValue(
+          getPaymentMethod({ id: 'pm_new_card', customer: null }) as Stripe.Response<Stripe.PaymentMethod>,
+        );
+      const updateSpy = jest.spyOn(stripe.subscriptions, 'update');
 
-      const result = await paymentService.getDefaultPaymentMethod.call(
-        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
-        customerId,
-        true,
-        UserType.Individual,
-      );
+      await expect(
+        paymentService.updateSubscriptionPaymentMethod('cus_internxt', 'pm_new_card', UserType.Individual),
+      ).rejects.toThrow('Payment method not attached');
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
 
-      expect(mockProvider.paymentMethods.list).toHaveBeenCalledWith({ customer: customerId });
+  describe('Default payment method of a user', () => {
+    const customerId = 'cus_internxt';
+    const card = getPaymentMethod({ id: 'pm_card' });
+    const legacyCard = { id: 'card_legacy', object: 'card' } as Stripe.Card;
+    const individualPlan = { metadata: { type: UserType.Individual } } as unknown as Stripe.Product;
+
+    const mockActiveSubscriptions = (subscriptions: Partial<Stripe.Subscription>[]) =>
+      jest.spyOn(stripe.subscriptions, 'list').mockResolvedValue({
+        data: subscriptions.map((subscription) => ({ ...subscription, plan: { product: individualPlan } })),
+      } as any);
+
+    test('When an individual lifetime user has payment methods, then the first one is returned', async () => {
+      const listSpy = jest.spyOn(stripe.paymentMethods, 'list').mockResolvedValue({ data: [card] } as any);
+
+      const result = await paymentService.getDefaultPaymentMethod(customerId, true, UserType.Individual);
+
+      expect(listSpy).toHaveBeenCalledWith({ customer: customerId });
+      expect(result).toStrictEqual(card);
+    });
+
+    test('When an individual lifetime user has no payment methods, then nothing is returned', async () => {
+      jest.spyOn(stripe.paymentMethods, 'list').mockResolvedValue({ data: [] } as any);
+
+      const result = await paymentService.getDefaultPaymentMethod(customerId, true, UserType.Individual);
+
       expect(result).toBeNull();
     });
 
-    it('when subscriptions exist with default payment method, then returns the default payment method', async () => {
-      const mockedSubscription = getCreatedSubscription();
-      const mockSubscriptions = [
-        {
-          ...mockedSubscription,
-        },
-      ];
-      mockGetActiveSubscriptions.mockResolvedValue(mockSubscriptions);
+    test('When the active subscription has a default payment method, then that payment method is returned', async () => {
+      mockActiveSubscriptions([{ id: 'sub_card', status: 'active', default_payment_method: card }]);
 
-      const result = await paymentService.getDefaultPaymentMethod.call(
-        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
-        customerId,
-        false,
-        UserType.Individual,
-      );
+      const result = await paymentService.getDefaultPaymentMethod(customerId, false, UserType.Individual);
 
-      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
-      expect(result).toEqual(mockSubscriptions[0].default_payment_method);
+      expect(result).toStrictEqual(card);
     });
 
-    it('when no active subscriptions exist, then returns null', async () => {
-      mockGetActiveSubscriptions.mockResolvedValue([]);
+    test('When the user has no active subscriptions, then nothing is returned', async () => {
+      mockActiveSubscriptions([]);
 
-      const result = await paymentService.getDefaultPaymentMethod.call(
-        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
-        customerId,
-        false,
-        UserType.Individual,
-      );
+      const result = await paymentService.getDefaultPaymentMethod(customerId, false, UserType.Individual);
 
-      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
       expect(result).toBeNull();
     });
 
-    it('when no default payment method exists in subscriptions, then returns the default source', async () => {
-      const mockedSubscription = getCreatedSubscription({
-        default_payment_method: undefined,
-      });
-      const mockSubscriptions = [
-        {
-          ...mockedSubscription,
-        },
-      ];
-      mockGetActiveSubscriptions.mockResolvedValue(mockSubscriptions);
+    test('When the active subscription only has a legacy default source, then that source is returned', async () => {
+      mockActiveSubscriptions([
+        { id: 'sub_legacy', status: 'active', default_payment_method: null, default_source: legacyCard },
+      ]);
 
-      const result = await paymentService.getDefaultPaymentMethod.call(
-        { provider: mockProvider, getActiveSubscriptions: mockGetActiveSubscriptions },
-        customerId,
-        false,
-        UserType.Individual,
+      const result = await paymentService.getDefaultPaymentMethod(customerId, false, UserType.Individual);
+
+      expect(result).toStrictEqual(legacyCard);
+    });
+
+    test('When the subscription has no payment method of its own, then the default payment method of the customer is returned', async () => {
+      mockActiveSubscriptions([
+        { id: 'sub_without_method', status: 'active', default_payment_method: null, default_source: null },
+      ]);
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
+        getCustomer({
+          id: customerId,
+          invoice_settings: { default_payment_method: card } as Stripe.Customer.InvoiceSettings,
+        }) as Stripe.Response<Stripe.Customer>,
       );
 
-      expect(mockGetActiveSubscriptions).toHaveBeenCalledWith(customerId);
-      expect(result).toEqual(mockSubscriptions[0].default_source);
+      const result = await paymentService.getDefaultPaymentMethod(customerId, false, UserType.Individual);
+
+      expect(result).toStrictEqual(card);
+    });
+
+    test('When the subscription has no payment method of its own and the customer was deleted, then nothing is returned', async () => {
+      mockActiveSubscriptions([
+        { id: 'sub_without_method', status: 'active', default_payment_method: null, default_source: null },
+      ]);
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue({ id: customerId, deleted: true } as any);
+
+      const result = await paymentService.getDefaultPaymentMethod(customerId, false, UserType.Individual);
+
+      expect(result).toBeNull();
     });
   });
 

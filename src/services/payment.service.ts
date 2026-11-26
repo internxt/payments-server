@@ -693,11 +693,12 @@ export class PaymentService {
 
     if (!subscriptionId) throw new Error('Subscription not found');
 
-    const { id, customer } = await this.provider.paymentMethods.attach(paymentMethodId, {
-      customer: customerId,
-    });
+    const { id, customerId: attachedCustomerId } = await this.stripeAdapter.attachPaymentMethod(
+      paymentMethodId,
+      customerId,
+    );
 
-    if (!id || !customer) throw new Error('Payment method not attached');
+    if (!id || !attachedCustomerId) throw new Error('Payment method not attached');
 
     return this.provider.subscriptions.update(subscriptionId, {
       default_payment_method: id,
@@ -802,9 +803,7 @@ export class PaymentService {
     userType: UserType = UserType.Individual,
   ): Promise<PaymentMethod | CustomerSource | null> {
     if (isLifetime && userType === UserType.Individual) {
-      const { data: userPaymentMethod } = await this.provider.paymentMethods.list({
-        customer: customerId,
-      });
+      const userPaymentMethod = await this.stripeAdapter.listPaymentMethods(customerId);
 
       if (userPaymentMethod.length === 0) return null;
 
@@ -827,15 +826,7 @@ export class PaymentService {
 
     const subscriptionWithDefaultSource = subscriptions.find((subscription) => subscription.default_source);
     if (subscriptionWithDefaultSource) return subscriptionWithDefaultSource.default_source as CustomerSource;
-    const customer = await this.provider.customers.retrieve(customerId, {
-      expand: ['default_source', 'invoice_settings.default_payment_method'],
-    });
-
-    if (customer.deleted) return null;
-
-    return (
-      (customer.invoice_settings.default_payment_method as PaymentMethod) ?? (customer.default_source as CustomerSource)
-    );
+    return this.stripeAdapter.getCustomerDefaultPaymentMethod(customerId);
   }
 
   async getUserSubscription(
