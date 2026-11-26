@@ -8,7 +8,7 @@ import { BadRequestError } from '../../errors/Errors';
 import Logger from '../../Logger';
 import { StripeAdapter } from '../../infrastructure/adapters/stripe.adapter';
 import { getInvoicePriceId, getInvoiceProductId } from '../../utils/invoice';
-import { Customer } from '../../infrastructure/domain/entities/customer';
+import { Customer } from '../../types/customer';
 
 export class DetermineLifetimeConditions {
   constructor(

@@ -9,14 +9,13 @@ import {
 } from '../../fixtures';
 import { StripeAdapter } from '../../../../src/infrastructure/adapters/stripe.adapter';
 import Stripe from 'stripe';
-import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
 import {
   InvalidConfirmationTokenError,
   InvalidTaxIdError,
   UserNotFoundError,
 } from '../../../../src/errors/PaymentErrors';
+import { BadRequestError } from '../../../../src/errors/Errors';
 import { ConfirmationToken } from '../../../../src/infrastructure/domain/entities/confirmationToken';
-import { PaymentMethod } from '../../../../src/infrastructure/domain/entities/paymentMethod';
 import { Price } from '../../../../src/infrastructure/domain/entities/price';
 import { UserType } from '../../../../src/core/users/User';
 import { PRODUCT_BASE } from '../../fixtures/stripe-base.generated';
@@ -29,137 +28,174 @@ const stripe = new Stripe('sk_test_stripe_adapter', { apiVersion: STRIPE_API_VER
 const stripeAdapter = new StripeAdapter(stripe);
 
 describe('Stripe Adapter', () => {
+  const stripeCustomer = (params?: Partial<Stripe.Customer>) =>
+    getCustomer({
+      id: 'cus_internxt',
+      name: 'My internxt',
+      email: 'example@internxt.com',
+      address: {
+        line1: 'Avenida el Port',
+        line2: 'Angels',
+        city: 'Valencia',
+        state: 'Valencia',
+        country: 'ES',
+        postal_code: '46023',
+      },
+      phone: '+34600000000',
+      metadata: { referralCode: 'ABC123' },
+      ...params,
+    });
+
+  const mappedCustomer = {
+    id: 'cus_internxt',
+    name: 'My internxt',
+    email: 'example@internxt.com',
+    address: {
+      line1: 'Avenida el Port',
+      line2: 'Angels',
+      city: 'Valencia',
+      state: 'Valencia',
+      country: 'ES',
+      postalCode: '46023',
+    },
+    phone: '+34600000000',
+    metadata: { referralCode: 'ABC123' },
+    defaultPaymentMethod: undefined,
+  };
+
   describe('Create customer', () => {
-    test('When creating a customer, then the customer is created and the correct data is returned', async () => {
-      const mockedCustomer = getCustomer();
-
-      jest.spyOn(stripe.customers, 'create').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
-
-      const metadata = { referralCode: 'ABC123' };
+    test('When creating a customer, then Stripe receives its data and the customer is returned as plain data', async () => {
+      const createSpy = jest
+        .spyOn(stripe.customers, 'create')
+        .mockResolvedValue(stripeCustomer() as Stripe.Response<Stripe.Customer>);
 
       const createdCustomer = await stripeAdapter.createCustomer({
-        email: mockedCustomer.email as string,
-        name: mockedCustomer.name as string,
-        address: {
-          line1: mockedCustomer.address?.line1 ?? '',
-          line2: mockedCustomer.address?.line2 ?? '',
-          city: mockedCustomer.address?.city ?? '',
-          state: mockedCustomer.address?.state ?? '',
-          country: mockedCustomer.address?.country ?? '',
-          postalCode: mockedCustomer.address?.postal_code ?? '',
-        },
-        metadata,
+        email: 'example@internxt.com',
+        name: 'My internxt',
+        address: { country: 'ES', postalCode: '46023' },
+        metadata: { referralCode: 'ABC123' },
       });
 
-      expect(createdCustomer).toStrictEqual(Customer.toDomain(mockedCustomer));
+      expect(createSpy).toHaveBeenCalledWith({
+        email: 'example@internxt.com',
+        name: 'My internxt',
+        address: {
+          line1: undefined,
+          line2: undefined,
+          city: undefined,
+          state: undefined,
+          country: 'ES',
+          postal_code: '46023',
+        },
+        metadata: { referralCode: 'ABC123' },
+      });
+      expect(createdCustomer).toStrictEqual(mappedCustomer);
+    });
+
+    test('When Stripe returns the customer without an email, then a bad request error is thrown', async () => {
+      jest
+        .spyOn(stripe.customers, 'create')
+        .mockResolvedValue(stripeCustomer({ email: null }) as Stripe.Response<Stripe.Customer>);
+
+      await expect(stripeAdapter.createCustomer({ name: 'My internxt' })).rejects.toThrow(
+        new BadRequestError('Customer email is required'),
+      );
     });
   });
 
   describe('Update customer', () => {
-    test('When updating a customer, then the customer is updated and the correct data is returned', async () => {
-      const mockedCustomer = getCustomer();
+    test('When updating a customer, then the updated customer is returned as plain data', async () => {
+      jest.spyOn(stripe.customers, 'update').mockResolvedValue(stripeCustomer() as Stripe.Response<Stripe.Customer>);
 
-      jest.spyOn(stripe.customers, 'update').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      const updatedCustomer = await stripeAdapter.updateCustomer('cus_internxt', { name: 'My internxt' });
 
-      const updatedCustomer = await stripeAdapter.updateCustomer(mockedCustomer.id, {
-        email: mockedCustomer.email as string,
-        name: mockedCustomer.name as string,
-        address: {
-          line1: mockedCustomer.address?.line1 ?? '',
-          line2: mockedCustomer.address?.line2 ?? '',
-          city: mockedCustomer.address?.city ?? '',
-          state: mockedCustomer.address?.state ?? '',
-          country: mockedCustomer.address?.country ?? '',
-          postalCode: mockedCustomer.address?.postal_code ?? '',
-        },
-      });
-
-      expect(updatedCustomer).toStrictEqual(Customer.toDomain(mockedCustomer));
+      expect(updatedCustomer).toStrictEqual(mappedCustomer);
     });
 
-    test('When address is not provided, then the existing address should be preserved', async () => {
-      const originalAddress = {
-        postal_code: '08001',
-        country: 'ES',
-        city: 'Barcelona',
-        line1: 'Carrer Major 1',
-        line2: 'Piso 2',
-        state: 'Catalunya',
-      };
-
-      const initialCustomer = getCustomer({
-        name: 'Original Name',
-        email: 'original@internxt.com',
-        address: originalAddress,
-      });
-
-      const updatedCustomer = getCustomer({
-        id: initialCustomer.id,
-        name: 'Updated Name',
-        email: 'original@internxt.com',
-        address: originalAddress,
-      });
-
+    test('When the address is not provided, then Stripe is not asked to change it', async () => {
       const updateSpy = jest
         .spyOn(stripe.customers, 'update')
-        .mockResolvedValue(updatedCustomer as Stripe.Response<Stripe.Customer>);
+        .mockResolvedValue(stripeCustomer({ name: 'Updated Name' }) as Stripe.Response<Stripe.Customer>);
 
-      const result = await stripeAdapter.updateCustomer(initialCustomer.id, {
-        name: 'Updated Name',
-      });
+      const result = await stripeAdapter.updateCustomer('cus_internxt', { name: 'Updated Name' });
 
-      expect(updateSpy).toHaveBeenCalledWith(initialCustomer.id, {
-        name: 'Updated Name',
-      });
-      expect(updateSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.not.objectContaining({ address: expect.anything() }),
-      );
-
+      expect(updateSpy).toHaveBeenCalledWith('cus_internxt', { name: 'Updated Name' });
       expect(result.name).toBe('Updated Name');
-      expect(result.address).toStrictEqual({
-        line1: originalAddress.line1,
-        line2: originalAddress.line2,
-        city: originalAddress.city,
-        state: originalAddress.state,
-        country: originalAddress.country,
-        postalCode: originalAddress.postal_code,
-      });
+      expect(result.address).toStrictEqual(mappedCustomer.address);
     });
   });
 
   describe('Get customer', () => {
-    test('When getting a customer, then the customer is returned', async () => {
-      const mockedCustomer = getCustomer();
+    test('When getting a customer, then the customer is returned as plain data', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(stripeCustomer() as Stripe.Response<Stripe.Customer>);
 
-      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(mockedCustomer as Stripe.Response<Stripe.Customer>);
+      const customer = await stripeAdapter.getCustomer('cus_internxt');
 
-      const customer = await stripeAdapter.getCustomer(mockedCustomer.id);
-
-      expect(customer).toStrictEqual(Customer.toDomain(mockedCustomer));
+      expect(customer).toStrictEqual(mappedCustomer);
     });
 
-    test('When the customer does not exists, then an error indicating so is thrown', async () => {
-      const mockedCustomer = {
-        deleted: true,
-      };
-      const mockedError = new UserNotFoundError();
+    test('When the customer has no name, then the default customer name is used', async () => {
+      jest
+        .spyOn(stripe.customers, 'retrieve')
+        .mockResolvedValue(stripeCustomer({ name: null }) as Stripe.Response<Stripe.Customer>);
 
-      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(mockedCustomer as any);
+      const customer = await stripeAdapter.getCustomer('cus_internxt');
 
-      await expect(stripeAdapter.getCustomer('')).rejects.toThrow(mockedError);
+      expect(customer.name).toBe('Internxt User');
+    });
+
+    test('When the customer pays by default with a payment method, then it is the default payment method', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
+        stripeCustomer({
+          invoice_settings: { default_payment_method: 'pm_invoices' } as Stripe.Customer.InvoiceSettings,
+          default_source: 'card_legacy',
+        }) as Stripe.Response<Stripe.Customer>,
+      );
+
+      const customer = await stripeAdapter.getCustomer('cus_internxt');
+
+      expect(customer.defaultPaymentMethod).toBe('pm_invoices');
+    });
+
+    test('When Stripe sends the default payment method expanded, then its id is the default payment method', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
+        stripeCustomer({
+          invoice_settings: {
+            default_payment_method: getPaymentMethod({ id: 'pm_expanded' }),
+          } as Stripe.Customer.InvoiceSettings,
+        }) as Stripe.Response<Stripe.Customer>,
+      );
+
+      const customer = await stripeAdapter.getCustomer('cus_internxt');
+
+      expect(customer.defaultPaymentMethod).toBe('pm_expanded');
+    });
+
+    test('When the customer only has a legacy default source, then it is the default payment method', async () => {
+      jest
+        .spyOn(stripe.customers, 'retrieve')
+        .mockResolvedValue(stripeCustomer({ default_source: 'card_legacy' }) as Stripe.Response<Stripe.Customer>);
+
+      const customer = await stripeAdapter.getCustomer('cus_internxt');
+
+      expect(customer.defaultPaymentMethod).toBe('card_legacy');
+    });
+
+    test('When the customer was deleted, then an error indicating it does not exist is thrown', async () => {
+      jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue({ id: 'cus_internxt', deleted: true } as any);
+
+      await expect(stripeAdapter.getCustomer('cus_internxt')).rejects.toThrow(UserNotFoundError);
     });
   });
 
   describe('Find customers by email', () => {
-    test('When listing customers by email, then Stripe is asked for that exact email', async () => {
-      const mockedCustomer = getCustomer({ email: 'example@internxt.com' });
-      const listSpy = jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: [mockedCustomer] } as any);
+    test('When listing customers by email, then Stripe is asked for that exact email and they are returned as plain data', async () => {
+      const listSpy = jest.spyOn(stripe.customers, 'list').mockResolvedValue({ data: [stripeCustomer()] } as any);
 
       const customers = await stripeAdapter.listCustomersByEmail('example@internxt.com');
 
       expect(listSpy).toHaveBeenCalledWith({ email: 'example@internxt.com' });
-      expect(customers).toStrictEqual([Customer.toDomain(mockedCustomer)]);
+      expect(customers).toStrictEqual([mappedCustomer]);
     });
 
     test('When searching customers by email, then Stripe search is used and the ids of the matches are returned', async () => {
@@ -185,17 +221,9 @@ describe('Stripe Adapter', () => {
   describe('Customer tax details', () => {
     test('When the customer exists, then whether it is tax exempt, its tax ids and its address are returned', async () => {
       const retrieveSpy = jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
-        getCustomer({
+        stripeCustomer({
           tax_exempt: 'reverse',
           tax_ids: { data: [{ value: 'ESB12345678' }] } as Stripe.ApiList<Stripe.TaxId>,
-          address: {
-            line1: 'Avenida el Port',
-            line2: 'Angels',
-            city: 'Valencia',
-            state: 'Valencia',
-            country: 'ES',
-            postal_code: '46023',
-          },
         }) as Stripe.Response<Stripe.Customer>,
       );
 
@@ -205,21 +233,14 @@ describe('Stripe Adapter', () => {
       expect(taxDetails).toStrictEqual({
         isTaxExempt: true,
         taxIds: ['ESB12345678'],
-        address: {
-          line1: 'Avenida el Port',
-          line2: 'Angels',
-          city: 'Valencia',
-          state: 'Valencia',
-          country: 'ES',
-          postalCode: '46023',
-        },
+        address: mappedCustomer.address,
       });
     });
 
     test('When the customer has no email, then its tax details are still returned', async () => {
       jest
         .spyOn(stripe.customers, 'retrieve')
-        .mockResolvedValue(getCustomer({ email: null }) as Stripe.Response<Stripe.Customer>);
+        .mockResolvedValue(stripeCustomer({ email: null }) as Stripe.Response<Stripe.Customer>);
 
       const taxDetails = await stripeAdapter.getCustomerTaxDetails('cus_internxt');
 
@@ -322,16 +343,24 @@ describe('Stripe Adapter', () => {
   });
 
   describe('Payment methods', () => {
-    test('When retrieving a payment method, then the payment method is returned', async () => {
-      const mockedPaymentMethod = getPaymentMethod();
-
+    test('When retrieving a payment method, then its id and billing address are returned as plain data', async () => {
       jest
         .spyOn(stripe.paymentMethods, 'retrieve')
-        .mockResolvedValue(mockedPaymentMethod as Stripe.Response<Stripe.PaymentMethod>);
+        .mockResolvedValue(getPaymentMethod({ id: 'pm_card' }) as Stripe.Response<Stripe.PaymentMethod>);
 
-      const paymentMethod = await stripeAdapter.retrievePaymentMethod(mockedPaymentMethod.id);
+      const paymentMethod = await stripeAdapter.retrievePaymentMethod('pm_card');
 
-      expect(paymentMethod).toStrictEqual(PaymentMethod.toDomain(mockedPaymentMethod));
+      expect(paymentMethod).toStrictEqual({
+        id: 'pm_card',
+        address: {
+          line1: '1234 Fake Street',
+          line2: null,
+          city: 'San Francisco',
+          state: 'CA',
+          country: 'US',
+          postalCode: '94102',
+        },
+      });
     });
 
     test('When attaching a payment method to a customer, then the attached payment method and its customer are returned', async () => {
@@ -359,7 +388,7 @@ describe('Stripe Adapter', () => {
     test('When the customer has a default payment method, then it is returned as Stripe sends it', async () => {
       const card = getPaymentMethod({ id: 'pm_card' });
       const retrieveSpy = jest.spyOn(stripe.customers, 'retrieve').mockResolvedValue(
-        getCustomer({
+        stripeCustomer({
           invoice_settings: { default_payment_method: card } as Stripe.Customer.InvoiceSettings,
         }) as Stripe.Response<Stripe.Customer>,
       );
@@ -376,7 +405,7 @@ describe('Stripe Adapter', () => {
       const legacyCard = { id: 'card_legacy', object: 'card' } as Stripe.Card;
       jest
         .spyOn(stripe.customers, 'retrieve')
-        .mockResolvedValue(getCustomer({ default_source: legacyCard }) as Stripe.Response<Stripe.Customer>);
+        .mockResolvedValue(stripeCustomer({ default_source: legacyCard }) as Stripe.Response<Stripe.Customer>);
 
       const defaultPaymentMethod = await stripeAdapter.getCustomerDefaultPaymentMethod('cus_internxt');
 

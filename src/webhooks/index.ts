@@ -102,7 +102,7 @@ export function webhookHandler({
           const eventData = event.data.object;
 
           const paymentMethod = await stripeAdapter.retrievePaymentMethod(eventData.payment_method as string);
-          const userAddressBillingDetails = paymentMethod.getAddress();
+          const userAddressBillingDetails = paymentMethod.address;
 
           if (userAddressBillingDetails) {
             await stripeAdapter.updateCustomer(eventData.customer as string, {
