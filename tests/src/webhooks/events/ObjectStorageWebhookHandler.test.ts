@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getCustomer, getInvoice, getProduct } from '../../fixtures';
 import Logger from '../../../../src/Logger';
 import { createTestServices } from '../../helpers/services-factory';
-import { Customer } from '../../../../src/infrastructure/domain/entities/customer';
+import { getCustomerEntity } from '../../entity.fixtures';
 
 const { objectStorageWebhookHandler, paymentService, objectStorageService } = createTestServices();
 
@@ -75,7 +75,11 @@ describe('Object Storage Webhook Handler', () => {
       const objectStorageServiceSpy = jest.spyOn(objectStorageService, 'reactivateAccount').mockResolvedValue();
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(
-        Customer.toDomain(mockedCustomer),
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         mockedInvoice,
       );
 
@@ -113,7 +117,11 @@ describe('Object Storage Webhook Handler', () => {
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(
-        Customer.toDomain(mockedCustomer),
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         mockedInvoice,
       );
 
@@ -149,7 +157,11 @@ describe('Object Storage Webhook Handler', () => {
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(
-        Customer.toDomain(mockedCustomer),
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         mockedInvoice,
       );
 
@@ -186,7 +198,11 @@ describe('Object Storage Webhook Handler', () => {
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       await objectStorageWebhookHandler.reactivateObjectStorageAccount(
-        Customer.toDomain(mockedCustomer),
+        getCustomerEntity({
+          id: mockedCustomer.id,
+          name: mockedCustomer.name as string,
+          email: mockedCustomer.email as string,
+        }),
         mockedInvoice,
       );
 
@@ -223,7 +239,14 @@ describe('Object Storage Webhook Handler', () => {
       jest.spyOn(objectStorageService, 'reactivateAccount').mockRejectedValue(new Error('Reactivation failed'));
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(
+          getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
+          mockedInvoice,
+        ),
       ).rejects.toThrow(new Error('Reactivation failed'));
     });
 
@@ -259,7 +282,14 @@ describe('Object Storage Webhook Handler', () => {
       const loggerSpy = jest.spyOn(Logger, 'info');
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(
+          getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
+          mockedInvoice,
+        ),
       ).resolves.not.toThrow();
       expect(loggerSpy).toHaveBeenCalledWith(
         `Object storage user ${mockedCustomer.email} (customer ${mockedCustomer.id}) was not found while reactivating`,
@@ -300,7 +330,14 @@ describe('Object Storage Webhook Handler', () => {
       const isAxiosErrorSpy = jest.spyOn(axios, 'isAxiosError').mockReturnValueOnce(true);
 
       await expect(
-        objectStorageWebhookHandler.reactivateObjectStorageAccount(Customer.toDomain(mockedCustomer), mockedInvoice),
+        objectStorageWebhookHandler.reactivateObjectStorageAccount(
+          getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
+          mockedInvoice,
+        ),
       ).rejects.toThrow(axiosError);
 
       isAxiosErrorSpy.mockRestore();

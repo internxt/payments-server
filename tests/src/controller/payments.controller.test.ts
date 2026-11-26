@@ -23,9 +23,8 @@ import CacheService from '../../../src/services/cache.service';
 import Stripe from 'stripe';
 import { LicenseCodesService } from '../../../src/services/licenseCodes.service';
 import { StripeAdapter } from '../../../src/infrastructure/adapters/stripe.adapter';
-import { Customer } from '../../../src/infrastructure/domain/entities/customer';
 import { UserType } from '../../../src/core/users/User';
-import { getPriceEntity, getSubscriptionEntity } from '../entity.fixtures';
+import { getPriceEntity, getSubscriptionEntity, getCustomerEntity } from '../entity.fixtures';
 
 const config = loadConfig();
 
@@ -199,9 +198,13 @@ describe('Payment controller e2e tests', () => {
         jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
-        const createdCustomerSpy = jest
-          .spyOn(StripeAdapter.prototype, 'createCustomer')
-          .mockResolvedValue(Customer.toDomain(mockedCustomer));
+        const createdCustomerSpy = jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(
+          getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
+        );
 
         const response = await app.inject({
           method: 'GET',
@@ -257,7 +260,13 @@ describe('Payment controller e2e tests', () => {
         jest
           .spyOn(PaymentService.prototype, 'getCustomerIdByEmail')
           .mockRejectedValue(new CustomerNotFoundError('Customer not found'));
-        jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+        jest.spyOn(StripeAdapter.prototype, 'createCustomer').mockResolvedValue(
+          getCustomerEntity({
+            id: mockedCustomer.id,
+            name: mockedCustomer.name as string,
+            email: mockedCustomer.email as string,
+          }),
+        );
         const attachVatIdSpy = jest
           .spyOn(PaymentService.prototype, 'getVatIdAndAttachTaxIdToCustomer')
           .mockImplementation(voidPromise);

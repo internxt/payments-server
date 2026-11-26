@@ -4,7 +4,7 @@ import handleSubscriptionCanceled from '../../../src/webhooks/handleSubscription
 import { handleCancelPlan } from '../../../src/webhooks/utils/handleCancelPlan';
 import { FREE_PLAN_BYTES_SPACE } from '../../../src/constants';
 import { createTestServices } from '../helpers/services-factory';
-import { Customer } from '../../../src/infrastructure/domain/entities/customer';
+import { getCustomerEntity } from '../entity.fixtures';
 
 jest.mock('../../../src/webhooks/utils/handleCancelPlan');
 
@@ -33,9 +33,13 @@ describe('Process when a subscription is cancelled', () => {
     const mockedCustomer = getCustomer();
 
     const getProductSpy = jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    const getCustomerSPy = jest
-      .spyOn(stripeAdapter, 'getCustomer')
-      .mockResolvedValue(Customer.toDomain(mockedCustomer));
+    const getCustomerSPy = jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+      getCustomerEntity({
+        id: mockedCustomer.id,
+        name: mockedCustomer.name as string,
+        email: mockedCustomer.email as string,
+      }),
+    );
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
     const trackCancellationSpy = jest
       .spyOn(klaviyoTrackingService, 'trackSubscriptionCancelled')
@@ -84,9 +88,13 @@ describe('Process when a subscription is cancelled', () => {
 
     jest.spyOn(tiersService, 'getTierProductsByProductsId').mockResolvedValue(mockedFreeTier);
     const getProductSpy = jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    const getCustomerSPy = jest
-      .spyOn(stripeAdapter, 'getCustomer')
-      .mockResolvedValue(Customer.toDomain(mockedCustomer));
+    const getCustomerSPy = jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+      getCustomerEntity({
+        id: mockedCustomer.id,
+        name: mockedCustomer.name as string,
+        email: mockedCustomer.email as string,
+      }),
+    );
     const findUserByCustomerIdSpy = jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
     const changeStorageSpy = jest.spyOn(storageService, 'updateUserStorageAndTier').mockResolvedValue();
     (handleCancelPlan as jest.Mock).mockRejectedValue(tierNotFoundError);
@@ -123,7 +131,13 @@ describe('Process when a subscription is cancelled', () => {
     const randomError = new Error('Tier not found');
 
     jest.spyOn(paymentService, 'getProduct').mockResolvedValue(mockedProduct as any);
-    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(Customer.toDomain(mockedCustomer));
+    jest.spyOn(stripeAdapter, 'getCustomer').mockResolvedValue(
+      getCustomerEntity({
+        id: mockedCustomer.id,
+        name: mockedCustomer.name as string,
+        email: mockedCustomer.email as string,
+      }),
+    );
     jest.spyOn(usersService, 'findUserByCustomerID').mockResolvedValue(mockedUser);
     (handleCancelPlan as jest.Mock).mockRejectedValue(randomError);
 
